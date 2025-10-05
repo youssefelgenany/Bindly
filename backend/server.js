@@ -11,6 +11,14 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ Connected to MongoDB Atlas'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
+// Import routes
+const bazaarRoutes = require('./routes/bazaarRoutes');
+const tripRoutes = require('./routes/tripRoutes');
+
+//Mount routes
+app.use('/api/bazaars', bazaarRoutes);
+app.use('/api/trips', tripRoutes);
+
 // Test route
 app.get('/', (req, res) => {
   res.send('Server is running and connected to MongoDB');
