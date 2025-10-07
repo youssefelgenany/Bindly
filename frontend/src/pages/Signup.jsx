@@ -20,9 +20,47 @@ const Signup = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: '', color: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const { signup } = useAuth();
   const navigate = useNavigate();
+
+  // Password strength calculation
+  const calculatePasswordStrength = (password) => {
+    let score = 0;
+    const requirements = {
+      length: password.length >= 8,
+      lowercase: /[a-z]/.test(password),
+      uppercase: /[A-Z]/.test(password),
+      number: /\d/.test(password),
+      symbol: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+    };
+
+    // Calculate score
+    Object.values(requirements).forEach(met => {
+      if (met) score++;
+    });
+
+    // Determine strength level
+    let label, color;
+    if (score <= 2) {
+      label = 'Weak';
+      color = '#dc3545'; // Red
+    } else if (score === 3) {
+      label = 'Fair';
+      color = '#fd7e14'; // Orange
+    } else if (score === 4) {
+      label = 'Good';
+      color = '#ffc107'; // Yellow
+    } else {
+      label = 'Strong';
+      color = '#28a745'; // Green
+    }
+
+    return { score, label, color, requirements };
+  };
 
   const userTypes = [
     { value: 'Student', label: 'Student', description: 'GUC Student' },
@@ -38,6 +76,13 @@ const Signup = () => {
       ...prev,
       [name]: value
     }));
+    
+    // Calculate password strength when password changes
+    if (name === 'password') {
+      const strength = calculatePasswordStrength(value);
+      setPasswordStrength(strength);
+    }
+    
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -74,8 +119,18 @@ const Signup = () => {
 
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+    } else {
+      const strength = calculatePasswordStrength(formData.password);
+      if (strength.score < 3) {
+        const missingRequirements = [];
+        if (!strength.requirements.length) missingRequirements.push('at least 8 characters');
+        if (!strength.requirements.lowercase) missingRequirements.push('lowercase letter');
+        if (!strength.requirements.uppercase) missingRequirements.push('uppercase letter');
+        if (!strength.requirements.number) missingRequirements.push('number');
+        if (!strength.requirements.symbol) missingRequirements.push('special character');
+        
+        newErrors.password = `Password must include: ${missingRequirements.join(', ')}`;
+      }
     }
 
     if (!formData.confirmPassword) {
@@ -331,27 +386,86 @@ const Signup = () => {
             </div>
           )}
 
-          {/* Password Fields */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="form-group">
-              <label htmlFor="password" className="form-label">Password</label>
+          {/* Password Field */}
+          <div className="form-group">
+            <label htmlFor="password" className="form-label">Password</label>
+            <div style={{ position: 'relative' }}>
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 id="password"
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
                 className={`form-input ${errors.password ? 'error' : ''}`}
-                placeholder="Min. 6 characters"
+                placeholder="Create a strong password"
                 disabled={loading}
+                style={{ paddingRight: '40px' }}
               />
-              {errors.password && <div className="form-error">{errors.password}</div>}
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-light)',
+                  fontSize: '16px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                disabled={loading}
+              >
+                {showPassword ? '⊘' : '○'}
+              </button>
             </div>
+            {errors.password && <div className="form-error">{errors.password}</div>}
+            
+            {/* Password Strength Scale - Always Visible */}
+            <div style={{ marginTop: '8px' }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                marginBottom: '4px'
+              }}>
+                <div style={{
+                  flex: 1,
+                  height: '4px',
+                  backgroundColor: '#e9ecef',
+                  borderRadius: '2px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${(passwordStrength.score / 5) * 100}%`,
+                    backgroundColor: passwordStrength.color || '#e9ecef',
+                    transition: 'all 0.3s ease'
+                  }}></div>
+                </div>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: passwordStrength.color || '#6c757d',
+                  minWidth: '50px'
+                }}>
+                  {passwordStrength.label || 'Enter password'}
+                </span>
+              </div>
+            </div>
+          </div>
 
-            <div className="form-group">
-              <label htmlFor="confirmPassword" className="form-label">Confirm Password</label>
+          {/* Confirm Password Field */}
+          <div className="form-group">
+            <label htmlFor="confirmPassword" className="form-label">Confirm Password</label>
+            <div style={{ position: 'relative' }}>
               <input
-                type="password"
+                type={showConfirmPassword ? "text" : "password"}
                 id="confirmPassword"
                 name="confirmPassword"
                 value={formData.confirmPassword}
@@ -359,9 +473,32 @@ const Signup = () => {
                 className={`form-input ${errors.confirmPassword ? 'error' : ''}`}
                 placeholder="Confirm password"
                 disabled={loading}
+                style={{ paddingRight: '40px' }}
               />
-              {errors.confirmPassword && <div className="form-error">{errors.confirmPassword}</div>}
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-light)',
+                  fontSize: '16px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                disabled={loading}
+              >
+                {showConfirmPassword ? '⊘' : '○'}
+              </button>
             </div>
+            {errors.confirmPassword && <div className="form-error">{errors.confirmPassword}</div>}
           </div>
 
           {/* File Uploads for Vendors */}
