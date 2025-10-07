@@ -14,9 +14,19 @@ app.get("/api/verify", verifyByToken);
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
+const cors = require('cors');
 
 const app = express();
+
+// Enable CORS for all routes
+app.use(cors({
+  origin: 'http://localhost:3000', // React app URL
+  credentials: true
+}));
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(require('path').join(__dirname, 'uploads')));
 
 // Connect to MongoDB Atlas
 mongoose.connect(process.env.MONGO_URI)
@@ -24,10 +34,12 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // Import routes
+const authRoutes = require('./routes/authRoutes');
 const bazaarRoutes = require('./routes/bazaarRoutes');
 const tripRoutes = require('./routes/tripRoutes');
 
 //Mount routes
+app.use('/api/auth', authRoutes);
 app.use('/api/bazaars', bazaarRoutes);
 app.use('/api/trips', tripRoutes);
 
