@@ -233,6 +233,14 @@ const Navbar = () => {
                   >
                     Manage Admins
                   </Link>
+                  <Link
+                    to="/admin/profile"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Profile & Settings
+                  </Link>
                 </>
               )}
 

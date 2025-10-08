@@ -5,6 +5,7 @@ import AdminUsers from './pages/AdminUsers';
 import AdminVendors from './pages/AdminVendors';
 import AdminEvents from './pages/AdminEvents';
 import AdminManagement from './pages/AdminManagement';
+import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
@@ -139,6 +140,16 @@ function App() {
                 <ProtectedRoute>
                   <AdminOnly>
                     <AdminManagement />
+                  </AdminOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/admin/profile" 
+              element={
+                <ProtectedRoute>
+                  <AdminOnly>
+                    <AdminProfile />
                   </AdminOnly>
                 </ProtectedRoute>
               }
