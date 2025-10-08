@@ -127,6 +127,8 @@ const AdminUsers = () => {
     }
   };
 
+  // Vendor-related controls removed per request
+
   // Basic guard (UI-level) to avoid rendering for non-admins
   if (!(user?.role === 'admin' || user?.userType === 'Admin')) {
     return (
@@ -260,6 +262,8 @@ const AdminUsers = () => {
                           </span>
                         )}
                       </div>
+
+                      {/* Vendor-specific actions removed */}
                     </div>
                   </div>
                 ))
@@ -268,6 +272,7 @@ const AdminUsers = () => {
           </div>
         </div>
       </div>
+      {/* Vendor modal and approval removed */}
     </div>
   );
 };

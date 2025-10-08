@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AdminUsers from './pages/AdminUsers';
+import AdminVendors from './pages/AdminVendors';
+import AdminManagement from './pages/AdminManagement';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
@@ -106,6 +108,26 @@ function App() {
                 <ProtectedRoute>
                   <AdminOnly>
                     <AdminUsers />
+                  </AdminOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/admin/vendors" 
+              element={
+                <ProtectedRoute>
+                  <AdminOnly>
+                    <AdminVendors />
+                  </AdminOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/admin/manage" 
+              element={
+                <ProtectedRoute>
+                  <AdminOnly>
+                    <AdminManagement />
                   </AdminOnly>
                 </ProtectedRoute>
               }

@@ -200,14 +200,32 @@ const Navbar = () => {
 
             <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
               {(user.role === 'admin' || user.userType === 'Admin') && (
-                <Link
-                  to="/admin/users"
-                  className="btn btn-primary"
-                  style={{ width: '100%' }}
-                  onClick={closeSidebar}
-                >
-                  View Users
-                </Link>
+                <>
+                  <Link
+                    to="/admin/users"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    View Users
+                  </Link>
+                  <Link
+                    to="/admin/vendors"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    View Vendors
+                  </Link>
+                  <Link
+                    to="/admin/manage"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Manage Admins
+                  </Link>
+                </>
               )}
 
               {/* Add more quick links here if needed */}
