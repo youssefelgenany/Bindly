@@ -37,11 +37,13 @@ mongoose.connect(process.env.MONGO_URI)
 const authRoutes = require('./routes/authRoutes');
 const bazaarRoutes = require('./routes/bazaarRoutes');
 const tripRoutes = require('./routes/tripRoutes');
+const vendorRequestRoutes = require('./routes/vendorRequestRoutes');
 
 //Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/bazaars', bazaarRoutes);
 app.use('/api/trips', tripRoutes);
+app.use('/api/vendor-requests', vendorRequestRoutes);
 
 // Test route
 app.get('/', (req, res) => {
