@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AdminUsers from './pages/AdminUsers';
 import AdminVendors from './pages/AdminVendors';
+import AdminEvents from './pages/AdminEvents';
 import AdminManagement from './pages/AdminManagement';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -118,6 +119,16 @@ function App() {
                 <ProtectedRoute>
                   <AdminOnly>
                     <AdminVendors />
+                  </AdminOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/admin/events" 
+              element={
+                <ProtectedRoute>
+                  <AdminOnly>
+                    <AdminEvents />
                   </AdminOnly>
                 </ProtectedRoute>
               }
