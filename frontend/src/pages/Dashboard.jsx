@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import ProfessorDashboardOverview from '../components/ProfessorDashboardOverview';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -101,6 +102,11 @@ const Dashboard = () => {
               {getWelcomeMessage(user.userType)}
             </p>
           </div>
+
+          {/* Professor Dashboard Overview */}
+          {user?.userType === 'Professor' && (
+            <ProfessorDashboardOverview />
+          )}
 
           {/* Admin Dashboard Overview */}
           {isAdmin && (
