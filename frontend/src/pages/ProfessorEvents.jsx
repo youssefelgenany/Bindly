@@ -64,6 +64,14 @@ const ProfessorEvents = () => {
   const [isEditingId, setIsEditingId] = useState(null);
   const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
   const [participantsEventId, setParticipantsEventId] = useState(null);
+  const [isAnnouncementsOpen, setIsAnnouncementsOpen] = useState(false);
+  const [announcementFormOpenForId, setAnnouncementFormOpenForId] = useState(null);
+  const [announcements, setAnnouncements] = useState([
+    { id: 'a-1', eventId: 'evt-1', title: 'Room Change', message: 'Workshop moved to Room B-302.', createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), source: 'Event Office' },
+    { id: 'a-2', eventId: 'evt-2', title: 'Guidelines Update', message: 'Please read the updated participation guidelines.', createdAt: new Date(Date.now() - 28 * 60 * 60 * 1000).toISOString(), source: 'Admin' },
+  ]);
+  const [newAnnouncement, setNewAnnouncement] = useState({ eventId: '', title: '', message: '' });
+  const [announceError, setAnnounceError] = useState('');
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -210,6 +218,33 @@ const ProfessorEvents = () => {
     w.document.close();
   };
 
+  const openAnnouncements = () => setIsAnnouncementsOpen(true);
+  const closeAnnouncements = () => setIsAnnouncementsOpen(false);
+
+  const openAnnouncementForm = (eventId) => {
+    setAnnouncementFormOpenForId(eventId);
+    setNewAnnouncement({ eventId, title: '', message: '' });
+    setAnnounceError('');
+  };
+
+  const submitAnnouncement = (e) => {
+    e.preventDefault();
+    setAnnounceError('');
+    const { eventId, title, message } = newAnnouncement;
+    if (!eventId || !title.trim() || !message.trim()) {
+      setAnnounceError('Please fill Event, Title, and Message.');
+      return;
+    }
+    const created = { id: `a-${Math.random().toString(36).slice(2, 8)}`, eventId, title, message, createdAt: new Date().toISOString(), source: 'Professor' };
+    setAnnouncements(prev => [created, ...prev]);
+    setAnnouncementFormOpenForId(null);
+  };
+
+  const notifyParticipants = (eventId) => {
+    // Placeholder for backend email notification trigger
+    alert('Participants notified for event: ' + (events.find(e => e.id === eventId)?.title || '')); // eslint-disable-line no-alert
+  };
+
   return (
     <div style={{ padding: '2rem' }}>
       <div className="container">
@@ -266,6 +301,12 @@ const ProfessorEvents = () => {
                             <button className="btn btn-outline" onClick={() => openParticipants(ev.id)}>
                               Participants
                             </button>
+                            <button className="btn btn-outline" onClick={() => openAnnouncementForm(ev.id)}>
+                              + Announcement
+                            </button>
+                            <button className="btn btn-outline" onClick={() => notifyParticipants(ev.id)}>
+                              Notify Participants
+                            </button>
                             <button className="btn btn-outline" disabled={!canEdit(ev.status)} onClick={() => openEdit(ev)}>
                               Edit
                             </button>
@@ -280,6 +321,10 @@ const ProfessorEvents = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+            <button className="btn btn-outline" onClick={openAnnouncements}>View Announcements</button>
           </div>
 
           {/* Modal */}
@@ -397,6 +442,67 @@ const ProfessorEvents = () => {
                     </>
                   );
                 })()}
+              </div>
+            </div>
+          )}
+
+          {/* Global Announcements Modal */}
+          {isAnnouncementsOpen && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
+              <div className="card" style={{ maxWidth: 900, width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ color: 'var(--charcoal-black)', margin: 0 }}>Announcements</h3>
+                  <button className="btn btn-secondary" onClick={closeAnnouncements}>Close</button>
+                </div>
+                <div style={{ display: 'grid', gap: '0.75rem' }}>
+                  {announcements.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: 'var(--text-light)', padding: '1rem' }}>No announcements yet.</div>
+                  ) : (
+                    announcements.map(a => (
+                      <div key={a.id} style={{ backgroundColor: 'var(--white)', border: '1px solid var(--medium-gray)', borderRadius: 8, padding: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                          <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>{a.title}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{new Date(a.createdAt).toLocaleString()}</div>
+                        </div>
+                        <div style={{ fontSize: 14, color: 'var(--text-light)', marginTop: 6 }}>{a.message}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 6 }}>Source: {a.source}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* New Announcement Form (per-event) */}
+          {announcementFormOpenForId && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
+              <div className="card" style={{ maxWidth: 640, width: '100%' }}>
+                <h3 style={{ color: 'var(--charcoal-black)', marginBottom: '1rem' }}>New Announcement</h3>
+                {announceError && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>{announceError}</div>}
+                <form onSubmit={submitAnnouncement}>
+                  <div className="form-group">
+                    <label className="form-label">Event</label>
+                    <select className="form-input" value={newAnnouncement.eventId} onChange={e => setNewAnnouncement({ ...newAnnouncement, eventId: e.target.value })}>
+                      <option value="">Select an event</option>
+                      {events.map(e => (
+                        <option key={e.id} value={e.id}>{e.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Title</label>
+                    <input className="form-input" type="text" value={newAnnouncement.title} onChange={e => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })} placeholder="Announcement title" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Message</label>
+                    <textarea className="form-input" rows="4" value={newAnnouncement.message} onChange={e => setNewAnnouncement({ ...newAnnouncement, message: e.target.value })} placeholder="Write your message..." />
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                    <button type="submit" className="btn btn-primary">Send</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => setAnnouncementFormOpenForId(null)}>Cancel</button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
