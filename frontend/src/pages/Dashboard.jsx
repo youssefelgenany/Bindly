@@ -272,6 +272,17 @@ const Dashboard = () => {
                   </>
                 )}
 
+                {user.userType === 'Professor' && (
+                  <>
+                    <Link to="/professor/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      + Create Event
+                    </Link>
+                    <Link to="/professor/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      View All My Events
+                    </Link>
+                  </>
+                )}
+
                 {user.userType === 'Vendor' && (
                   <>
                     <button className="btn btn-outline" style={{ width: '100%' }}>

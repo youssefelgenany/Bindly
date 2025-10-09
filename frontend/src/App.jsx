@@ -9,6 +9,7 @@ import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
+import ProfessorEvents from './pages/ProfessorEvents';
 import Navbar from './components/Navbar';
 
 // Protected Route Component
@@ -103,6 +104,14 @@ function App() {
                   <Dashboard />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/professor/events" 
+              element={
+                <ProtectedRoute>
+                  <ProfessorEvents />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/admin/users" 
