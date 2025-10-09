@@ -33,25 +33,33 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password) => {
-    // Mock professor credentials
-    const mockEmail = "prof@guc.edu";
-    const mockPassword = "123456";
-  
-    if (email === mockEmail && password === mockPassword) {
-      const mockUser = {
-        firstName: "John",
-        lastName: "Doe",
-        email: mockEmail,
-        userType: "Professor",
-      };
-  
-      // Save mock user in localStorage or state
-      setUser(mockUser);
-      localStorage.setItem("user", JSON.stringify(mockUser));
-  
-      return { success: true, message: "Login successful (Professor mode)" };
-    } else {
-      return { success: false, message: "Invalid email or password" };
+    try {
+      const response = await axios.post('/api/auth/login', {
+        email,
+        password
+      });
+
+      const { user: userData, token } = response.data;
+      
+      // Store token and user data
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      
+      // Set default authorization header
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      setUser(userData);
+      return { success: true, user: userData };
+    } catch (error) {
+      console.error('Login error:', error);
+      
+      if (error.response?.data?.message) {
+        return { success: false, message: error.response.data.message };
+      } else if (error.code === 'NETWORK_ERROR' || !error.response) {
+        return { success: false, message: 'Network error. Please check your connection and ensure the backend server is running.' };
+      } else {
+        return { success: false, message: `Login failed: ${error.message}` };
+      }
     }
   };
 
