@@ -12,6 +12,11 @@ const initialMockEvents = [
     category: 'Academic Talk',
     status: 'approved',
     participants: 42,
+    registrations: [
+      { id: 'r-1', name: 'Sara Kamal', email: 'sara.kamal@guc.edu', studentId: '19-1234', status: 'approved' },
+      { id: 'r-2', name: 'Ahmed Hassan', email: 'ahmed.hassan@guc.edu', studentId: '20-5678', status: 'approved' },
+      { id: 'r-3', name: 'Omar Ali', email: 'omar.ali@guc.edu', studentId: '21-4321', status: 'pending' },
+    ],
     bannerName: '',
   },
   {
@@ -23,6 +28,11 @@ const initialMockEvents = [
     category: 'Seminar',
     status: 'pending',
     participants: 15,
+    registrations: [
+      { id: 'r-4', name: 'Mona Adel', email: 'mona.adel@guc.edu', studentId: '19-7890', status: 'pending' },
+      { id: 'r-5', name: 'Youssef Zaki', email: 'youssef.zaki@guc.edu', studentId: '20-2468', status: 'pending' },
+      { id: 'r-6', name: 'Laila Nabil', email: 'laila.nabil@guc.edu', studentId: '18-1357', status: 'rejected' },
+    ],
     bannerName: 'ethics-flyer.pdf',
   },
   {
@@ -34,6 +44,7 @@ const initialMockEvents = [
     category: 'Club Event',
     status: 'rejected',
     participants: 0,
+    registrations: [],
     bannerName: '',
   },
 ];
@@ -51,6 +62,8 @@ const ProfessorEvents = () => {
   const [events, setEvents] = useState(initialMockEvents);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditingId, setIsEditingId] = useState(null);
+  const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
+  const [participantsEventId, setParticipantsEventId] = useState(null);
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -135,6 +148,68 @@ const ProfessorEvents = () => {
 
   const canEdit = (status) => status === 'pending';
 
+  const openParticipants = (eventId) => {
+    setParticipantsEventId(eventId);
+    setIsParticipantsOpen(true);
+  };
+
+  const updateRegistrationStatus = (eventId, regId, status) => {
+    setEvents(prev => prev.map(ev => {
+      if (ev.id !== eventId) return ev;
+      const updatedRegs = (ev.registrations || []).map(r => r.id === regId ? { ...r, status } : r);
+      const approvedCount = updatedRegs.filter(r => r.status === 'approved').length;
+      return { ...ev, registrations: updatedRegs, participants: approvedCount };
+    }));
+  };
+
+  const downloadCSV = (eventId) => {
+    const ev = events.find(e => e.id === eventId);
+    const rows = [['Name', 'Email', 'Student ID', 'Status']].concat((ev.registrations || []).map(r => [r.name, r.email, r.studentId, r.status]));
+    const csv = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${ev.title.replace(/[^a-z0-9]+/gi, '_').toLowerCase()}_attendance.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadPDF = (eventId) => {
+    const ev = events.find(e => e.id === eventId);
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const rows = (ev.registrations || []).map(r => `<tr><td>${r.name}</td><td>${r.email}</td><td>${r.studentId}</td><td>${r.status}</td></tr>`).join('');
+    w.document.write(`
+      <html>
+        <head>
+          <title>${ev.title} - Attendance</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; }
+            h2 { margin: 0 0 16px 0; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
+            th { background: #f2f2f2; }
+          </style>
+        </head>
+        <body>
+          <h2>${ev.title} - Attendance List</h2>
+          <div>Date: ${new Date(ev.datetime).toLocaleString()}</div>
+          <div>Location: ${ev.location}</div>
+          <br />
+          <table>
+            <thead><tr><th>Name</th><th>Email</th><th>Student ID</th><th>Status</th></tr></thead>
+            <tbody>${rows || ''}</tbody>
+          </table>
+          <script>window.onload = function(){ window.print(); }<\/script>
+        </body>
+      </html>
+    `);
+    w.document.close();
+  };
+
   return (
     <div style={{ padding: '2rem' }}>
       <div className="container">
@@ -187,7 +262,10 @@ const ProfessorEvents = () => {
                         <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{ev.category}</td>
                         <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{ev.participants}</td>
                         <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <button className="btn btn-outline" onClick={() => openParticipants(ev.id)}>
+                              Participants
+                            </button>
                             <button className="btn btn-outline" disabled={!canEdit(ev.status)} onClick={() => openEdit(ev)}>
                               Edit
                             </button>
@@ -255,6 +333,70 @@ const ProfessorEvents = () => {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* Participants Modal */}
+          {isParticipantsOpen && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
+              <div className="card" style={{ maxWidth: 900, width: '100%' }}>
+                {(() => {
+                  const ev = events.find(e => e.id === participantsEventId);
+                  return (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h3 style={{ color: 'var(--charcoal-black)', margin: 0 }}>Participants - {ev?.title}</h3>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button className="btn btn-outline" onClick={() => downloadCSV(participantsEventId)}>Download CSV</button>
+                          <button className="btn btn-outline" onClick={() => downloadPDF(participantsEventId)}>Download PDF</button>
+                          <button className="btn btn-secondary" onClick={() => { setIsParticipantsOpen(false); setParticipantsEventId(null); }}>Close</button>
+                        </div>
+                      </div>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ textAlign: 'left' }}>
+                              <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Name</th>
+                              <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Email</th>
+                              <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Student ID</th>
+                              <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Status</th>
+                              <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(ev?.registrations || []).length === 0 ? (
+                              <tr>
+                                <td colSpan="5" style={{ padding: '1rem', color: 'var(--text-light)', textAlign: 'center' }}>No registrations yet.</td>
+                              </tr>
+                            ) : (
+                              ev?.registrations?.map(r => (
+                                <tr key={r.id}>
+                                  <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{r.name}</td>
+                                  <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{r.email}</td>
+                                  <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{r.studentId}</td>
+                                  <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>
+                                    <span style={{
+                                      color: r.status === 'approved' ? 'var(--success-green)' : r.status === 'rejected' ? 'var(--error-red)' : 'var(--warning-yellow)'
+                                    }}>
+                                      {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>
+                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                      <button className="btn btn-primary" disabled={r.status === 'approved'} onClick={() => updateRegistrationStatus(ev.id, r.id, 'approved')}>Approve</button>
+                                      <button className="btn btn-secondary" disabled={r.status === 'rejected'} onClick={() => updateRegistrationStatus(ev.id, r.id, 'rejected')}>Reject</button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           )}
