@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import ProfessorEvents from './pages/ProfessorEvents';
+import ProfessorProfile from './pages/ProfessorProfile';
 import Navbar from './components/Navbar';
 
 // Protected Route Component
@@ -110,6 +111,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ProfessorEvents />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/professor/profile" 
+              element={
+                <ProtectedRoute>
+                  <ProfessorProfile />
                 </ProtectedRoute>
               }
             />

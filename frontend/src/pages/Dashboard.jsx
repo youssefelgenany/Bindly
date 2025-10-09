@@ -280,6 +280,9 @@ const Dashboard = () => {
                     <Link to="/professor/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
                       View All My Events
                     </Link>
+                    <Link to="/professor/profile" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      Profile & Account Settings
+                    </Link>
                   </>
                 )}
 
