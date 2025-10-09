@@ -3,15 +3,20 @@ import mongoose from "mongoose";
 const vendorRequestSchema = new mongoose.Schema({
   vendor: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Vendor",
+    ref: "User",
     required: true,
   },
   bazaar: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Bazaar",
+    ref: "Bazaar", // Assuming bazaarModel exists, ref to Bazaar model
     required: true,
   },
-  // Up to 5 individuals attending the booth
+  // For booth requests, we'll handle separately in controller
+  booth: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Booth",
+    required: function() { return !this.bazaar; }, // Either bazaar or booth, not both
+  },
   attendees: [
     {
       name: { type: String, required: true },
@@ -41,5 +46,4 @@ const vendorRequestSchema = new mongoose.Schema({
   },
 });
 
-const VendorRequest = mongoose.model("VendorRequest", vendorRequestSchema);
-export default VendorRequest;
+export default mongoose.model("VendorRequest", vendorRequestSchema);
