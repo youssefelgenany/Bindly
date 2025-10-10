@@ -1,5 +1,5 @@
 const bcrypt = require("bcryptjs");
-const User = require("../models/User");
+const User = require("../models/userModel");
 
 // Admin creates new admin/event office accounts
 exports.createAdminOrEventOffice = async (req, res) => {

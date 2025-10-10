@@ -1,8 +1,16 @@
 // server.js
-const adminRoutes = require("./routes/admin");
-const eventRoutes = require("./routes/events");
-const gymRoutes = require("./routes/gym");
-const { verifyByToken } = require("./controllers/authVerifyCtrl");
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+
+const app = express();
+
+const adminRoutes = require("./routes/adminRoutes");
+
+const eventRoutes = require("./routes/eventRoutes");
+const gymRoutes = require("./routes/gymRoutes");
+const { verifyByToken } = require("./controllers/authVerifyController");
 
 // After your existing routes
 app.use("/api/admin", adminRoutes);
@@ -11,12 +19,6 @@ app.use("/api/gym", gymRoutes);
 
 // Email verification link route (Req 6)
 app.get("/api/verify", verifyByToken);
-require('dotenv').config();
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-
-const app = express();
 
 // Enable CORS for all routes
 app.use(cors({
