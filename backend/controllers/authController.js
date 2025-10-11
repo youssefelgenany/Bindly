@@ -240,6 +240,7 @@ const login = async (req, res) => {
     // Email verification disabled for Students; allow login regardless
 
     const isPasswordValid = await user.comparePassword(password);
+    console.log(password);
     console.log("passvalid?", isPasswordValid);
     if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password ' });
 

@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const User = require("../models/User");
+const User = require("../models/userModel");
 const { sendVerificationEmail } = require("../Utils/mailer");
 
 // Admin assigns correct role (staff/TA/professor) and sends email
@@ -30,5 +30,18 @@ exports.assignRoleAndSendVerification = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Server error" });
+  }
+};
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find({}, '-password'); // exclude password field
+    res.status(200).json({
+      success: true,
+      message: 'All users fetched successfully',
+      users
+    });
+  } catch (err) {
+    console.error('Error fetching users:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
