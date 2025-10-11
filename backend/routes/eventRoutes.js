@@ -7,7 +7,8 @@ const {
   updateEvent,
   deleteEvent,
   registerForEvent,
-  getMyRegistrations
+  getMyRegistrations,
+  eventController
 } = require("../controllers/eventController");
 
 const { protect, permit } = require("../middleware/authMiddleware");
@@ -54,5 +55,12 @@ router.post(
 
 // 👤 Get logged-in user’s event registrations
 router.get("/my/registrations", protect, getMyRegistrations);
+
+// Route to create a conference (protected, e.g. admin/event office only)
+router.post(
+  "/conference",
+  auth,
+  eventController.createConference
+);
 
 module.exports = router;

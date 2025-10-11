@@ -47,6 +47,7 @@ app.use('/api/bazaars', bazaarRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/vendor-requests', vendorRequestRoutes);
 
+
 // Test route
 app.get('/', (req, res) => {
   res.send('Server is running and connected to MongoDB');

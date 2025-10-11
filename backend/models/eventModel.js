@@ -40,6 +40,15 @@ const eventSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  agenda: String, 
+  website: String,
+  budget: Number, 
+  fundingSource: {
+    type: String,
+    enum: ['external', 'GUC'],
+    default: 'GUC'
+  },
+  extraResources: String 
 }, { timestamps: true });
 
 module.exports = mongoose.model('Event', eventSchema);
