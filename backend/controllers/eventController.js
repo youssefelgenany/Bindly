@@ -30,6 +30,52 @@ exports.createEvent = async (req, res) => {
   }
 };
 
+// Create a new conference (Admin or Event Office)
+exports.createConference = async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      agenda,
+      website,
+      budget,
+      fundingSource,
+      extraResources,
+      startDate,
+      endDate,
+      location,
+      capacity
+    } = req.body;
+
+    if (!title || !startDate || !endDate || !location || !agenda || !website || !budget || !fundingSource) {
+      return res.status(400).json({ msg: "Missing required conference fields" });
+    }
+
+    const newConference = new Event({
+      title,
+      description,
+      type: "conference",
+      agenda,
+      website,
+      budget,
+      fundingSource,
+      extraResources,
+      startDate,
+      endDate,
+      location,
+      capacity: capacity || 100,
+      createdBy: req.user._id,
+      status: "approved"
+    });
+
+    await newConference.save();
+    res.status(201).json({ msg: "Conference created successfully", conference: newConference });
+  } catch (err) {
+    console.error("❌ Error creating conference:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
 // 📅 Get all approved/upcoming events
 exports.getAllEvents = async (req, res) => {
   try {

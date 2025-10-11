@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard';
 import ProfessorEvents from './pages/ProfessorEvents';
 import ProfessorProfile from './pages/ProfessorProfile';
 import Navbar from './components/Navbar';
+import CreateConference from "./pages/CreatConfrence";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -172,6 +173,15 @@ function App() {
                 </ProtectedRoute>
               }
             />
+             <Route
+               path="/create-conference" 
+               element={
+                <ProtectedRoute>
+                  <AdminOnly>
+                    <CreateConference />
+                  </AdminOnly>
+                </ProtectedRoute> } 
+              />
           </Routes>
         </div>
       </Router>
