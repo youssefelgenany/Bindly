@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
+const auth = require('../middleware/authMiddleware');
 
 // Middleware to verify JWT token
 const protect = async (req, res, next) => {
@@ -49,7 +50,7 @@ const permit = (...roles) => {
       });
     }
 
-    if (!roles.includes(req.user.role)) {  // assuming your user model has a "role" field
+    if (!roles.includes(req.user.userType)) {  // using userType field from user model
       return res.status(403).json({
         success: false,
         message: 'Insufficient permissions'

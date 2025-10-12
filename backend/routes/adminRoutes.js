@@ -1,13 +1,30 @@
 const express = require("express");
 const router = express.Router();
-const { createGymSession, viewGymScheduleMonth } = require("../controllers/gymController");
 const { protect, permit } = require("../middleware/authMiddleware");
-const { getAllUsers } = require('../controllers/adminController');
+const { getAllUsers, updateUserRole, updateUserStatus, changePassword, updateProfile, getAllVendors, updateVendorVerification, updateVendorStatus } = require('../controllers/adminController');
+const { createAdminOrEventOffice, deleteAdminOrEventOffice } = require('../controllers/adminAccountsController');
 
-// Event Office creates gym sessions (Req 84)
-router.post("/", protect, permit("event_office"), createGymSession);
+// Admin routes
+router.get('/users', protect, permit('Admin'), getAllUsers);
+router.put('/users/:userId/role', protect, permit('Admin'), updateUserRole);
+router.patch('/users/:userId/status', protect, permit('Admin'), updateUserStatus);
 
-// Everyone (student/staff/ta/professor/event_office) views schedule (Req 80)
-router.get("/month", protect, permit("student","staff","ta","professor","event_office"), viewGymScheduleMonth);
-router.get('/users', protect, permit('admin'), getAllUsers);
-module.exports = router;
+// Admin account management routes
+router.post('/accounts', protect, permit('Admin'), createAdminOrEventOffice);
+router.delete('/accounts/:id', protect, permit('Admin'), deleteAdminOrEventOffice);
+
+// Admin password change
+router.put('/change-password', protect, permit('Admin'), changePassword);
+
+// Admin profile update
+router.put('/profile', protect, permit('Admin'), updateProfile);
+
+// Vendor management routes
+router.get('/vendors', protect, permit('Admin'), getAllVendors);
+router.put('/vendors/:vendorId/verification', protect, permit('Admin'), updateVendorVerification);
+router.put('/vendors/:vendorId/status', protect, permit('Admin'), updateVendorStatus);
+
+
+
+
+module.exports = router;

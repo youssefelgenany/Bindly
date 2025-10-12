@@ -4,29 +4,55 @@ const User = require("../models/userModel");
 // Admin creates new admin/event office accounts
 exports.createAdminOrEventOffice = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
-    if (!name || !email || !password || !role)
-      return res.status(400).json({ msg: "Missing required fields" });
+    const { firstName, lastName, email, password, role } = req.body;
+    if (!firstName || !lastName || !email || !password || !role)
+      return res.status(400).json({ 
+        success: false,
+        message: "Missing required fields" 
+      });
 
-    if (!["admin", "event_office"].includes(role))
-      return res.status(400).json({ msg: "Role must be admin or event_office" });
+    if (!["Admin", "Event Office"].includes(role))
+      return res.status(400).json({ 
+        success: false,
+        message: "Role must be Admin or Event Office" 
+      });
 
     const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ msg: "Email already exists" });
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const newUser = await User.create({
-      name,
-      email,
-      passwordHash,
-      role,
-      verified: true, // auto-verified since admin created it
+    if (exists) return res.status(400).json({ 
+      success: false,
+      message: "Email already exists" 
     });
 
-    res.json({ msg: "Account created successfully", id: newUser._id });
+    const newUser = await User.create({
+      firstName,
+      lastName,
+      email,
+      password,
+      userType: role,
+      isVerified: true, // auto-verified since admin created it
+      status: 'active'
+    });
+
+    res.status(201).json({ 
+      success: true,
+      message: "Account created successfully", 
+      user: {
+        id: newUser._id,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email,
+        userType: newUser.userType,
+        isVerified: newUser.isVerified,
+        status: newUser.status,
+        createdAt: newUser.createdAt
+      }
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ msg: "Server error" });
+    res.status(500).json({ 
+      success: false,
+      message: "Server error" 
+    });
   }
 };
 
@@ -34,15 +60,27 @@ exports.createAdminOrEventOffice = async (req, res) => {
 exports.deleteAdminOrEventOffice = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ msg: "User not found" });
+    if (!user) return res.status(404).json({ 
+      success: false,
+      message: "User not found" 
+    });
 
-    if (!["admin", "event_office"].includes(user.role))
-      return res.status(400).json({ msg: "Not an admin/event office account" });
+    if (!["Admin", "Event Office"].includes(user.userType))
+      return res.status(400).json({ 
+        success: false,
+        message: "Not an admin/event office account" 
+      });
 
     await user.deleteOne();
-    res.json({ msg: "Account deleted successfully" });
+    res.status(200).json({ 
+      success: true,
+      message: "Account deleted successfully" 
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ msg: "Server error" });
+    res.status(500).json({ 
+      success: false,
+      message: "Server error" 
+    });
   }
 };

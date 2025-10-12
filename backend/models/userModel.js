@@ -26,7 +26,7 @@ const userSchema = new mongoose.Schema({
   userType: {
     type: String,
     required: true,
-    enum: ['Student', 'Staff', 'TA', 'Professor', 'Vendor']
+    enum: ['Student', 'Staff', 'TA', 'Professor', 'Vendor', 'Admin', 'Event Office']
   },
   // For GUC users (Student, Staff, TA, Professor)
   gucId: {

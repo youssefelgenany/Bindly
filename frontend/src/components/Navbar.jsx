@@ -92,7 +92,7 @@ const Navbar = () => {
                   fontWeight: '600',
                   fontSize: '16px'
                 }}>
-                  {user.firstName.charAt(0).toUpperCase()}
+                   {user?.firstName?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
               </div>
 

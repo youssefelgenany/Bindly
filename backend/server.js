@@ -4,6 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
+
 const app = express();
 
 const adminRoutes = require("./routes/adminRoutes");
@@ -11,11 +12,11 @@ const adminRoutes = require("./routes/adminRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const gymRoutes = require("./routes/gymRoutes");
 const { verifyByToken } = require("./controllers/authVerifyController");
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // After your existing routes
-app.use("/api/admin", adminRoutes);
-app.use("/api/events", eventRoutes);
-app.use("/api/gym", gymRoutes);
+
 
 // Email verification link route (Req 6)
 app.get("/api/verify", verifyByToken);
@@ -26,8 +27,7 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
 app.use('/uploads', express.static(require('path').join(__dirname, 'uploads')));
 
 // Connect to MongoDB Atlas
@@ -46,6 +46,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/bazaars', bazaarRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/vendor-requests', vendorRequestRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/events", eventRoutes);
+app.use("/api/gym", gymRoutes);
+
 
 
 // Test route

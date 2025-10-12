@@ -1,75 +1,98 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { adminApiService } from '../api/adminApi';
 
 const AdminVendors = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchField, setSearchField] = useState('all'); // all | name | email | company
+  const [statusFilter, setStatusFilter] = useState('all'); // all | verified | pending | active | blocked
+  
+  // Vendors state - will be loaded from API
+  const [vendors, setVendors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [processingIds, setProcessingIds] = useState({}); // id -> boolean
+  const [actionMessages, setActionMessages] = useState({}); // id -> message
 
-  // Placeholder vendor data
-  const vendors = [
-    {
-      id: 'vendor-001',
-      firstName: 'Mona',
-      lastName: 'Adel',
-      email: 'mona.adel@company.com',
-      userType: 'Vendor',
-      companyName: 'Adel Foods',
-      isVerified: false,
-      isActive: true,
-      vendorLogoUrl: 'https://via.placeholder.com/200x120?text=Vendor+Logo',
-      vendorTaxCardUrl: 'https://via.placeholder.com/300x200?text=Tax+Card+PDF+Preview',
-      createdAt: '2024-09-12T12:45:00Z'
-    },
-    {
-      id: 'vendor-002',
-      firstName: 'Ahmed',
-      lastName: 'Hassan',
-      email: 'ahmed.hassan@techcorp.com',
-      userType: 'Vendor',
-      companyName: 'TechCorp Solutions',
-      isVerified: true,
-      isActive: true,
-      vendorLogoUrl: 'https://via.placeholder.com/200x120?text=TechCorp+Logo',
-      vendorTaxCardUrl: 'https://via.placeholder.com/300x200?text=TechCorp+Tax+Card',
-      createdAt: '2024-09-08T09:30:00Z'
-    },
-    {
-      id: 'vendor-003',
-      firstName: 'Fatma',
-      lastName: 'Mohamed',
-      email: 'fatma.mohamed@fashion.com',
-      userType: 'Vendor',
-      companyName: 'Fashion Forward',
-      isVerified: false,
-      isActive: false,
-      vendorLogoUrl: 'https://via.placeholder.com/200x120?text=Fashion+Logo',
-      vendorTaxCardUrl: 'https://via.placeholder.com/300x200?text=Fashion+Tax+Card',
-      createdAt: '2024-09-15T14:20:00Z'
+  const loadVendors = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      console.log('Loading vendors with filters:', { q: searchQuery, status: statusFilter });
+      const result = await adminApiService.getAllVendors({
+        q: searchQuery,
+        status: statusFilter
+      });
+      console.log('Vendors API result:', result);
+      if (result.success) {
+        setVendors(result.data.vendors || []);
+        console.log('Vendors loaded:', result.data.vendors);
+      } else {
+        setError(result.message);
+        console.error('API error:', result.message);
+      }
+    } catch (err) {
+      setError('Failed to load vendors');
+      console.error('Error loading vendors:', err);
+    } finally {
+      setLoading(false);
     }
-  ];
+  }, [searchQuery, statusFilter]);
+
+  // Load vendors on component mount and when filters change
+  useEffect(() => {
+    loadVendors();
+  }, [loadVendors]);
+
+  const handleVerificationToggle = async (vendorId, currentStatus) => {
+    setProcessingIds(prev => ({ ...prev, [vendorId]: true }));
+    setActionMessages(prev => ({ ...prev, [vendorId]: '' }));
+
+    try {
+      const result = await adminApiService.updateVendorVerification(vendorId, !currentStatus);
+      if (result.success) {
+        setActionMessages(prev => ({ ...prev, [vendorId]: result.data.message }));
+        // Reload vendors to get updated data
+        await loadVendors();
+      } else {
+        setActionMessages(prev => ({ ...prev, [vendorId]: result.message }));
+      }
+    } catch (error) {
+      setActionMessages(prev => ({ ...prev, [vendorId]: 'Failed to update verification status' }));
+    } finally {
+      setProcessingIds(prev => ({ ...prev, [vendorId]: false }));
+    }
+  };
+
+  const handleStatusToggle = async (vendorId, currentStatus) => {
+    setProcessingIds(prev => ({ ...prev, [vendorId]: true }));
+    setActionMessages(prev => ({ ...prev, [vendorId]: '' }));
+
+    try {
+      const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
+      const result = await adminApiService.updateVendorStatus(vendorId, newStatus);
+      if (result.success) {
+        setActionMessages(prev => ({ ...prev, [vendorId]: result.data.message }));
+        // Reload vendors to get updated data
+        await loadVendors();
+      } else {
+        setActionMessages(prev => ({ ...prev, [vendorId]: result.message }));
+      }
+    } catch (error) {
+      setActionMessages(prev => ({ ...prev, [vendorId]: 'Failed to update status' }));
+    } finally {
+      setProcessingIds(prev => ({ ...prev, [vendorId]: false }));
+    }
+  };
 
   const filteredVendors = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return vendors;
-
-    const match = (v) => {
-      const name = `${v.firstName || ''} ${v.lastName || ''}`.trim().toLowerCase();
-      const email = (v.email || '').toLowerCase();
-      const company = (v.companyName || '').toLowerCase();
-      const id = (v.id || v._id || '').toLowerCase();
-
-      if (searchField === 'name') return name.includes(q);
-      if (searchField === 'email') return email.includes(q);
-      if (searchField === 'company') return company.includes(q);
-      return name.includes(q) || email.includes(q) || company.includes(q) || id.includes(q);
-    };
-
-    return vendors.filter(match);
-  }, [searchQuery, searchField, vendors]);
+    // The filtering is now handled by the backend API
+    return vendors;
+  }, [vendors]);
 
   // Basic guard (UI-level) to avoid rendering for non-admins
-  if (!(user?.role === 'admin' || user?.userType === 'Admin')) {
+  if (!(user?.userType === 'Admin')) {
     return (
       <div style={{ padding: '2rem' }}>
         <div className="container">
@@ -106,69 +129,111 @@ const AdminVendors = () => {
               />
               <select
                 className="form-input"
-                value={searchField}
-                onChange={(e) => setSearchField(e.target.value)}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
                 style={{ width: '180px' }}
               >
-                <option value="all">All fields</option>
-                <option value="name">Name</option>
-                <option value="email">Email</option>
-                <option value="company">Company</option>
+                <option value="all">All Status</option>
+                <option value="verified">Verified</option>
+                <option value="pending">Pending</option>
+                <option value="active">Active</option>
+                <option value="blocked">Blocked</option>
               </select>
             </div>
 
             {/* Vendors List */}
             <div style={{ display: 'grid', gap: '0.75rem' }}>
-              {filteredVendors.length === 0 ? (
+              {loading ? (
+                <div className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
+                  <div style={{ padding: '2rem', textAlign: 'center' }}>
+                    <div className="spinner" style={{ margin: '0 auto' }}></div>
+                    <div style={{ marginTop: '1rem', color: 'var(--text-light)' }}>Loading vendors...</div>
+                  </div>
+                </div>
+              ) : error ? (
+                <div className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
+                  <div style={{ padding: '1rem', color: 'var(--guc-red)', textAlign: 'center' }}>
+                    {error}
+                    <button 
+                      onClick={loadVendors}
+                      className="btn btn-outline"
+                      style={{ marginLeft: '1rem', padding: '4px 8px' }}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              ) : filteredVendors.length === 0 ? (
                 <div className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
                   <div style={{ padding: '1rem', color: 'var(--text-light)' }}>
                     No vendors match your search.
                   </div>
                 </div>
               ) : (
-                filteredVendors.map((v) => (
-                  <div key={v.id || v._id} className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
-                    <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{ display: 'grid', gap: '0.25rem' }}>
-                          <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>
-                            {(v.firstName || '') + ' ' + (v.lastName || '')}
+                filteredVendors.map((v) => {
+                  const vendorId = v._id || v.id;
+                  return (
+                    <div key={vendorId} className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
+                      <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                          <div style={{ display: 'grid', gap: '0.25rem' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>
+                              {(v.firstName || '') + ' ' + (v.lastName || '')}
+                            </div>
+                            <div style={{ color: 'var(--text-light)', fontSize: '14px' }}>{v.email}</div>
+                            <div style={{ color: 'var(--text-light)', fontSize: '12px' }}>
+                              Company: {v.companyName || 'N/A'}
+                            </div>
                           </div>
-                          <div style={{ color: 'var(--text-light)', fontSize: '14px' }}>{v.email}</div>
-                          <div style={{ color: 'var(--text-light)', fontSize: '12px' }}>
-                            Company: {v.companyName}
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '12px', color: v.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)' }}>
+                              {v.isVerified ? 'Verified' : 'Pending'}
+                            </div>
+                            <div style={{ fontSize: '12px', color: v.status === 'active' ? 'var(--success-green)' : 'var(--guc-red)' }}>
+                              {v.status === 'active' ? 'Active' : 'Blocked'}
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
+                              {v.createdAt ? new Date(v.createdAt).toLocaleDateString() : ''}
+                            </div>
                           </div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '12px', color: v.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)' }}>
-                            {v.isVerified ? 'Verified' : 'Pending'}
-                          </div>
-                          <div style={{ fontSize: '12px', color: v.isActive ? 'var(--success-green)' : 'var(--guc-red)' }}>
-                            {v.isActive ? 'Active' : 'Disabled'}
-                          </div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
-                            {v.createdAt ? new Date(v.createdAt).toLocaleDateString() : ''}
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* Vendor Actions */}
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <button className="btn btn-outline" style={{ fontSize: '12px' }}>
-                          View Documents
-                        </button>
-                        {!v.isVerified && (
-                          <button className="btn btn-primary" style={{ fontSize: '12px' }}>
-                            Approve Vendor
+                        {/* Vendor Actions */}
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <button className="btn btn-outline" style={{ fontSize: '12px' }}>
+                            View Documents
                           </button>
-                        )}
-                        <button className={v.isActive ? 'btn btn-outline' : 'btn btn-primary'} style={{ fontSize: '12px' }}>
-                          {v.isActive ? 'Deactivate' : 'Activate'}
-                        </button>
+                          <button 
+                            className={v.isVerified ? 'btn btn-outline' : 'btn btn-primary'} 
+                            style={{ fontSize: '12px' }}
+                            onClick={() => handleVerificationToggle(vendorId, v.isVerified)}
+                            disabled={!!processingIds[vendorId]}
+                          >
+                            {processingIds[vendorId] ? 'Processing...' : (v.isVerified ? 'Unverify' : 'Verify')}
+                          </button>
+                          <button 
+                            className={v.status === 'active' ? 'btn btn-outline' : 'btn btn-primary'} 
+                            style={{ fontSize: '12px' }}
+                            onClick={() => handleStatusToggle(vendorId, v.status)}
+                            disabled={!!processingIds[vendorId]}
+                          >
+                            {processingIds[vendorId] ? 'Processing...' : (v.status === 'active' ? 'Block' : 'Activate')}
+                          </button>
+                          
+                          {actionMessages[vendorId] && (
+                            <span style={{ 
+                              marginLeft: '0.5rem', 
+                              fontSize: '12px', 
+                              color: actionMessages[vendorId].includes('successfully') ? 'var(--success-green)' : 'var(--guc-red)' 
+                            }}>
+                              {actionMessages[vendorId]}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

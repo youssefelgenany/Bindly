@@ -3,12 +3,13 @@ const router = express.Router();
 const {
   createEvent,
   getAllEvents,
+  getAllEventsForAdmin,
   getEventById,
   updateEvent,
   deleteEvent,
   registerForEvent,
   getMyRegistrations,
-  eventController
+  createConference
 } = require("../controllers/eventController");
 
 const { protect, permit } = require("../middleware/authMiddleware");
@@ -19,12 +20,15 @@ const { protect, permit } = require("../middleware/authMiddleware");
 router.post(
   "/",
   protect,
-  permit("event_office", "admin"),
+  permit("Event Office", "Admin"),
   createEvent
 );
 
 // 📅 Get all events (everyone logged in)
 router.get("/", protect, getAllEvents);
+
+// 📅 Get all events for admin management (including pending)
+router.get("/admin/all", protect, permit("Admin"), getAllEventsForAdmin);
 
 // 🔍 Get a specific event by its ID
 router.get("/:id", protect, getEventById);
@@ -33,7 +37,7 @@ router.get("/:id", protect, getEventById);
 router.put(
   "/:id",
   protect,
-  permit("event_office", "admin"),
+  permit("Event Office", "Admin"),
   updateEvent
 );
 
@@ -41,7 +45,7 @@ router.put(
 router.delete(
   "/:id",
   protect,
-  permit("event_office", "admin"),
+  permit("Event Office", "Admin"),
   deleteEvent
 );
 
@@ -49,7 +53,7 @@ router.delete(
 router.post(
   "/:id/register",
   protect,
-  permit("student", "staff", "ta", "professor"),
+  permit("Student", "Staff", "TA", "Professor"),
   registerForEvent
 );
 
@@ -59,8 +63,8 @@ router.get("/my/registrations", protect, getMyRegistrations);
 // Route to create a conference (protected, e.g. admin/event office only)
 router.post(
   "/conference",
-  auth,
-  eventController.createConference
+  protect,
+  createConference
 );
 
 module.exports = router;

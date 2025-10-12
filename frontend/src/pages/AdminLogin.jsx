@@ -41,7 +41,7 @@ const AdminLogin = () => {
       const result = await login(formData.email, formData.password);
 
       // Check if user is admin
-      if (result.success && result.user.role === 'admin') {
+      if (result.success && result.user.userType === 'Admin') {
         setMessage('Login successful! Redirecting...');
         setTimeout(() => navigate('/dashboard'), 1000);
       } else {

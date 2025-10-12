@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { adminApiService } from '../api/adminApi';
 
 const AdminUsers = () => {
   const { user } = useAuth();
@@ -9,42 +10,10 @@ const AdminUsers = () => {
   const [updatingIds, setUpdatingIds] = useState({}); // id -> boolean
   const [messageById, setMessageById] = useState({}); // id -> message
 
-  // Placeholder data until backend is wired
-  const users = [
-    {
-      id: '64fa-1001',
-      firstName: 'Sara',
-      lastName: 'Kamal',
-      email: 'sara.kamal@student.guc.edu.eg',
-      userType: 'Student',
-      gucId: '34-1234',
-      isVerified: true,
-      isActive: true,
-      createdAt: '2024-09-10T10:00:00Z'
-    },
-    {
-      id: '64fa-1002',
-      firstName: 'Omar',
-      lastName: 'Hassan',
-      email: 'omar.hassan@guc.edu.eg',
-      userType: 'Staff',
-      gucId: '12-5678',
-      isVerified: false,
-      isActive: false,
-      createdAt: '2024-09-11T08:20:00Z'
-    },
-    {
-      id: '64fa-1003',
-      firstName: 'Mona',
-      lastName: 'Adel',
-      email: 'mona.adel@company.com',
-      userType: 'Vendor',
-      companyName: 'Adel Foods',
-      isVerified: true,
-      isActive: true,
-      createdAt: '2024-09-12T12:45:00Z'
-    }
-  ];
+  // Users state - will be loaded from API
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const filteredUsers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -75,6 +44,29 @@ const AdminUsers = () => {
     'Admin'
   ];
 
+  // Load users on component mount
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const result = await adminApiService.getAllUsers();
+      if (result.success) {
+        setUsers(result.data.users || []);
+      } else {
+        setError(result.message);
+      }
+    } catch (err) {
+      setError('Failed to load users');
+      console.error('Error loading users:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRoleChange = (userId, nextRole) => {
     setPendingRoles(prev => ({ ...prev, [userId]: nextRole }));
     setMessageById(prev => ({ ...prev, [userId]: '' }));
@@ -91,10 +83,18 @@ const AdminUsers = () => {
     setMessageById(prev => ({ ...prev, [userId]: '' }));
 
     try {
-      // TODO: Replace with backend call
-      // Example: await axios.put(`/api/admin/users/${userId}/role`, { role: selectedRole });
-      await new Promise(res => setTimeout(res, 600));
-      setMessageById(prev => ({ ...prev, [userId]: 'Role updated successfully.' }));
+      const result = await adminApiService.updateUserRole(userId, selectedRole);
+      if (result.success) {
+        setMessageById(prev => ({ ...prev, [userId]: 'Role updated successfully.' }));
+        // Update the user in the local state
+        setUsers(prev => prev.map(u => 
+          u._id === userId ? { ...u, userType: selectedRole } : u
+        ));
+        // Clear the pending role
+        setPendingRoles(prev => ({ ...prev, [userId]: '' }));
+      } else {
+        setMessageById(prev => ({ ...prev, [userId]: result.message || 'Failed to update role.' }));
+      }
     } catch (err) {
       setMessageById(prev => ({ ...prev, [userId]: 'Failed to update role. Try again.' }));
     } finally {
@@ -102,24 +102,36 @@ const AdminUsers = () => {
     }
   };
 
-  const [activeStatusById, setActiveStatusById] = useState(() => {
-    const initial = {};
-    users.forEach(u => { initial[u.id || u._id] = !!u.isActive; });
-    return initial;
-  });
-
+  const [activeStatusById, setActiveStatusById] = useState({});
   const [togglingIds, setTogglingIds] = useState({}); // id -> boolean
   const [toggleMsgById, setToggleMsgById] = useState({}); // id -> message
 
+  // Update activeStatusById when users are loaded
+  useEffect(() => {
+    const initial = {};
+    users.forEach(u => { 
+      initial[u._id || u.id] = u.status === 'active'; 
+    });
+    setActiveStatusById(initial);
+  }, [users]);
+
   const handleToggleActive = async (userId) => {
+    const newStatus = !activeStatusById[userId];
     setTogglingIds(prev => ({ ...prev, [userId]: true }));
     setToggleMsgById(prev => ({ ...prev, [userId]: '' }));
+    
     try {
-      // TODO: replace with backend call
-      // Example: await axios.patch(`/api/admin/users/${userId}/status`, { isActive: !activeStatusById[userId] });
-      await new Promise(res => setTimeout(res, 500));
-      setActiveStatusById(prev => ({ ...prev, [userId]: !prev[userId] }));
-      setToggleMsgById(prev => ({ ...prev, [userId]: 'Status updated.' }));
+      const result = await adminApiService.updateUserStatus(userId, newStatus);
+      if (result.success) {
+        setActiveStatusById(prev => ({ ...prev, [userId]: newStatus }));
+        setToggleMsgById(prev => ({ ...prev, [userId]: 'Status updated.' }));
+        // Update the user in the local state
+        setUsers(prev => prev.map(u => 
+          u._id === userId ? { ...u, status: newStatus ? 'active' : 'blocked' } : u
+        ));
+      } else {
+        setToggleMsgById(prev => ({ ...prev, [userId]: result.message || 'Failed to update status.' }));
+      }
     } catch (e) {
       setToggleMsgById(prev => ({ ...prev, [userId]: 'Failed to update status.' }));
     } finally {
@@ -130,7 +142,7 @@ const AdminUsers = () => {
   // Vendor-related controls removed per request
 
   // Basic guard (UI-level) to avoid rendering for non-admins
-  if (!(user?.role === 'admin' || user?.userType === 'Admin')) {
+  if (!(user?.userType === 'Admin')) {
     return (
       <div style={{ padding: '2rem' }}>
         <div className="container">
@@ -138,6 +150,24 @@ const AdminUsers = () => {
             <div className="card-header">
               <h1 className="card-title" style={{ color: 'var(--guc-red)' }}>Unauthorized</h1>
               <p className="card-subtitle">You do not have access to this page.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: '2rem' }}>
+        <div className="container">
+          <div className="card">
+            <div className="card-header">
+              <h1 className="card-title" style={{ color: 'var(--guc-red)' }}>Users</h1>
+              <p className="card-subtitle">Loading users...</p>
+            </div>
+            <div style={{ padding: '2rem', textAlign: 'center' }}>
+              <div className="spinner" style={{ margin: '0 auto' }}></div>
             </div>
           </div>
         </div>
@@ -155,6 +185,19 @@ const AdminUsers = () => {
           </div>
 
           <div style={{ padding: '1rem', display: 'grid', gap: '1rem' }}>
+            {error && (
+              <div className="alert alert-error">
+                {error}
+                <button 
+                  onClick={loadUsers}
+                  className="btn btn-outline"
+                  style={{ marginLeft: '1rem', padding: '4px 8px' }}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
             {/* Search Controls */}
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <input
@@ -183,96 +226,96 @@ const AdminUsers = () => {
               {filteredUsers.length === 0 ? (
                 <div className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
                   <div style={{ padding: '1rem', color: 'var(--text-light)' }}>
-                    No users match your search.
+                    {users.length === 0 ? 'No users found.' : 'No users match your search.'}
                   </div>
                 </div>
               ) : (
-                filteredUsers.map((u) => (
-                  <div key={u.id || u._id} className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
-                    <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{ display: 'grid', gap: '0.25rem' }}>
-                          <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>
-                            {(u.firstName || '') + ' ' + (u.lastName || '')}
+                filteredUsers.map((u) => {
+                  const userId = u._id || u.id;
+                  return (
+                    <div key={userId} className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
+                      <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                          <div style={{ display: 'grid', gap: '0.25rem' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>
+                              {(u.firstName || '') + ' ' + (u.lastName || '')}
+                            </div>
+                            <div style={{ color: 'var(--text-light)', fontSize: '14px' }}>{u.email}</div>
+                            <div style={{ color: 'var(--text-light)', fontSize: '12px' }}>
+                              {(u.gucId && `GUC ID: ${u.gucId}`) || `ID: ${userId}`}
+                            </div>
                           </div>
-                          <div style={{ color: 'var(--text-light)', fontSize: '14px' }}>{u.email}</div>
-                          <div style={{ color: 'var(--text-light)', fontSize: '12px' }}>
-                            {(u.gucId && `GUC ID: ${u.gucId}`) || (u.id && `ID: ${u.id}`) || (u._id && `ID: ${u._id}`)}
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '12px', color: u.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)' }}>
+                              {u.isVerified ? 'Verified' : 'Pending'}
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
+                              {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : ''}
+                            </div>
                           </div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '12px', color: u.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)' }}>
-                            {u.isVerified ? 'Verified' : 'Pending'}
-                          </div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
-                            {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : ''}
-                          </div>
+
+                        {/* Role controls */}
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <select
+                            className="form-input"
+                            value={pendingRoles[userId] ?? ''}
+                            onChange={(e) => handleRoleChange(userId, e.target.value)}
+                            style={{ minWidth: '180px' }}
+                          >
+                            <option value="" disabled>
+                              Select role
+                            </option>
+                            {roleOptions.map((r) => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
+                          <button
+                            className="btn btn-primary"
+                            onClick={() => handleUpdateRole(userId)}
+                            disabled={!!updatingIds[userId]}
+                          >
+                            {updatingIds[userId] ? 'Updating...' : 'Update Role'}
+                          </button>
+
+                          {messageById[userId] && (
+                            <span style={{ marginLeft: '0.5rem', fontSize: '12px', color: messageById[userId].includes('success') ? 'var(--success-green)' : 'var(--guc-red)' }}>
+                              {messageById[userId]}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Activation controls */}
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <button
+                            className={activeStatusById[userId] ? 'btn btn-outline' : 'btn btn-primary'}
+                            onClick={() => handleToggleActive(userId)}
+                            disabled={!!togglingIds[userId]}
+                          >
+                            {togglingIds[userId]
+                              ? 'Updating...'
+                              : activeStatusById[userId]
+                                ? 'Deactivate User'
+                                : 'Activate User'}
+                          </button>
+                          <span style={{ fontSize: '12px', color: activeStatusById[userId] ? 'var(--success-green)' : 'var(--guc-red)' }}>
+                            {activeStatusById[userId] ? 'Active' : 'Disabled'}
+                          </span>
+                          {toggleMsgById[userId] && (
+                            <span style={{ marginLeft: '0.5rem', fontSize: '12px', color: 'var(--text-light)' }}>
+                              {toggleMsgById[userId]}
+                            </span>
+                          )}
                         </div>
                       </div>
-
-                      {/* Role controls */}
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <select
-                          className="form-input"
-                          value={pendingRoles[u.id || u._id] ?? ''}
-                          onChange={(e) => handleRoleChange(u.id || u._id, e.target.value)}
-                          style={{ minWidth: '180px' }}
-                        >
-                          <option value="" disabled>
-                            Select role
-                          </option>
-                          {roleOptions.map((r) => (
-                            <option key={r} value={r}>{r}</option>
-                          ))}
-                        </select>
-                        <button
-                          className="btn btn-primary"
-                          onClick={() => handleUpdateRole(u.id || u._id)}
-                          disabled={!!updatingIds[u.id || u._id]}
-                        >
-                          {updatingIds[u.id || u._id] ? 'Updating...' : 'Update Role'}
-                        </button>
-
-                        {messageById[u.id || u._id] && (
-                          <span style={{ marginLeft: '0.5rem', fontSize: '12px', color: messageById[u.id || u._id].includes('success') ? 'var(--success-green)' : 'var(--guc-red)' }}>
-                            {messageById[u.id || u._id]}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Activation controls */}
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <button
-                          className={activeStatusById[u.id || u._id] ? 'btn btn-outline' : 'btn btn-primary'}
-                          onClick={() => handleToggleActive(u.id || u._id)}
-                          disabled={!!togglingIds[u.id || u._id]}
-                        >
-                          {togglingIds[u.id || u._id]
-                            ? 'Updating...'
-                            : activeStatusById[u.id || u._id]
-                              ? 'Deactivate User'
-                              : 'Activate User'}
-                        </button>
-                        <span style={{ fontSize: '12px', color: activeStatusById[u.id || u._id] ? 'var(--success-green)' : 'var(--guc-red)' }}>
-                          {activeStatusById[u.id || u._id] ? 'Active' : 'Disabled'}
-                        </span>
-                        {toggleMsgById[u.id || u._id] && (
-                          <span style={{ marginLeft: '0.5rem', fontSize: '12px', color: 'var(--text-light)' }}>
-                            {toggleMsgById[u.id || u._id]}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Vendor-specific actions removed */}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
         </div>
       </div>
-      {/* Vendor modal and approval removed */}
     </div>
   );
 };
