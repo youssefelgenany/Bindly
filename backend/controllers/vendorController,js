@@ -1,0 +1,101 @@
+import User from '../models/User.js';
+import Bazaar from '../models/Bazaar.js'; // Assuming bazaarModel exists
+import Booth from '../models/Booth.js';
+import VendorRequest from '../models/VendorRequest.js';
+
+// View upcoming bazaars/booths
+export const viewUpcomingEvents = async (req, res) => {
+  try {
+    const { type } = req.query;
+    if (!['bazaar', 'booth'].includes(type)) return res.status(400).json({ message: 'Invalid type' });
+    const now = new Date();
+    let events;
+    if (type === 'bazaar') {
+      events = await Bazaar.find({
+        startDate: { $gt: now },
+        registrationDeadline: { $gt: now },
+        status: 'upcoming',
+      }).select('name startDate endDate location description _id');
+    } else { // booth
+      events = await Booth.find({
+        startDate: { $gt: now },
+        registrationDeadline: { $gt: now },
+        status: 'upcoming',
+      }).select('name startDate endDate location description _id durationWeeks boothLocation');
+    }
+    res.json(events);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Apply to bazaar or booth
+export const applyToEvent = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const { eventId, attendees, boothSize, durationWeeks, boothLocation, message, eventType } = req.body;
+
+    // Validate vendor role
+    const vendor = await User.findById(vendorId);
+    if (vendor.userType !== 'Vendor') return res.status(403).json({ message: 'Unauthorized' });
+
+    // Attendees validated by frontend selection (max 5), no error message needed
+    if (attendees.length > 5) return res.status(400).json({ message: 'Max 5 attendees exceeded' });
+
+    let event;
+    if (eventType === 'bazaar') {
+      event = await Bazaar.findById(eventId);
+      if (!event) return res.status(404).json({ message: 'Invalid bazaar' });
+    } else if (eventType === 'booth') {
+      event = await Booth.findById(eventId);
+      if (!event) return res.status(404).json({ message: 'Invalid booth' });
+      if (!durationWeeks || !boothLocation || durationWeeks < 1 || durationWeeks > 4) {
+        return res.status(400).json({ message: 'Valid duration (1-4 weeks) and location required for booth' });
+      }
+    } else {
+      return res.status(400).json({ message: 'Invalid event type' });
+    }
+
+    const existingRequest = await VendorRequest.findOne({ vendor: vendorId, $or: [{ bazaar: eventId }, { booth: eventId }] });
+    if (existingRequest) return res.status(400).json({ message: 'Already applied' });
+
+    const request = new VendorRequest({
+      vendor: vendorId,
+      [eventType === 'bazaar' ? 'bazaar' : 'booth']: eventId,
+      attendees,
+      boothSize,
+      durationWeeks: eventType === 'booth' ? durationWeeks : undefined,
+      boothLocation: eventType === 'booth' ? boothLocation : undefined,
+      message,
+    });
+    await request.save();
+    res.status(201).json({ message: 'Application submitted' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// View all requests (accepted, pending, rejected) for vendor homepage
+export const viewAllRequests = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const now = new Date();
+    const requests = await VendorRequest.find({ vendor: vendorId })
+      .populate({
+        path: 'bazaar',
+        match: { startDate: { $gt: now } },
+        select: 'name startDate endDate location type',
+      })
+      .populate({
+        path: 'booth',
+        match: { startDate: { $gt: now } },
+        select: 'name startDate endDate location type durationWeeks boothLocation',
+      })
+      .exec();
+    // Filter out requests with past events
+    const filteredRequests = requests.filter(r => r.bazaar || r.booth);
+    res.json(filteredRequests);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};

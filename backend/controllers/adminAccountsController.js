@@ -1,0 +1,86 @@
+const bcrypt = require("bcryptjs");
+const User = require("../models/userModel");
+
+// Admin creates new admin/event office accounts
+exports.createAdminOrEventOffice = async (req, res) => {
+  try {
+    const { firstName, lastName, email, password, role } = req.body;
+    if (!firstName || !lastName || !email || !password || !role)
+      return res.status(400).json({ 
+        success: false,
+        message: "Missing required fields" 
+      });
+
+    if (!["Admin", "Event Office"].includes(role))
+      return res.status(400).json({ 
+        success: false,
+        message: "Role must be Admin or Event Office" 
+      });
+
+    const exists = await User.findOne({ email });
+    if (exists) return res.status(400).json({ 
+      success: false,
+      message: "Email already exists" 
+    });
+
+    const newUser = await User.create({
+      firstName,
+      lastName,
+      email,
+      password,
+      userType: role,
+      isVerified: true, // auto-verified since admin created it
+      status: 'active'
+    });
+
+    res.status(201).json({ 
+      success: true,
+      message: "Account created successfully", 
+      user: {
+        id: newUser._id,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email,
+        userType: newUser.userType,
+        isVerified: newUser.isVerified,
+        status: newUser.status,
+        createdAt: newUser.createdAt
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error" 
+    });
+  }
+};
+
+// Admin deletes admin or event office accounts
+exports.deleteAdminOrEventOffice = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ 
+      success: false,
+      message: "User not found" 
+    });
+
+    if (!["Admin", "Event Office"].includes(user.userType))
+      return res.status(400).json({ 
+        success: false,
+        message: "Not an admin/event office account" 
+      });
+
+    await user.deleteOne();
+    res.status(200).json({ 
+      success: true,
+      message: "Account deleted successfully" 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error" 
+    });
+  }
+};
