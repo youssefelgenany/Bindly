@@ -2,21 +2,22 @@ const GymSession = require("../models/GymSession");
 
 // Create a gym session (Event Office only)
 exports.createGymSession = async (req, res) => {
+  console.log("🔹 Body received:", req.body);
   try {
-    const { date, startTime, durationMinutes, type, maxParticipants, title } = req.body;
+    const { date, time, duration, type, capacity } = req.body;
 
-    if (!date || !startTime || !durationMinutes || !type || !maxParticipants)
+    if (!date || !time || !duration || !type || !capacity)
       return res.status(400).json({ msg: "Missing fields" });
 
-    const session = await GymSession.create({
-      title,
-      date: new Date(date),
-      startTime,
-      durationMinutes,
-      type,
-      maxParticipants,
-      createdBy: req.user._id,
-    });
+const session = await GymSession.create({
+  date: new Date(date),
+  time, // e.g. "17:00"
+  duration, // e.g. 60 (minutes)
+  type, // e.g. "zumba"
+  capacity // matches 'max number of participants'
+  
+});
+
 
     res.json({ msg: "Gym session created", session });
   } catch (err) {

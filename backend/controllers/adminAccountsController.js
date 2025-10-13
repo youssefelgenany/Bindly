@@ -1,21 +1,18 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/userModel");
+const Admin = require("../models/AdminModel");
 
 // Admin creates new admin/event office accounts
 exports.createAdminOrEventOffice = async (req, res) => {
+   console.log("🔹 Body received:", req.body);
   try {
-    const { firstName, lastName, email, password, role } = req.body;
-    if (!firstName || !lastName || !email || !password || !role)
-      return res.status(400).json({ 
-        success: false,
-        message: "Missing required fields" 
-      });
+    const { name, email, password, userType } = req.body;
 
-    if (!["Admin", "Event Office"].includes(role))
-      return res.status(400).json({ 
-        success: false,
-        message: "Role must be Admin or Event Office" 
-      });
+    if (!name || !email || !password || !userType)
+      return res.status(400).json({ msg: "Missing required fields" });
+
+    if (!["admin", "event_office"].includes(userType.toLowerCase()))
+      return res.status(400).json({ msg: "userType must be admin or event_office" });
 
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ 
@@ -23,14 +20,14 @@ exports.createAdminOrEventOffice = async (req, res) => {
       message: "Email already exists" 
     });
 
+    //const passwordHash = await bcrypt.hash(password, 10);
     const newUser = await User.create({
       firstName,
       lastName,
       email,
       password,
-      userType: role,
-      isVerified: true, // auto-verified since admin created it
-      status: 'active'
+      userType: userType.toLowerCase(),
+      isVerified: true, // auto-verified
     });
 
     res.status(201).json({ 
@@ -65,11 +62,8 @@ exports.deleteAdminOrEventOffice = async (req, res) => {
       message: "User not found" 
     });
 
-    if (!["Admin", "Event Office"].includes(user.userType))
-      return res.status(400).json({ 
-        success: false,
-        message: "Not an admin/event office account" 
-      });
+    if (!["admin", "event_office"].includes(user.userType.toLowerCase()))
+      return res.status(400).json({ msg: "Not an admin/event office account" });
 
     await user.deleteOne();
     res.status(200).json({ 
