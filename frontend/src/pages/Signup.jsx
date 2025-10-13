@@ -258,10 +258,17 @@ const Signup = () => {
       const result = await signup(submitData);
       
       if (result.success) {
-        setMessage('Account created successfully! Redirecting to login...');
-        setTimeout(() => {
-          navigate('/login');
-        }, 1000);
+        if (result.requiresVerification) {
+          setMessage('Account created successfully! Redirecting to verification page...');
+          setTimeout(() => {
+            navigate('/verification-pending');
+          }, 1000);
+        } else {
+          setMessage('Account created successfully! Redirecting to login...');
+          setTimeout(() => {
+            navigate('/login');
+          }, 1000);
+        }
       } else {
         setMessage(result.message);
         console.error('Signup failed:', result.message);

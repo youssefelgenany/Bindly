@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { createGymSession, viewGymScheduleMonth } = require("../controllers/gymCtrl");
-const { protect, permit } = require("../middleware/auth");
+const { createGymSession, viewGymScheduleMonth } = require("../controllers/gymController");
+const { protect, permit } = require("../middleware/authMiddleware");
 
 // Event Office creates gym sessions (Req 84)
 router.post("/", protect, permit("event_office"), createGymSession);

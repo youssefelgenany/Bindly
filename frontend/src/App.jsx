@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
+import VerificationPending from './pages/VerificationPending';
 import Navbar from './components/Navbar';
 
 // Protected Route Component
@@ -67,6 +68,14 @@ function App() {
               element={
                 <PublicRoute>
                   <Signup />
+                </PublicRoute>
+              } 
+            />
+            <Route 
+              path="/verification-pending" 
+              element={
+                <PublicRoute>
+                  <VerificationPending />
                 </PublicRoute>
               } 
             />

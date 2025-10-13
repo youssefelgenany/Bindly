@@ -128,7 +128,7 @@ const signup = async (req, res) => {
       firstName, 
       lastName, 
       userType,
-      isVerified: true // All users are verified immediately
+      isVerified: ['Staff', 'TA', 'Professor'].includes(userType) ? false : true // Staff/TA/Professor need admin verification
     };
 
     // Add GUC ID for academic users
@@ -193,11 +193,18 @@ const signup = async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // Determine response message based on user type
+    let responseMessage = 'User created successfully';
+    if (['Staff', 'TA', 'Professor'].includes(userType)) {
+      responseMessage = 'Account created successfully. Your account is pending admin verification. You will receive an email once verified.';
+    }
+
     const responseBody = {
       success: true,
-      message: 'User created successfully',
+      message: responseMessage,
       user: userResponse,
-      token
+      token: ['Staff', 'TA', 'Professor'].includes(userType) ? null : token, // No token for unverified accounts
+      requiresVerification: ['Staff', 'TA', 'Professor'].includes(userType)
     };
 
     res.status(201).json(responseBody);
@@ -230,7 +237,13 @@ const login = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
-    // Email verification disabled for Students; allow login regardless
+    // Check verification status for Staff/TA/Professor
+    if (['Staff', 'TA', 'Professor'].includes(user.userType) && !user.isVerified) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Your account is pending admin verification. You will receive an email once verified.' 
+      });
+    }
 
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password' });

@@ -1,4 +1,4 @@
-const GymSession = require("../models/GymSession");
+const GymSession = require("../models/gymSessionModel");
 
 // Create a gym session (Event Office only)
 exports.createGymSession = async (req, res) => {

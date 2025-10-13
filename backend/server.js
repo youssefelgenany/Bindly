@@ -1,16 +1,3 @@
-// server.js
-const adminRoutes = require("./routes/admin");
-const eventRoutes = require("./routes/events");
-const gymRoutes = require("./routes/gym");
-const { verifyByToken } = require("./controllers/authVerifyCtrl");
-
-// After your existing routes
-app.use("/api/admin", adminRoutes);
-app.use("/api/events", eventRoutes);
-app.use("/api/gym", gymRoutes);
-
-// Email verification link route (Req 6)
-app.get("/api/verify", verifyByToken);
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -37,11 +24,15 @@ mongoose.connect(process.env.MONGO_URI)
 const authRoutes = require('./routes/authRoutes');
 const bazaarRoutes = require('./routes/bazaarRoutes');
 const tripRoutes = require('./routes/tripRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const gymRoutes = require('./routes/gymRoutes');
 
 //Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/bazaars', bazaarRoutes);
 app.use('/api/trips', tripRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/gym', gymRoutes);
 
 // Test route
 app.get('/', (req, res) => {

@@ -67,12 +67,17 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.post('/api/auth/signup', userData);
       
-      const { user: newUser, token } = response.data;
+      const { user: newUser, token, requiresVerification } = response.data;
       
       // Don't automatically log in the user after signup
       // Just return success - user will need to login manually
       
-      return { success: true, user: newUser, message: 'Account created successfully' };
+      return { 
+        success: true, 
+        user: newUser, 
+        message: 'Account created successfully',
+        requiresVerification: requiresVerification || false
+      };
     } catch (error) {
       console.error('Signup error:', error);
       
