@@ -5,6 +5,9 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
+const Admin = require('../models/AdminModel');
+
+
 
 // ==================== EMAIL TRANSPORT ====================
 const transporter = nodemailer.createTransport({
@@ -232,9 +235,13 @@ const signup = async (req, res) => {
 
 // ==================== LOGIN ====================
 const login = async (req, res) => {
+  console.log("🟢 Login route hit");
+
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+   
+    const user = await User.findOne({ email }) || await Admin.findOne({ email });
+    console.log("🔍 Found user:", user);
     if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
     // Check verification status for Staff/TA/Professor
@@ -246,10 +253,12 @@ const login = async (req, res) => {
     }
 
     const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    console.log(password);
+    console.log("passvalid?", isPasswordValid);
+    if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password ' });
 
     const token = jwt.sign(
-      { userId: user._id, email: user.email, userType: user.userType },
+      { userId: user._id, email: user.email, role: user.role || user.userType  },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );

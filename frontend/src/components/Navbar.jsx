@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const toggleSidebar = () => setIsSidebarOpen(prev => !prev);
+  const closeSidebar = () => setIsSidebarOpen(false);
 
   const handleLogout = () => {
     logout();
@@ -34,23 +39,33 @@ const Navbar = () => {
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        {/* Logo/Brand */}
-        <Link 
-          to={user ? '/dashboard' : '/'} 
-          style={{ 
-            textDecoration: 'none',
-            display: 'flex',
-            alignItems: 'center'
-          }}
-        >
-          <div style={{
-            fontSize: '1.5rem',
-            fontWeight: '700',
-            color: 'var(--guc-red)'
-          }}>
-            Bindly
-          </div>
-        </Link>
+        {/* Left group: hamburger at extreme left + brand */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button
+            onClick={toggleSidebar}
+            className="btn btn-outline"
+            aria-label="Open menu"
+            style={{ padding: '8px 12px', fontSize: '18px' }}
+          >
+            ≡
+          </button>
+          <Link 
+            to={user ? '/dashboard' : '/'} 
+            style={{ 
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            <div style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: 'var(--guc-red)'
+            }}>
+              Bindly
+            </div>
+          </Link>
+        </div>
 
         {/* Navigation Links */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
@@ -73,7 +88,6 @@ const Navbar = () => {
                     {getUserTypeDisplay(user.userType)}
                   </div>
                 </div>
-                
                 {/* User Avatar */}
                 <div style={{
                   width: '40px',
@@ -87,7 +101,7 @@ const Navbar = () => {
                   fontWeight: '600',
                   fontSize: '16px'
                 }}>
-                  {user.firstName.charAt(0).toUpperCase()}
+                   {user?.firstName?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
               </div>
 
@@ -129,6 +143,129 @@ const Navbar = () => {
           )}
         </div>
       </div>
+
+      {/* Right Sidebar Overlay */}
+      {user && (
+        <>
+          {/* Dim Background */}
+          <div
+            onClick={closeSidebar}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              opacity: isSidebarOpen ? 1 : 0,
+              pointerEvents: isSidebarOpen ? 'auto' : 'none',
+              transition: 'opacity 0.25s ease',
+              zIndex: 999
+            }}
+          />
+
+          {/* Sidebar Panel */}
+          <aside
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              height: '100vh',
+              width: '280px',
+              backgroundColor: 'var(--white)',
+              boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+              transform: isSidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+              transition: 'transform 0.25s ease',
+              zIndex: 1000,
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            aria-hidden={!isSidebarOpen}
+          >
+            <div style={{
+              padding: '1rem',
+              borderBottom: '1px solid var(--medium-gray)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ fontWeight: 700, color: 'var(--guc-red)' }}>Menu</div>
+              <button
+                onClick={closeSidebar}
+                className="btn btn-outline"
+                aria-label="Close menu"
+                style={{ padding: '6px 10px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+              <Link
+                to="/gym"
+                className="btn btn-outline"
+                style={{ width: '100%' }}
+                onClick={closeSidebar}
+              >
+                Gym Schedule
+              </Link>
+              {(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'Events Office' || user.role === 'event_office' || user.userType === 'event_office') && (
+                <Link
+                  to="/gym/manage"
+                  className="btn btn-outline"
+                  style={{ width: '100%' }}
+                  onClick={closeSidebar}
+                >
+                  Manage Gym
+                </Link>
+              )}
+              {(user.role === 'admin' || user.userType === 'Admin') && (
+                <>
+                  <Link
+                    to="/admin/users"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    View Users
+                  </Link>
+                  <Link
+                    to="/admin/vendors"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    View Vendors
+                  </Link>
+                  <Link
+                    to="/admin/events"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Manage Events
+                  </Link>
+                  <Link
+                    to="/admin/manage"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Manage Admins
+                  </Link>
+                  <Link
+                    to="/admin/profile"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Profile & Settings
+                  </Link>
+                </>
+              )}
+
+              {/* Add more quick links here if needed */}
+            </div>
+          </aside>
+        </>
+      )}
     </nav>
   );
 };

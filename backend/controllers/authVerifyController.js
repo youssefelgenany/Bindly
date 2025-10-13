@@ -1,4 +1,4 @@
-const User = require("../models/User");
+const User = require("../models/userModel");
 
 // When user clicks verification link
 exports.verifyByToken = async (req, res) => {
