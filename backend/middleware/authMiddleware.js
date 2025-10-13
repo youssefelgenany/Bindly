@@ -17,10 +17,10 @@ const protect = async (req, res, next) => {
       });
     }
     console.log("secret",process.env.JWT_SECRET);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log("decoded",decoded);
-    let account = await User.findById(decoded.id).select('-password');
-    if (!account) account = await Admin.findById(decoded.id).select('-password');
+    let account = await User.findById(decoded.userId).select('-password');
+    if (!account) account = await Admin.findById(decoded.userId).select('-password');
 
     if (!account) {
       return res.status(401).json({
@@ -32,6 +32,7 @@ const protect = async (req, res, next) => {
     req.user = account;
     next();
   } catch (error) {
+    console.error("❌ JWT verification failed:", error.message);
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ success: false, message: 'Invalid token' });
     }
@@ -53,7 +54,7 @@ const permit = (...roles) => {
       });
     }
 
-    if (!roles.includes(req.user.role.toLowerCase())) {
+    if (!roles.includes(req.user.userType.toLowerCase())) {
       return res.status(403).json({
         success: false,
         message: 'Insufficient permissions'

@@ -5,7 +5,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
-
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 const adminRoutes = require("./routes/adminRoutes");
 
 const eventRoutes = require("./routes/eventRoutes");

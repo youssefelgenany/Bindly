@@ -5,12 +5,17 @@ const gymSessionSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
-  startTime: {
-    type: String,
+  time: {
+    type: String, // e.g. "10:00 AM"
     required: true,
   },
-  endTime: {
+  duration: {
+    type: Number, // in minutes or hours
+    required: true,
+  },
+  type: {
     type: String,
+    enum: ["yoga", "pilates", "aerobics", "zumba", "cross circuit", "kick-boxing"],
     required: true,
   },
   capacity: {
