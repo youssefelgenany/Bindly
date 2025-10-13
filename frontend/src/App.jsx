@@ -10,6 +10,9 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import ProfessorEvents from './pages/ProfessorEvents';
+import Events from './pages/Events';
+import GymSchedule from './pages/GymSchedule';
+import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
 import Navbar from './components/Navbar';
 import CreateConference from "./pages/CreatConfrence";
@@ -106,6 +109,31 @@ function App() {
                   <Dashboard />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/events" 
+              element={
+                <ProtectedRoute>
+                  <Events />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/gym" 
+              element={
+                <ProtectedRoute>
+                  <GymSchedule />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/gym/manage" 
+              element={
+                <ProtectedRoute>
+                  {/* Allow Admin and Events Office */}
+                  <GymManage />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/professor/events" 
