@@ -1,10 +1,10 @@
-import User from '../models/User.js';
-import Bazaar from '../models/Bazaar.js'; // Assuming bazaarModel exists
-import Booth from '../models/Booth.js';
-import VendorRequest from '../models/VendorRequest.js';
+const User = require('../models/userModel.js');
+const Bazaar = require('../models/bazaarModel.js'); // Assuming bazaarModel exists
+const Booth = require('../models/boothModel.js');
+const VendorRequest = require('../models/vendorRequest.js');
 
 // View upcoming bazaars/booths
-export const viewUpcomingEvents = async (req, res) => {
+module.exports.viewUpcomingEvents = async (req, res) => {
   try {
     const { type } = req.query;
     if (!['bazaar', 'booth'].includes(type)) return res.status(400).json({ message: 'Invalid type' });
@@ -14,23 +14,22 @@ export const viewUpcomingEvents = async (req, res) => {
       events = await Bazaar.find({
         startDate: { $gt: now },
         registrationDeadline: { $gt: now },
-        status: 'upcoming',
       }).select('name startDate endDate location description _id');
     } else { // booth
       events = await Booth.find({
         startDate: { $gt: now },
         registrationDeadline: { $gt: now },
-        status: 'upcoming',
       }).select('name startDate endDate location description _id durationWeeks boothLocation');
     }
     res.json(events);
   } catch (error) {
+    console.error('Server error in viewUpcomingEvents:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
 // Apply to bazaar or booth
-export const applyToEvent = async (req, res) => {
+module.exports.applyToEvent = async (req, res) => {
   try {
     const vendorId = req.user.id;
     const { eventId, attendees, boothSize, durationWeeks, boothLocation, message, eventType } = req.body;
@@ -71,31 +70,7 @@ export const applyToEvent = async (req, res) => {
     await request.save();
     res.status(201).json({ message: 'Application submitted' });
   } catch (error) {
+    console.error('Server error in applyToEvent:', error);
     res.status(500).json({ message: 'Server error' });
   }
-};
-
-// View all requests (accepted, pending, rejected) for vendor homepage
-export const viewAllRequests = async (req, res) => {
-  try {
-    const vendorId = req.user.id;
-    const now = new Date();
-    const requests = await VendorRequest.find({ vendor: vendorId })
-      .populate({
-        path: 'bazaar',
-        match: { startDate: { $gt: now } },
-        select: 'name startDate endDate location type',
-      })
-      .populate({
-        path: 'booth',
-        match: { startDate: { $gt: now } },
-        select: 'name startDate endDate location type durationWeeks boothLocation',
-      })
-      .exec();
-    // Filter out requests with past events
-    const filteredRequests = requests.filter(r => r.bazaar || r.booth);
-    res.json(filteredRequests);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
+  };

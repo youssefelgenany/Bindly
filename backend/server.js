@@ -16,6 +16,7 @@ const { verifyByToken } = require("./controllers/authVerifyController");
 // ADD YOUR ROUTES HERE
 const professorRoutes = require("./routes/professorRoutes");
 const workshopRoutes = require("./routes/workshopRoutes");
+const vendorRoutes = require("./routes/vendorRoutes");
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -24,11 +25,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/admin", adminRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/gym", gymRoutes);
-
+app.use("/api/vendor", vendorRoutes);
 // ADD YOUR ROUTE MOUNTS HERE
 app.use("/api/professors", professorRoutes);
 app.use("/api/workshops", workshopRoutes);
-
 
 // Email verification link route (Req 6)
 app.get("/api/verify", verifyByToken);

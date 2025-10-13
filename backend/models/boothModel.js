@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 const boothSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -15,4 +15,4 @@ const boothSchema = new mongoose.Schema({
   boothLocation: { type: String, required: true }, // e.g., map coordinates or description
 }, { timestamps: true });
 
-export default mongoose.model('Booth', boothSchema);
+module.exports = mongoose.model('Booth', boothSchema);
