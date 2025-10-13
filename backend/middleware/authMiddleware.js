@@ -66,4 +66,14 @@ const permit = (...roles) => {
   };
 };
 
+// Alias for compatibility
+const protect = authenticateToken;
+const permit = requireRole;
+
+module.exports = {
+  authenticateToken,
+  requireRole,
+  protect,
+  permit
+};
 module.exports = { protect, permit };

@@ -9,6 +9,7 @@ import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
+import VerificationPending from './pages/VerificationPending';
 import ProfessorEvents from './pages/ProfessorEvents';
 import Events from './pages/Events';
 import GymSchedule from './pages/GymSchedule';
@@ -99,6 +100,14 @@ function App() {
               element={
                 <PublicRoute>
                   <Signup />
+                </PublicRoute>
+              } 
+            />
+            <Route 
+              path="/verification-pending" 
+              element={
+                <PublicRoute>
+                  <VerificationPending />
                 </PublicRoute>
               } 
             />
