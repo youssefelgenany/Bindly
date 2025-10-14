@@ -4,6 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
+const app = express();
 
 const app = express();
 app.use(express.json());
@@ -52,12 +53,16 @@ mongoose.connect(process.env.MONGO_URI)
 const authRoutes = require('./routes/authRoutes');
 const bazaarRoutes = require('./routes/bazaarRoutes');
 const tripRoutes = require('./routes/tripRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const gymRoutes = require('./routes/gymRoutes');
 const vendorRequestRoutes = require('./routes/vendorRequestRoutes');
 
 //Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/bazaars', bazaarRoutes);
 app.use('/api/trips', tripRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/gym', gymRoutes);
 app.use('/api/vendor-requests', vendorRequestRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/events", eventRoutes);

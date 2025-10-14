@@ -1,5 +1,7 @@
 const express = require("express");
 const router = express.Router();
+const { createGymSession, viewGymScheduleMonth } = require("../controllers/gymController");
+const { protect, permit } = require("../middleware/authMiddleware");
 const { protect, permit } = require("../middleware/authMiddleware");
 const { getAllUsers } = require('../controllers/adminController');
 const { createAdminOrEventOffice, deleteAdminOrEventOffice, } = require('../controllers/adminAccountsController');
