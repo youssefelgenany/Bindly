@@ -2,15 +2,13 @@ const express = require("express");
 const router = express.Router();
 const { createGymSession, viewGymScheduleMonth } = require("../controllers/gymController");
 const { protect, permit } = require("../middleware/authMiddleware");
-const { protect, permit } = require("../middleware/authMiddleware");
-const { getAllUsers } = require('../controllers/adminController');
 const { createAdminOrEventOffice, deleteAdminOrEventOffice, } = require('../controllers/adminAccountsController');
 const {assignRoleAndSendVerification} = require('../controllers/adminController');
 const { getAllUsers, updateUserRole, updateUserStatus, changePassword, updateProfile, getAllVendors, updateVendorVerification, updateVendorStatus } = require('../controllers/adminController');
 
 
 // Admin routes
-router.get('/users', protect, permit('Admin'), getAllUsers);
+//router.get('/users', protect, permit('Admin'), getAllUsers);
 router.put('/users/:userId/role', protect, permit('Admin'), updateUserRole);
 router.patch('/users/:userId/status', protect, permit('Admin'), updateUserStatus);
 
