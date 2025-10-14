@@ -17,7 +17,7 @@ import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
 import Navbar from './components/Navbar';
 import CreateConference from "./pages/CreatConfrence";
-import CreateBazaar from './pages/CreateBazaar';
+import CreateBazaar from "./pages/CreateBazaar";
 import CreateTrip from './pages/CreateTrip';
 import EditBazaar from './pages/EditBazaar';
 import EditTrip from './pages/EditTrip';
