@@ -1,39 +1,7 @@
-import axios from 'axios';
-
-// Public Events API (non-admin) - YOUR FRIEND'S CODE
-const eventsApi = axios.create({
-  baseURL: '/api/events',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  }
-});
-
-export const eventsApiService = {
-  // Fetch approved/upcoming events with optional search and type filters
-  getPublicEvents: async (filters = {}) => {
-    try {
-      const query = new URLSearchParams();
-      if (filters.q) query.append('q', filters.q);
-      if (filters.type) query.append('type', filters.type);
-      if (filters.when) query.append('when', filters.when);
-
-      const url = `/public?${query.toString()}`;
-      const response = await eventsApi.get(url);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return {
-        success: false,
-        message: error.response?.data?.message || 'Failed to fetch events',
-        error: error.response?.data || error.message,
-      };
-    }
-  }
-};
-
-// ✅ ADD YOUR BAZAAR & TRIP APIs HERE
+// Base URL for your backend
 const API_BASE = 'http://localhost:5000/api';
 
+// BAZAAR API - matches your bazaarRoutes.js and bazaarModel.js
 export const bazaarApi = {
   create: async (bazaarData) => {
     const response = await fetch(`${API_BASE}/bazaars`, {
@@ -58,6 +26,7 @@ export const bazaarApi = {
   }
 };
 
+// TRIP API - matches your tripRoutes.js and tripModel.js
 export const tripApi = {
   create: async (tripData) => {
     const response = await fetch(`${API_BASE}/trips`, {
@@ -81,5 +50,3 @@ export const tripApi = {
     return await response.json();
   }
 };
-
-export default eventsApiService;
