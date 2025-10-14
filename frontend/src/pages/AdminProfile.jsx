@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { adminApiService } from '../api/adminApi';
+import axios from 'axios';
+
 
 const AdminProfile = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'password', 'settings'
 
@@ -47,7 +50,7 @@ const AdminProfile = () => {
     }
   };
 
-  const handlePasswordChange = (e) => {
+  const handlePasswordChange = async(e) => {
     const { name, value } = e.target;
     setPasswordData(prev => ({ ...prev, [name]: value }));
     if (passwordErrors[name]) {
@@ -94,10 +97,19 @@ const AdminProfile = () => {
     setProfileMessage('');
 
     try {
-      // TODO: Replace with backend call
-      // Example: await axios.put('/api/admin/profile', profileData);
-      await new Promise(res => setTimeout(res, 1000));
-      setProfileMessage('Profile updated successfully!');
+      const result = await adminApiService.updateProfile({
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        email: profileData.email
+      });
+      
+      if (result.success) {
+        setProfileMessage('Profile updated successfully!');
+        // Update the user context with new data
+        updateUser(result.data.user);
+      } else {
+        setProfileMessage(result.message || 'Failed to update profile. Please try again.');
+      }
     } catch (error) {
       setProfileMessage('Failed to update profile. Please try again.');
     } finally {
@@ -113,11 +125,17 @@ const AdminProfile = () => {
     setPasswordMessage('');
 
     try {
-      // TODO: Replace with backend call
-      // Example: await axios.put('/api/admin/change-password', passwordData);
-      await new Promise(res => setTimeout(res, 1000));
-      setPasswordMessage('Password changed successfully!');
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      const result = await adminApiService.changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
+      
+      if (result.success) {
+        setPasswordMessage('Password changed successfully!');
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      } else {
+        setPasswordMessage(result.message || 'Failed to change password. Please check your current password.');
+      }
     } catch (error) {
       setPasswordMessage('Failed to change password. Please check your current password.');
     } finally {
@@ -148,7 +166,7 @@ const AdminProfile = () => {
   };
 
   // Basic guard (UI-level) to avoid rendering for non-admins
-  if (!(user?.role === 'admin' || user?.userType === 'Admin')) {
+  if (!(user?.userType === 'Admin')) {
     return (
       <div style={{ padding: '2rem' }}>
         <div className="container">

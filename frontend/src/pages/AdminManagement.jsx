@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { adminApiService } from '../api/adminApi';
 
 const AdminManagement = () => {
   const { user } = useAuth();
@@ -17,42 +18,43 @@ const AdminManagement = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [createMessage, setCreateMessage] = useState('');
 
-  // Admin accounts data
-  const [adminAccounts, setAdminAccounts] = useState([
-    {
-      id: 'admin-001',
-      firstName: 'System',
-      lastName: 'Admin',
-      email: 'admin@guc.edu.eg',
-      role: 'Admin',
-      createdAt: '2024-01-01T00:00:00Z',
-      isActive: true
-    },
-    {
-      id: 'admin-002',
-      firstName: 'Event',
-      lastName: 'Manager',
-      email: 'events@guc.edu.eg',
-      role: 'Event Office',
-      createdAt: '2024-02-15T10:30:00Z',
-      isActive: true
-    },
-    {
-      id: 'admin-003',
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john.doe@guc.edu.eg',
-      role: 'Event Office',
-      createdAt: '2024-03-20T14:45:00Z',
-      isActive: false
-    }
-  ]);
+  // Admin accounts data - will be loaded from API
+  const [adminAccounts, setAdminAccounts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, account: null });
   const [isDeleting, setIsDeleting] = useState(false);
 
   const roleOptions = ['Admin', 'Event Office'];
+
+  // Load admin accounts on component mount
+  useEffect(() => {
+    loadAdminAccounts();
+  }, []);
+
+  const loadAdminAccounts = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const result = await adminApiService.getAllUsers();
+      if (result.success) {
+        // Filter for admin and event office accounts
+        const adminUsers = result.data.users.filter(user => 
+          user.userType === 'Admin' || user.userType === 'Event Office'
+        );
+        setAdminAccounts(adminUsers);
+      } else {
+        setError(result.message);
+      }
+    } catch (err) {
+      setError('Failed to load admin accounts');
+      console.error('Error loading admin accounts:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -84,24 +86,22 @@ const AdminManagement = () => {
     setCreateMessage('');
 
     try {
-      // TODO: Replace with backend call
-      // Example: await axios.post('/api/admin/create-account', formData);
-      await new Promise(res => setTimeout(res, 1000));
-      
-      // Add to local state for demo
-      const newAccount = {
-        id: `admin-${Date.now()}`,
+      const result = await adminApiService.createAdminAccount({
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
-        role: formData.role,
-        createdAt: new Date().toISOString(),
-        isActive: true
-      };
-      setAdminAccounts(prev => [...prev, newAccount]);
+        password: formData.password,
+        role: formData.role
+      });
       
-      setCreateMessage('Account created successfully!');
-      setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'Admin' });
+      if (result.success) {
+        setCreateMessage('Account created successfully!');
+        setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'Admin' });
+        // Reload admin accounts to show the new one
+        await loadAdminAccounts();
+      } else {
+        setCreateMessage(result.message || 'Failed to create account. Please try again.');
+      }
     } catch (error) {
       setCreateMessage('Failed to create account. Please try again.');
     } finally {
@@ -118,12 +118,18 @@ const AdminManagement = () => {
 
     setIsDeleting(true);
     try {
-      // TODO: Replace with backend call
-      // Example: await axios.delete(`/api/admin/accounts/${deleteConfirm.account.id}`);
-      await new Promise(res => setTimeout(res, 500));
+      const accountId = deleteConfirm.account._id || deleteConfirm.account.id;
+      const result = await adminApiService.deleteAdminAccount(accountId);
       
-      setAdminAccounts(prev => prev.filter(acc => acc.id !== deleteConfirm.account.id));
-      setDeleteConfirm({ show: false, account: null });
+      if (result.success) {
+        setAdminAccounts(prev => prev.filter(acc => 
+          (acc._id || acc.id) !== accountId
+        ));
+        setDeleteConfirm({ show: false, account: null });
+      } else {
+        console.error('Delete failed:', result.message);
+        // You could show an error message to the user here
+      }
     } catch (error) {
       console.error('Delete failed:', error);
     } finally {
@@ -136,7 +142,7 @@ const AdminManagement = () => {
   };
 
   // Basic guard (UI-level) to avoid rendering for non-admins
-  if (!(user?.role === 'admin' || user?.userType === 'Admin')) {
+  if (!(user?.userType === 'Admin')) {
     return (
       <div style={{ padding: '2rem' }}>
         <div className="container">
@@ -144,6 +150,24 @@ const AdminManagement = () => {
             <div className="card-header">
               <h1 className="card-title" style={{ color: 'var(--guc-red)' }}>Unauthorized</h1>
               <p className="card-subtitle">You do not have access to this page.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: '2rem' }}>
+        <div className="container">
+          <div className="card">
+            <div className="card-header">
+              <h1 className="card-title" style={{ color: 'var(--guc-red)' }}>Admin Management</h1>
+              <p className="card-subtitle">Loading...</p>
+            </div>
+            <div style={{ padding: '2rem', textAlign: 'center' }}>
+              <div className="spinner" style={{ margin: '0 auto' }}></div>
             </div>
           </div>
         </div>
@@ -161,6 +185,19 @@ const AdminManagement = () => {
           </div>
 
           <div style={{ padding: '1rem' }}>
+            {error && (
+              <div className="alert alert-error">
+                {error}
+                <button 
+                  onClick={loadAdminAccounts}
+                  className="btn btn-outline"
+                  style={{ marginLeft: '1rem', padding: '4px 8px' }}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
             {/* Tab Navigation */}
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
               <button
@@ -300,39 +337,50 @@ const AdminManagement = () => {
                   </h3>
                   
                   <div style={{ display: 'grid', gap: '0.75rem' }}>
-                    {adminAccounts.map((account) => (
-                      <div key={account.id} className="card" style={{ backgroundColor: 'var(--white)' }}>
-                        <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ display: 'grid', gap: '0.25rem' }}>
-                            <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>
-                              {account.firstName} {account.lastName}
-                            </div>
-                            <div style={{ color: 'var(--text-light)', fontSize: '14px' }}>
-                              {account.email}
-                            </div>
-                            <div style={{ color: 'var(--text-light)', fontSize: '12px' }}>
-                              Role: {account.role} • Created: {new Date(account.createdAt).toLocaleDateString()}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ 
-                              fontSize: '12px', 
-                              color: account.isActive ? 'var(--success-green)' : 'var(--guc-red)' 
-                            }}>
-                              {account.isActive ? 'Active' : 'Inactive'}
-                            </span>
-                            <button
-                              className="btn btn-outline"
-                              onClick={() => handleDeleteClick(account)}
-                              style={{ padding: '4px 8px', fontSize: '12px', color: 'var(--guc-red)' }}
-                              title="Delete Account"
-                            >
-                              🗑️
-                            </button>
-                          </div>
+                    {adminAccounts.length === 0 ? (
+                      <div className="card" style={{ backgroundColor: 'var(--white)' }}>
+                        <div style={{ padding: '1rem', color: 'var(--text-light)' }}>
+                          No admin accounts found.
                         </div>
                       </div>
-                    ))}
+                    ) : (
+                      adminAccounts.map((account) => {
+                        const accountId = account._id || account.id;
+                        return (
+                          <div key={accountId} className="card" style={{ backgroundColor: 'var(--white)' }}>
+                            <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'grid', gap: '0.25rem' }}>
+                                <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>
+                                  {account.firstName} {account.lastName}
+                                </div>
+                                <div style={{ color: 'var(--text-light)', fontSize: '14px' }}>
+                                  {account.email}
+                                </div>
+                                <div style={{ color: 'var(--text-light)', fontSize: '12px' }}>
+                                  Role: {account.userType} • Created: {new Date(account.createdAt).toLocaleDateString()}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ 
+                                  fontSize: '12px', 
+                                  color: account.status === 'active' ? 'var(--success-green)' : 'var(--guc-red)' 
+                                }}>
+                                  {account.status === 'active' ? 'Active' : 'Inactive'}
+                                </span>
+                                <button
+                                  className="btn btn-outline"
+                                  onClick={() => handleDeleteClick(account)}
+                                  style={{ padding: '4px 8px', fontSize: '12px', color: 'var(--guc-red)' }}
+                                  title="Delete Account"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               </div>

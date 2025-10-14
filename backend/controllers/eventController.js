@@ -30,6 +30,52 @@ exports.createEvent = async (req, res) => {
   }
 };
 
+// Create a new conference (Admin or Event Office)
+exports.createConference = async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      agenda,
+      website,
+      budget,
+      fundingSource,
+      extraResources,
+      startDate,
+      endDate,
+      location,
+      capacity
+    } = req.body;
+
+    if (!title || !startDate || !endDate || !location || !agenda || !website || !budget || !fundingSource) {
+      return res.status(400).json({ msg: "Missing required conference fields" });
+    }
+
+    const newConference = new Event({
+      title,
+      description,
+      type: "conference",
+      agenda,
+      website,
+      budget,
+      fundingSource,
+      extraResources,
+      startDate,
+      endDate,
+      location,
+      capacity: capacity || 100,
+      createdBy: req.user._id,
+      status: "approved"
+    });
+
+    await newConference.save();
+    res.status(201).json({ msg: "Conference created successfully", conference: newConference });
+  } catch (err) {
+    console.error("❌ Error creating conference:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
 // 📅 Get all approved/upcoming events
 exports.getAllEvents = async (req, res) => {
   try {
@@ -51,6 +97,47 @@ exports.getAllEvents = async (req, res) => {
   } catch (err) {
     console.error("❌ Error fetching events:", err);
     res.status(500).json({ msg: "Server error" });
+  }
+};
+
+// Get all events for admin management (including pending)
+exports.getAllEventsForAdmin = async (req, res) => {
+  try {
+    const { q, type, status } = req.query;
+    console.log('🔍 Admin requesting events with query:', { q, type, status });
+    
+    const filter = {};
+
+    if (q) {
+      filter.$or = [
+        { title: new RegExp(q, "i") },
+        { description: new RegExp(q, "i") },
+        { location: new RegExp(q, "i") },
+      ];
+    }
+    if (type) filter.type = type;
+    if (status && status !== 'all') filter.status = status;
+
+    console.log('🔍 Filter applied:', filter);
+
+    const events = await Event.find(filter)
+      .populate('createdBy', 'firstName lastName email')
+      .sort({ createdAt: -1 });
+
+    console.log('📊 Found events:', events.length);
+    console.log('📊 Events data:', events);
+
+    res.status(200).json({
+      success: true,
+      message: 'Events fetched successfully',
+      events
+    });
+  } catch (err) {
+    console.error("❌ Error fetching events for admin:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error" 
+    });
   }
 };
 

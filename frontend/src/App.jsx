@@ -10,8 +10,12 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import ProfessorEvents from './pages/ProfessorEvents';
+import Events from './pages/Events';
+import GymSchedule from './pages/GymSchedule';
+import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
 import Navbar from './components/Navbar';
+import CreateConference from "./pages/CreatConfrence";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -107,6 +111,31 @@ function App() {
               } 
             />
             <Route 
+              path="/events" 
+              element={
+                <ProtectedRoute>
+                  <Events />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/gym" 
+              element={
+                <ProtectedRoute>
+                  <GymSchedule />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/gym/manage" 
+              element={
+                <ProtectedRoute>
+                  {/* Allow Admin and Events Office */}
+                  <GymManage />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
               path="/professor/events" 
               element={
                 <ProtectedRoute>
@@ -172,6 +201,15 @@ function App() {
                 </ProtectedRoute>
               }
             />
+             <Route
+               path="/create-conference" 
+               element={
+                <ProtectedRoute>
+                  <AdminOnly>
+                    <CreateConference />
+                  </AdminOnly>
+                </ProtectedRoute> } 
+              />
           </Routes>
         </div>
       </Router>
