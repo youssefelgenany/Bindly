@@ -66,6 +66,11 @@ const permit = (...roles) => {
 };
 
 module.exports = {
+// Alias for compatibility
+
+
+module.exports = {
+  
   protect,
   permit
 };
