@@ -40,21 +40,26 @@ const protect = async (req, res, next) => {
   }
 };
 
-// Middleware to check if user has specific role
+// Normalize role strings for comparison (case-insensitive, unify spacing/underscores)
+function normalizeRole(role) {
+  return String(role || '')
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Middleware to check if user has specific role (case-insensitive, tolerant)
 const permit = (...roles) => {
+  const allowed = roles.map(normalizeRole);
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
-    if (!roles.includes(req.user.userType)) {  // using userType field from user model
-      return res.status(403).json({
-        success: false,
-        message: 'Insufficient permissions'
-      });
+    const userRole = normalizeRole(req.user.userType);
+    if (!allowed.includes(userRole)) {
+      return res.status(403).json({ success: false, message: 'Insufficient permissions' });
     }
 
     next();

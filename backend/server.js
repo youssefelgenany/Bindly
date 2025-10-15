@@ -40,6 +40,8 @@ const authRoutes = require('./routes/authRoutes');
 const bazaarRoutes = require('./routes/bazaarRoutes');
 const tripRoutes = require('./routes/tripRoutes');
 const vendorRequestRoutes = require('./routes/vendorRequestRoutes');
+const announcementRoutes = require('./routes/announcementRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 //Mount routes
 app.use('/api/auth', authRoutes);
@@ -49,6 +51,8 @@ app.use('/api/vendor-requests', vendorRequestRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/gym", gymRoutes);
+app.use("/api/announcements", announcementRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 
 

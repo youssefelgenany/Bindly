@@ -1,5 +1,47 @@
 const Bazaar = require ('../models/bazaarModel');
 
+// Get all bazaars (for users to browse)
+exports.getAllBazaars = async (req, res) => {
+  try {
+    const { q } = req.query;
+    const filter = {};
+    
+    if (q) {
+      filter.$or = [
+        { name: new RegExp(q, "i") },
+        { description: new RegExp(q, "i") },
+        { location: new RegExp(q, "i") },
+      ];
+    }
+    
+    const bazaars = await Bazaar.find(filter).sort({ startDate: 1 });
+    res.json(bazaars);
+  } catch (err) {
+    console.error("❌ Error fetching bazaars:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
+// Register a user for a bazaar
+exports.registerForBazaar = async (req, res) => {
+  try {
+    const bazaar = await Bazaar.findById(req.params.id);
+    if (!bazaar) return res.status(404).json({ msg: "Bazaar not found" });
+
+    // Check if registration deadline passed
+    if (new Date() > new Date(bazaar.registrationDeadline)) {
+      return res.status(400).json({ msg: "Registration deadline has passed" });
+    }
+
+    // For now, we'll just return success since bazaars don't have capacity limits
+    // In a real implementation, you might want to track registrations separately
+    res.status(201).json({ msg: "Successfully registered for bazaar", bazaar: bazaar.name });
+  } catch (err) {
+    console.error("❌ Error registering for bazaar:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
 // Create bazaar (31)
 exports.createBazaar = async (req, res) => {
     try {

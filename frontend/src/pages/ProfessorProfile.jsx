@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { professorApiService } from '../api/professorApi';
 
 const ProfessorProfile = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'password'
@@ -55,10 +56,31 @@ const ProfessorProfile = () => {
     setIsUpdatingProfile(true);
     setProfileMessage('');
     try {
-      // TODO: call backend to update profile and upload avatar
-      await new Promise(res => setTimeout(res, 800));
-      setProfileMessage('Profile updated successfully!');
+      console.log('👤 Updating profile with data:', profileData);
+      const result = await professorApiService.updateProfile(profileData);
+      
+      if (result.success) {
+        console.log('✅ Profile updated successfully:', result.data);
+        setProfileMessage('Profile updated successfully!');
+        
+        // Update the user context with the new data
+        const updatedUser = result.data.user;
+        updateUser(updatedUser);
+        
+        // Also update the local profileData state to reflect the changes
+        setProfileData({
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          email: updatedUser.email,
+          department: updatedUser.department || '',
+          gucId: updatedUser.gucId || '',
+          avatarFile: null,
+        });
+      } else {
+        setProfileMessage(result.message || 'Failed to update profile. Please try again.');
+      }
     } catch (err) {
+      console.error('❌ Error updating profile:', err);
       setProfileMessage('Failed to update profile. Please try again.');
     } finally {
       setIsUpdatingProfile(false);
@@ -88,11 +110,18 @@ const ProfessorProfile = () => {
     setIsChangingPassword(true);
     setPasswordMessage('');
     try {
-      // TODO: call backend to change password
-      await new Promise(res => setTimeout(res, 800));
-      setPasswordMessage('Password changed successfully!');
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      console.log('🔒 Changing password...');
+      const result = await professorApiService.changePassword(passwordData);
+      
+      if (result.success) {
+        console.log('✅ Password changed successfully');
+        setPasswordMessage('Password changed successfully!');
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      } else {
+        setPasswordMessage(result.message || 'Failed to change password.');
+      }
     } catch (err) {
+      console.error('❌ Error changing password:', err);
       setPasswordMessage('Failed to change password.');
     } finally {
       setIsChangingPassword(false);
@@ -179,9 +208,25 @@ const ProfessorProfile = () => {
                       </div>
                       <div className="form-group">
                         <label className="form-label">Profile Picture</label>
-                        <input className="form-input" name="avatarFile" type="file" onChange={handleProfileChange} disabled={isUpdatingProfile} />
+                        <input className="form-input" name="avatarFile" type="file" accept="image/*" onChange={handleProfileChange} disabled={isUpdatingProfile} />
                         {profileData.avatarFile && (
                           <div style={{ fontSize: 14, color: 'var(--text-light)', marginTop: '0.25rem' }}>Selected: {profileData.avatarFile.name}</div>
+                        )}
+                        {user?.profilePicturePath && !profileData.avatarFile && (
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <div style={{ fontSize: 14, color: 'var(--text-light)', marginBottom: '0.25rem' }}>Current profile picture:</div>
+                            <img 
+                              src={`http://localhost:5000${user.profilePicturePath}`} 
+                              alt="Profile" 
+                              style={{ 
+                                width: 60, 
+                                height: 60, 
+                                borderRadius: '50%', 
+                                objectFit: 'cover',
+                                border: '2px solid var(--medium-gray)'
+                              }} 
+                            />
+                          </div>
                         )}
                       </div>
                     </div>

@@ -68,6 +68,9 @@ const Login = () => {
         }, 1000);
       } else {
         setMessage(result.message);
+        if (result.redirect) {
+          setTimeout(() => navigate(result.redirect), 1000);
+        }
       }
     } catch (error) {
       setMessage('An unexpected error occurred. Please try again.');

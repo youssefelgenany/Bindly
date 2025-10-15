@@ -30,11 +30,23 @@ adminApi.interceptors.request.use(
 adminApi.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid
+    const status = error.response?.status;
+    const message = error.response?.data?.message;
+
+    // Do NOT force logout/redirect for admin activation wrong password case
+    const isAdminStatusEndpoint = error.config?.url?.includes('/users/') && error.config?.url?.includes('/status');
+    const isAdminVerifyEndpoint = error.config?.url?.includes('/users/') && error.config?.url?.includes('/verification');
+    const isWrongActivationPassword = message === 'Invalid confirmation password';
+    if (status === 401 && (isAdminStatusEndpoint || isAdminVerifyEndpoint) && isWrongActivationPassword) {
+      return Promise.reject(error); // let caller handle and show modal error
+    }
+
+    if (status === 401) {
+      // Token expired or invalid → logout and redirect
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/admin/login';
+      return; // safety
     }
     return Promise.reject(error);
   }
@@ -115,9 +127,9 @@ export const adminApiService = {
   },
 
   // Update user status (activate/deactivate)
-  updateUserStatus: async (userId, isActive) => {
+  updateUserStatus: async (userId, isActive, confirmationPassword) => {
     try {
-      const response = await adminApi.patch(`/users/${userId}/status`, { isActive });
+      const response = await adminApi.patch(`/users/${userId}/status`, { isActive, confirmationPassword });
       return {
         success: true,
         data: response.data,
@@ -207,18 +219,30 @@ export const adminApiService = {
   // Update event status
   updateEventStatus: async (eventId, status) => {
     try {
-      const response = await axios.put(`/api/events/${eventId}`, { status }, {
+      const url = `/api/events/${eventId}`;
+      const data = { status };
+      console.log('🌐 Making event status update API call to:', url);
+      console.log('📊 Event ID:', eventId);
+      console.log('📊 New Status:', status);
+      console.log('🔑 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+      
+      const response = await axios.put(url, data, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         }
       });
+      
+      console.log('✅ Event Status Update Response:', response.data);
       return {
         success: true,
         data: response.data,
       };
     } catch (error) {
-      console.error('Error updating event status:', error);
+      console.error('❌ Error updating event status:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      console.error('❌ Error message:', error.message);
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to update event status',
@@ -284,13 +308,25 @@ export const adminApiService = {
   // Update vendor verification status
   updateVendorVerification: async (vendorId, isVerified) => {
     try {
-      const response = await adminApi.put(`/vendors/${vendorId}/verification`, { isVerified });
+      const url = `/vendors/${vendorId}/verification`;
+      const data = { isVerified };
+      console.log('🌐 Making vendor verification API call to:', url);
+      console.log('📊 Vendor ID:', vendorId);
+      console.log('📊 Is Verified:', isVerified);
+      console.log('🔑 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+      
+      const response = await adminApi.put(url, data);
+      
+      console.log('✅ Vendor Verification Response:', response.data);
       return {
         success: true,
         data: response.data,
       };
     } catch (error) {
-      console.error('Error updating vendor verification:', error);
+      console.error('❌ Error updating vendor verification:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      console.error('❌ Error message:', error.message);
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to update vendor verification',
@@ -302,16 +338,62 @@ export const adminApiService = {
   // Update vendor status (active/blocked)
   updateVendorStatus: async (vendorId, status) => {
     try {
-      const response = await adminApi.put(`/vendors/${vendorId}/status`, { status });
+      const url = `/vendors/${vendorId}/status`;
+      const data = { status };
+      console.log('🌐 Making vendor status API call to:', url);
+      console.log('📊 Vendor ID:', vendorId);
+      console.log('📊 New Status:', status);
+      console.log('🔑 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+      
+      const response = await adminApi.put(url, data);
+      
+      console.log('✅ Vendor Status Response:', response.data);
       return {
         success: true,
         data: response.data,
       };
     } catch (error) {
-      console.error('Error updating vendor status:', error);
+      console.error('❌ Error updating vendor status:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      console.error('❌ Error message:', error.message);
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to update vendor status',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
+  // Update user verification status
+  updateUserVerification: async (userId, isVerified, confirmationPassword) => {
+    try {
+      const url = `/users/${userId}/verification`;
+      const data = { isVerified, confirmationPassword };
+      console.log('🌐 Making user verification API call to:', url);
+      console.log('📊 User ID:', userId);
+      console.log('📊 Is Verified:', isVerified);
+      console.log('📊 Request Data:', data);
+      console.log('🔑 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+      console.log('🔑 Full URL will be:', `/api/admin${url}`);
+      
+      const response = await adminApi.put(url, data);
+      
+      console.log('✅ User Verification Response:', response.data);
+      console.log('✅ Response Status:', response.status);
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('❌ Error updating user verification:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Full error object:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to update user verification',
         error: error.response?.data || error.message,
       };
     }

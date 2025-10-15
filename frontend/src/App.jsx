@@ -9,8 +9,11 @@ import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
+import PendingVerification from './pages/PendingVerification';
 import ProfessorEvents from './pages/ProfessorEvents';
+import ProfessorAllEvents from './pages/ProfessorAllEvents';
 import ProfessorProfile from './pages/ProfessorProfile';
+import ProfessorGymSchedule from './pages/ProfessorGymSchedule';
 import Navbar from './components/Navbar';
 import CreateConference from "./pages/CreatConfrence";
 
@@ -100,6 +103,10 @@ function App() {
               } 
             />
             <Route 
+              path="/pending-verification"
+              element={<PendingVerification />}
+            />
+            <Route 
               path="/dashboard" 
               element={
                 <ProtectedRoute>
@@ -116,10 +123,26 @@ function App() {
               }
             />
             <Route 
+              path="/professor/all-events" 
+              element={
+                <ProtectedRoute>
+                  <ProfessorAllEvents />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
               path="/professor/profile" 
               element={
                 <ProtectedRoute>
                   <ProfessorProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/professor/gym-schedule" 
+              element={
+                <ProtectedRoute>
+                  <ProfessorGymSchedule />
                 </ProtectedRoute>
               }
             />

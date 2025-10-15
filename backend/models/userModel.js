@@ -34,7 +34,18 @@ const userSchema = new mongoose.Schema({
     required: function() {
       return ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
     },
+    trim: true,
+    default: null
+  },
+  // Department field for GUC users
+  department: {
+    type: String,
     trim: true
+  },
+  // Profile picture for all users
+  profilePicturePath: {
+    type: String,
+    default: null
   },
   // For vendors
   companyName: {
@@ -46,16 +57,10 @@ const userSchema = new mongoose.Schema({
   },
   vendorLogoPath: {
     type: String,
-    required: function() {
-      return this.userType === 'Vendor';
-    },
     default: null
   },
   vendorTaxCardPath: {
     type: String,
-    required: function() {
-      return this.userType === 'Vendor';
-    },
     default: null
   },
   isVerified: {
@@ -77,7 +82,7 @@ const userSchema = new mongoose.Schema({
    status: {
     type: String,
     enum: ['active', 'blocked'],
-    default: 'active'
+    default: 'blocked'
   }
 });
 

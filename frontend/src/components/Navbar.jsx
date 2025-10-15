@@ -22,7 +22,9 @@ const Navbar = () => {
       'Staff': 'Staff',
       'TA': 'TA',
       'Professor': 'Professor',
-      'Vendor': 'Vendor'
+      'Vendor': 'Vendor',
+      'Admin': 'Admin',
+      'Event Office': 'Event Office'
     };
     return types[userType] || userType;
   };
@@ -80,12 +82,30 @@ const Navbar = () => {
                 </div>
                 
                 {/* User Avatar */}
+                {user?.profilePicturePath ? (
+                  <img 
+                    src={`http://localhost:5000${user.profilePicturePath}`}
+                    alt={`${user.firstName} ${user.lastName}`}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '2px solid var(--guc-red)'
+                    }}
+                    onError={(e) => {
+                      // Fallback to initials if image fails to load
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
                 <div style={{
                   width: '40px',
                   height: '40px',
                   borderRadius: '50%',
                   backgroundColor: 'var(--guc-red)',
-                  display: 'flex',
+                  display: user?.profilePicturePath ? 'none' : 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'var(--white)',

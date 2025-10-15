@@ -4,10 +4,10 @@ const { createGymSession, viewGymScheduleMonth } = require("../controllers/gymCo
 const { protect, permit } = require("../middleware/authMiddleware");
 
 // Event Office creates gym sessions (Req 84)
-router.post("/", protect, permit("event_office"), createGymSession);
+router.post("/", protect, permit("Event Office", "Admin"), createGymSession);
 
 // Everyone (student/staff/ta/professor/event_office) views schedule (Req 80)
-router.get("/month", protect, permit("student","staff","ta","professor","event_office"), viewGymScheduleMonth);
+router.get("/month", protect, permit("Student", "Staff", "TA", "Professor", "Event Office", "Admin"), viewGymScheduleMonth);
 
 module.exports = router;
 

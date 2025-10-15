@@ -105,9 +105,14 @@ exports.updateUserRole = async (req, res) => {
 exports.updateUserStatus = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { isActive } = req.body;
+    const { isActive, confirmationPassword } = req.body;
+
+    console.log('🔍 Updating user status:', userId);
+    console.log('🔍 Is Active:', isActive);
+    console.log('🔍 Request body:', req.body);
 
     if (typeof isActive !== 'boolean') {
+      console.log('❌ Invalid isActive type:', typeof isActive);
       return res.status(400).json({
         success: false,
         message: 'isActive must be a boolean value'
@@ -116,15 +121,44 @@ exports.updateUserStatus = async (req, res) => {
 
     const user = await User.findById(userId);
     if (!user) {
+      console.log('❌ User not found:', userId);
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
 
+    console.log('📊 Current user:', {
+      id: user._id,
+      name: `${user.firstName} ${user.lastName}`,
+      userType: user.userType,
+      currentStatus: user.status
+    });
+
+    // Require password confirmation when modifying Admin/Event Office accounts
+    if (user.userType === 'Admin' || user.userType === 'Event Office') {
+      if (!confirmationPassword || typeof confirmationPassword !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'confirmationPassword is required to modify admin accounts'
+        });
+      }
+      if (confirmationPassword !== '123456') {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid confirmation password'
+        });
+      }
+    }
+
     // Update user status
     user.status = isActive ? 'active' : 'blocked';
+    
+    console.log('📊 New status:', user.status);
+    
     await user.save();
+    
+    console.log('✅ User status updated successfully');
 
     res.status(200).json({
       success: true,
@@ -140,7 +174,7 @@ exports.updateUserStatus = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Error updating user status:', err);
+    console.error('❌ Error updating user status:', err);
     res.status(500).json({
       success: false,
       message: 'Server error'
@@ -328,8 +362,12 @@ exports.updateVendorVerification = async (req, res) => {
   try {
     const { vendorId } = req.params;
     const { isVerified } = req.body;
+    
+    console.log('🔍 Updating vendor verification:', vendorId);
+    console.log('🔍 Is Verified:', isVerified);
 
     if (typeof isVerified !== 'boolean') {
+      console.log('❌ Invalid isVerified type:', typeof isVerified);
       return res.status(400).json({
         success: false,
         message: "isVerified must be a boolean value",
@@ -338,14 +376,17 @@ exports.updateVendorVerification = async (req, res) => {
 
     const vendor = await User.findOne({ _id: vendorId, userType: 'Vendor' });
     if (!vendor) {
+      console.log('❌ Vendor not found:', vendorId);
       return res.status(404).json({
         success: false,
         message: "Vendor not found",
       });
     }
 
+    console.log('📊 Current verification status:', vendor.isVerified);
     vendor.isVerified = isVerified;
     await vendor.save();
+    console.log('✅ Vendor verification updated successfully');
 
     res.status(200).json({
       success: true,
@@ -361,7 +402,7 @@ exports.updateVendorVerification = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error updating vendor verification:", error);
+    console.error("❌ Error updating vendor verification:", error);
     res.status(500).json({
       success: false,
       message: "Failed to update vendor verification",
@@ -375,8 +416,12 @@ exports.updateVendorStatus = async (req, res) => {
   try {
     const { vendorId } = req.params;
     const { status } = req.body;
+    
+    console.log('🔍 Updating vendor status:', vendorId);
+    console.log('🔍 New Status:', status);
 
     if (!['active', 'blocked'].includes(status)) {
+      console.log('❌ Invalid status:', status);
       return res.status(400).json({
         success: false,
         message: "Status must be 'active' or 'blocked'",
@@ -385,14 +430,17 @@ exports.updateVendorStatus = async (req, res) => {
 
     const vendor = await User.findOne({ _id: vendorId, userType: 'Vendor' });
     if (!vendor) {
+      console.log('❌ Vendor not found:', vendorId);
       return res.status(404).json({
         success: false,
         message: "Vendor not found",
       });
     }
 
+    console.log('📊 Current status:', vendor.status);
     vendor.status = status;
     await vendor.save();
+    console.log('✅ Vendor status updated successfully');
 
     res.status(200).json({
       success: true,
@@ -408,10 +456,80 @@ exports.updateVendorStatus = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error updating vendor status:", error);
+    console.error("❌ Error updating vendor status:", error);
     res.status(500).json({
       success: false,
       message: "Failed to update vendor status",
+      error: error.message,
+    });
+  }
+};
+
+// Update user verification status
+exports.updateUserVerification = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { isVerified, confirmationPassword } = req.body;
+    
+    console.log('🔍 Updating user verification:', userId);
+    console.log('🔍 Is Verified:', isVerified);
+
+    if (typeof isVerified !== 'boolean') {
+      console.log('❌ Invalid isVerified type:', typeof isVerified);
+      return res.status(400).json({
+        success: false,
+        message: "isVerified must be a boolean value",
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      console.log('❌ User not found:', userId);
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Require password confirmation when modifying Admin/Event Office verification
+    if (user.userType === 'Admin' || user.userType === 'Event Office') {
+      if (!confirmationPassword || typeof confirmationPassword !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'confirmationPassword is required to modify admin accounts'
+        });
+      }
+      if (confirmationPassword !== '123456') {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid confirmation password'
+        });
+      }
+    }
+
+    console.log('📊 Current verification status:', user.isVerified);
+    user.isVerified = isVerified;
+    await user.save();
+    console.log('✅ User verification updated successfully');
+
+    res.status(200).json({
+      success: true,
+      message: `User ${isVerified ? 'verified' : 'unverified'} successfully`,
+      user: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        userType: user.userType,
+        isVerified: user.isVerified,
+        status: user.status,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error updating user verification:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update user verification",
       error: error.message,
     });
   }
