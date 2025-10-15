@@ -208,6 +208,19 @@ const Navbar = () => {
               >
                 Gym Schedule
               </Link>
+              
+              {/* EVENTS MANAGEMENT - MOVED HERE FOR BETTER VISIBILITY */}
+              {(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'Events Office' || user.role === 'event_office') && (
+                <Link
+                  to="/events"
+                  className="btn btn-outline"
+                  style={{ width: '100%' }}
+                  onClick={closeSidebar}
+                >
+                  Events Management
+                </Link>
+              )}
+              
               {(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'Events Office' || user.role === 'event_office' || user.userType === 'event_office') && (
                 <Link
                   to="/gym/manage"
@@ -218,6 +231,7 @@ const Navbar = () => {
                   Manage Gym
                 </Link>
               )}
+              
               {(user.role === 'admin' || user.userType === 'Admin') && (
                 <>
                   <Link
@@ -262,8 +276,6 @@ const Navbar = () => {
                   </Link>
                 </>
               )}
-
-              {/* Add more quick links here if needed */}
             </div>
           </aside>
         </>

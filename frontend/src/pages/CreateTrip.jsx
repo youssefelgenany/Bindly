@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TripForm from '../components/TripForm';
-import { tripApi } from '../api/eventAPI';
+import { tripApi } from '../api/eventsApi';
 import '../styles/CreateTrip.css';
 
 const CreateTrip = () => {
