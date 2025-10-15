@@ -39,16 +39,18 @@ const Navbar = () => {
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        {/* Left group: hamburger at extreme left + brand */}
+        {/* Left group: brand only */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button
-            onClick={toggleSidebar}
-            className="btn btn-outline"
-            aria-label="Open menu"
-            style={{ padding: '8px 12px', fontSize: '18px' }}
-          >
-            ≡
-          </button>
+          {user && (
+            <button
+              onClick={toggleSidebar}
+              className="btn btn-outline"
+              aria-label="Open menu"
+              style={{ padding: '8px 12px', fontSize: '18px' }}
+            >
+              ≡
+            </button>
+          )}
           <Link 
             to={user ? '/dashboard' : '/'} 
             style={{ 

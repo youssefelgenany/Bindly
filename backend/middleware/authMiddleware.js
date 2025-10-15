@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 const Admin = require('../models/AdminModel');
-const auth = require('../middleware/authMiddleware');
 
 const protect = async (req, res, next) => {
   try {
@@ -66,14 +65,7 @@ const permit = (...roles) => {
   };
 };
 
-// Alias for compatibility
-const protect = authenticateToken;
-const permit = requireRole;
-
 module.exports = {
-  authenticateToken,
-  requireRole,
   protect,
   permit
 };
-module.exports = { protect, permit };

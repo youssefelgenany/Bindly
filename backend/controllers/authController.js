@@ -240,8 +240,14 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
    
-    const user = await User.findOne({ email }) || await Admin.findOne({ email });
-    console.log("🔍 Found user:", user);
+    // Try to find user in User model first
+    let user = await User.findOne({ email });
+    
+    // If not found in User model, try Admin model
+    if (!user) {
+      user = await Admin.findOne({ email });
+    }
+    
     if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
     // Check verification status for Staff/TA/Professor
@@ -253,9 +259,7 @@ const login = async (req, res) => {
     }
 
     const isPasswordValid = await user.comparePassword(password);
-    console.log(password);
-    console.log("passvalid?", isPasswordValid);
-    if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password ' });
+    if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
     const token = jwt.sign(
       { userId: user._id, email: user.email, role: user.role || user.userType  },
