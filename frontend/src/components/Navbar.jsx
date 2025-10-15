@@ -220,17 +220,19 @@ const Navbar = () => {
             </div>
 
             <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-              <Link
-                to="/gym"
-                className="btn btn-outline"
-                style={{ width: '100%' }}
-                onClick={closeSidebar}
-              >
-                Gym Schedule
-              </Link>
+              {!(user.role === 'admin' || user.userType === 'Admin') && (
+                <Link
+                  to="/gym"
+                  className="btn btn-outline"
+                  style={{ width: '100%' }}
+                  onClick={closeSidebar}
+                >
+                  Gym Schedule
+                </Link>
+              )}
               
               {/* EVENTS MANAGEMENT - MOVED HERE FOR BETTER VISIBILITY */}
-              {(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'Events Office' || user.role === 'event_office') && (
+              {(user.userType === 'Events Office' || user.role === 'event_office') && (
                 <Link
                   to="/events"
                   className="btn btn-outline"
@@ -241,7 +243,7 @@ const Navbar = () => {
                 </Link>
               )}
               
-              {(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'Events Office' || user.role === 'event_office' || user.userType === 'event_office') && (
+              {(user.userType === 'Events Office' || user.role === 'event_office' || user.userType === 'event_office') && (
                 <Link
                   to="/gym/manage"
                   className="btn btn-outline"
