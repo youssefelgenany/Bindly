@@ -9,5 +9,4 @@ router.post("/", protect, permit("Event Office", "Admin"), createGymSession);
 // Everyone (student/staff/ta/professor/event_office) views schedule (Req 80)
 router.get("/month", protect, permit("Student", "Staff", "TA", "Professor", "Event Office", "Admin"), viewGymScheduleMonth);
 
-module.exports = router;
-
+module.exports = router;

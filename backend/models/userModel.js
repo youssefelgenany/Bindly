@@ -13,20 +13,30 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
-  firstName: {
+   firstName: {
     type: String,
-    required: true,
+    required: function() {
+      return ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
+    },
     trim: true
   },
   lastName: {
     type: String,
-    required: true,
+    required: function() {
+      return ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
+    },
     trim: true
+  },
+   name: {
+    type: String,
+    required: function() {
+      return ['admin', 'event_office'].includes(this.userType);
+    }
   },
   userType: {
     type: String,
     required: true,
-    enum: ['Student', 'Staff', 'TA', 'Professor', 'Vendor', 'Admin', 'Event Office']
+    enum: ['Student', 'Staff', 'TA', 'Professor', 'Vendor','event_office','admin']
   },
   // For GUC users (Student, Staff, TA, Professor)
   gucId: {

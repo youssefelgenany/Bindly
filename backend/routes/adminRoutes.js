@@ -1,5 +1,7 @@
 const express = require("express");
 const router = express.Router();
+
+const { createGymSession, viewGymScheduleMonth } = require("../controllers/gymController");
 const { protect, permit } = require("../middleware/authMiddleware");
 const { getAllUsers, updateUserRole, updateUserStatus, changePassword, updateProfile, getAllVendors, updateVendorVerification, updateVendorStatus, updateUserVerification } = require('../controllers/adminController');
 const { createAdminOrEventOffice, deleteAdminOrEventOffice } = require('../controllers/adminAccountsController');
@@ -33,8 +35,5 @@ router.put('/vendors/:vendorId/status', protect, permit('Admin'), (req, res, nex
   console.log('🚀 Vendor status route hit:', req.params.vendorId, req.body);
   next();
 }, updateVendorStatus);
-
-
-
 
 module.exports = router;

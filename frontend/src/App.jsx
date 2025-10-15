@@ -12,10 +12,19 @@ import Dashboard from './pages/Dashboard';
 import PendingVerification from './pages/PendingVerification';
 import ProfessorEvents from './pages/ProfessorEvents';
 import ProfessorAllEvents from './pages/ProfessorAllEvents';
+import VerificationPending from './pages/VerificationPending';
+import Events from './pages/Events';
+import GymSchedule from './pages/GymSchedule';
+import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
 import ProfessorGymSchedule from './pages/ProfessorGymSchedule';
 import Navbar from './components/Navbar';
 import CreateConference from "./pages/CreatConfrence";
+import EventsList from './pages/EventsList';
+import CreateBazaar from "./pages/CreateBazaar";
+import CreateTrip from './pages/CreateTrip';
+import EditBazaar from './pages/EditBazaar';
+import EditTrip from './pages/EditTrip';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -78,6 +87,29 @@ const AdminOnly = ({ children }) => {
   return isAdmin ? children : <Navigate to="/dashboard" />;
 };
 
+// Events Office guard
+const EventsOfficeOnly = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh' 
+      }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  const isEventsOffice = user && (user.userType === 'Events Office' || user.role === 'event_office');
+  const isAdmin = user && (user.role === 'admin' || user.userType === 'Admin');
+  
+  return (isEventsOffice || isAdmin) ? children : <Navigate to="/dashboard" />;
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -107,12 +139,44 @@ function App() {
               element={<PendingVerification />}
             />
             <Route 
+              path="/verification-pending" 
+              element={
+                <PublicRoute>
+                  <VerificationPending />
+                </PublicRoute>
+              } 
+            />
+            <Route 
               path="/dashboard" 
               element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/events" 
+              element={
+                <ProtectedRoute>
+                  <EventsList />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/gym" 
+              element={
+                <ProtectedRoute>
+                  <GymSchedule />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/gym/manage" 
+              element={
+                <ProtectedRoute>
+                  <GymManage />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/professor/events" 
@@ -196,15 +260,58 @@ function App() {
                 </ProtectedRoute>
               }
             />
-             <Route
-               path="/create-conference" 
-               element={
+            <Route
+              path="/create-conference" 
+              element={
                 <ProtectedRoute>
                   <AdminOnly>
                     <CreateConference />
                   </AdminOnly>
-                </ProtectedRoute> } 
-              />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* ✅ ADD YOUR EVENT MANAGEMENT ROUTES HERE */}
+            <Route 
+              path="/create-bazaar" 
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <CreateBazaar />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/create-trip" 
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <CreateTrip />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/edit-bazaar/:id" 
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <EditBazaar />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/edit-trip/:id" 
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <EditTrip />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              } 
+            />
           </Routes>
         </div>
       </Router>

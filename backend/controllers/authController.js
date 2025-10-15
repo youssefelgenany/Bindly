@@ -131,8 +131,7 @@ const signup = async (req, res) => {
       firstName, 
       lastName, 
       userType,
-      isVerified: false,
-      status: 'blocked'
+      isVerified: ['Staff', 'TA', 'Professor'].includes(userType) ? false : true // Staff/TA/Professor need admin verification
     };
 
     // Add GUC ID for academic users
@@ -188,10 +187,29 @@ const signup = async (req, res) => {
       createdAt: newUser.createdAt
     };
 
+    // Generate JWT token for immediate login
+    const token = jwt.sign(
+      { 
+        userId: newUser._id, 
+        email: newUser.email, 
+        userType: newUser.userType 
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '7d' }
+    );
+
+    // Determine response message based on user type
+    let responseMessage = 'User created successfully';
+    if (['Staff', 'TA', 'Professor'].includes(userType)) {
+      responseMessage = 'Account created successfully. Your account is pending admin verification. You will receive an email once verified.';
+    }
+
     const responseBody = {
       success: true,
-      message: 'User created successfully. Awaiting verification by admin.',
-      user: userResponse
+      message: responseMessage,
+      user: userResponse,
+      token: ['Staff', 'TA', 'Professor'].includes(userType) ? null : token, // No token for unverified accounts
+      requiresVerification: ['Staff', 'TA', 'Professor'].includes(userType)
     };
 
     res.status(201).json(responseBody);
@@ -224,16 +242,26 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
    
-    const user = await User.findOne({ email }) || await Admin.findOne({ email });
-    console.log("🔍 Found user:", user);
+    // Try to find user in User model first
+    let user = await User.findOne({ email });
+    
+    // If not found in User model, try Admin model
+    if (!user) {
+      user = await Admin.findOne({ email });
+    }
+    
     if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
-    // Email verification disabled for Students; allow login regardless
+    // Check verification status for Staff/TA/Professor
+    if (['Staff', 'TA', 'Professor'].includes(user.userType) && !user.isVerified) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Your account is pending admin verification. You will receive an email once verified.' 
+      });
+    }
 
     const isPasswordValid = await user.comparePassword(password);
-    console.log(password);
-    console.log("passvalid?", isPasswordValid);
-    if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password ' });
+    if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
     // Block login for unverified or inactive users
     if (!user.isVerified || user.status !== 'active') {
@@ -245,7 +273,7 @@ const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user._id, email: user.email, userType: user.userType },
+      { userId: user._id, email: user.email, role: user.role || user.userType  },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );

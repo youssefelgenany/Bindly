@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const vendorRequestSchema = new mongoose.Schema({
   vendor: {
@@ -46,4 +46,4 @@ const vendorRequestSchema = new mongoose.Schema({
   },
 });
 
-export default mongoose.model("VendorRequest", vendorRequestSchema);
+module.exports = mongoose.model("VendorRequest", vendorRequestSchema);

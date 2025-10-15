@@ -1,8 +1,10 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/userModel");
+const Admin = require("../models/AdminModel");
 
 // Admin creates new admin/event office accounts
 exports.createAdminOrEventOffice = async (req, res) => {
+   console.log("🔹 Body received:", req.body);
   try {
     const { firstName, lastName, email, password, role } = req.body;
     const requestingUser = req.user; // The admin making the request
@@ -29,6 +31,7 @@ exports.createAdminOrEventOffice = async (req, res) => {
       message: "Email already exists" 
     });
 
+    //const passwordHash = await bcrypt.hash(password, 10);
     const newUser = await User.create({
       firstName,
       lastName,
@@ -73,11 +76,8 @@ exports.deleteAdminOrEventOffice = async (req, res) => {
       message: "User not found" 
     });
 
-    if (!["Admin", "Event Office"].includes(user.userType))
-      return res.status(400).json({ 
-        success: false,
-        message: "Not an admin/event office account" 
-      });
+    if (!["admin", "event_office"].includes(user.userType.toLowerCase()))
+      return res.status(400).json({ msg: "Not an admin/event office account" });
 
     await user.deleteOne();
     res.status(200).json({ 
