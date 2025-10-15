@@ -7,7 +7,6 @@ const { protect, permit } = require("../middleware/authMiddleware");
 router.post("/", protect, permit("event_office"), createGymSession);
 
 // Everyone (student/staff/ta/professor/event_office) views schedule (Req 80)
-router.get("/month", protect, permit("student","staff","ta","professor","event_office"), viewGymScheduleMonth);
+router.get("/month", protect, permit("student", "staff", "ta", "professor", "event_office"), viewGymScheduleMonth);
 
-module.exports = router;
-
+module.exports = router;

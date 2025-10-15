@@ -7,6 +7,8 @@ exports.createAdminOrEventOffice = async (req, res) => {
    console.log("🔹 Body received:", req.body);
   try {
     const { name, email, password, userType } = req.body;
+    const [firstName, lastName = ""] = name.trim().split(" ");
+
 
     if (!name || !email || !password || !userType)
       return res.status(400).json({ msg: "Missing required fields" });

@@ -8,7 +8,7 @@ const protect = async (req, res, next) => {
     console.log('🔐 Auth Header:', authHeader);
 
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-    console.log("token",token); 
+    console.log("token", token);
 
     if (!token) {
       return res.status(401).json({
@@ -16,9 +16,11 @@ const protect = async (req, res, next) => {
         message: 'Access token required'
       });
     }
-    console.log("secret",process.env.JWT_SECRET);
+
+    console.log("secret", process.env.JWT_SECRET);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("decoded",decoded);
+    console.log("decoded", decoded);
+
     let account = await User.findById(decoded.userId).select('-password');
     if (!account) account = await Admin.findById(decoded.userId).select('-password');
 
@@ -66,11 +68,6 @@ const permit = (...roles) => {
 };
 
 module.exports = {
-// Alias for compatibility
-
-
-module.exports = {
-  
   protect,
   permit
 };
