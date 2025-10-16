@@ -238,13 +238,16 @@ const signup = async (req, res) => {
 // ==================== LOGIN ====================
 const login = async (req, res) => {
   console.log("🟢 Login route hit");
+  
 
   try {
+    
     const { email, password } = req.body;
-   
+   console.log("user",req.body);
     // Try to find user in User model first
     let user = await User.findOne({ email });
-    
+    console.log("user",user);
+    console.log("secret",process.env.JWT_SECRET);
     // If not found in User model, try Admin model
     if (!user) {
       user = await Admin.findOne({ email });
@@ -264,7 +267,7 @@ const login = async (req, res) => {
     if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
     // Block login for unverified or inactive users
-    if (!user.isVerified || user.status !== 'active') {
+    if (['Staff', 'TA', 'Professor'].includes(user.userType) && (!user.isVerified || user.status !== 'active')) {
       return res.status(403).json({
         success: false,
         code: 'AWAITING_VERIFICATION',

@@ -6,20 +6,20 @@ const Admin = require("../models/AdminModel");
 exports.createAdminOrEventOffice = async (req, res) => {
    console.log("🔹 Body received:", req.body);
   try {
-    const { firstName, lastName, email, password, role } = req.body;
+    const { name, email, password, role } = req.body;
     const requestingUser = req.user; // The admin making the request
     
-    console.log('🔍 Creating admin account:', { firstName, lastName, email, role });
+    console.log('🔍 Creating admin account:', { name, email, role });
     console.log('🔍 Requesting user:', { id: requestingUser._id, userType: requestingUser.userType });
     
-    if (!firstName || !lastName || !email || !password || !role)
+    if (!name || !email || !password || !role)
       return res.status(400).json({ 
         success: false,
         message: "Missing required fields" 
       });
 
     // Validate role
-    if (!["Admin", "Event Office"].includes(role))
+    if (!["Admin", "Event Office","admin", "event_office"].includes(role))
       return res.status(400).json({ 
         success: false,
         message: "Invalid role. Must be Admin or Event Office" 
@@ -31,6 +31,7 @@ exports.createAdminOrEventOffice = async (req, res) => {
       message: "Email already exists" 
     });
 
+<<<<<<< HEAD
     // Map human role to schema enum and satisfy required fields
     const mappedUserType = role === 'Admin' ? 'admin' : 'event_office';
 
@@ -50,6 +51,23 @@ exports.createAdminOrEventOffice = async (req, res) => {
     if (lastName) payload.lastName = lastName;
 
     const newUser = await User.create(payload);
+=======
+    //const passwordHash = await bcrypt.hash(password, 10);
+    const newUser = await User.create({
+      name,
+      email,
+      password,
+      userType:
+  role === "Admin"
+    ? "admin"
+    : role === "Event Office"
+      ? "event_office"
+      : role,
+
+      isVerified: false,
+      status: 'active'
+    });
+>>>>>>> 0f613bea9e7159d154d283ea92290f6b518f8703
 
     console.log('✅ Admin account created successfully:', newUser._id);
 
@@ -58,8 +76,7 @@ exports.createAdminOrEventOffice = async (req, res) => {
       message: "Account created successfully", 
       user: {
         id: newUser._id,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
+        name: newUser.name,
         email: newUser.email,
         userType: newUser.userType,
         isVerified: newUser.isVerified,
