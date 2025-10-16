@@ -34,45 +34,25 @@ exports.createEvent = async (req, res) => {
 exports.createConference = async (req, res) => {
   try {
     const {
-      title,
-      description,
-      agenda,
-      website,
-      budget,
-      fundingSource,
-      extraResources,
-      startDate,
-      endDate,
-      location,
-      capacity
-    } = req.body;
+      title, startDate, endDate, location, agenda, website, budget, fundingSource
+    } = req.body || {};
 
-    if (!title || !startDate || !endDate || !location || !agenda || !website || !budget || !fundingSource) {
+    if (!title || !startDate || !endDate || !location || !agenda || !website || budget == null || !fundingSource) {
       return res.status(400).json({ msg: "Missing required conference fields" });
     }
 
     const newConference = new Event({
-      title,
-      description,
+      ...req.body,
       type: "conference",
-      agenda,
-      website,
-      budget,
-      fundingSource,
-      extraResources,
-      startDate,
-      endDate,
-      location,
-      capacity: capacity || 100,
-      createdBy: req.user._id,
+      createdBy: req.user ? req.user._id : undefined,
       status: "approved"
     });
 
     await newConference.save();
-    res.status(201).json({ msg: "Conference created successfully", conference: newConference });
+    return res.status(201).json({ msg: "Conference created", conference: newConference });
   } catch (err) {
-    console.error("❌ Error creating conference:", err);
-    res.status(500).json({ msg: "Server error" });
+    console.error("createConference error:", err);
+    return res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
 
@@ -193,14 +173,14 @@ exports.deleteEvent = async (req, res) => {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ msg: "Event not found" });
 
-<<<<<<< HEAD
-    if (event.registeredCount > 0) {
-      return res.status(400).json({ msg: "Cannot delete event: users already registered." });
-=======
-    // Check if professor is trying to delete someone else's event
-    if (req.user.userType === "Professor" && event.createdBy.toString() !== req.user._id.toString()) {
+    // Professors may only delete events they created
+    if (req.user && req.user.userType === "Professor" && event.createdBy?.toString() !== req.user._id.toString()) {
       return res.status(403).json({ msg: "You can only delete your own events" });
->>>>>>> 6a955d4855d9e3a9a98908e3f6ba207b8172e654
+    }
+
+    // Do not allow delete if people already registered
+    if (event.registeredCount && event.registeredCount > 0) {
+      return res.status(400).json({ msg: "Cannot delete event: users already registered." });
     }
 
     await event.deleteOne();
