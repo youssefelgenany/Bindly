@@ -6,10 +6,10 @@ const Admin = require("../models/AdminModel");
 exports.createAdminOrEventOffice = async (req, res) => {
    console.log("🔹 Body received:", req.body);
   try {
-    const { firstName, lastName, email, password, role } = req.body;
+    const { name, email, password, role } = req.body;
     const requestingUser = req.user; // The admin making the request
     
-    console.log('🔍 Creating admin account:', { firstName, lastName, email, role });
+    console.log('🔍 Creating admin account:', { name, email, role });
     console.log('🔍 Requesting user:', { id: requestingUser._id, userType: requestingUser.userType });
     
     if (!firstName || !lastName || !email || !password || !role)
@@ -33,8 +33,7 @@ exports.createAdminOrEventOffice = async (req, res) => {
 
     //const passwordHash = await bcrypt.hash(password, 10);
     const newUser = await User.create({
-      firstName,
-      lastName,
+      name,
       email,
       password,
       userType: role,
@@ -49,8 +48,7 @@ exports.createAdminOrEventOffice = async (req, res) => {
       message: "Account created successfully", 
       user: {
         id: newUser._id,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
+        name: newUser.name,
         email: newUser.email,
         userType: newUser.userType,
         isVerified: newUser.isVerified,
