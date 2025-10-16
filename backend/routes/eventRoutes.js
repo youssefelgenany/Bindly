@@ -72,6 +72,7 @@ router.post(
 router.post(
   "/conference",
   protect,
+  permit("Event Office", "Admin"),
   createConference
 );
 

@@ -1,10 +1,22 @@
 const express = require('express');
-const { viewUpcomingEvents, applyToEvent, getParticipants } = require('../controllers/vendorController.js');
+const { viewUpcomingEvents, applyToEvent, getParticipants, getMyAcceptedUpcoming, getMyRequests } = require('../controllers/vendorController.js');
+const { protect, permit } = require('../middleware/authMiddleware.js');
 
 const router = express.Router();
 
+// Publicly list upcoming events for vendors to browse
 router.get('/events/upcoming', viewUpcomingEvents); // ?type=bazaar or booth
-router.post('/apply', applyToEvent); // Requires eventType (bazaar/booth) in body
-router.get('/participants', getParticipants); // ?type=bazaar|booth&id=EVENT_ID
+
+// Applying to an event requires authenticated Vendor
+router.post('/apply', protect, permit('Vendor'), applyToEvent); // Requires eventType (bazaar/booth) in body
+
+// Participants list (protected)
+router.get('/participants', protect, getParticipants); // ?type=bazaar|booth&id=EVENT_ID
+
+// Vendor's accepted upcoming events (bazaar/booth)
+router.get('/my/upcoming', protect, permit('Vendor'), getMyAcceptedUpcoming); // optional ?type=bazaar|booth
+
+// Vendor's pending/rejected upcoming requests
+router.get('/my/requests', protect, permit('Vendor'), getMyRequests); // ?status=pending|rejected & optional ?type=bazaar|booth
 
 module.exports = router;
