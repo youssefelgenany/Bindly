@@ -56,7 +56,18 @@ module.exports.applyToEvent = async (req, res) => {
     }
 
     const existingRequest = await VendorRequest.findOne({ vendor: vendorId, $or: [{ bazaar: eventId }, { booth: eventId }] });
-    if (existingRequest) return res.status(400).json({ message: 'Already applied' });
+    if (existingRequest) {
+      // Update existing application instead of rejecting duplicates
+      existingRequest.attendees = attendees;
+      existingRequest.boothSize = boothSize;
+      if (eventType === 'booth') {
+        existingRequest.durationWeeks = durationWeeks;
+        existingRequest.boothLocation = boothLocation;
+      }
+      if (typeof message === 'string') existingRequest.message = message;
+      await existingRequest.save();
+      return res.status(200).json({ message: 'Application updated' });
+    }
 
     const request = new VendorRequest({
       vendor: vendorId,
@@ -73,7 +84,7 @@ module.exports.applyToEvent = async (req, res) => {
     console.error('Server error in applyToEvent:', error);
     res.status(500).json({ message: 'Server error' });
   }
-  };
+};
 
 module.exports.getParticipants = async (req, res) => {
   try {
