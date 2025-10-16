@@ -55,6 +55,8 @@ const CreateBazaar = () => {
         <BazaarForm 
           onSubmit={handleCreateBazaar}
           loading={loading}
+          submitLabel="Create Bazaar"
+          loadingLabel="Creating..."
         />
       </div>
     </div>

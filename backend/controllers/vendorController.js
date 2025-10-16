@@ -31,11 +31,17 @@ module.exports.viewUpcomingEvents = async (req, res) => {
 // Apply to bazaar or booth
 module.exports.applyToEvent = async (req, res) => {
   try {
-    const vendorId = req.user.id;
+    // Check if user is authenticated
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+    
+    const vendorId = req.user._id || req.user.id;
     const { eventId, attendees, boothSize, durationWeeks, boothLocation, message, eventType } = req.body;
 
     // Validate vendor role
     const vendor = await User.findById(vendorId);
+    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
     if (vendor.userType !== 'Vendor') return res.status(403).json({ message: 'Unauthorized' });
 
     // Attendees validated by frontend selection (max 5), no error message needed
