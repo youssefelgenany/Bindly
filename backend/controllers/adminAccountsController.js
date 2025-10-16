@@ -12,14 +12,14 @@ exports.createAdminOrEventOffice = async (req, res) => {
     console.log('🔍 Creating admin account:', { name, email, role });
     console.log('🔍 Requesting user:', { id: requestingUser._id, userType: requestingUser.userType });
     
-    if (!firstName || !lastName || !email || !password || !role)
+    if (!name || !email || !password || !role)
       return res.status(400).json({ 
         success: false,
         message: "Missing required fields" 
       });
 
     // Validate role
-    if (!["Admin", "Event Office"].includes(role))
+    if (!["Admin", "Event Office","admin", "event_office"].includes(role))
       return res.status(400).json({ 
         success: false,
         message: "Invalid role. Must be Admin or Event Office" 
@@ -36,9 +36,15 @@ exports.createAdminOrEventOffice = async (req, res) => {
       name,
       email,
       password,
-      userType: role,
+      userType:
+  role === "Admin"
+    ? "admin"
+    : role === "Event Office"
+      ? "event_office"
+      : role,
+
       isVerified: false,
-      status: 'blocked'
+      status: 'active'
     });
 
     console.log('✅ Admin account created successfully:', newUser._id);
