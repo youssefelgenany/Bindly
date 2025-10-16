@@ -29,6 +29,8 @@ import EditBazaar from './pages/EditBazaar';
 import EditTrip from './pages/EditTrip';
 import VendorBazaars from './pages/VendorBazaars';
 import Confrences from './pages/Confrences';
+import VendorAccepted from './pages/VendorAccepted';
+import VendorRequests from './pages/VendorRequests';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -173,6 +175,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <VendorBazaars />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vendor/accepted"
+              element={
+                <ProtectedRoute>
+                  <VendorAccepted />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vendor/requests"
+              element={
+                <ProtectedRoute>
+                  <VendorRequests />
                 </ProtectedRoute>
               }
             />

@@ -117,3 +117,119 @@ module.exports.getParticipants = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// Get upcoming bazaars/booths the logged-in vendor is accepted for
+module.exports.getMyAcceptedUpcoming = async (req, res) => {
+  try {
+    const vendorId = req.user && (req.user.id || req.user._id);
+    if (!vendorId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const { type } = req.query; // 'bazaar' | 'booth' | undefined
+    const now = new Date();
+
+    const buildQuery = (eventKey) => ({
+      vendor: vendorId,
+      status: 'accepted',
+      [eventKey]: { $ne: null }
+    });
+
+    const pickFields = 'name startDate endDate location description _id';
+
+    const fetchForType = async (t) => {
+      if (t === 'bazaar') {
+        const requests = await VendorRequest.find(buildQuery('bazaar'))
+          .populate({ path: 'bazaar', select: pickFields })
+          .lean();
+        const eventsOnly = (requests || [])
+          .map(r => r.bazaar)
+          .filter(e => e && new Date(e.startDate) > now);
+        return eventsOnly.map(e => ({ ...e, type: 'bazaar' }));
+      }
+      if (t === 'booth') {
+        const requests = await VendorRequest.find(buildQuery('booth'))
+          .populate({ path: 'booth', select: pickFields })
+          .lean();
+        const eventsOnly = (requests || [])
+          .map(r => r.booth)
+          .filter(e => e && new Date(e.startDate) > now);
+        return eventsOnly.map(e => ({ ...e, type: 'booth' }));
+      }
+      return [];
+    };
+
+    if (type === 'bazaar' || type === 'booth') {
+      const list = await fetchForType(type);
+      return res.json({ success: true, events: list });
+    }
+
+    // If no specific type requested, return combined list
+    const [bazaars, booths] = await Promise.all([
+      fetchForType('bazaar'),
+      fetchForType('booth')
+    ]);
+    const combined = [...bazaars, ...booths].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    return res.json({ success: true, events: combined });
+  } catch (error) {
+    console.error('Server error in getMyAcceptedUpcoming:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get pending/rejected requests by the vendor for upcoming bazaars/booths
+module.exports.getMyRequests = async (req, res) => {
+  try {
+    const vendorId = req.user && (req.user.id || req.user._id);
+    if (!vendorId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const { status = 'pending', type } = req.query; // status: pending|rejected
+    if (!['pending', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    const now = new Date();
+    const pickFields = 'name startDate endDate location description _id';
+
+    const buildQuery = (eventKey) => ({
+      vendor: vendorId,
+      status,
+      [eventKey]: { $ne: null }
+    });
+
+    const fetchForType = async (t) => {
+      if (t === 'bazaar') {
+        const requests = await VendorRequest.find(buildQuery('bazaar'))
+          .populate({ path: 'bazaar', select: pickFields })
+          .lean();
+        const eventsOnly = (requests || [])
+          .map(r => ({ requestId: r._id, event: r.bazaar }))
+          .filter(x => x.event && new Date(x.event.startDate) > now);
+        return eventsOnly.map(x => ({ ...x.event, type: 'bazaar', requestId: x.requestId, status }));
+      }
+      if (t === 'booth') {
+        const requests = await VendorRequest.find(buildQuery('booth'))
+          .populate({ path: 'booth', select: pickFields })
+          .lean();
+        const eventsOnly = (requests || [])
+          .map(r => ({ requestId: r._id, event: r.booth }))
+          .filter(x => x.event && new Date(x.event.startDate) > now);
+        return eventsOnly.map(x => ({ ...x.event, type: 'booth', requestId: x.requestId, status }));
+      }
+      return [];
+    };
+
+    if (type === 'bazaar' || type === 'booth') {
+      const list = await fetchForType(type);
+      return res.json({ success: true, events: list, status });
+    }
+
+    const [bazaars, booths] = await Promise.all([
+      fetchForType('bazaar'),
+      fetchForType('booth')
+    ]);
+    const combined = [...bazaars, ...booths].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    return res.json({ success: true, events: combined, status });
+  } catch (error) {
+    console.error('Server error in getMyRequests:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

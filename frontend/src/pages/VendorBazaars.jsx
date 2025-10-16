@@ -13,6 +13,7 @@ const VendorBazaars = () => {
         attendees: [{ name: '', email: '' }],
         boothSize: ''
     });
+    // Removed "My Accepted Upcoming" section from this page; available on /vendor/accepted
 
     useEffect(() => {
         const load = async () => {
@@ -61,6 +62,8 @@ const VendorBazaars = () => {
         load();
     }, [query]);
 
+    // my accepted section moved to dedicated page
+
     return (
         <div className="events-page">
             <div className="events-header">
@@ -85,6 +88,8 @@ const VendorBazaars = () => {
                     Demo data loaded (backend unreachable). Bazaars: {bazaars.length}
                 </div>
             )}
+            {/* my accepted section removed; see /vendor/accepted */}
+
             {loading ? (
                 <div className="events-loading">
                     <div className="loading-spinner"></div>

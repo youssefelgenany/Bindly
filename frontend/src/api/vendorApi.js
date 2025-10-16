@@ -32,6 +32,18 @@ export const vendorApi = {
             message
         });
         return res.data;
+    },
+
+    // List upcoming events the current vendor is accepted for
+    listMyAccepted: async (type) => {
+        const res = await api.get('/my/upcoming', { params: { type } });
+        return res.data;
+    },
+
+    // List pending or rejected upcoming requests (optional filter by type)
+    listMyRequests: async ({ status = 'pending', type } = {}) => {
+        const res = await api.get('/my/requests', { params: { status, type } });
+        return res.data;
     }
 };
 

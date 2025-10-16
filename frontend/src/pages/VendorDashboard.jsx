@@ -74,6 +74,12 @@ const VendorDashboard = () => {
                                 <button className="btn btn-outline" style={{ width: '100%' }}>
                                     View Analytics
                                 </button>
+                                <Link to="/vendor/accepted" className="btn btn-primary" style={{ width: '100%', textDecoration: 'none', display: 'inline-block', textAlign: 'center' }}>
+                                    My Accepted Upcoming
+                                </Link>
+                                <Link to="/vendor/requests" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block', textAlign: 'center' }}>
+                                    Requests (Pending/Rejected)
+                                </Link>
                                 <Link to="/vendor/bazaars" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
                                     Browse Upcoming Bazaars
                                 </Link>
