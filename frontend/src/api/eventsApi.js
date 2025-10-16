@@ -55,6 +55,33 @@ export const bazaarApi = {
       body: JSON.stringify(bazaarData),
     });
     return await response.json();
+  },
+
+  list: async (query = {}) => {
+    const token = localStorage.getItem('token');
+    const params = new URLSearchParams();
+    if (query.q) params.append('q', query.q);
+    const url = `${API_BASE}/bazaars?${params.toString()}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+    return await response.json();
+  },
+
+  register: async (id) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE}/bazaars/${id}/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+    return await response.json();
   }
 };
 
