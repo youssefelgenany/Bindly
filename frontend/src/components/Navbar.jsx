@@ -230,6 +230,18 @@ const Navbar = () => {
                   Gym Schedule
                 </Link>
               )}
+
+{(user.userType === 'Event Office' || user.role === 'event_office' || user.userType === 'event_office') && (
+  <>
+    <Link
+      to="/confrences"
+      className="btn btn-outline"
+      style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}
+    >
+      Confrences
+    </Link>
+  </>
+)}
               
               {/* EVENTS MANAGEMENT - MOVED HERE FOR BETTER VISIBILITY */}
               {(user.userType === 'Events Office' || user.role === 'event_office') && (
@@ -241,6 +253,7 @@ const Navbar = () => {
                 >
                   Events Management
                 </Link>
+                
               )}
               
               {/* Hide Manage Gym for Event Office */}
