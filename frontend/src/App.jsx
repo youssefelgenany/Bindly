@@ -130,116 +130,116 @@ function App() {
           <Navbar />
           <Routes>
             <Route path="/" element={<Navigate to="/login" />} />
-            <Route
-              path="/login"
+            <Route 
+              path="/login" 
               element={
                 <PublicRoute>
                   <Login />
                 </PublicRoute>
-              }
+              } 
             />
-            <Route
-              path="/signup"
+            <Route 
+              path="/signup" 
               element={
                 <PublicRoute>
                   <Signup />
                 </PublicRoute>
-              }
+              } 
             />
-            <Route
+            <Route 
               path="/pending-verification"
               element={<PendingVerification />}
             />
-            <Route
-              path="/verification-pending"
+            <Route 
+              path="/verification-pending" 
               element={
                 <PublicRoute>
                   <VerificationPending />
                 </PublicRoute>
-              }
+              } 
             />
-            <Route
-              path="/dashboard"
+            <Route 
+              path="/dashboard" 
               element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
-              }
+              } 
             />
-            <Route
-              path="/vendor"
+            <Route 
+              path="/vendor" 
               element={
                 <ProtectedRoute>
                   <VendorDashboard />
                 </ProtectedRoute>
-              }
+              } 
             />
-            <Route
-              path="/vendor/bazaars"
+            <Route 
+              path="/vendor/bazaars" 
               element={
                 <ProtectedRoute>
                   <VendorBazaars />
                 </ProtectedRoute>
-              }
+              } 
             />
-            <Route
-              path="/events"
+            <Route 
+              path="/events" 
               element={
                 <ProtectedRoute>
                   <EventsList />
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/gym"
+            <Route 
+              path="/gym" 
               element={
                 <ProtectedRoute>
                   <GymSchedule />
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/gym/manage"
+            <Route 
+              path="/gym/manage" 
               element={
                 <ProtectedRoute>
                   <GymManage />
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/professor/events"
+            <Route 
+              path="/professor/events" 
               element={
                 <ProtectedRoute>
                   <ProfessorEvents />
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/professor/all-events"
+            <Route 
+              path="/professor/all-events" 
               element={
                 <ProtectedRoute>
                   <ProfessorAllEvents />
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/professor/profile"
+            <Route 
+              path="/professor/profile" 
               element={
                 <ProtectedRoute>
                   <ProfessorProfile />
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/professor/gym-schedule"
+            <Route 
+              path="/professor/gym-schedule" 
               element={
                 <ProtectedRoute>
                   <ProfessorGymSchedule />
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/admin/users"
+            <Route 
+              path="/admin/users" 
               element={
                 <ProtectedRoute>
                   <AdminOnly>
@@ -248,8 +248,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/admin/vendors"
+            <Route 
+              path="/admin/vendors" 
               element={
                 <ProtectedRoute>
                   <AdminOnly>
@@ -258,8 +258,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/admin/events"
+            <Route 
+              path="/admin/events" 
               element={
                 <ProtectedRoute>
                   <AdminOnly>
@@ -268,8 +268,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/admin/manage"
+            <Route 
+              path="/admin/manage" 
               element={
                 <ProtectedRoute>
                   <AdminOnly>
@@ -278,8 +278,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/admin/profile"
+            <Route 
+              path="/admin/profile" 
               element={
                 <ProtectedRoute>
                   <AdminOnly>
@@ -289,89 +289,67 @@ function App() {
               }
             />
             <Route
-              path="/create-conference"
+              path="/create-conference" 
               element={
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <CreateConference />
-<<<<<<< HEAD
-                  </AdminOnly>
-                </ProtectedRoute>
-              }
-            />
+                  </EventsOfficeOnly>
+                </ProtectedRoute> } 
+              />
             <Route
               path="/edit-conference/:id"
               element={
                 <ProtectedRoute>
-                  <AdminOnly>
-                    <EditConfrences />
-                  </AdminOnly>
+                  <EditConfrences />
                 </ProtectedRoute>
-              }
-            />
-=======
-                  </EventsOfficeOnly>
-                </ProtectedRoute> } 
-              />
-               <Route
-                path="/edit-conference/:id"
-                element={
-                    <ProtectedRoute>
-                     
-                        <EditConfrences />
-                     
-                    </ProtectedRoute>
-                  } />
-            
->>>>>>> 37c1f91 (event office frontend)
+              } />
             {/* ✅ ADD YOUR EVENT MANAGEMENT ROUTES HERE */}
-            <Route
-              path="/create-bazaar"
+            <Route 
+              path="/create-bazaar" 
               element={
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <CreateBazaar />
                   </EventsOfficeOnly>
                 </ProtectedRoute>
-              }
+              } 
             />
-            <Route
-              path="/create-trip"
+            <Route 
+              path="/create-trip" 
               element={
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <CreateTrip />
                   </EventsOfficeOnly>
                 </ProtectedRoute>
-              }
+              } 
             />
-            <Route
-              path="/edit-bazaar/:id"
+            <Route 
+              path="/edit-bazaar/:id" 
               element={
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <EditBazaar />
                   </EventsOfficeOnly>
                 </ProtectedRoute>
-              }
+              } 
             />
-            <Route
-              path="/edit-trip/:id"
+            <Route 
+              path="/edit-trip/:id" 
               element={
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <EditTrip />
                   </EventsOfficeOnly>
                 </ProtectedRoute>
-              }
+              } 
             />
             <Route
               path="/confrences"
               element={
                 <ProtectedRoute>
-
                   <Confrences />
-
                 </ProtectedRoute>
               }
             />
