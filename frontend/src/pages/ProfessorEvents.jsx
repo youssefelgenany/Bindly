@@ -34,9 +34,13 @@ const ProfessorEvents = () => {
   const [form, setForm] = useState({
     title: '',
     description: '',
-    datetime: '',
+    agenda: '',
+    faculty: '',
+    professors: '',
+    startDate: '',
+    endDate: '',
     location: '',
-    category: categories[0],
+    category: 'workshop',
     bannerFile: null,
   });
   const [formError, setFormError] = useState('');
@@ -85,7 +89,7 @@ const ProfessorEvents = () => {
   }, [events]);
 
   const resetForm = () => {
-    setForm({ title: '', description: '', datetime: '', location: '', category: categories[0], bannerFile: null });
+    setForm({ title: '', description: '', agenda: '', faculty: '', professors: '', startDate: '', endDate: '', location: '', category: 'workshop', bannerFile: null });
     setFormError('');
     setIsEditingId(null);
   };
@@ -112,8 +116,8 @@ const ProfessorEvents = () => {
     e.preventDefault();
     setFormError('');
 
-    if (!form.title.trim() || !form.datetime || !form.location.trim() || !form.category) {
-      setFormError('Please fill in Title, Date & Time, Location, and Category.');
+    if (!form.title.trim() || !form.startDate || !form.endDate || !form.location.trim()) {
+      setFormError('Please fill in Workshop Name, Start & End, and Location.');
       return;
     }
 
@@ -124,12 +128,14 @@ const ProfessorEvents = () => {
       const eventData = {
         title: form.title,
         description: form.description,
-        type: form.category,
-        startDate: new Date(form.datetime).toISOString(),
-        endDate: new Date(new Date(form.datetime).getTime() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours later
+        agenda: form.agenda,
+        extraResources: { faculty: form.faculty, professors: form.professors },
+        type: 'workshop',
+        startDate: new Date(form.startDate).toISOString(),
+        endDate: new Date(form.endDate).toISOString(),
         location: form.location,
         capacity: 100,
-        status: 'pending' // submit for approval
+        status: 'pending'
       };
 
       if (isEditingId) {
@@ -383,7 +389,7 @@ const ProfessorEvents = () => {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div style={{ color: 'var(--text-light)' }}>Logged in as: {user?.firstName} {user?.lastName}</div>
-            <button className="btn btn-primary" onClick={openCreate}>+ Create Event</button>
+            <button className="btn btn-primary" onClick={openCreate}>+ Create Workshop</button>
           </div>
 
           {error && (
@@ -471,35 +477,49 @@ const ProfessorEvents = () => {
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '1rem', overflowY: 'auto' }}>
               <div className="card" style={{ maxWidth: 640, width: '100%', maxHeight: '90vh', marginTop: '2rem', marginBottom: '2rem' }}>
                 <h3 style={{ color: 'var(--charcoal-black)', marginBottom: '1rem' }}>
-                  {isEditingId ? 'Edit Event' : 'Create Event'}
+                  {isEditingId ? 'Edit Workshop' : 'Create Workshop'}
                 </h3>
                 {formError && (
                   <div className="alert alert-error" style={{ marginBottom: '1rem' }}>{formError}</div>
                 )}
                 <form onSubmit={onSubmit} style={{ overflowY: 'auto', maxHeight: 'calc(90vh - 120px)' }}>
                   <div className="form-group">
-                    <label className="form-label">Event Title</label>
-                    <input className="form-input" type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Enter event title" />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Description</label>
-                    <textarea className="form-input" rows="4" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Describe the event (optional)" />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Date & Time</label>
-                    <input className="form-input" type="datetime-local" value={form.datetime} onChange={e => setForm({ ...form, datetime: e.target.value })} />
+                    <label className="form-label">Workshop Name</label>
+                    <input className="form-input" type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Enter workshop name" />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Location</label>
-                    <input className="form-input" type="text" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g., Room C-210" />
+                    <select className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })}>
+                      <option value="">Select location</option>
+                      <option value="GUC Cairo">GUC Cairo</option>
+                      <option value="GUC Berlin">GUC Berlin</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Start Date & Time</label>
+                      <input className="form-input" type="datetime-local" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">End Date & Time</label>
+                      <input className="form-input" type="datetime-local" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} />
+                    </div>
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Category</label>
-                    <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-                      {categories.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
+                    <label className="form-label">Short Description</label>
+                    <textarea className="form-input" rows="3" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Brief overview" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Full Agenda</label>
+                    <textarea className="form-input" rows="5" value={form.agenda} onChange={e => setForm({ ...form, agenda: e.target.value })} placeholder="Detailed agenda" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Faculty Responsible</label>
+                    <input className="form-input" type="text" value={form.faculty} onChange={e => setForm({ ...form, faculty: e.target.value })} placeholder="e.g., MET, IET" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Professor(s)</label>
+                    <input className="form-input" type="text" value={form.professors} onChange={e => setForm({ ...form, professors: e.target.value })} placeholder="Comma-separated names" />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Banner/Flyer (optional)</label>
@@ -510,7 +530,7 @@ const ProfessorEvents = () => {
                   </div>
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
                     <button type="submit" className="btn btn-primary">
-                      {isEditingId ? 'Save Changes' : 'Submit for Approval'}
+                      {isEditingId ? 'Save Changes' : 'Create Workshop'}
                     </button>
                     <button type="button" className="btn btn-secondary" onClick={() => { setIsModalOpen(false); resetForm(); }}>
                       Cancel

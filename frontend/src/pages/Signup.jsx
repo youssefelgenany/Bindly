@@ -336,41 +336,41 @@ const Signup = () => {
             </div>
           </div>
 
-          {/* Employee Type Selection - Hidden until Employee is selected */}
-          {formData.userType === 'Employee' && (
-            <div className="form-group">
-              <label className="form-label">Employee Type</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                {employeeTypes.map(type => (
-                  <label key={type.value} style={{
-                    padding: '12px',
-                    border: `2px solid ${formData.employeeType === type.value ? 'var(--guc-red)' : 'var(--medium-gray)'}`,
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    backgroundColor: formData.employeeType === type.value ? 'rgba(210, 10, 10, 0.1)' : 'var(--white)',
-                    transition: 'all 0.3s ease'
-                  }}>
-                    <input
-                      type="radio"
-                      name="employeeType"
-                      value={type.value}
-                      checked={formData.employeeType === type.value}
-                      onChange={handleChange}
-                      style={{ marginRight: '8px' }}
-                    />
-                    <div>
-                      <div style={{ fontWeight: '600', color: 'var(--text-dark)' }}>
-                        {type.label}
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
-                        {type.description}
-                      </div>
+        {/* Employee Type Selection - Hidden until Employee is selected (moved above personal info) */}
+        {formData.userType === 'Employee' && (
+          <div className="form-group">
+            <label className="form-label">Employee Type</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+              {employeeTypes.map(type => (
+                <label key={type.value} style={{
+                  padding: '12px',
+                  border: `2px solid ${formData.employeeType === type.value ? 'var(--guc-red)' : 'var(--medium-gray)'}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  backgroundColor: formData.employeeType === type.value ? 'rgba(210, 10, 10, 0.1)' : 'var(--white)',
+                  transition: 'all 0.3s ease'
+                }}>
+                  <input
+                    type="radio"
+                    name="employeeType"
+                    value={type.value}
+                    checked={formData.employeeType === type.value}
+                    onChange={handleChange}
+                    style={{ marginRight: '8px' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: '600', color: 'var(--text-dark)' }}>
+                      {type.label}
                     </div>
-                  </label>
-                ))}
-              </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
+                      {type.description}
+                    </div>
+                  </div>
+                </label>
+              ))}
             </div>
-          )}
+          </div>
+        )}
 
           {/* Personal Information */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -446,6 +446,7 @@ const Signup = () => {
               {errors.gucId && <div className="form-error">{errors.gucId}</div>}
             </div>
           )}
+
 
           {/* Company Name for Vendors */}
           {formData.userType === 'Vendor' && (
@@ -651,3 +652,5 @@ const Signup = () => {
 };
 
 export default Signup;
+
+

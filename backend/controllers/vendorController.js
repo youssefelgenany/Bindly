@@ -74,3 +74,32 @@ module.exports.applyToEvent = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
   };
+
+module.exports.getParticipants = async (req, res) => {
+  try {
+    const { type, id } = req.query;
+    if (!['bazaar', 'booth'].includes(type)) return res.status(400).json({ message: 'Invalid type' });
+    if (!id) return res.status(400).json({ message: 'Missing id' });
+
+    const filter = type === 'bazaar' ? { bazaar: id } : { booth: id };
+    filter.status = 'accepted';
+
+    const requests = await VendorRequest.find(filter)
+      .populate('vendor', 'companyName firstName lastName email')
+      .select('vendor attendees boothSize createdAt');
+
+    const participants = requests.map(r => ({
+      id: r._id,
+      companyName: r.vendor?.companyName || `${r.vendor?.firstName || ''} ${r.vendor?.lastName || ''}`.trim(),
+      email: r.vendor?.email || '',
+      attendees: r.attendees || [],
+      boothSize: r.boothSize || null,
+      joinedAt: r.createdAt
+    }));
+
+    return res.json({ success: true, participants });
+  } catch (error) {
+    console.error('Server error in getParticipants:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

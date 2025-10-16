@@ -59,21 +59,84 @@ exports.createConference = async (req, res) => {
 // 📅 Get all approved/upcoming events
 exports.getAllEvents = async (req, res) => {
   try {
-    const { q, type } = req.query;
-    const filter = { status: "approved" };
+    const { q, name, type, status } = req.query;
+    const search = (q || name || '').toString().trim();
 
-    if (q) {
-      filter.$or = [
-        { title: new RegExp(q, "i") },
-        { description: new RegExp(q, "i") },
-        { location: new RegExp(q, "i") },
-      ];
+    // Base match (type/status)
+    const baseMatch = {};
+    if (type) {
+      const typeMap = {
+        workshops: 'workshop',
+        trips: 'trip',
+        bazaars: 'bazaar',
+        booths: 'booth',
+        confrence: 'conference',
+        conference: 'conference'
+      };
+      baseMatch.type = typeMap[type] || type;
     }
-    if (type) filter.type = type;
+    if (status && status !== 'all') {
+      baseMatch.status = status;
+    }
 
-    const events = await Event.find(filter).sort({ startDate: 1 });
+    const pipeline = [
+      { $match: baseMatch },
+      { $lookup: { from: 'users', localField: 'createdBy', foreignField: '_id', as: 'creator' } },
+      { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
+    ];
 
-    res.json(events);
+    if (search) {
+      const nameRegex = new RegExp(search, 'i');
+      pipeline.push({
+        $match: {
+          $or: [
+            { title: nameRegex },
+            { name: nameRegex },
+            { description: nameRegex },
+            { location: nameRegex },
+            { 'creator.firstName': nameRegex },
+            { 'creator.lastName': nameRegex },
+          ]
+        }
+      });
+    }
+
+    pipeline.push(
+      { $sort: { startDate: 1 } },
+      { $project: {
+        _id: 1,
+        title: 1,
+        name: 1,
+        description: 1,
+        type: 1,
+        startDate: 1,
+        endDate: 1,
+        location: 1,
+        capacity: 1,
+        registeredCount: 1,
+        status: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        createdBy: {
+          _id: '$creator._id',
+          firstName: '$creator.firstName',
+          lastName: '$creator.lastName',
+          email: '$creator.email',
+          userType: '$creator.userType'
+        }
+      } }
+    );
+
+    const events = await Event.aggregate(pipeline);
+    const withCreator = events.map(e => ({
+      ...e,
+      creatorName: e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null,
+      creatorRole: e.createdBy ? (e.createdBy.userType || null) : null,
+      creatorFirstName: e.createdBy?.firstName || null,
+      creatorLastName: e.createdBy?.lastName || null,
+    }));
+
+    res.json(withCreator);
   } catch (err) {
     console.error("❌ Error fetching events:", err);
     res.status(500).json({ msg: "Server error" });
@@ -197,6 +260,11 @@ exports.registerForEvent = async (req, res) => {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ msg: "Event not found" });
 
+    // Allow only workshops and trips for professor simple registration
+    if (!['workshop', 'trip'].includes(event.type)) {
+      return res.status(400).json({ msg: 'Only workshops and trips allow this registration' });
+    }
+
     // Check if registration deadline passed or event full
     if (event.capacity && event.registeredCount >= event.capacity) {
       return res.status(400).json({ msg: "Event is full" });
@@ -210,10 +278,18 @@ exports.registerForEvent = async (req, res) => {
       return res.status(400).json({ msg: "You are already registered for this event" });
     }
 
+    // Accept minimal identity payload for professor: name, email, gucId
+    const { firstName, lastName, email, gucId } = req.body || {};
+    if (req.user.userType === 'Professor') {
+      if (!firstName || !lastName || !email || !gucId) {
+        return res.status(400).json({ msg: 'firstName, lastName, email, and gucId are required' });
+      }
+    }
+
     const registration = new Registration({
       event: event._id,
       user: req.user._id,
-      role: req.user.role,
+      role: (req.user.role || req.user.userType || '').toString().toLowerCase(),
       status: "approved"
     });
 
@@ -235,7 +311,8 @@ exports.getMyRegistrations = async (req, res) => {
   try {
     const registrations = await Registration.find({ user: req.user._id })
       .populate("event", "title startDate endDate location type")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json(registrations);
   } catch (err) {

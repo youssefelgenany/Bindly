@@ -267,7 +267,7 @@ const login = async (req, res) => {
     if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
     // Block login for unverified or inactive users
-    if (!user.isVerified || user.status !== 'active') {
+    if (['Staff', 'TA', 'Professor'].includes(user.userType) && (!user.isVerified || user.status !== 'active')) {
       return res.status(403).json({
         success: false,
         code: 'AWAITING_VERIFICATION',
