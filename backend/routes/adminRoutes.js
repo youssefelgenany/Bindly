@@ -3,13 +3,13 @@ const router = express.Router();
 const { createGymSession, viewGymScheduleMonth } = require("../controllers/gymController");
 const { protect, permit } = require("../middleware/authMiddleware");
 const { getAllUsers, updateUserRole, updateUserStatus, changePassword, updateProfile, getAllVendors, updateVendorVerification, updateVendorStatus, assignRoleAndSendVerification } = require('../controllers/adminController');
-const { createAdminOrEventOffice, deleteAdminOrEventOffice } = require('../controllers/adminAccountsController');
+//const { createAdminOrEventOffice, deleteAdminOrEventOffice } = require('../controllers/adminAccountsController');
 
 // Event Office creates gym sessions (Req 84)
 router.post("/", protect, permit("event_office"), createGymSession);
 const { createAdminOrEventOffice, deleteAdminOrEventOffice, } = require('../controllers/adminAccountsController');
-const {assignRoleAndSendVerification} = require('../controllers/adminController');
-const { getAllUsers, updateUserRole, updateUserStatus, changePassword, updateProfile, getAllVendors, updateVendorVerification, updateVendorStatus } = require('../controllers/adminController');
+//const {assignRoleAndSendVerification} = require('../controllers/adminController');
+//const { getAllUsers, updateUserRole, updateUserStatus, changePassword, updateProfile, getAllVendors, updateVendorVerification, updateVendorStatus } = require('../controllers/adminController');
 
 
 // Admin routes

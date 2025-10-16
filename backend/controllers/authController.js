@@ -236,13 +236,16 @@ const signup = async (req, res) => {
 // ==================== LOGIN ====================
 const login = async (req, res) => {
   console.log("🟢 Login route hit");
+  
 
   try {
+    
     const { email, password } = req.body;
-   
+   console.log("user",req.body);
     // Try to find user in User model first
     let user = await User.findOne({ email });
-    
+    console.log("user",user);
+    console.log("secret",process.env.JWT_SECRET);
     // If not found in User model, try Admin model
     if (!user) {
       user = await Admin.findOne({ email });

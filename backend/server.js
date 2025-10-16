@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -59,17 +60,17 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // Import routes
-const authRoutes = require('./routes/authRoutes');
-const bazaarRoutes = require('./routes/bazaarRoutes');
-const tripRoutes = require('./routes/tripRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-const gymRoutes = require('./routes/gymRoutes');
-const vendorRequestRoutes = require('./routes/vendorRequestRoutes');
-const professorRoutes = require('./routes/professorRoutes');
-const workshopRoutes = require('./routes/workshopRoutes');
-const vendorRoutes = require('./routes/vendorRoutes');
-const eventRoutes = require('./routes/eventRoutes');
-const { verifyByToken } = require('./controllers/authVerifyController');
+
+//const bazaarRoutes = require('./routes/bazaarRoutes');
+//const tripRoutes = require('./routes/tripRoutes');
+//const adminRoutes = require('./routes/adminRoutes');
+//const gymRoutes = require('./routes/gymRoutes');
+//const vendorRequestRoutes = require('./routes/vendorRequestRoutes');
+//const professorRoutes = require('./routes/professorRoutes');
+//const workshopRoutes = require('./routes/workshopRoutes');
+//const vendorRoutes = require('./routes/vendorRoutes');
+//const eventRoutes = require('./routes/eventRoutes');
+//const { verifyByToken } = require('./controllers/authVerifyController');
 
 
 // Mount routes
