@@ -64,9 +64,9 @@ export const professorApiService = {
   },
 
   // Register logged-in user for an event
-  registerForEvent: async (eventId) => {
+  registerForEvent: async (eventId, payload = undefined) => {
     try {
-      const response = await professorApi.post(`/events/${eventId}/register`);
+      const response = await professorApi.post(`/events/${eventId}/register`, payload);
       return {
         success: true,
         data: response.data,
@@ -236,6 +236,23 @@ export const professorApiService = {
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to fetch event registrations',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
+  // Get events the current user is registered for
+  getMyRegistrations: async () => {
+    try {
+      const response = await professorApi.get('/events/my/registrations');
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch my registrations',
         error: error.response?.data || error.message,
       };
     }

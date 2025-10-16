@@ -220,7 +220,7 @@ const Navbar = () => {
             </div>
 
             <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-              {!(user.role === 'admin' || user.userType === 'Admin') && (
+              {!(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'Event Office' || user.userType === 'event_office') && (
                 <Link
                   to="/gym"
                   className="btn btn-outline"
@@ -230,6 +230,18 @@ const Navbar = () => {
                   Gym Schedule
                 </Link>
               )}
+
+{(user.userType === 'Event Office' || user.role === 'event_office' || user.userType === 'event_office') && (
+  <>
+    <Link
+      to="/confrences"
+      className="btn btn-outline"
+      style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}
+    >
+      Confrences
+    </Link>
+  </>
+)}
               
               {/* EVENTS MANAGEMENT - MOVED HERE FOR BETTER VISIBILITY */}
               {(user.userType === 'Events Office' || user.role === 'event_office') && (
@@ -241,18 +253,10 @@ const Navbar = () => {
                 >
                   Events Management
                 </Link>
+                
               )}
               
-              {(user.userType === 'Events Office' || user.role === 'event_office' || user.userType === 'event_office') && (
-                <Link
-                  to="/gym/manage"
-                  className="btn btn-outline"
-                  style={{ width: '100%' }}
-                  onClick={closeSidebar}
-                >
-                  Manage Gym
-                </Link>
-              )}
+              {/* Hide Manage Gym for Event Office */}
               
               {(user.role === 'admin' || user.userType === 'Admin') && (
                 <>

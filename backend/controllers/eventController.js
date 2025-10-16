@@ -34,66 +34,109 @@ exports.createEvent = async (req, res) => {
 exports.createConference = async (req, res) => {
   try {
     const {
-      title,
-      description,
-      agenda,
-      website,
-      budget,
-      fundingSource,
-      extraResources,
-      startDate,
-      endDate,
-      location,
-      capacity
-    } = req.body;
+      title, startDate, endDate, location, agenda, website, budget, fundingSource
+    } = req.body || {};
 
-    if (!title || !startDate || !endDate || !location || !agenda || !website || !budget || !fundingSource) {
+    if (!title || !startDate || !endDate || !location || !agenda || !website || budget == null || !fundingSource) {
       return res.status(400).json({ msg: "Missing required conference fields" });
     }
 
     const newConference = new Event({
-      title,
-      description,
+      ...req.body,
       type: "conference",
-      agenda,
-      website,
-      budget,
-      fundingSource,
-      extraResources,
-      startDate,
-      endDate,
-      location,
-      capacity: capacity || 100,
-      createdBy: req.user._id,
+      createdBy: req.user ? req.user._id : undefined,
       status: "approved"
     });
 
     await newConference.save();
-    res.status(201).json({ msg: "Conference created successfully", conference: newConference });
+    return res.status(201).json({ msg: "Conference created", conference: newConference });
   } catch (err) {
-    console.error("❌ Error creating conference:", err);
-    res.status(500).json({ msg: "Server error" });
+    console.error("createConference error:", err);
+    return res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
 
 // 📅 Get all approved/upcoming events
 exports.getAllEvents = async (req, res) => {
   try {
-    const { q, type } = req.query;
-    const filter = { status: "approved" };
+    const { q, name, type, status } = req.query;
+    const search = (q || name || '').toString().trim();
 
-    if (q) {
-      filter.$or = [
-        { title: new RegExp(q, "i") },
-        { description: new RegExp(q, "i") },
-        { location: new RegExp(q, "i") },
-      ];
+    // Base match (type/status)
+    const baseMatch = {};
+    if (type) {
+      const typeMap = {
+        workshops: 'workshop',
+        trips: 'trip',
+        bazaars: 'bazaar',
+        booths: 'booth',
+        confrence: 'conference',
+        conference: 'conference'
+      };
+      baseMatch.type = typeMap[type] || type;
     }
-    if (type) filter.type = type;
+    if (status && status !== 'all') {
+      baseMatch.status = status;
+    }
 
-    const events = await Event.find(filter).sort({ startDate: 1 });
+    const pipeline = [
+      { $match: baseMatch },
+      { $lookup: { from: 'users', localField: 'createdBy', foreignField: '_id', as: 'creator' } },
+      { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
+    ];
 
-    res.json(events);
+    if (search) {
+      const nameRegex = new RegExp(search, 'i');
+      pipeline.push({
+        $match: {
+          $or: [
+            { title: nameRegex },
+            { name: nameRegex },
+            { description: nameRegex },
+            { location: nameRegex },
+            { 'creator.firstName': nameRegex },
+            { 'creator.lastName': nameRegex },
+          ]
+        }
+      });
+    }
+
+    pipeline.push(
+      { $sort: { startDate: 1 } },
+      { $project: {
+        _id: 1,
+        title: 1,
+        name: 1,
+        description: 1,
+        type: 1,
+        startDate: 1,
+        endDate: 1,
+        location: 1,
+        capacity: 1,
+        registeredCount: 1,
+        status: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        createdBy: {
+          _id: '$creator._id',
+          firstName: '$creator.firstName',
+          lastName: '$creator.lastName',
+          email: '$creator.email',
+          userType: '$creator.userType'
+        }
+      } }
+    );
+
+    const events = await Event.aggregate(pipeline);
+    const withCreator = events.map(e => ({
+      ...e,
+      creatorName: e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null,
+      creatorRole: e.createdBy ? (e.createdBy.userType || null) : null,
+      creatorFirstName: e.createdBy?.firstName || null,
+      creatorLastName: e.createdBy?.lastName || null,
+    }));
+
+    res.json(withCreator);
   } catch (err) {
     console.error("❌ Error fetching events:", err);
     res.status(500).json({ msg: "Server error" });
@@ -193,9 +236,14 @@ exports.deleteEvent = async (req, res) => {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ msg: "Event not found" });
 
-    // Check if professor is trying to delete someone else's event
-    if (req.user.userType === "Professor" && event.createdBy.toString() !== req.user._id.toString()) {
+    // Professors may only delete events they created
+    if (req.user && req.user.userType === "Professor" && event.createdBy?.toString() !== req.user._id.toString()) {
       return res.status(403).json({ msg: "You can only delete your own events" });
+    }
+
+    // Do not allow delete if people already registered
+    if (event.registeredCount && event.registeredCount > 0) {
+      return res.status(400).json({ msg: "Cannot delete event: users already registered." });
     }
 
     await event.deleteOne();
@@ -278,7 +326,8 @@ exports.getMyRegistrations = async (req, res) => {
   try {
     const registrations = await Registration.find({ user: req.user._id })
       .populate("event", "title startDate endDate location type")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json(registrations);
   } catch (err) {

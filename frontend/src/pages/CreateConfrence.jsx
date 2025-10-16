@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 const CreateConference = () => {
   const [form, setForm] = useState({
@@ -17,6 +18,19 @@ const CreateConference = () => {
   });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchConferences = async () => {
+      try {
+        const res = await axios.get("/api/events?type=conference");
+        setConferences(res.data);
+      } catch (err) {
+        setMsg("Error fetching conferences");
+      }
+    };
+    fetchConferences();
+  }, []);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -51,8 +65,25 @@ const CreateConference = () => {
     setLoading(false);
   };
 
+  const [conferences, setConferences] = useState([]);
+
+  const handleEdit = (id) => {
+    navigate(`/edit-conference/${id}`);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this conference?")) return;
+    try {
+      await axios.delete(`/api/events/${id}`);
+      setConferences(conferences.filter(c => c._id !== id));
+      setMsg("Conference deleted successfully");
+    } catch (err) {
+      setMsg(err.response?.data?.msg || "Error deleting conference");
+    }
+  };
+
   return (
-    <div className="create-conference-container">
+    <div>
       <h2>Create Conference</h2>
       <form onSubmit={handleSubmit} className="conference-form">
         <input
@@ -145,6 +176,18 @@ const CreateConference = () => {
         </button>
         {msg && <div className="form-message">{msg}</div>}
       </form>
+
+      <h2>All Conferences</h2>
+      {msg && <div>{msg}</div>}
+      <ul>
+        {conferences.map(conf => (
+          <li key={conf._id}>
+            <strong>{conf.title}</strong> ({conf.startDate} - {conf.endDate})
+            <button onClick={() => handleEdit(conf._id)}>Edit</button>
+            <button onClick={() => handleDelete(conf._id)}>Delete</button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
