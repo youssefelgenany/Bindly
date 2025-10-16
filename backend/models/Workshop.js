@@ -66,7 +66,7 @@ const workshopSchema = new mongoose.Schema({
   },
   professorId: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Professor', 
+    ref: 'User', 
     required: true 
   },
   status: { 
