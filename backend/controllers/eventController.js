@@ -137,6 +137,10 @@ exports.deleteEvent = async (req, res) => {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ msg: "Event not found" });
 
+    if (event.registeredCount > 0) {
+      return res.status(400).json({ msg: "Cannot delete event: users already registered." });
+    }
+
     await event.deleteOne();
     res.json({ msg: "Event deleted successfully" });
   } catch (err) {

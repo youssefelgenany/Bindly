@@ -12,8 +12,8 @@ import Dashboard from './pages/Dashboard';
 import ProfessorEvents from './pages/ProfessorEvents';
 import ProfessorProfile from './pages/ProfessorProfile';
 import Navbar from './components/Navbar';
-import CreateConference from "./pages/CreatConfrence";
-
+import CreateConference from "./pages/CreateConfrence";
+import EditConfrences from "./pages/EditConfrences";
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -182,6 +182,15 @@ function App() {
                   </AdminOnly>
                 </ProtectedRoute> } 
               />
+               <Route
+                path="/edit-conference/:id"
+                element={
+                    <ProtectedRoute>
+                      <AdminOnly>
+                        <EditConfrences />
+                      </AdminOnly>
+                    </ProtectedRoute>
+                  } />
           </Routes>
         </div>
       </Router>
