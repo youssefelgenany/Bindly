@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/dyalaelsmery/Bindly#readme",
   "dependencies": {
+    "mongoose": "^8.19.1",
     "react-router-dom": "^7.9.4"
   }
 }

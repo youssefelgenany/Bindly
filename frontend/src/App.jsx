@@ -20,13 +20,15 @@ import ProfessorProfile from './pages/ProfessorProfile';
 import ProfessorGymSchedule from './pages/ProfessorGymSchedule';
 import Navbar from './components/Navbar';
 import VendorDashboard from './pages/VendorDashboard';
-import CreateConference from "./pages/CreatConfrence";
+import CreateConference from './pages/CreateConfrence';
+import EditConfrences from './pages/EditConfrences';
 import EventsList from './pages/EventsList';
 import CreateBazaar from "./pages/CreateBazaar";
 import CreateTrip from './pages/CreateTrip';
 import EditBazaar from './pages/EditBazaar';
 import EditTrip from './pages/EditTrip';
 import VendorBazaars from './pages/VendorBazaars';
+import Confrences from './pages/Confrences';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -290,7 +292,16 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
+            <Route
+              path="/edit-conference/:id"
+              element={
+                <ProtectedRoute>
+                  <AdminOnly>
+                    <EditConfrences />
+                  </AdminOnly>
+                </ProtectedRoute>
+              }
+            />
             {/* ✅ ADD YOUR EVENT MANAGEMENT ROUTES HERE */}
             <Route
               path="/create-bazaar"
@@ -329,6 +340,16 @@ function App() {
                   <EventsOfficeOnly>
                     <EditTrip />
                   </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/confrences"
+              element={
+                <ProtectedRoute>
+
+                  <Confrences />
+
                 </ProtectedRoute>
               }
             />
