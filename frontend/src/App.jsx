@@ -19,18 +19,15 @@ import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
 import ProfessorGymSchedule from './pages/ProfessorGymSchedule';
 import Navbar from './components/Navbar';
-<<<<<<< HEAD
-import CreateConference from "./pages/CreateConfrence";
-import EditConfrences from "./pages/EditConfrences";
-=======
-import CreateConference from "./pages/CreatConfrence";
+import CreateConference from './pages/CreateConfrence';
+import EditConfrences from './pages/EditConfrences';
 import EventsList from './pages/EventsList';
 import CreateBazaar from "./pages/CreateBazaar";
 import CreateTrip from './pages/CreateTrip';
 import EditBazaar from './pages/EditBazaar';
 import EditTrip from './pages/EditTrip';
+import Confrences from './pages/Confrences';
 
->>>>>>> 6a955d4855d9e3a9a98908e3f6ba207b8172e654
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -272,7 +269,6 @@ function App() {
                   <AdminOnly>
                     <CreateConference />
                   </AdminOnly>
-<<<<<<< HEAD
                 </ProtectedRoute> } 
               />
                <Route
@@ -284,10 +280,6 @@ function App() {
                       </AdminOnly>
                     </ProtectedRoute>
                   } />
-=======
-                </ProtectedRoute>
-              } 
-            />
             
             {/* ✅ ADD YOUR EVENT MANAGEMENT ROUTES HERE */}
             <Route 
@@ -330,7 +322,16 @@ function App() {
                 </ProtectedRoute>
               } 
             />
->>>>>>> 6a955d4855d9e3a9a98908e3f6ba207b8172e654
+            <Route
+              path="/confrences"
+              element={
+                <ProtectedRoute>
+                
+                    <Confrences />
+              
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </div>
       </Router>

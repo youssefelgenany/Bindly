@@ -241,18 +241,30 @@ const Navbar = () => {
                 >
                   Events Management
                 </Link>
+                
               )}
               
               {(user.userType === 'Events Office' || user.role === 'event_office' || user.userType === 'event_office') && (
-                <Link
-                  to="/gym/manage"
-                  className="btn btn-outline"
-                  style={{ width: '100%' }}
-                  onClick={closeSidebar}
-                >
-                  Manage Gym
-                </Link>
+                  <Link
+                    to="/gym/manage"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Manage Gym
+                  </Link>
               )}
+{(user.userType === 'Event Office' || user.role === 'event_office' || user.userType === 'event_office') && (
+  <>
+    <Link
+      to="/confrences"
+      className="btn btn-outline"
+      style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}
+    >
+      Confrences
+    </Link>
+  </>
+)}
               
               {(user.role === 'admin' || user.userType === 'Admin') && (
                 <>
