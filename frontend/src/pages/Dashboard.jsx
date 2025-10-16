@@ -264,7 +264,7 @@ const Dashboard = () => {
                 {user.userType === 'Professor' && (
                   <>
                     <Link to="/professor/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
-                      View & Create My Events
+                      Create Workshop
                     </Link>
                     <Link to="/professor/all-events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
                       All Events & Bazaars
