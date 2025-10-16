@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import BazaarForm from '../components/BazaarForm';
-import { bazaarApi } from '../api/eventsApi';
+import { bazaarApi } from '../api/eventManagementApi';
 import '../styles/EditBazaar.css';
 
 const EditBazaar = () => {

@@ -127,6 +127,17 @@ const Navbar = () => {
                 </div>
               </div>
 
+              {/* Event Office quick link */}
+              {(user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
+                <Link 
+                  to="/events" 
+                  className="btn btn-outline"
+                  style={{ padding: '8px 16px', fontSize: '14px' }}
+                >
+                  View Events
+                </Link>
+              )}
+
               {/* Logout Button */}
               <button 
                 onClick={handleLogout}
@@ -231,29 +242,36 @@ const Navbar = () => {
                 </Link>
               )}
 
-{(user.userType === 'Event Office' || user.role === 'event_office' || user.userType === 'event_office') && (
-  <>
-    <Link
-      to="/confrences"
-      className="btn btn-outline"
-      style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}
-    >
-      Confrences
-    </Link>
-  </>
-)}
+{/* Conferences link moved into Events page filters */}
               
-              {/* EVENTS MANAGEMENT - MOVED HERE FOR BETTER VISIBILITY */}
-              {(user.userType === 'Events Office' || user.role === 'event_office') && (
-                <Link
-                  to="/events"
-                  className="btn btn-outline"
-                  style={{ width: '100%' }}
-                  onClick={closeSidebar}
-                >
-                  Events Management
-                </Link>
-                
+              {/* EVENTS - visible to Event Office */}
+              {(user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
+                <>
+                  <Link
+                    to="/events"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    View Events
+                  </Link>
+                  <Link
+                    to="/create-bazaar"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Create Bazaar
+                  </Link>
+                  <Link
+                    to="/create-conference"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Create Conference
+                  </Link>
+                </>
               )}
               
               {/* Hide Manage Gym for Event Office */}

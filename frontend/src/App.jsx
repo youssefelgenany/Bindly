@@ -106,7 +106,13 @@ const EventsOfficeOnly = ({ children }) => {
     );
   }
 
-  const isEventsOffice = user && (user.userType === 'Events Office' || user.role === 'event_office');
+  const isEventsOffice = user && (
+    user.userType === 'Event Office' || 
+    user.userType === 'Events Office' || 
+    user.userType === 'event_office' || 
+    user.role === 'event_office' || 
+    user.role === 'Event Office'
+  );
   const isAdmin = user && (user.role === 'admin' || user.userType === 'Admin');
   
   return (isEventsOffice || isAdmin) ? children : <Navigate to="/dashboard" />;
@@ -266,9 +272,9 @@ function App() {
               path="/create-conference" 
               element={
                 <ProtectedRoute>
-                  <AdminOnly>
+                  <EventsOfficeOnly>
                     <CreateConference />
-                  </AdminOnly>
+                  </EventsOfficeOnly>
                 </ProtectedRoute> } 
               />
                <Route
