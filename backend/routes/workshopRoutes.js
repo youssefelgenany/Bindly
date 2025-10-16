@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { protect, permit } = require('../middleware/authMiddleware');
 const {
   getAllWorkshops,
   getMyWorkshops,
@@ -13,7 +14,9 @@ const {
 
 // Professor routes (require professor-id header)
 router.get('/my-workshops', getMyWorkshops);
-router.post('/', createWorkshop);
+// routes/workshopRoutes.js
+router.post('/', protect, permit('Professor'), createWorkshop);
+
 router.put('/:id', updateWorkshop);
 router.delete('/:id', deleteWorkshop);
 
