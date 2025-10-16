@@ -22,7 +22,9 @@ const Navbar = () => {
       'Staff': 'Staff',
       'TA': 'TA',
       'Professor': 'Professor',
-      'Vendor': 'Vendor'
+      'Vendor': 'Vendor',
+      'Admin': 'Admin',
+      'Event Office': 'Event Office'
     };
     return types[userType] || userType;
   };
@@ -91,12 +93,30 @@ const Navbar = () => {
                   </div>
                 </div>
                 {/* User Avatar */}
+                {user?.profilePicturePath ? (
+                  <img 
+                    src={`http://localhost:5000${user.profilePicturePath}`}
+                    alt={`${user.firstName} ${user.lastName}`}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '2px solid var(--guc-red)'
+                    }}
+                    onError={(e) => {
+                      // Fallback to initials if image fails to load
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
                 <div style={{
                   width: '40px',
                   height: '40px',
                   borderRadius: '50%',
                   backgroundColor: 'var(--guc-red)',
-                  display: 'flex',
+                  display: user?.profilePicturePath ? 'none' : 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'var(--white)',
@@ -200,15 +220,30 @@ const Navbar = () => {
             </div>
 
             <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-              <Link
-                to="/gym"
-                className="btn btn-outline"
-                style={{ width: '100%' }}
-                onClick={closeSidebar}
-              >
-                Gym Schedule
-              </Link>
-              {(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'Events Office' || user.role === 'event_office' || user.userType === 'event_office') && (
+              {!(user.role === 'admin' || user.userType === 'Admin') && (
+                <Link
+                  to="/gym"
+                  className="btn btn-outline"
+                  style={{ width: '100%' }}
+                  onClick={closeSidebar}
+                >
+                  Gym Schedule
+                </Link>
+              )}
+              
+              {/* EVENTS MANAGEMENT - MOVED HERE FOR BETTER VISIBILITY */}
+              {(user.userType === 'Events Office' || user.role === 'event_office') && (
+                <Link
+                  to="/events"
+                  className="btn btn-outline"
+                  style={{ width: '100%' }}
+                  onClick={closeSidebar}
+                >
+                  Events Management
+                </Link>
+              )}
+              
+              {(user.userType === 'Events Office' || user.role === 'event_office' || user.userType === 'event_office') && (
                 <Link
                   to="/gym/manage"
                   className="btn btn-outline"
@@ -218,6 +253,7 @@ const Navbar = () => {
                   Manage Gym
                 </Link>
               )}
+              
               {(user.role === 'admin' || user.userType === 'Admin') && (
                 <>
                   <Link
@@ -262,8 +298,6 @@ const Navbar = () => {
                   </Link>
                 </>
               )}
-
-              {/* Add more quick links here if needed */}
             </div>
           </aside>
         </>

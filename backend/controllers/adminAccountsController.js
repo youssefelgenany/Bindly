@@ -6,13 +6,24 @@ const Admin = require("../models/AdminModel");
 exports.createAdminOrEventOffice = async (req, res) => {
    console.log("🔹 Body received:", req.body);
   try {
-    const { name, email, password, userType } = req.body;
+    const { firstName, lastName, email, password, role } = req.body;
+    const requestingUser = req.user; // The admin making the request
+    
+    console.log('🔍 Creating admin account:', { firstName, lastName, email, role });
+    console.log('🔍 Requesting user:', { id: requestingUser._id, userType: requestingUser.userType });
+    
+    if (!firstName || !lastName || !email || !password || !role)
+      return res.status(400).json({ 
+        success: false,
+        message: "Missing required fields" 
+      });
 
-    if (!name || !email || !password || !userType)
-      return res.status(400).json({ msg: "Missing required fields" });
-
-    if (!["admin", "event_office"].includes(userType.toLowerCase()))
-      return res.status(400).json({ msg: "userType must be admin or event_office" });
+    // Validate role
+    if (!["Admin", "Event Office"].includes(role))
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid role. Must be Admin or Event Office" 
+      });
 
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ 
@@ -26,9 +37,12 @@ exports.createAdminOrEventOffice = async (req, res) => {
       lastName,
       email,
       password,
-      userType: userType.toLowerCase(),
-      isVerified: true, // auto-verified
+      userType: role,
+      isVerified: false,
+      status: 'blocked'
     });
+
+    console.log('✅ Admin account created successfully:', newUser._id);
 
     res.status(201).json({ 
       success: true,
@@ -45,7 +59,7 @@ exports.createAdminOrEventOffice = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err);
+    console.error('❌ Error creating admin account:', err);
     res.status(500).json({ 
       success: false,
       message: "Server error" 

@@ -52,7 +52,12 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: userData };
     } catch (error) {
       console.error('Login error:', error);
-      
+
+      // Handle awaiting verification redirect
+      if (error.response?.status === 403 && error.response?.data?.code === 'AWAITING_VERIFICATION') {
+        return { success: false, message: 'Your account is awaiting verification. Redirecting...', redirect: '/pending-verification' };
+      }
+
       if (error.response?.data?.message) {
         return { success: false, message: error.response.data.message };
       } else if (error.code === 'NETWORK_ERROR' || !error.response) {

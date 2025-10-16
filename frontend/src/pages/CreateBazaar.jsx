@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BazaarForm from '../components/BazaarForm';
-import { bazaarApi } from '../api/eventAPI';
+import { bazaarApi } from '../api/eventsApi';
 import '../styles/CreateBazaar.css';
 
 const CreateBazaar = () => {

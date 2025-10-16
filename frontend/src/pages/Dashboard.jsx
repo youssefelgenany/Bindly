@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
 import ProfessorDashboardOverview from '../components/ProfessorDashboardOverview';
 
 const Dashboard = () => {
@@ -12,7 +13,9 @@ const Dashboard = () => {
       'Staff': 'Staff Member',
       'TA': 'Teaching Assistant',
       'Professor': 'Professor',
-      'Vendor': 'Vendor'
+      'Vendor': 'Vendor',
+      'Admin': 'Admin',
+      'Event Office': 'Event Office'
     };
     return types[userType] || userType;
   };
@@ -24,69 +27,47 @@ const Dashboard = () => {
       'TA': 'Welcome to the TA dashboard. Help manage student activities.',
       'Professor': 'Welcome to the professor portal. Create and manage academic events.',
       'Vendor': 'Welcome to the vendor portal. Manage your business listings.',
-      'Admin': 'Welcome to the admin dashboard! Monitor and manage the platform.'
+      'Admin': 'Welcome to the admin dashboard! Monitor and manage the platform.',
+      'Event Office': 'Welcome to the event office dashboard! Manage events and activities.'
     };
     return messages[userType] || 'Welcome to your dashboard!';
   };
 
-  // Mock data for admin dashboard
-  const statsData = {
-    totalUsers: 1247,
-    totalVendors: 23,
-    totalEvents: 156,
-    pendingApprovals: 8
-  };
+  const [statsData, setStatsData] = useState({ totalUsers: 0, totalVendors: 0, totalEvents: 0, pendingApprovals: 0 });
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [loadingAdmin, setLoadingAdmin] = useState(false);
+  const [adminError, setAdminError] = useState('');
 
-  const recentActivity = [
-    {
-      id: 1,
-      type: 'login',
-      user: 'Sara Kamal',
-      action: 'logged in',
-      timestamp: '2024-09-15T14:30:00Z',
-      icon: '🔐'
-    },
-    {
-      id: 2,
-      type: 'registration',
-      user: 'Ahmed Hassan',
-      action: 'registered as Vendor',
-      timestamp: '2024-09-15T13:45:00Z',
-      icon: '👤'
-    },
-    {
-      id: 3,
-      type: 'event',
-      user: 'Tech Club',
-      action: 'created new event: "AI Workshop"',
-      timestamp: '2024-09-15T12:20:00Z',
-      icon: '📅'
-    },
-    {
-      id: 4,
-      type: 'login',
-      user: 'Mona Adel',
-      action: 'logged in',
-      timestamp: '2024-09-15T11:15:00Z',
-      icon: '🔐'
-    },
-    {
-      id: 5,
-      type: 'registration',
-      user: 'Omar Mohamed',
-      action: 'registered as Student',
-      timestamp: '2024-09-15T10:30:00Z',
-      icon: '👤'
-    },
-    {
-      id: 6,
-      type: 'event',
-      user: 'Cultural Society',
-      action: 'created new event: "Cultural Night"',
-      timestamp: '2024-09-15T09:45:00Z',
-      icon: '📅'
-    }
-  ];
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      if (!(user?.userType === 'Admin')) return;
+      try {
+        setLoadingAdmin(true);
+        setAdminError('');
+        const token = localStorage.getItem('token');
+        const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+        const [statsRes, activityRes] = await Promise.all([
+          axios.get('/api/dashboard/admin/stats', { headers: authHeaders }),
+          axios.get('/api/dashboard/admin/activity', { headers: authHeaders })
+        ]);
+        if (statsRes.data?.success) setStatsData(statsRes.data.stats || {});
+        if (activityRes.data?.success) {
+          const activities = (activityRes.data.activities || []).map(a => ({
+            ...a,
+            icon: a.type === 'registration' ? '👤' : a.type === 'event' ? '📅' : 'ℹ️'
+          }));
+          setRecentActivity(activities);
+        }
+      } catch (e) {
+        console.error('Dashboard load error:', e?.response?.status, e?.response?.data || e.message);
+        const msg = e?.response?.data?.message || 'Failed to load dashboard data';
+        setAdminError(msg);
+      } finally {
+        setLoadingAdmin(false);
+      }
+    };
+    fetchAdminData();
+  }, [user]);
 
   const isAdmin = user?.role === 'admin' || user?.userType === 'Admin';
 
@@ -114,6 +95,12 @@ const Dashboard = () => {
               <h3 style={{ color: 'var(--charcoal-black)', marginBottom: '1rem' }}>
                 Platform Overview
               </h3>
+              {adminError && (
+                <div className="alert alert-error">{adminError}</div>
+              )}
+              {loadingAdmin && (
+                <div style={{ color: 'var(--text-light)', marginBottom: '1rem' }}>Loading...</div>
+              )}
               
               {/* Stats Cards */}
               <div style={{ 
@@ -191,6 +178,8 @@ const Dashboard = () => {
               </div>
             </div>
           )}
+
+          
 
           <div style={{ 
             display: 'grid', 
@@ -275,10 +264,13 @@ const Dashboard = () => {
                 {user.userType === 'Professor' && (
                   <>
                     <Link to="/professor/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
-                      + Create Event
+                      View & Create My Events
                     </Link>
-                    <Link to="/professor/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
-                      View All My Events
+                    <Link to="/professor/all-events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      All Events & Bazaars
+                    </Link>
+                    <Link to="/professor/gym-schedule" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      View Gym Schedule
                     </Link>
                     <Link to="/professor/profile" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
                       Profile & Account Settings

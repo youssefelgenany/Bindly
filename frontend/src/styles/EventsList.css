@@ -1,0 +1,140 @@
+.events-page {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.events-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.events-header h1 {
+  color: var(--guc-red);
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.events-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 2rem 0;
+}
+
+.events-filters {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.filter-btn {
+  padding: 0.5rem 1.5rem;
+  border: 2px solid var(--medium-gray);
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.filter-btn.active {
+  background-color: var(--guc-red);
+  color: white;
+  border-color: var(--guc-red);
+}
+
+.events-list {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.event-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border: 1px solid var(--medium-gray);
+  display: flex;
+  justify-content: between;
+  align-items: flex-start;
+}
+
+.event-info {
+  flex: 1;
+}
+
+.event-info h3 {
+  color: var(--charcoal-black);
+  margin-bottom: 0.5rem;
+}
+
+.event-type {
+  display: inline-block;
+  background: var(--guc-red);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+.event-location, .event-date {
+  color: var(--text-light);
+  margin-bottom: 0.5rem;
+}
+
+.event-description {
+  margin: 1rem 0;
+  color: var(--text-dark);
+}
+
+.trip-details {
+  background: var(--light-gray);
+  padding: 1rem;
+  border-radius: 6px;
+  margin-top: 1rem;
+}
+
+.event-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 120px;
+}
+
+.events-loading {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-light);
+}
+
+.no-events {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-light);
+  background: white;
+  border-radius: 12px;
+  border: 2px dashed var(--medium-gray);
+}
+
+@media (max-width: 768px) {
+  .events-page {
+    padding: 1rem;
+  }
+  
+  .event-card {
+    flex-direction: column;
+  }
+  
+  .event-actions {
+    flex-direction: row;
+    margin-top: 1rem;
+  }
+  
+  .events-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+}

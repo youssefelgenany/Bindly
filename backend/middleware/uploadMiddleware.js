@@ -42,8 +42,12 @@ const uploadVendorFiles = upload.fields([
   { name: 'vendorTaxCard', maxCount: 1 }
 ]);
 
+// Profile picture upload (single file)
+const uploadProfilePicture = upload.single('profilePicture');
+
 module.exports = {
-  uploadVendorFiles
+  uploadVendorFiles,
+  uploadProfilePicture
 };
 
 
