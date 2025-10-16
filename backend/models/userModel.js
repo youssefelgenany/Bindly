@@ -13,20 +13,30 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
-  firstName: {
+   firstName: {
     type: String,
-    required: true,
+    required: function() {
+      return ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
+    },
     trim: true
   },
   lastName: {
     type: String,
-    required: true,
+    required: function() {
+      return ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
+    },
     trim: true
+  },
+   name: {
+    type: String,
+    required: function() {
+      return ['admin', 'event_office'].includes(this.userType);
+    }
   },
   userType: {
     type: String,
     required: true,
-    enum: ['Student', 'Staff', 'TA', 'Professor', 'Vendor']
+    enum: ['Student', 'Staff', 'TA', 'Professor', 'Vendor','event_office','admin']
   },
   // For GUC users (Student, Staff, TA, Professor)
   gucId: {
@@ -34,7 +44,18 @@ const userSchema = new mongoose.Schema({
     required: function() {
       return ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
     },
+    trim: true,
+    default: null
+  },
+  // Department field for GUC users
+  department: {
+    type: String,
     trim: true
+  },
+  // Profile picture for all users
+  profilePicturePath: {
+    type: String,
+    default: null
   },
   // For vendors
   companyName: {
@@ -46,16 +67,10 @@ const userSchema = new mongoose.Schema({
   },
   vendorLogoPath: {
     type: String,
-    required: function() {
-      return this.userType === 'Vendor';
-    },
     default: null
   },
   vendorTaxCardPath: {
     type: String,
-    required: function() {
-      return this.userType === 'Vendor';
-    },
     default: null
   },
   isVerified: {
@@ -77,7 +92,13 @@ const userSchema = new mongoose.Schema({
    status: {
     type: String,
     enum: ['active', 'blocked'],
-    default: 'active'
+      default: function () {
+    // 'this' refers to the current document being created
+    if (this.userType === 'Staff' || this.userType === 'TA' || this.userType === 'Professor') {
+      return 'blocked';
+    }
+    return 'active';
+  }
   }
 });
 

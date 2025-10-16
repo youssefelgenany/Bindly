@@ -52,7 +52,12 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: userData };
     } catch (error) {
       console.error('Login error:', error);
-      
+
+      // Handle awaiting verification redirect
+      if (error.response?.status === 403 && error.response?.data?.code === 'AWAITING_VERIFICATION') {
+        return { success: false, message: 'Your account is awaiting verification. Redirecting...', redirect: '/pending-verification' };
+      }
+
       if (error.response?.data?.message) {
         return { success: false, message: error.response.data.message };
       } else if (error.code === 'NETWORK_ERROR' || !error.response) {
@@ -67,12 +72,17 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.post('/api/auth/signup', userData);
       
-      const { user: newUser, token } = response.data;
+      const { user: newUser, token, requiresVerification } = response.data;
       
       // Don't automatically log in the user after signup
       // Just return success - user will need to login manually
       
-      return { success: true, user: newUser, message: 'Account created successfully' };
+      return { 
+        success: true, 
+        user: newUser, 
+        message: 'Account created successfully',
+        requiresVerification: requiresVerification || false
+      };
     } catch (error) {
       console.error('Signup error:', error);
       
@@ -102,11 +112,18 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const updateUser = (updatedUserData) => {
+    const updatedUser = { ...user, ...updatedUserData };
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  };
+
   const value = {
     user,
     login,
     signup,
     logout,
+    updateUser,
     loading
   };
 

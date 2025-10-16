@@ -4,24 +4,31 @@
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "supervisor server.js"
+    "dev": "supervisor server.js",
+    "start": "nodemon server.js",
+    "lint": "eslint . --ext .js",
+    "lint:fix": "eslint . --ext .js --fix"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "bcryptjs": "^2.4.3",
+    "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-validator": "^7.0.1",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.19.0",
+    "mongodb": "^6.20.0",
+    "mongoose": "^8.19.1",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.13"
   },
   "devDependencies": {
+    "@eslint/js": "^9.37.0",
+    "eslint": "^9.37.0",
+    "globals": "^16.4.0",
     "nodemon": "^3.1.10",
     "supervisor": "^0.12.0"
   }

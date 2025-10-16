@@ -131,7 +131,7 @@ const signup = async (req, res) => {
       firstName, 
       lastName, 
       userType,
-      isVerified: true // All users are verified immediately
+      isVerified: ['Staff', 'TA', 'Professor'].includes(userType) ? false : true // Staff/TA/Professor need admin verification
     };
 
     // Add GUC ID for academic users
@@ -180,6 +180,8 @@ const signup = async (req, res) => {
       lastName: newUser.lastName,
       userType: newUser.userType,
       gucId: newUser.gucId,
+      department: newUser.department,
+      profilePicturePath: newUser.profilePicturePath,
       companyName: newUser.companyName,
       isVerified: newUser.isVerified,
       createdAt: newUser.createdAt
@@ -196,11 +198,18 @@ const signup = async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // Determine response message based on user type
+    let responseMessage = 'User created successfully';
+    if (['Staff', 'TA', 'Professor'].includes(userType)) {
+      responseMessage = 'Account created successfully. Your account is pending admin verification. You will receive an email once verified.';
+    }
+
     const responseBody = {
       success: true,
-      message: 'User created successfully',
+      message: responseMessage,
       user: userResponse,
-      token
+      token: ['Staff', 'TA', 'Professor'].includes(userType) ? null : token, // No token for unverified accounts
+      requiresVerification: ['Staff', 'TA', 'Professor'].includes(userType)
     };
 
     res.status(201).json(responseBody);
@@ -229,23 +238,45 @@ const signup = async (req, res) => {
 // ==================== LOGIN ====================
 const login = async (req, res) => {
   console.log("🟢 Login route hit");
+  
 
   try {
+    
     const { email, password } = req.body;
-   
-    const user = await User.findOne({ email }) || await Admin.findOne({ email });
-    console.log("🔍 Found user:", user);
+   console.log("user",req.body);
+    // Try to find user in User model first
+    let user = await User.findOne({ email });
+    console.log("user",user);
+    console.log("secret",process.env.JWT_SECRET);
+    // If not found in User model, try Admin model
+    if (!user) {
+      user = await Admin.findOne({ email });
+    }
+    
     if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
-    // Email verification disabled for Students; allow login regardless
+    // Check verification status for Staff/TA/Professor
+    if (['Staff', 'TA', 'Professor'].includes(user.userType) && !user.isVerified) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Your account is pending admin verification. You will receive an email once verified.' 
+      });
+    }
 
     const isPasswordValid = await user.comparePassword(password);
-    console.log(password);
-    console.log("passvalid?", isPasswordValid);
-    if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password ' });
+    if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password' });
+
+    // Block login for unverified or inactive users
+    if (!user.isVerified || user.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        code: 'AWAITING_VERIFICATION',
+        message: 'Your account is awaiting verification. Please wait for admin approval.'
+      });
+    }
 
     const token = jwt.sign(
-      { userId: user._id, email: user.email, userType: user.userType },
+      { userId: user._id, email: user.email, role: user.role || user.userType  },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
@@ -257,6 +288,8 @@ const login = async (req, res) => {
       lastName: user.lastName,
       userType: user.userType,
       gucId: user.gucId,
+      department: user.department,
+      profilePicturePath: user.profilePicturePath,
       companyName: user.companyName,
       isVerified: user.isVerified,
       createdAt: user.createdAt
@@ -344,6 +377,155 @@ async function resendVerification(req, res) {
   }
 }
 
+// Update user profile
+const updateProfile = async (req, res) => {
+  try {
+    const { firstName, lastName, email, gucId, department } = req.body;
+    const userId = req.user._id;
+
+    if (!firstName || !lastName || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'First name, last name, and email are required'
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address'
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if email is already taken by another user
+    if (email !== user.email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email is already taken by another user'
+        });
+      }
+    }
+
+    // Update user profile
+    user.firstName = firstName;
+    user.lastName = lastName;
+    user.email = email;
+    
+    // Update GUC ID if provided and user is a GUC user
+    if (gucId && ['Student', 'Staff', 'TA', 'Professor'].includes(user.userType)) {
+      user.gucId = gucId;
+    }
+    
+    // Update department if provided
+    if (department) {
+      user.department = department;
+    }
+    
+    // Handle profile picture upload
+    if (req.file) {
+      console.log('📸 Profile picture uploaded:', req.file.filename);
+      user.profilePicturePath = '/uploads/' + req.file.filename;
+    }
+    
+    console.log('🔍 Before save - user department:', user.department);
+    await user.save();
+    console.log('🔍 After save - user department:', user.department);
+
+    console.log('✅ Profile updated successfully for user:', userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        userType: user.userType,
+        gucId: user.gucId,
+        department: user.department,
+        profilePicturePath: user.profilePicturePath,
+        isVerified: user.isVerified,
+        status: user.status
+      }
+    });
+  } catch (err) {
+    console.error('❌ Error updating profile:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+// Change user password
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user._id;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long'
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+    if (!isCurrentPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    console.log('✅ Password changed successfully for user:', userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (err) {
+    console.error('❌ Error changing password:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
 // ==================== EXPORT ====================
 module.exports = {
   signup,
@@ -352,5 +534,7 @@ module.exports = {
   verifyEmail,
   smtpStatus,
   sendTestEmail,
-  resendVerification
+  resendVerification,
+  updateProfile,
+  changePassword
 };

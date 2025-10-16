@@ -10,6 +10,7 @@ const Signup = () => {
     firstName: '',
     lastName: '',
     userType: 'Student',
+    employeeType: '',
     gucId: '',
     companyName: ''
   });
@@ -62,20 +63,38 @@ const Signup = () => {
     return { score, label, color, requirements };
   };
 
-  const userTypes = [
+  const mainUserTypes = [
     { value: 'Student', label: 'Student', description: 'GUC Student' },
+    { value: 'Employee', label: 'Employee', description: 'GUC Employee' },
+    { value: 'Vendor', label: 'Vendor', description: 'External Vendor' }
+  ];
+
+  const employeeTypes = [
     { value: 'Staff', label: 'Staff', description: 'GUC Staff Member' },
     { value: 'TA', label: 'Teaching Assistant', description: 'GUC Teaching Assistant' },
-    { value: 'Professor', label: 'Professor', description: 'GUC Professor' },
-    { value: 'Vendor', label: 'Vendor', description: 'External Vendor' }
+    { value: 'Professor', label: 'Professor', description: 'GUC Professor' }
   ];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    if (name === 'userType') {
+      setFormData(prev => ({
+        ...prev,
+        userType: value,
+        employeeType: value === 'Employee' ? prev.employeeType : '' // Clear employee type if not Employee
+      }));
+    } else if (name === 'employeeType') {
+      setFormData(prev => ({
+        ...prev,
+        employeeType: value
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
     
     // Calculate password strength when password changes
     if (name === 'password') {
@@ -147,8 +166,13 @@ const Signup = () => {
       newErrors.lastName = 'Last name is required';
     }
 
+    // Employee type validation
+    if (formData.userType === 'Employee' && !formData.employeeType) {
+      newErrors.employeeType = 'Please select an employee type';
+    }
+
     // GUC user validations
-    if (['Student', 'Staff', 'TA', 'Professor'].includes(formData.userType)) {
+    if (formData.userType === 'Student' || (formData.userType === 'Employee' && formData.employeeType)) {
       const gucEmailRegex = /^[a-zA-Z0-9._%+-]+@student\.guc\.edu\.eg$|^[a-zA-Z0-9._%+-]+@guc\.edu\.eg$/;
       if (!gucEmailRegex.test(formData.email)) {
         newErrors.email = 'GUC users must use a valid GUC email address (@student.guc.edu.eg or @guc.edu.eg)';
@@ -191,15 +215,26 @@ const Signup = () => {
     try {
       const submitData = new FormData();
       
+      // Determine the actual userType to send to backend
+      const actualUserType = formData.userType === 'Employee' ? formData.employeeType : formData.userType;
+      
       // Add form fields
-      Object.keys(formData).forEach(key => {
-        if (formData[key]) {
-          submitData.append(key, formData[key]);
-        }
-      });
+      submitData.append('email', formData.email);
+      submitData.append('password', formData.password);
+      submitData.append('firstName', formData.firstName);
+      submitData.append('lastName', formData.lastName);
+      submitData.append('userType', actualUserType);
+      
+      if (formData.gucId) {
+        submitData.append('gucId', formData.gucId);
+      }
+      
+      if (formData.companyName) {
+        submitData.append('companyName', formData.companyName);
+      }
 
       // Add files for vendors
-      if (formData.userType === 'Vendor') {
+      if (actualUserType === 'Vendor') {
         if (files.vendorLogo) {
           submitData.append('vendorLogo', files.vendorLogo);
         }
@@ -210,7 +245,7 @@ const Signup = () => {
 
       // Debug: Log the form data being sent
       console.log('Form data being sent:', {
-        userType: formData.userType,
+        userType: actualUserType,
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -223,10 +258,17 @@ const Signup = () => {
       const result = await signup(submitData);
       
       if (result.success) {
-        setMessage('Account created successfully! Redirecting to login...');
-        setTimeout(() => {
-          navigate('/login');
-        }, 1000);
+        if (result.requiresVerification) {
+          setMessage('Account created successfully! Redirecting to verification page...');
+          setTimeout(() => {
+            navigate('/verification-pending');
+          }, 1000);
+        } else {
+          setMessage('Account created successfully! Redirecting to login...');
+          setTimeout(() => {
+            navigate('/login');
+          }, 1000);
+        }
       } else {
         setMessage(result.message);
         console.error('Signup failed:', result.message);
@@ -261,11 +303,10 @@ const Signup = () => {
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* User Type Selection */}
+          {/* Main User Type Selection */}
           <div className="form-group">
-            <label className="form-label">Account Type</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-              {userTypes.map(type => (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+              {mainUserTypes.map(type => (
                 <label key={type.value} style={{
                   padding: '12px',
                   border: `2px solid ${formData.userType === type.value ? 'var(--guc-red)' : 'var(--medium-gray)'}`,
@@ -294,6 +335,42 @@ const Signup = () => {
               ))}
             </div>
           </div>
+
+          {/* Employee Type Selection - Hidden until Employee is selected */}
+          {formData.userType === 'Employee' && (
+            <div className="form-group">
+              <label className="form-label">Employee Type</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                {employeeTypes.map(type => (
+                  <label key={type.value} style={{
+                    padding: '12px',
+                    border: `2px solid ${formData.employeeType === type.value ? 'var(--guc-red)' : 'var(--medium-gray)'}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: formData.employeeType === type.value ? 'rgba(210, 10, 10, 0.1)' : 'var(--white)',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    <input
+                      type="radio"
+                      name="employeeType"
+                      value={type.value}
+                      checked={formData.employeeType === type.value}
+                      onChange={handleChange}
+                      style={{ marginRight: '8px' }}
+                    />
+                    <div>
+                      <div style={{ fontWeight: '600', color: 'var(--text-dark)' }}>
+                        {type.label}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
+                        {type.description}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Personal Information */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -341,6 +418,8 @@ const Signup = () => {
               placeholder={
                 formData.userType === 'Student'
                   ? "your.email@student.guc.edu.eg"
+                  : formData.userType === 'Employee'
+                  ? "your.email@guc.edu.eg"
                   : formData.userType === 'Vendor'
                   ? "your.email@company.com"
                   : "your.email@guc.edu.eg"
@@ -351,7 +430,7 @@ const Signup = () => {
           </div>
 
           {/* GUC ID for GUC users */}
-          {['Student', 'Staff', 'TA', 'Professor'].includes(formData.userType) && (
+          {(formData.userType === 'Student' || (formData.userType === 'Employee' && formData.employeeType)) && (
             <div className="form-group">
               <label htmlFor="gucId" className="form-label">GUC ID</label>
               <input
@@ -421,7 +500,7 @@ const Signup = () => {
                 }}
                 disabled={loading}
               >
-                {showPassword ? '⊘' : '○'}
+                {showPassword ? '👁️‍🗨️' : '👁️'}
               </button>
             </div>
             {errors.password && <div className="form-error">{errors.password}</div>}
@@ -495,7 +574,7 @@ const Signup = () => {
                 }}
                 disabled={loading}
               >
-                {showConfirmPassword ? '⊘' : '○'}
+                {showConfirmPassword ? '👁️‍🗨️' : '👁️'}
               </button>
             </div>
             {errors.confirmPassword && <div className="form-error">{errors.confirmPassword}</div>}

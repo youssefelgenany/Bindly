@@ -1,8 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { createBazaar, editBazaar } = require('../controllers/bazaarController');
+const { createBazaar, editBazaar, getAllBazaars, registerForBazaar } = require('../controllers/bazaarController');
+const { protect, permit } = require('../middleware/authMiddleware');
 
-router.post('/', createBazaar);
-router.put('/:id', editBazaar);
+// Get all bazaars (for users to browse)
+router.get('/', protect, getAllBazaars);
+
+// Register for a bazaar
+router.post('/:id/register', protect, registerForBazaar);
+
+// Bazaar management routes - Event Office / Admin
+router.post('/', protect, permit('Event Office', 'Admin'), createBazaar);
+router.put('/:id', protect, permit('Event Office', 'Admin'), editBazaar);
 
 module.exports = router;

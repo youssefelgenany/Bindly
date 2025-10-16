@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { adminApiService } from '../api/adminApi';
 
 const AdminEvents = () => {
   const { user } = useAuth();
@@ -15,78 +16,44 @@ const AdminEvents = () => {
   const [actionMessages, setActionMessages] = useState({}); // id -> message
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, event: null });
 
-  // Placeholder events data
-  const events = [
-    {
-      id: 'event-001',
-      title: 'Tech Conference 2024',
-      description: 'Annual technology conference featuring latest innovations',
-      date: '2024-12-15T09:00:00Z',
-      location: 'GUC Main Auditorium',
-      organizer: 'Tech Club',
-      organizerEmail: 'tech.club@guc.edu.eg',
-      status: 'pending',
-      createdAt: '2024-09-10T10:00:00Z',
-      maxAttendees: 200,
-      currentAttendees: 45
-    },
-    {
-      id: 'event-002',
-      title: 'Career Fair',
-      description: 'Meet with top companies and explore career opportunities',
-      date: '2024-11-20T10:00:00Z',
-      location: 'Sports Complex',
-      organizer: 'Career Services',
-      organizerEmail: 'career@guc.edu.eg',
-      status: 'approved',
-      createdAt: '2024-09-05T14:30:00Z',
-      maxAttendees: 500,
-      currentAttendees: 120
-    },
-    {
-      id: 'event-003',
-      title: 'Cultural Night',
-      description: 'Celebrate diversity with performances from different cultures',
-      date: '2024-10-25T18:00:00Z',
-      location: 'Student Center',
-      organizer: 'Cultural Society',
-      organizerEmail: 'cultural@guc.edu.eg',
-      status: 'rejected',
-      createdAt: '2024-09-12T16:45:00Z',
-      maxAttendees: 150,
-      currentAttendees: 0
-    },
-    {
-      id: 'event-004',
-      title: 'Workshop: Data Science',
-      description: 'Hands-on workshop on data analysis and machine learning',
-      date: '2024-11-05T14:00:00Z',
-      location: 'Computer Lab 3',
-      organizer: 'Data Science Club',
-      organizerEmail: 'datascience@guc.edu.eg',
-      status: 'pending',
-      createdAt: '2024-09-15T11:20:00Z',
-      maxAttendees: 30,
-      currentAttendees: 8
-    },
-    {
-      id: 'event-005',
-      title: 'Sports Tournament',
-      description: 'Inter-departmental sports competition',
-      date: '2024-12-01T08:00:00Z',
-      location: 'Sports Complex',
-      organizer: 'Sports Committee',
-      organizerEmail: 'sports@guc.edu.eg',
-      status: 'approved',
-      createdAt: '2024-09-08T09:15:00Z',
-      maxAttendees: 100,
-      currentAttendees: 67
+  // Events state - will be loaded from API
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadEvents = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      console.log('Loading events with filters:', { q: searchQuery, status: statusFilter });
+      const result = await adminApiService.getAllEvents({
+        q: searchQuery,
+        status: statusFilter
+      });
+      console.log('Events API result:', result);
+      if (result.success) {
+        setEvents(result.data.events || []);
+        console.log('Events loaded:', result.data.events);
+      } else {
+        setError(result.message);
+        console.error('API error:', result.message);
+      }
+    } catch (err) {
+      setError('Failed to load events');
+      console.error('Error loading events:', err);
+    } finally {
+      setLoading(false);
     }
-  ];
+  }, [searchQuery, statusFilter]);
+
+  // Load events on component mount and when filters change
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
 
   // Get unique organizers for filter
   const organizers = useMemo(() => {
-    const unique = [...new Set(events.map(e => e.organizer))];
+    const unique = [...new Set(events.map(e => e.createdBy?.firstName + ' ' + e.createdBy?.lastName || 'Unknown'))];
     return unique.sort();
   }, [events]);
 
@@ -144,11 +111,14 @@ const AdminEvents = () => {
     setActionMessages(prev => ({ ...prev, [eventId]: '' }));
 
     try {
-      // TODO: Replace with backend call
-      // Example: await axios.patch(`/api/admin/events/${eventId}/status`, { status: newStatus });
-      await new Promise(res => setTimeout(res, 500));
-      
-      setActionMessages(prev => ({ ...prev, [eventId]: `Event ${newStatus} successfully.` }));
+      const result = await adminApiService.updateEventStatus(eventId, newStatus);
+      if (result.success) {
+        setActionMessages(prev => ({ ...prev, [eventId]: `Event ${newStatus} successfully.` }));
+        // Reload events to get updated data
+        await loadEvents();
+      } else {
+        setActionMessages(prev => ({ ...prev, [eventId]: result.message || `Failed to ${newStatus} event.` }));
+      }
     } catch (error) {
       setActionMessages(prev => ({ ...prev, [eventId]: `Failed to ${newStatus} event.` }));
     } finally {
@@ -163,18 +133,22 @@ const AdminEvents = () => {
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm.event) return;
 
-    setProcessingIds(prev => ({ ...prev, [deleteConfirm.event.id]: true }));
+    const eventId = deleteConfirm.event._id || deleteConfirm.event.id;
+    setProcessingIds(prev => ({ ...prev, [eventId]: true }));
     try {
-      // TODO: Replace with backend call
-      // Example: await axios.delete(`/api/admin/events/${deleteConfirm.event.id}`);
-      await new Promise(res => setTimeout(res, 500));
-      
-      setDeleteConfirm({ show: false, event: null });
-      setActionMessages(prev => ({ ...prev, [deleteConfirm.event.id]: 'Event deleted successfully.' }));
+      const result = await adminApiService.deleteEvent(eventId);
+      if (result.success) {
+        setDeleteConfirm({ show: false, event: null });
+        setActionMessages(prev => ({ ...prev, [eventId]: 'Event deleted successfully.' }));
+        // Reload events to get updated data
+        await loadEvents();
+      } else {
+        setActionMessages(prev => ({ ...prev, [eventId]: result.message || 'Failed to delete event.' }));
+      }
     } catch (error) {
-      setActionMessages(prev => ({ ...prev, [deleteConfirm.event.id]: 'Failed to delete event.' }));
+      setActionMessages(prev => ({ ...prev, [eventId]: 'Failed to delete event.' }));
     } finally {
-      setProcessingIds(prev => ({ ...prev, [deleteConfirm.event.id]: false }));
+      setProcessingIds(prev => ({ ...prev, [eventId]: false }));
     }
   };
 
@@ -201,7 +175,7 @@ const AdminEvents = () => {
   };
 
   // Basic guard (UI-level) to avoid rendering for non-admins
-  if (!(user?.role === 'admin' || user?.userType === 'Admin')) {
+  if (!(user?.userType === 'Admin')) {
     return (
       <div style={{ padding: '2rem' }}>
         <div className="container">
@@ -293,29 +267,51 @@ const AdminEvents = () => {
 
             {/* Events List */}
             <div style={{ display: 'grid', gap: '0.75rem' }}>
-              {filteredEvents.length === 0 ? (
+              {loading ? (
+                <div className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
+                  <div style={{ padding: '2rem', textAlign: 'center' }}>
+                    <div className="spinner" style={{ margin: '0 auto' }}></div>
+                    <div style={{ marginTop: '1rem', color: 'var(--text-light)' }}>Loading events...</div>
+                  </div>
+                </div>
+              ) : error ? (
+                <div className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
+                  <div style={{ padding: '1rem', color: 'var(--guc-red)', textAlign: 'center' }}>
+                    {error}
+                    <button 
+                      onClick={loadEvents}
+                      className="btn btn-outline"
+                      style={{ marginLeft: '1rem', padding: '4px 8px' }}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              ) : filteredEvents.length === 0 ? (
                 <div className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
                   <div style={{ padding: '1rem', color: 'var(--text-light)', textAlign: 'center' }}>
                     No events match your search criteria.
                   </div>
                 </div>
               ) : (
-                filteredEvents.map((event) => (
-                  <div key={event.id} className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
-                    <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-                      {/* Event Header */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-                        <div style={{ display: 'grid', gap: '0.25rem', flex: 1 }}>
-                          <div style={{ fontWeight: 600, color: 'var(--charcoal-black)', fontSize: '18px' }}>
-                            {event.title}
+                filteredEvents.map((event) => {
+                  const eventId = event._id || event.id;
+                  return (
+                    <div key={eventId} className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
+                      <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+                        {/* Event Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                          <div style={{ display: 'grid', gap: '0.25rem', flex: 1 }}>
+                            <div style={{ fontWeight: 600, color: 'var(--charcoal-black)', fontSize: '18px' }}>
+                              {event.title}
+                            </div>
+                            <div style={{ color: 'var(--text-light)', fontSize: '14px' }}>
+                              {event.description}
+                            </div>
+                            <div style={{ color: 'var(--text-light)', fontSize: '12px' }}>
+                              📍 {event.location} • 👥 {event.registeredCount || 0}/{event.capacity} attendees
+                            </div>
                           </div>
-                          <div style={{ color: 'var(--text-light)', fontSize: '14px' }}>
-                            {event.description}
-                          </div>
-                          <div style={{ color: 'var(--text-light)', fontSize: '12px' }}>
-                            📍 {event.location} • 👥 {event.currentAttendees}/{event.maxAttendees} attendees
-                          </div>
-                        </div>
                         <div style={{ textAlign: 'right', display: 'grid', gap: '0.25rem' }}>
                           <div style={{ 
                             fontSize: '12px', 
@@ -328,10 +324,10 @@ const AdminEvents = () => {
                             {getStatusIcon(event.status)} {event.status.toUpperCase()}
                           </div>
                           <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
-                            📅 {new Date(event.date).toLocaleDateString()} at {new Date(event.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            📅 {new Date(event.startDate).toLocaleDateString()} at {new Date(event.startDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                           </div>
                           <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
-                            👤 {event.organizer}
+                            👤 {event.createdBy?.firstName} {event.createdBy?.lastName} ({event.createdBy?.email})
                           </div>
                         </div>
                       </div>
@@ -342,19 +338,19 @@ const AdminEvents = () => {
                           <>
                             <button
                               className="btn btn-primary"
-                              onClick={() => handleStatusChange(event.id, 'approved')}
-                              disabled={!!processingIds[event.id]}
+                              onClick={() => handleStatusChange(eventId, 'approved')}
+                              disabled={!!processingIds[eventId]}
                               style={{ fontSize: '12px' }}
                             >
-                              {processingIds[event.id] ? 'Processing...' : '✓ Approve'}
+                              {processingIds[eventId] ? 'Processing...' : '✓ Approve'}
                             </button>
                             <button
                               className="btn btn-outline"
-                              onClick={() => handleStatusChange(event.id, 'rejected')}
-                              disabled={!!processingIds[event.id]}
+                              onClick={() => handleStatusChange(eventId, 'rejected')}
+                              disabled={!!processingIds[eventId]}
                               style={{ fontSize: '12px', color: 'var(--guc-red)', borderColor: 'var(--guc-red)' }}
                             >
-                              {processingIds[event.id] ? 'Processing...' : '✗ Reject'}
+                              {processingIds[eventId] ? 'Processing...' : '✗ Reject'}
                             </button>
                           </>
                         )}
@@ -362,47 +358,48 @@ const AdminEvents = () => {
                         {event.status === 'approved' && (
                           <button
                             className="btn btn-outline"
-                            onClick={() => handleStatusChange(event.id, 'rejected')}
-                            disabled={!!processingIds[event.id]}
+                            onClick={() => handleStatusChange(eventId, 'rejected')}
+                            disabled={!!processingIds[eventId]}
                             style={{ fontSize: '12px', color: 'var(--guc-red)', borderColor: 'var(--guc-red)' }}
                           >
-                            {processingIds[event.id] ? 'Processing...' : '✗ Reject'}
+                            {processingIds[eventId] ? 'Processing...' : '✗ Reject'}
                           </button>
                         )}
 
                         {event.status === 'rejected' && (
                           <button
                             className="btn btn-primary"
-                            onClick={() => handleStatusChange(event.id, 'approved')}
-                            disabled={!!processingIds[event.id]}
+                            onClick={() => handleStatusChange(eventId, 'approved')}
+                            disabled={!!processingIds[eventId]}
                             style={{ fontSize: '12px' }}
                           >
-                            {processingIds[event.id] ? 'Processing...' : '✓ Approve'}
+                            {processingIds[eventId] ? 'Processing...' : '✓ Approve'}
                           </button>
                         )}
 
                         <button
                           className="btn btn-outline"
                           onClick={() => handleDeleteClick(event)}
-                          disabled={!!processingIds[event.id]}
+                          disabled={!!processingIds[eventId]}
                           style={{ fontSize: '12px', color: 'var(--guc-red)', borderColor: 'var(--guc-red)' }}
                         >
                           🗑️ Delete
                         </button>
 
-                        {actionMessages[event.id] && (
+                        {actionMessages[eventId] && (
                           <span style={{ 
                             marginLeft: '0.5rem', 
                             fontSize: '12px', 
-                            color: actionMessages[event.id].includes('successfully') ? 'var(--success-green)' : 'var(--guc-red)' 
+                            color: actionMessages[eventId].includes('successfully') ? 'var(--success-green)' : 'var(--guc-red)' 
                           }}>
-                            {actionMessages[event.id]}
+                            {actionMessages[eventId]}
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

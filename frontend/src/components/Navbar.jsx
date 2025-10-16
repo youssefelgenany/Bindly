@@ -22,7 +22,9 @@ const Navbar = () => {
       'Staff': 'Staff',
       'TA': 'TA',
       'Professor': 'Professor',
-      'Vendor': 'Vendor'
+      'Vendor': 'Vendor',
+      'Admin': 'Admin',
+      'Event Office': 'Event Office'
     };
     return types[userType] || userType;
   };
@@ -39,23 +41,35 @@ const Navbar = () => {
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        {/* Logo/Brand */}
-        <Link 
-          to={user ? '/dashboard' : '/'} 
-          style={{ 
-            textDecoration: 'none',
-            display: 'flex',
-            alignItems: 'center'
-          }}
-        >
-          <div style={{
-            fontSize: '1.5rem',
-            fontWeight: '700',
-            color: 'var(--guc-red)'
-          }}>
-            Bindly
-          </div>
-        </Link>
+        {/* Left group: brand only */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {user && (
+            <button
+              onClick={toggleSidebar}
+              className="btn btn-outline"
+              aria-label="Open menu"
+              style={{ padding: '8px 12px', fontSize: '18px' }}
+            >
+              ≡
+            </button>
+          )}
+          <Link 
+            to={user ? '/dashboard' : '/'} 
+            style={{ 
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            <div style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: 'var(--guc-red)'
+            }}>
+              Bindly
+            </div>
+          </Link>
+        </div>
 
         {/* Navigation Links */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
@@ -78,33 +92,40 @@ const Navbar = () => {
                     {getUserTypeDisplay(user.userType)}
                   </div>
                 </div>
-                
                 {/* User Avatar */}
+                {user?.profilePicturePath ? (
+                  <img 
+                    src={`http://localhost:5000${user.profilePicturePath}`}
+                    alt={`${user.firstName} ${user.lastName}`}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '2px solid var(--guc-red)'
+                    }}
+                    onError={(e) => {
+                      // Fallback to initials if image fails to load
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
                 <div style={{
                   width: '40px',
                   height: '40px',
                   borderRadius: '50%',
                   backgroundColor: 'var(--guc-red)',
-                  display: 'flex',
+                  display: user?.profilePicturePath ? 'none' : 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'var(--white)',
                   fontWeight: '600',
                   fontSize: '16px'
                 }}>
-                  {user.firstName.charAt(0).toUpperCase()}
+                   {user?.firstName?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
               </div>
-
-              {/* Right-side menu toggle (three vertical dashes) */}
-              <button
-                onClick={toggleSidebar}
-                className="btn btn-outline"
-                aria-label="Open menu"
-                style={{ padding: '8px 12px', fontSize: '18px' }}
-              >
-                |||
-              </button>
 
               {/* Logout Button */}
               <button 
@@ -167,12 +188,12 @@ const Navbar = () => {
             style={{
               position: 'fixed',
               top: 0,
-              right: 0,
+              left: 0,
               height: '100vh',
               width: '280px',
               backgroundColor: 'var(--white)',
-              boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
-              transform: isSidebarOpen ? 'translateX(0)' : 'translateX(100%)',
+              boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+              transform: isSidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
               transition: 'transform 0.25s ease',
               zIndex: 1000,
               display: 'flex',
@@ -199,6 +220,40 @@ const Navbar = () => {
             </div>
 
             <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+              {!(user.role === 'admin' || user.userType === 'Admin') && (
+                <Link
+                  to="/gym"
+                  className="btn btn-outline"
+                  style={{ width: '100%' }}
+                  onClick={closeSidebar}
+                >
+                  Gym Schedule
+                </Link>
+              )}
+              
+              {/* EVENTS MANAGEMENT - MOVED HERE FOR BETTER VISIBILITY */}
+              {(user.userType === 'Events Office' || user.role === 'event_office') && (
+                <Link
+                  to="/events"
+                  className="btn btn-outline"
+                  style={{ width: '100%' }}
+                  onClick={closeSidebar}
+                >
+                  Events Management
+                </Link>
+              )}
+              
+              {(user.userType === 'Events Office' || user.role === 'event_office' || user.userType === 'event_office') && (
+                <Link
+                  to="/gym/manage"
+                  className="btn btn-outline"
+                  style={{ width: '100%' }}
+                  onClick={closeSidebar}
+                >
+                  Manage Gym
+                </Link>
+              )}
+              
               {(user.role === 'admin' || user.userType === 'Admin') && (
                 <>
                   <Link
@@ -243,8 +298,6 @@ const Navbar = () => {
                   </Link>
                 </>
               )}
-
-              {/* Add more quick links here if needed */}
             </div>
           </aside>
         </>
