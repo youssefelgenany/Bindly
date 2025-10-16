@@ -92,7 +92,13 @@ const userSchema = new mongoose.Schema({
    status: {
     type: String,
     enum: ['active', 'blocked'],
-    default: 'blocked'
+      default: function () {
+    // 'this' refers to the current document being created
+    if (this.userType === 'Staff' || this.userType === 'TA' || this.userType === 'Professor') {
+      return 'blocked';
+    }
+    return 'active';
+  }
   }
 });
 

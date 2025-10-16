@@ -30,7 +30,7 @@ exports.assignRoleAndSendVerification = async (req, res) => {
     const name = user.firstName ? `${user.firstName} ${user.lastName}` : user.name;
     await sendVerificationEmail(user.email, user.verificationToken, name);
 
-    res.json({ msg: "Role assigned and verification email sent successfully." });
+    res.json({ msg: "Role assigned and verification email sent successfully.",token:user.verificationToken });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Server error" });
