@@ -13,7 +13,7 @@ const registrationSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'staff', 'ta', 'professor', 'vendor'],
+    enum: ['student', 'staff', 'TA', 'professor', 'vendor'],
   },
   status: {
     type: String,

@@ -1,6 +1,6 @@
 const Event = require("../models/eventModel");
 const Registration = require("../models/registrationModel");
-
+const Trip = require("../models/tripModel");
 // 🎯 Create a new event (Admin or Event Office)
 exports.createEvent = async (req, res) => {
   try {
@@ -207,43 +207,71 @@ exports.deleteEvent = async (req, res) => {
 };
 
 // 📝 Register a user for an event
+// 📝 Register a user for an event OR a trip using the same endpoint
 exports.registerForEvent = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id);
-    if (!event) return res.status(404).json({ msg: "Event not found" });
+    const id = req.params.id;
+    const userId = req.user?._id || req.user?.id;
 
-    // Check if registration deadline passed or event full
-    if (event.capacity && event.registeredCount >= event.capacity) {
-      return res.status(400).json({ msg: "Event is full" });
+    if (!id) return res.status(400).json({ msg: "Missing id in URL" });
+    if (!userId) return res.status(401).json({ msg: "Unauthorized" });
+
+    // Try Event first
+    let holder = await Event.findById(id);
+    let holderType = "event";
+
+    // If not an Event, try Trip
+    if (!holder) {
+      holder = await Trip.findById(id);
+      holderType = holder ? "trip" : null;
     }
 
-    const existing = await Registration.findOne({
-      event: event._id,
-      user: req.user._id
-    });
+    if (!holderType) {
+      return res.status(404).json({ msg: "Event/Trip not found" });
+    }
+
+    // Optional: check registration deadline for trips
+    if (holderType === "trip" && holder.registrationDeadline && holder.registrationDeadline < new Date()) {
+      return res.status(400).json({ msg: "Registration deadline has passed" });
+    }
+
+    // Capacity check: use count of registrations for this id
+    const regCount = await Registration.countDocuments({ event: id });
+    if (holder.capacity && regCount >= holder.capacity) {
+      return res.status(400).json({ msg: `${holderType === 'trip' ? 'Trip' : 'Event'} is full` });
+    }
+
+    // Prevent duplicate registration
+    const existing = await Registration.findOne({ event: id, user: userId });
     if (existing) {
-      return res.status(400).json({ msg: "You are already registered for this event" });
+      return res.status(400).json({ msg: "You are already registered" });
     }
 
-    const registration = new Registration({
-      event: event._id,
-      user: req.user._id,
-      role: req.user.role,
+    // Create registration (store the same id in `event` field)
+    const registration = await Registration.create({
+      event: id,                 // works for both Event and Trip ids
+      user: userId,
+      role: req.user.userType || req.user.role || "attendee",
       status: "approved"
     });
 
-    await registration.save();
+    // Optionally increment registeredCount for Events only (Trips don’t have this field)
+    if (holderType === "event") {
+      holder.registeredCount = (holder.registeredCount || 0) + 1;
+      await holder.save();
+    }
 
-    // Increment count in Event
-    event.registeredCount = (event.registeredCount || 0) + 1;
-    await event.save();
-
-    res.status(201).json({ msg: "Successfully registered for event", registration });
+    return res.status(201).json({
+      msg: `Successfully registered for ${holderType}`,
+      holderType,
+      registration
+    });
   } catch (err) {
-    console.error("❌ Error registering for event:", err);
-    res.status(500).json({ msg: "Server error" });
+    console.error("❌ Error registering for event/trip:", err);
+    return res.status(500).json({ msg: "Server error" });
   }
 };
+
 
 // 👤 Get events the logged-in user is registered for
 exports.getMyRegistrations = async (req, res) => {

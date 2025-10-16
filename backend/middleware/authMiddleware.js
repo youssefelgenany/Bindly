@@ -1,50 +1,42 @@
+
+const Admin = require('../models/AdminModel');
+
+// middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
-const Admin = require('../models/AdminModel');
 
 const protect = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization || req.headers.Authorization;
-    console.log('🔐 Auth Header:', authHeader);
-
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-    console.log("token", token);
-
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Access token required'
-      });
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) {
+      return res.status(401).json({ msg: 'No token provided' });
     }
-
-    console.log("secret", process.env.JWT_SECRET);
+    const token = auth.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("decoded", decoded);
 
-    let account = await User.findById(decoded.userId).select('-password');
-    if (!account) account = await Admin.findById(decoded.userId).select('-password');
+    // decoded.userId must match what you sign in your login
+    const user = await User.findById(decoded.userId).select('-password');
+    if (!user) return res.status(401).json({ msg: 'User not found' });
 
-    if (!account) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token'
-      });
-    }
-
-    req.user = account;
+    // normalize the shape used everywhere
+    req.user = {
+      _id: user._id,
+      userType: user.userType,   // e.g., "Professor", "Student", ...
+      email: user.email
+    };
     next();
-  } catch (error) {
-    console.error("❌ JWT verification failed:", error.message);
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ success: false, message: 'Invalid token' });
-    }
-
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ success: false, message: 'Token expired' });
-    }
-
-    res.status(500).json({ success: false, message: 'Internal server error' });
+  } catch (e) {
+    console.error('auth error:', e);
+    res.status(401).json({ msg: 'Invalid/expired token' });
   }
+};
+
+exports.permit = (...allowed) => (req, res, next) => {
+  const role = req.user?.userType;       // single source of truth
+  if (!role || !allowed.includes(role)) {
+    return res.status(403).json({ msg: 'Forbidden' });
+  }
+  next();
 };
 
 // Normalize role strings for comparison (case-insensitive, unify spacing/underscores)
