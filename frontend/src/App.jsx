@@ -275,9 +275,9 @@ function App() {
                 path="/edit-conference/:id"
                 element={
                     <ProtectedRoute>
-                      <AdminOnly>
+                     
                         <EditConfrences />
-                      </AdminOnly>
+                     
                     </ProtectedRoute>
                   } />
             
