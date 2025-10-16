@@ -31,6 +31,7 @@ exports.createAdminOrEventOffice = async (req, res) => {
       message: "Email already exists"
     });
 
+<<<<<<< HEAD
     //const passwordHash = await bcrypt.hash(password, 10);
     const newUser = await User.create({
       name,
@@ -46,6 +47,22 @@ exports.createAdminOrEventOffice = async (req, res) => {
       isVerified: false,
       status: 'active'
     });
+=======
+    // Map human role to schema enum and satisfy required fields
+    const mappedUserType = (role === 'Admin' || role === 'admin') ? 'admin' : 'event_office';
+
+    // Build payload; for admin/event_office the schema requires `name`
+    const payload = {
+      name: String(name || '').trim() || role,
+      email,
+      password,
+      userType: mappedUserType,
+      isVerified: true,
+      status: 'active'
+    };
+
+    const newUser = await User.create(payload);
+>>>>>>> 37c1f91 (event office frontend)
 
     console.log('✅ Admin account created successfully:', newUser._id);
 
