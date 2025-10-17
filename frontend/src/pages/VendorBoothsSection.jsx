@@ -5,7 +5,7 @@ const VendorBoothsSection = ({ query }) => {
     const [booths, setBooths] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [demoMode, setDemoMode] = useState(false);
+    // Removed demo mode; only real data should be shown
     const [activeBoothId, setActiveBoothId] = useState(null);
     const [formState, setFormState] = useState({
         attendees: [{ name: '', email: '' }],
@@ -29,32 +29,10 @@ const VendorBoothsSection = ({ query }) => {
                         (b.location || '').toLowerCase().includes(query.toLowerCase())
                     )
                 );
-                if (filtered.length === 0) {
-                    const now = new Date();
-                    const plusDays = (d) => new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
-                    const demo = [
-                        { _id: 'demo-bo0', name: "Mother's Day Booths", location: 'Central Plaza', description: 'Special themed booths for Mother\'s Day', startDate: plusDays(6), endDate: plusDays(34) },
-                        { _id: 'demo-bo1', name: 'Food Court Booths', location: 'North Wing', description: 'Prime food area', startDate: plusDays(9), endDate: plusDays(37) },
-                        { _id: 'demo-bo2', name: 'Merchandise Booths', location: 'South Hall', description: 'High foot traffic', startDate: plusDays(16), endDate: plusDays(44) }
-                    ];
-                    setBooths(demo);
-                    setDemoMode(true);
-                } else {
-                    setBooths(filtered);
-                    setDemoMode(false);
-                }
+                setBooths(filtered);
             } catch (e) {
-                // Fallback to demo data so you can see the UI working
-                const now = new Date();
-                const plusDays = (d) => new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
-                const demo = [
-                    { _id: 'demo-bo0', name: "Mother's Day Booths", location: 'Central Plaza', description: 'Special themed booths for Mother\'s Day', startDate: plusDays(6), endDate: plusDays(34) },
-                    { _id: 'demo-bo1', name: 'Food Court Booths', location: 'North Wing', description: 'Prime food area', startDate: plusDays(9), endDate: plusDays(37) },
-                    { _id: 'demo-bo2', name: 'Merchandise Booths', location: 'South Hall', description: 'High foot traffic', startDate: plusDays(16), endDate: plusDays(44) }
-                ];
-                setBooths(demo);
-                setError('');
-                setDemoMode(true);
+                setBooths([]);
+                setError('Failed to load booths');
             } finally {
                 setLoading(false);
             }
@@ -66,11 +44,7 @@ const VendorBoothsSection = ({ query }) => {
         <div>
             <h2 style={{ marginBottom: '0.5rem' }}>Booths {booths.length ? `(${booths.length})` : ''}</h2>
             {error && <div className="alert alert-error">{error}</div>}
-            {demoMode && (
-                <div className="alert alert-success" style={{ marginBottom: '1rem' }}>
-                    Demo data loaded (backend unreachable). Booth groups: {booths.length}
-                </div>
-            )}
+            {/* Demo mode removed */}
             {loading ? (
                 <div className="events-loading">
                     <div className="loading-spinner"></div>

@@ -40,15 +40,15 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchAdminData = async () => {
-      if (!(user?.userType === 'Admin')) return;
+      if (!(user?.userType === 'admin' || user?.userType === 'Admin')) return;
       try {
         setLoadingAdmin(true);
         setAdminError('');
         const token = localStorage.getItem('token');
         const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
         const [statsRes, activityRes] = await Promise.all([
-          axios.get('/api/dashboard/admin/stats', { headers: authHeaders }),
-          axios.get('/api/dashboard/admin/activity', { headers: authHeaders })
+          axios.get('http://localhost:5000/api/dashboard/admin/stats', { headers: authHeaders }),
+          axios.get('http://localhost:5000/api/dashboard/admin/activity', { headers: authHeaders })
         ]);
         if (statsRes.data?.success) setStatsData(statsRes.data.stats || {});
         if (activityRes.data?.success) {
@@ -69,7 +69,7 @@ const Dashboard = () => {
     fetchAdminData();
   }, [user]);
 
-  const isAdmin = user?.role === 'admin' || user?.userType === 'Admin';
+  const isAdmin = user?.role === 'admin' || user?.userType === 'admin' || user?.userType === 'Admin';
 
   return (
     <div style={{ padding: '2rem' }}>

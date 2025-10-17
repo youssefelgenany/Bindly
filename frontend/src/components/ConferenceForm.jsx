@@ -1,17 +1,23 @@
 import React from 'react';
-import '../styles/BazaarForm.css'; // Reuse existing styles
 
-const ConferenceForm = ({ onSubmit, loading = false, initialData = {}, submitLabel = 'Create Conference', loadingLabel = 'Creating...' }) => {
+const ConferenceForm = ({ onSubmit, loading = false, initialData = {} }) => {
+  console.log('🔹 ConferenceForm: Received initialData:', initialData);
+  
   const [formData, setFormData] = React.useState({
     title: initialData.title || '',
-    location: initialData.location || '',
+    description: initialData.description || '',
     agenda: initialData.agenda || '',
     website: initialData.website || '',
     budget: initialData.budget || '',
-    fundingSource: initialData.fundingSource || '',
+    fundingSource: initialData.fundingSource || 'GUC',
+    extraResources: initialData.extraResources || '',
     startDate: initialData.startDate || '',
-    endDate: initialData.endDate || ''
+    endDate: initialData.endDate || '',
+    location: initialData.location || '',
+    capacity: initialData.capacity || ''
   });
+
+  console.log('🔹 ConferenceForm: Initialized formData:', formData);
 
   const handleChange = (e) => {
     const value = e.target.type === 'number' ? parseFloat(e.target.value) : e.target.value;
@@ -27,9 +33,9 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {}, submitLab
   };
 
   return (
-    <form className="bazaar-form" onSubmit={handleSubmit}>
+    <form className="conference-form" onSubmit={handleSubmit}>
       <div className="form-group">
-        <label className="form-label">Conference Title *</label>
+        <label className="form-label">Conference Name *</label>
         <input
           type="text"
           name="title"
@@ -37,20 +43,19 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {}, submitLab
           value={formData.title}
           onChange={handleChange}
           required
-          placeholder="Enter conference title"
+          placeholder="Enter conference name"
         />
       </div>
 
       <div className="form-group">
-        <label className="form-label">Location *</label>
+        <label className="form-label">Short Description</label>
         <input
           type="text"
-          name="location"
+          name="description"
           className="form-input"
-          value={formData.location}
+          value={formData.description}
           onChange={handleChange}
-          required
-          placeholder="Enter location"
+          placeholder="Brief description of the conference"
         />
       </div>
 
@@ -58,87 +63,131 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {}, submitLab
         <label className="form-label">Agenda *</label>
         <textarea
           name="agenda"
-          className="form-input"
-          rows="4"
+          className="form-textarea"
           value={formData.agenda}
           onChange={handleChange}
           required
-          placeholder="Enter conference agenda"
+          placeholder="Detailed agenda of the conference"
+          rows="4"
         />
       </div>
 
-      <div className="form-group">
-        <label className="form-label">Website *</label>
-        <input
-          type="url"
-          name="website"
-          className="form-input"
-          value={formData.website}
-          onChange={handleChange}
-          required
-          placeholder="Enter conference website"
-        />
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label">Website Link *</label>
+          <input
+            type="url"
+            name="website"
+            className="form-input"
+            value={formData.website}
+            onChange={handleChange}
+            required
+            placeholder="https://example.com"
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Location *</label>
+          <input
+            type="text"
+            name="location"
+            className="form-input"
+            value={formData.location}
+            onChange={handleChange}
+            required
+            placeholder="Conference venue"
+          />
+        </div>
+      </div>
+
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label">Required Budget *</label>
+          <input
+            type="number"
+            name="budget"
+            className="form-input"
+            value={formData.budget}
+            onChange={handleChange}
+            min="0"
+            step="0.01"
+            required
+            placeholder="0.00"
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Source of Funding *</label>
+          <select
+            name="fundingSource"
+            className="form-input"
+            value={formData.fundingSource}
+            onChange={handleChange}
+            required
+          >
+            <option value="GUC">GUC</option>
+            <option value="external">External</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label">Start Date & Time *</label>
+          <input
+            type="datetime-local"
+            name="startDate"
+            className="form-input"
+            value={formData.startDate}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">End Date & Time *</label>
+          <input
+            type="datetime-local"
+            name="endDate"
+            className="form-input"
+            value={formData.endDate}
+            onChange={handleChange}
+            required
+          />
+        </div>
       </div>
 
       <div className="form-group">
-        <label className="form-label">Budget *</label>
+        <label className="form-label">Capacity</label>
         <input
           type="number"
-          name="budget"
+          name="capacity"
           className="form-input"
-          value={formData.budget}
+          value={formData.capacity}
           onChange={handleChange}
-          required
           min="0"
-          step="0.01"
-          placeholder="Enter budget amount"
+          placeholder="Maximum number of attendees"
         />
       </div>
 
       <div className="form-group">
-        <label className="form-label">Funding Source *</label>
-        <input
-          type="text"
-          name="fundingSource"
-          className="form-input"
-          value={formData.fundingSource}
+        <label className="form-label">Extra Resources</label>
+        <textarea
+          name="extraResources"
+          className="form-textarea"
+          value={formData.extraResources}
           onChange={handleChange}
-          required
-          placeholder="Enter funding source"
+          placeholder="Additional resources or requirements"
+          rows="3"
         />
       </div>
 
-      <div className="form-group">
-        <label className="form-label">Start Date & Time *</label>
-        <input
-          type="datetime-local"
-          name="startDate"
-          className="form-input"
-          value={formData.startDate}
-          onChange={handleChange}
-          required
-        />
+      <div className="form-actions">
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={loading}
+        >
+          {loading ? 'Creating...' : 'Create Conference'}
+        </button>
       </div>
-
-      <div className="form-group">
-        <label className="form-label">End Date & Time *</label>
-        <input
-          type="datetime-local"
-          name="endDate"
-          className="form-input"
-          value={formData.endDate}
-          onChange={handleChange}
-          required
-        />
-      </div>
-
-      <button 
-        type="submit" 
-        className="btn btn-primary submit-btn"
-        disabled={loading}
-      >
-        {loading ? loadingLabel : submitLabel}
-      </button>
     </form>
   );
 };

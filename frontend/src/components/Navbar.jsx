@@ -256,6 +256,14 @@ const Navbar = () => {
                     View Events
                   </Link>
                   <Link
+                    to="/event-office/vendor-requests"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Vendor Requests
+                  </Link>
+                  <Link
                     to="/create-bazaar"
                     className="btn btn-primary"
                     style={{ width: '100%' }}
@@ -264,12 +272,28 @@ const Navbar = () => {
                     Create Bazaar
                   </Link>
                   <Link
+                    to="/create-trip"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Create Trip
+                  </Link>
+                  <Link
                     to="/create-conference"
                     className="btn btn-primary"
                     style={{ width: '100%' }}
                     onClick={closeSidebar}
                   >
                     Create Conference
+                  </Link>
+                  <Link
+                    to="/create-booth"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Create Booth
                   </Link>
                 </>
               )}
@@ -293,6 +317,14 @@ const Navbar = () => {
                     onClick={closeSidebar}
                   >
                     View Vendors
+                  </Link>
+                  <Link
+                    to="/event-office/vendor-requests"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Vendor Requests
                   </Link>
                   <Link
                     to="/admin/events"

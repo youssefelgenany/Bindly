@@ -65,22 +65,10 @@ const VendorDashboard = () => {
                                 Quick Actions
                             </h3>
                             <div style={{ display: 'grid', gap: '1rem' }}>
-                                <button className="btn btn-outline" style={{ width: '100%' }}>
-                                    My Listings
-                                </button>
-                                <button className="btn btn-outline" style={{ width: '100%' }}>
-                                    Add New Listing
-                                </button>
-                                <button className="btn btn-outline" style={{ width: '100%' }}>
-                                    View Analytics
-                                </button>
-                                <Link to="/vendor/accepted" className="btn btn-primary" style={{ width: '100%', textDecoration: 'none', display: 'inline-block', textAlign: 'center' }}>
-                                    My Accepted Upcoming
-                                </Link>
                                 <Link to="/vendor/requests" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block', textAlign: 'center' }}>
-                                    Requests (Pending/Rejected)
+                                    My Requests
                                 </Link>
-                                <Link to="/vendor/bazaars" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                                <Link to="/vendor/bazaars" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block', textAlign: 'center' }}>
                                     Browse Upcoming Bazaars
                                 </Link>
                             </div>

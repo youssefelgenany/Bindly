@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { vendorApi } from '../api/vendorApi';
-import VendorBoothsSection from './VendorBoothsSection';
+// Booths section removed per requirement to show only bazaars
 
 const VendorBazaars = () => {
     const [bazaars, setBazaars] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [demoMode, setDemoMode] = useState(false);
+    // Removed demo mode; only real data should be shown
     const [query, setQuery] = useState('');
     const [activeBazaarId, setActiveBazaarId] = useState(null);
     const [formState, setFormState] = useState({
@@ -28,33 +28,12 @@ const VendorBazaars = () => {
                         (b.location || '').toLowerCase().includes(query.toLowerCase())
                     )
                 );
-                if (filtered.length === 0) {
-                    // Also fallback to demo if API returns empty
-                    const now = new Date();
-                    const plusDays = (d) => new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
-                    const demo = [
-                        { _id: 'demo-b0', name: "Mother's Day Bazaar", location: 'Central Plaza', description: 'Special offers and gifts for Mother\'s Day', startDate: plusDays(5), endDate: plusDays(5) },
-                        { _id: 'demo-b1', name: 'Spring Bazaar', location: 'Main Campus', description: 'Food, crafts, and music', startDate: plusDays(7), endDate: plusDays(7) },
-                        { _id: 'demo-b2', name: 'Tech Fair', location: 'Central Plaza', description: 'Showcasing startups and gadgets', startDate: plusDays(14), endDate: plusDays(14) }
-                    ];
-                    setBazaars(demo);
-                    setDemoMode(true);
-                } else {
-                    setBazaars(filtered);
-                    setDemoMode(false);
-                }
+                setBazaars(filtered);
+
+                // trips removed per requirement
             } catch (e) {
-                // Fallback to demo data so you can see the UI working
-                const now = new Date();
-                const plusDays = (d) => new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
-                const demo = [
-                    { _id: 'demo-b0', name: "Mother's Day Bazaar", location: 'Central Plaza', description: 'Special offers and gifts for Mother\'s Day', startDate: plusDays(5), endDate: plusDays(5) },
-                    { _id: 'demo-b1', name: 'Spring Bazaar', location: 'Main Campus', description: 'Food, crafts, and music', startDate: plusDays(7), endDate: plusDays(7) },
-                    { _id: 'demo-b2', name: 'Tech Fair', location: 'Central Plaza', description: 'Showcasing startups and gadgets', startDate: plusDays(14), endDate: plusDays(14) }
-                ];
-                setBazaars(demo);
-                setError('');
-                setDemoMode(true);
+                setBazaars([]);
+                setError('Failed to load bazaars');
             } finally {
                 setLoading(false);
             }
@@ -67,8 +46,8 @@ const VendorBazaars = () => {
     return (
         <div className="events-page">
             <div className="events-header">
-                <h1>Upcoming Events</h1>
-                <p>Browse upcoming bazaars and booths. Vendors have read-only access here.</p>
+                <h1>Upcoming Bazaars</h1>
+                <p>Browse upcoming approved bazaars. Vendors have read-only access here.</p>
 
                 <div className="events-filters" style={{ marginTop: '1rem' }}>
                     <input
@@ -83,11 +62,7 @@ const VendorBazaars = () => {
             </div>
 
             {error && <div className="alert alert-error">{error}</div>}
-            {demoMode && (
-                <div className="alert alert-success" style={{ marginBottom: '1rem' }}>
-                    Demo data loaded (backend unreachable). Bazaars: {bazaars.length}
-                </div>
-            )}
+            {/* Demo mode removed */}
             {/* my accepted section removed; see /vendor/accepted */}
 
             {loading ? (
@@ -117,9 +92,7 @@ const VendorBazaars = () => {
                             ))
                         )}
                     </div>
-
-                    {/* Booths */}
-                    <VendorBoothsSection query={query} />
+                    {/* Trips removed */}
                 </div>
             )}
         </div>
@@ -333,6 +306,8 @@ const BazaarCard = ({ bazaar, activeBazaarId, setActiveBazaarId, formState, setF
         </div>
     );
 };
+
+// TripCard removed
 
 export default VendorBazaars;
 

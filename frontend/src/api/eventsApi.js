@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Public Events API (non-admin) - YOUR FRIEND'S CODE
 const eventsApi = axios.create({
-  baseURL: '/api/events',
+  baseURL: 'http://localhost:5000/api/events',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -76,6 +76,18 @@ export const eventsApiService = {
         error: error.response?.data || error.message,
       };
     }
+  },
+  updateEventStatus: async (id, statusData) => {
+    try {
+      const response = await eventsApi.put(`/${id}`, statusData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to update event status',
+        error: error.response?.data || error.message,
+      };
+    }
   }
 };
 
@@ -139,10 +151,12 @@ export const bazaarApi = {
 
 export const tripApi = {
   create: async (tripData) => {
+    const token = localStorage.getItem('token');
     const response = await fetch(`${API_BASE}/trips`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
       body: JSON.stringify(tripData),
     });
@@ -150,10 +164,12 @@ export const tripApi = {
   },
 
   update: async (id, tripData) => {
+    const token = localStorage.getItem('token');
     const response = await fetch(`${API_BASE}/trips/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
       body: JSON.stringify(tripData),
     });

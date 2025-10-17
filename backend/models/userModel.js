@@ -92,13 +92,12 @@ const userSchema = new mongoose.Schema({
    status: {
     type: String,
     enum: ['active', 'blocked'],
-      default: function () {
-    // 'this' refers to the current document being created
-    if (this.userType === 'Staff' || this.userType === 'TA' || this.userType === 'Professor') {
+    default: function () {
+      // All users start as blocked until admin verification
+      // This includes admin and event_office accounts too
+      console.log('🔍 User Model - Setting default status to BLOCKED for userType:', this.userType);
       return 'blocked';
     }
-    return 'active';
-  }
   }
 });
 

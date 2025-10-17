@@ -1,30 +1,42 @@
 const User = require('../models/userModel.js');
-const Bazaar = require('../models/bazaarModel.js'); // Assuming bazaarModel exists
-const Booth = require('../models/boothModel.js');
+const Bazaar = require('../models/bazaarModel.js'); // legacy (unused for upcoming)
+const Booth = require('../models/boothModel.js');   // legacy (unused for upcoming)
 const VendorRequest = require('../models/vendorRequest.js');
-const events = require('../models/eventModel.js');
+const Event = require('../models/eventModel.js');
 // View upcoming bazaars/booths
 module.exports.viewUpcomingEvents = async (req, res) => {
   try {
     const { type } = req.query;
-    if (!['bazaar', 'booth'].includes(type)) return res.status(400).json({ message: 'Invalid type' });
-    const now = new Date();
-    let events;
-    if (type === 'bazaar') {
-      events = await Bazaar.find({
-        startDate: { $gt: now },
-        registrationDeadline: { $gt: now },
-      }).select('name startDate endDate location description _id');
-    } else { // booth
-      events = await Booth.find({
-        startDate: { $gt: now },
-        registrationDeadline: { $gt: now },
-      }).select('name startDate endDate location description _id durationWeeks boothLocation');
+    if (!['bazaar', 'booth', 'trip'].includes(type)) {
+      return res.status(400).json({ message: 'Invalid type' });
     }
-    res.json(events);
+
+    const now = new Date();
+
+    // Read from unified events collection
+    const docs = await Event.find({
+      type,
+      startDate: { $gt: now },
+      status: 'approved',
+    })
+      .select('title startDate endDate location description _id')
+      .sort({ startDate: 1 })
+      .lean();
+
+    // Map title -> name to match existing frontend expectations
+    const mapped = (docs || []).map(e => ({
+      _id: e._id,
+      name: e.title,
+      location: e.location,
+      description: e.description,
+      startDate: e.startDate,
+      endDate: e.endDate,
+    }));
+
+    return res.json(mapped);
   } catch (error) {
     console.error('Server error in viewUpcomingEvents:', error);
-    res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -48,7 +60,7 @@ module.exports.applyToEvent = async (req, res) => {
     if (attendees.length > 5) return res.status(400).json({ message: 'Max 5 attendees exceeded' });
 
     // Fetch event from 'events' collection based on type
-    const event = await events.findById(eventId);
+    const event = await Event.findById(eventId);
     if (!event) return res.status(404).json({ message: 'Invalid event' });
     if (event.type !== 'bazaar' && event.type !== 'booth') {
       return res.status(400).json({ message: 'Event type must be bazaar or booth' });
@@ -86,6 +98,9 @@ module.exports.applyToEvent = async (req, res) => {
       durationWeeks: event.type === 'booth' ? durationWeeks : undefined,
       boothLocation: event.type === 'booth' ? boothLocation : undefined,
       message,
+      // denormalized fields for quick access
+      eventName: event.title || event.name,
+      eventType: event.type,
     });
     await request.save();
     res.status(201).json({ message: 'Application submitted' });
@@ -187,17 +202,16 @@ module.exports.getMyRequests = async (req, res) => {
     const vendorId = req.user && (req.user.id || req.user._id);
     if (!vendorId) return res.status(401).json({ message: 'Unauthorized' });
 
-    const { status = 'pending', type } = req.query; // status: pending|rejected
-    if (!['pending', 'rejected'].includes(status)) {
+    const { status = 'pending', type } = req.query; // status: pending|rejected|accepted|all
+    if (!['pending', 'rejected', 'accepted', 'all'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
 
-    const now = new Date();
-    const pickFields = 'name startDate endDate location description _id';
+    const pickFields = 'name title startDate endDate location description _id';
 
     const buildQuery = (eventKey) => ({
       vendor: vendorId,
-      status,
+      ...(status === 'all' ? {} : { status }),
       [eventKey]: { $ne: null }
     });
 
@@ -206,19 +220,44 @@ module.exports.getMyRequests = async (req, res) => {
         const requests = await VendorRequest.find(buildQuery('bazaar'))
           .populate({ path: 'bazaar', select: pickFields })
           .lean();
-        const eventsOnly = (requests || [])
-          .map(r => ({ requestId: r._id, event: r.bazaar }))
-          .filter(x => x.event && new Date(x.event.startDate) > now);
-        return eventsOnly.map(x => ({ ...x.event, type: 'bazaar', requestId: x.requestId, status }));
+        return (requests || [])
+          .filter(r => r.bazaar)
+          .map(r => ({
+            _id: r.bazaar._id,
+            title: r.bazaar.title,
+            name: r.bazaar.name || r.bazaar.title,
+            description: r.bazaar.description,
+            startDate: r.bazaar.startDate,
+            endDate: r.bazaar.endDate,
+            location: r.bazaar.location,
+            type: 'bazaar',
+            requestId: r._id,
+            status: r.status,
+            attendees: r.attendees || [],
+            boothSize: r.boothSize || undefined
+          }));
       }
       if (t === 'booth') {
         const requests = await VendorRequest.find(buildQuery('booth'))
           .populate({ path: 'booth', select: pickFields })
           .lean();
-        const eventsOnly = (requests || [])
-          .map(r => ({ requestId: r._id, event: r.booth }))
-          .filter(x => x.event && new Date(x.event.startDate) > now);
-        return eventsOnly.map(x => ({ ...x.event, type: 'booth', requestId: x.requestId, status }));
+        return (requests || [])
+          .filter(r => r.booth)
+          .map(r => ({
+            _id: r.booth._id,
+            title: r.booth.title,
+            name: r.booth.name || r.booth.title,
+            description: r.booth.description,
+            startDate: r.booth.startDate,
+            endDate: r.booth.endDate,
+            location: r.booth.location,
+            type: 'booth',
+            requestId: r._id,
+            status: r.status,
+            attendees: r.attendees || [],
+            durationWeeks: r.durationWeeks || undefined,
+            boothLocation: r.boothLocation || undefined
+          }));
       }
       return [];
     };

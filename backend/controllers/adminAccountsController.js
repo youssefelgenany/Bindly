@@ -6,16 +6,17 @@ const Admin = require("../models/AdminModel");
 exports.createAdminOrEventOffice = async (req, res) => {
   console.log("🔹 Body received:", req.body);
   try {
-    const { name, email, password, role } = req.body;
+    const { firstName, lastName, email, password, role } = req.body;
     const requestingUser = req.user; // The admin making the request
 
-    console.log('🔍 Creating admin account:', { name, email, role });
+    console.log('🔍 Creating admin account:', { firstName, lastName, email, role });
+    console.log('🔄 NEW VERSION - Admin accounts will be UNVERIFIED and BLOCKED');
     console.log('🔍 Requesting user:', { id: requestingUser._id, userType: requestingUser.userType });
 
-    if (!name || !email || !password || !role)
+    if (!firstName || !lastName || !email || !password || !role)
       return res.status(400).json({
         success: false,
-        message: "Missing required fields"
+        message: "Missing required fields: firstName, lastName, email, password, role"
       });
 
     // Validate role
@@ -35,25 +36,37 @@ exports.createAdminOrEventOffice = async (req, res) => {
     const mappedUserType = (role === 'Admin' || role === 'admin') ? 'admin' : 'event_office';
 
     // Build payload; for admin/event_office the schema requires `name`
+    const fullName = `${firstName} ${lastName}`.trim();
     const payload = {
-      name: String(name || '').trim() || role,
+      name: fullName || role,
       email,
       password,
       userType: mappedUserType,
-      isVerified: true,
-      status: 'active'
+      isVerified: false, // All accounts start unverified
+      status: 'blocked' // All accounts start blocked until verified
     };
 
     const newUser = await User.create(payload);
 
     console.log('✅ Admin account created successfully:', newUser._id);
+    console.log('📋 Account details:', {
+      email: newUser.email,
+      userType: newUser.userType,
+      isVerified: newUser.isVerified,
+      status: newUser.status
+    });
+    console.log('🔍 Verification Status:', newUser.isVerified ? 'VERIFIED' : 'UNVERIFIED');
+    console.log('🔍 Account Status:', newUser.status);
+    console.log('🚨 EXPECTED: isVerified should be FALSE, status should be BLOCKED');
 
     res.status(201).json({
       success: true,
-      message: "Account created successfully",
+      message: "Account created successfully. The account is pending verification and will be activated by an administrator.",
       user: {
         id: newUser._id,
         name: newUser.name,
+        firstName: firstName,
+        lastName: lastName,
         email: newUser.email,
         userType: newUser.userType,
         isVerified: newUser.isVerified,

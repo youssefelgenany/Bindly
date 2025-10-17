@@ -14,7 +14,7 @@ const Confrences = () => {
     const fetchConfs = async () => {
       try {
         setLoading(true);
-        const res = await axios.get('/api/events?type=conference');
+        const res = await axios.get('http://localhost:5000/api/events?type=conference');
         const list = Array.isArray(res.data) ? res.data : (res.data.events || []);
         list.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
         setConferences(list);

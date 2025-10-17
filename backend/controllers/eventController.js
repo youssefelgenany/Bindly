@@ -4,7 +4,20 @@ const Trip = require("../models/tripModel");
 // 🎯 Create a new event (Admin or Event Office)
 exports.createEvent = async (req, res) => {
   try {
-    const { title, description, type, startDate, endDate, location, capacity } = req.body;
+    const { 
+      title, 
+      description, 
+      type, 
+      startDate, 
+      endDate, 
+      location, 
+      capacity,
+      agenda,
+      faculty,
+      professors,
+      extraResources,
+      bannerFile
+    } = req.body;
 
     if (!title || !type || !startDate || !endDate || !location) {
       return res.status(400).json({ msg: "Missing required fields" });
@@ -19,7 +32,13 @@ exports.createEvent = async (req, res) => {
       location,
       capacity: capacity || 100,
       createdBy: req.user._id,
-      status: req.user.userType === "Professor" ? "pending" : "approved" // Professors submit for approval
+      status: req.user.userType === "Professor" ? "pending" : "approved", // Professors submit for approval
+      // Workshop-specific fields
+      agenda,
+      faculty,
+      professors,
+      extraResources,
+      bannerFile
     });
 
     await newEvent.save();
@@ -111,12 +130,23 @@ exports.getAllEvents = async (req, res) => {
         type: 1,
         startDate: 1,
         endDate: 1,
+        registrationDeadline: 1,
         location: 1,
         capacity: 1,
+        price: 1,
         registeredCount: 1,
         status: 1,
         createdAt: 1,
         updatedAt: 1,
+        agenda: 1,
+        website: 1,
+        budget: 1,
+        fundingSource: 1,
+        extraResources: 1,
+        // Workshop-specific fields
+        faculty: 1,
+        professors: 1,
+        bannerFile: 1,
         createdBy: {
           _id: '$creator._id',
           firstName: '$creator.firstName',

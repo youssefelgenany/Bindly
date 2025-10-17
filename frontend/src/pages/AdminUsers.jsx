@@ -232,7 +232,7 @@ const AdminUsers = () => {
   // Vendor-related controls removed per request
 
   // Basic guard (UI-level) to avoid rendering for non-admins
-  if (!(user?.userType === 'Admin')) {
+  if (!(user?.userType === 'admin' || user?.userType === 'Admin')) {
     return (
       <div style={{ padding: '2rem' }}>
         <div className="container">

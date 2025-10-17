@@ -131,7 +131,8 @@ const signup = async (req, res) => {
       firstName, 
       lastName, 
       userType,
-      isVerified: ['Staff', 'TA', 'Professor'].includes(userType) ? false : true // Staff/TA/Professor need admin verification
+      isVerified: false, // All users need admin verification by default
+      status: 'blocked' // All users start as blocked until verified
     };
 
     // Add GUC ID for academic users
@@ -199,17 +200,14 @@ const signup = async (req, res) => {
     );
 
     // Determine response message based on user type
-    let responseMessage = 'User created successfully';
-    if (['Staff', 'TA', 'Professor'].includes(userType)) {
-      responseMessage = 'Account created successfully. Your account is pending admin verification. You will receive an email once verified.';
-    }
-
+    let responseMessage = 'Account created successfully. Your account is pending admin verification. You will receive an email once verified.';
+    
     const responseBody = {
       success: true,
       message: responseMessage,
       user: userResponse,
-      token: ['Staff', 'TA', 'Professor'].includes(userType) ? null : token, // No token for unverified accounts
-      requiresVerification: ['Staff', 'TA', 'Professor'].includes(userType)
+      token: null, // No token for unverified accounts
+      requiresVerification: true // All accounts require verification
     };
 
     res.status(201).json(responseBody);
@@ -255,23 +253,54 @@ const login = async (req, res) => {
     
     if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
-    // Check verification status for Staff/TA/Professor
-    if (['Staff', 'TA', 'Professor'].includes(user.userType) && !user.isVerified) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Your account is pending admin verification. You will receive an email once verified.' 
-      });
-    }
-
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
-    // Block login for unverified or inactive users
-    if (['Staff', 'TA', 'Professor'].includes(user.userType) && (!user.isVerified || user.status !== 'active')) {
+    // Check verification status for ALL user types (including admin)
+    if (!user.isVerified) {
+      const userResponse = {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        name: user.name, // For admin accounts
+        userType: user.userType,
+        gucId: user.gucId,
+        companyName: user.companyName,
+        isVerified: user.isVerified,
+        status: user.status,
+        createdAt: user.createdAt
+      };
+      
+      return res.status(403).json({ 
+        success: false, 
+        code: 'AWAITING_VERIFICATION',
+        message: 'Your account is pending admin verification. You will receive an email once verified.',
+        user: userResponse
+      });
+    }
+
+    // Block login for inactive users (including admin)
+    if (user.status !== 'active') {
+      const userResponse = {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        name: user.name, // For admin accounts
+        userType: user.userType,
+        gucId: user.gucId,
+        companyName: user.companyName,
+        isVerified: user.isVerified,
+        status: user.status,
+        createdAt: user.createdAt
+      };
+      
       return res.status(403).json({
         success: false,
         code: 'AWAITING_VERIFICATION',
-        message: 'Your account is awaiting verification. Please wait for admin approval.'
+        message: 'Your account is awaiting verification. Please wait for admin approval.',
+        user: userResponse
       });
     }
 
@@ -526,6 +555,48 @@ const changePassword = async (req, res) => {
   }
 };
 
+// ==================== GET CURRENT USER ====================
+const getCurrentUser = async (req, res) => {
+  try {
+    // User is already attached to req by the protect middleware
+    const userId = req.user._id;
+    
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    console.log('✅ Current user fetched:', user.email);
+
+    res.status(200).json({
+      success: true,
+      user: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        userType: user.userType,
+        gucId: user.gucId,
+        companyName: user.companyName,
+        isVerified: user.isVerified,
+        isActive: user.isActive,
+        profilePicturePath: user.profilePicturePath,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      }
+    });
+  } catch (err) {
+    console.error('❌ Error fetching current user:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
 // ==================== EXPORT ====================
 module.exports = {
   signup,
@@ -536,5 +607,6 @@ module.exports = {
   sendTestEmail,
   resendVerification,
   updateProfile,
-  changePassword
+  changePassword,
+  getCurrentUser
 };

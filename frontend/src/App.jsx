@@ -12,7 +12,6 @@ import Dashboard from './pages/Dashboard';
 import PendingVerification from './pages/PendingVerification';
 import ProfessorEvents from './pages/ProfessorEvents';
 import ProfessorAllEvents from './pages/ProfessorAllEvents';
-import VerificationPending from './pages/VerificationPending';
 import Events from './pages/Events';
 import GymSchedule from './pages/GymSchedule';
 import GymManage from './pages/GymManage';
@@ -25,6 +24,7 @@ import EditConfrences from './pages/EditConfrences';
 import EventsList from './pages/EventsList';
 import CreateBazaar from "./pages/CreateBazaar";
 import CreateTrip from './pages/CreateTrip';
+import CreateBooth from './pages/CreateBooth';
 import EditBazaar from './pages/EditBazaar';
 import EditTrip from './pages/EditTrip';
 import VendorBazaars from './pages/VendorBazaars';
@@ -49,7 +49,16 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  return user ? children : <Navigate to="/login" />;
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  // Check if user is verified (except for admin users who are always verified)
+  if (!user.isVerified && user.userType !== 'admin' && user.userType !== 'Admin') {
+    return <Navigate to="/pending-verification" />;
+  }
+
+  return children;
 };
 
 // Public Route Component (redirect to dashboard if already logged in)
@@ -153,14 +162,6 @@ function App() {
               element={<PendingVerification />}
             />
             <Route
-              path="/verification-pending"
-              element={
-                <PublicRoute>
-                  <VerificationPending />
-                </PublicRoute>
-              }
-            />
-            <Route
               path="/dashboard"
               element={
                 <ProtectedRoute>
@@ -197,6 +198,16 @@ function App() {
               element={
                 <ProtectedRoute>
                   <VendorRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/event-office/vendor-requests"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <VendorRequests />
+                  </EventsOfficeOnly>
                 </ProtectedRoute>
               }
             />
@@ -339,6 +350,16 @@ function App() {
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <CreateTrip />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/create-booth"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <CreateBooth />
                   </EventsOfficeOnly>
                 </ProtectedRoute>
               }
