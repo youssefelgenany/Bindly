@@ -92,7 +92,7 @@ const AdminVendors = () => {
   }, [vendors]);
 
   // Basic guard (UI-level) to avoid rendering for non-admins
-  if (!(user?.userType === 'Admin')) {
+  if (!(user?.userType === 'Admin' || user?.userType === 'admin')) {
     return (
       <div style={{ padding: '2rem' }}>
         <div className="container">

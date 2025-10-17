@@ -1,10 +1,23 @@
 const Event = require("../models/eventModel");
 const Registration = require("../models/registrationModel");
-
+const Trip = require("../models/tripModel");
 // 🎯 Create a new event (Admin or Event Office)
 exports.createEvent = async (req, res) => {
   try {
-    const { title, description, type, startDate, endDate, location, capacity } = req.body;
+    const { 
+      title, 
+      description, 
+      type, 
+      startDate, 
+      endDate, 
+      location, 
+      capacity,
+      agenda,
+      faculty,
+      professors,
+      extraResources,
+      bannerFile
+    } = req.body;
 
     if (!title || !type || !startDate || !endDate || !location) {
       return res.status(400).json({ msg: "Missing required fields" });
@@ -19,7 +32,13 @@ exports.createEvent = async (req, res) => {
       location,
       capacity: capacity || 100,
       createdBy: req.user._id,
-      status: "approved" // Automatically approve for admins/event office
+      status: req.user.userType === "Professor" ? "pending" : "approved", // Professors submit for approval
+      // Workshop-specific fields
+      agenda,
+      faculty,
+      professors,
+      extraResources,
+      bannerFile
     });
 
     await newEvent.save();
@@ -34,66 +53,120 @@ exports.createEvent = async (req, res) => {
 exports.createConference = async (req, res) => {
   try {
     const {
-      title,
-      description,
-      agenda,
-      website,
-      budget,
-      fundingSource,
-      extraResources,
-      startDate,
-      endDate,
-      location,
-      capacity
-    } = req.body;
+      title, startDate, endDate, location, agenda, website, budget, fundingSource
+    } = req.body || {};
 
-    if (!title || !startDate || !endDate || !location || !agenda || !website || !budget || !fundingSource) {
+    if (!title || !startDate || !endDate || !location || !agenda || !website || budget == null || !fundingSource) {
       return res.status(400).json({ msg: "Missing required conference fields" });
     }
 
     const newConference = new Event({
-      title,
-      description,
+      ...req.body,
       type: "conference",
-      agenda,
-      website,
-      budget,
-      fundingSource,
-      extraResources,
-      startDate,
-      endDate,
-      location,
-      capacity: capacity || 100,
-      createdBy: req.user._id,
+      createdBy: req.user ? req.user._id : undefined,
       status: "approved"
     });
 
     await newConference.save();
-    res.status(201).json({ msg: "Conference created successfully", conference: newConference });
+    return res.status(201).json({ msg: "Conference created", conference: newConference });
   } catch (err) {
-    console.error("❌ Error creating conference:", err);
-    res.status(500).json({ msg: "Server error" });
+    console.error("createConference error:", err);
+    return res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
 
 // 📅 Get all approved/upcoming events
 exports.getAllEvents = async (req, res) => {
   try {
-    const { q, type } = req.query;
-    const filter = { status: "approved" };
+    const { q, name, type, status } = req.query;
+    const search = (q || name || '').toString().trim();
 
-    if (q) {
-      filter.$or = [
-        { title: new RegExp(q, "i") },
-        { description: new RegExp(q, "i") },
-        { location: new RegExp(q, "i") },
-      ];
+    // Base match (type/status)
+    const baseMatch = {};
+    if (type) {
+      const typeMap = {
+        workshops: 'workshop',
+        trips: 'trip',
+        bazaars: 'bazaar',
+        booths: 'booth',
+        confrence: 'conference',
+        conference: 'conference'
+      };
+      baseMatch.type = typeMap[type] || type;
     }
-    if (type) filter.type = type;
+    if (status && status !== 'all') {
+      baseMatch.status = status;
+    }
 
-    const events = await Event.find(filter).sort({ startDate: 1 });
+    const pipeline = [
+      { $match: baseMatch },
+      { $lookup: { from: 'users', localField: 'createdBy', foreignField: '_id', as: 'creator' } },
+      { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
+    ];
 
-    res.json(events);
+    if (search) {
+      const nameRegex = new RegExp(search, 'i');
+      pipeline.push({
+        $match: {
+          $or: [
+            { title: nameRegex },
+            { name: nameRegex },
+            { description: nameRegex },
+            { location: nameRegex },
+            { 'creator.firstName': nameRegex },
+            { 'creator.lastName': nameRegex },
+          ]
+        }
+      });
+    }
+
+    pipeline.push(
+      { $sort: { startDate: 1 } },
+      { $project: {
+        _id: 1,
+        title: 1,
+        name: 1,
+        description: 1,
+        type: 1,
+        startDate: 1,
+        endDate: 1,
+        registrationDeadline: 1,
+        location: 1,
+        capacity: 1,
+        price: 1,
+        registeredCount: 1,
+        status: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        agenda: 1,
+        website: 1,
+        budget: 1,
+        fundingSource: 1,
+        extraResources: 1,
+        // Workshop-specific fields
+        faculty: 1,
+        professors: 1,
+        bannerFile: 1,
+        createdBy: {
+          _id: '$creator._id',
+          firstName: '$creator.firstName',
+          lastName: '$creator.lastName',
+          email: '$creator.email',
+          userType: '$creator.userType'
+        }
+      } }
+    );
+
+    const events = await Event.aggregate(pipeline);
+    const withCreator = events.map(e => ({
+      ...e,
+      creatorName: e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null,
+      creatorRole: e.createdBy ? (e.createdBy.userType || null) : null,
+      creatorFirstName: e.createdBy?.firstName || null,
+      creatorLastName: e.createdBy?.lastName || null,
+    }));
+
+    res.json(withCreator);
   } catch (err) {
     console.error("❌ Error fetching events:", err);
     res.status(500).json({ msg: "Server error" });
@@ -158,13 +231,28 @@ exports.updateEvent = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    
+    console.log('🔍 Updating event:', id);
+    console.log('🔍 Updates:', updates);
 
     const event = await Event.findById(id);
-    if (!event) return res.status(404).json({ msg: "Event not found" });
+    if (!event) {
+      console.log('❌ Event not found:', id);
+      return res.status(404).json({ msg: "Event not found" });
+    }
+
+    // Check if professor is trying to edit someone else's event
+    if (req.user.userType === "Professor" && event.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ msg: "You can only edit your own events" });
+    }
+
+    console.log('📊 Current event status:', event.status);
+    console.log('📊 New status:', updates.status);
 
     Object.assign(event, updates);
     await event.save();
 
+    console.log('✅ Event updated successfully');
     res.json({ msg: "Event updated successfully", event });
   } catch (err) {
     console.error("❌ Error updating event:", err);
@@ -178,6 +266,16 @@ exports.deleteEvent = async (req, res) => {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ msg: "Event not found" });
 
+    // Professors may only delete events they created
+    if (req.user && req.user.userType === "Professor" && event.createdBy?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ msg: "You can only delete your own events" });
+    }
+
+    // Do not allow delete if people already registered
+    if (event.registeredCount && event.registeredCount > 0) {
+      return res.status(400).json({ msg: "Cannot delete event: users already registered." });
+    }
+
     await event.deleteOne();
     res.json({ msg: "Event deleted successfully" });
   } catch (err) {
@@ -187,54 +285,157 @@ exports.deleteEvent = async (req, res) => {
 };
 
 // 📝 Register a user for an event
+// 📝 Register a user for an event OR a trip using the same endpoint
 exports.registerForEvent = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id);
-    if (!event) return res.status(404).json({ msg: "Event not found" });
+    const id = req.params.id;
+    const userId = req.user?._id || req.user?.id;
 
-    // Check if registration deadline passed or event full
-    if (event.capacity && event.registeredCount >= event.capacity) {
-      return res.status(400).json({ msg: "Event is full" });
+    if (!id) return res.status(400).json({ msg: "Missing id in URL" });
+    if (!userId) return res.status(401).json({ msg: "Unauthorized" });
+
+    // Try Event first
+    let holder = await Event.findById(id);
+    let holderType = "event";
+
+    // If not an Event, try Trip
+    if (!holder) {
+      holder = await Trip.findById(id);
+      holderType = holder ? "trip" : null;
     }
 
-    const existing = await Registration.findOne({
-      event: event._id,
-      user: req.user._id
-    });
+    if (!holderType) {
+      return res.status(404).json({ msg: "Event/Trip not found" });
+    }
+
+    // Optional: check registration deadline for trips
+    if (holderType === "trip" && holder.registrationDeadline && holder.registrationDeadline < new Date()) {
+      return res.status(400).json({ msg: "Registration deadline has passed" });
+    }
+
+    // Capacity check: use count of registrations for this id
+    const regCount = await Registration.countDocuments({ event: id });
+    if (holder.capacity && regCount >= holder.capacity) {
+      return res.status(400).json({ msg: `${holderType === 'trip' ? 'Trip' : 'Event'} is full` });
+    }
+
+    // Prevent duplicate registration
+    const existing = await Registration.findOne({ event: id, user: userId });
     if (existing) {
-      return res.status(400).json({ msg: "You are already registered for this event" });
+      return res.status(400).json({ msg: "You are already registered" });
     }
 
-    const registration = new Registration({
-      event: event._id,
-      user: req.user._id,
-      role: req.user.role,
+    // Create registration (store the same id in `event` field)
+    const registration = await Registration.create({
+      event: id,                 // works for both Event and Trip ids
+      user: userId,
+      role: req.user.userType || req.user.role || "attendee",
       status: "approved"
     });
 
-    await registration.save();
+    // Optionally increment registeredCount for Events only (Trips don’t have this field)
+    if (holderType === "event") {
+      holder.registeredCount = (holder.registeredCount || 0) + 1;
+      await holder.save();
+    }
 
-    // Increment count in Event
-    event.registeredCount = (event.registeredCount || 0) + 1;
-    await event.save();
-
-    res.status(201).json({ msg: "Successfully registered for event", registration });
+    return res.status(201).json({
+      msg: `Successfully registered for ${holderType}`,
+      holderType,
+      registration
+    });
   } catch (err) {
-    console.error("❌ Error registering for event:", err);
-    res.status(500).json({ msg: "Server error" });
+    console.error("❌ Error registering for event/trip:", err);
+    return res.status(500).json({ msg: "Server error" });
   }
 };
+
 
 // 👤 Get events the logged-in user is registered for
 exports.getMyRegistrations = async (req, res) => {
   try {
     const registrations = await Registration.find({ user: req.user._id })
       .populate("event", "title startDate endDate location type")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json(registrations);
   } catch (err) {
     console.error("❌ Error fetching registrations:", err);
     res.status(500).json({ msg: "Server error" });
+  }
+};
+
+// 🎓 Get events created by the logged-in professor
+exports.getMyEvents = async (req, res) => {
+  try {
+    console.log('🎓 Professor requesting their events, user ID:', req.user._id);
+    
+    const events = await Event.find({ createdBy: req.user._id })
+      .populate('createdBy', 'firstName lastName email')
+      .sort({ createdAt: -1 });
+
+    console.log('📊 Found professor events:', events.length);
+
+    res.status(200).json({
+      success: true,
+      message: 'Professor events fetched successfully',
+      events
+    });
+  } catch (err) {
+    console.error("❌ Error fetching professor events:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error" 
+    });
+  }
+};
+
+// 👥 Get registrations for a specific event (for event creators)
+exports.getEventRegistrations = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    console.log('👥 Fetching registrations for event:', eventId);
+    
+    // First verify the event exists and the user created it
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ msg: "Event not found" });
+    }
+    
+    // Check if the user created this event (or is admin)
+    if (event.createdBy.toString() !== req.user._id.toString() && req.user.userType !== 'Admin') {
+      return res.status(403).json({ msg: "Not authorized to view registrations for this event" });
+    }
+    
+    // Get registrations for this event with user details
+    const registrations = await Registration.find({ event: eventId })
+      .populate('user', 'firstName lastName email gucId userType')
+      .sort({ createdAt: -1 });
+
+    console.log('📊 Found registrations:', registrations.length);
+
+    // Transform the data to match frontend expectations
+    const transformedRegistrations = registrations.map(reg => ({
+      id: reg._id,
+      name: `${reg.user.firstName} ${reg.user.lastName}`,
+      email: reg.user.email,
+      studentId: reg.user.gucId || '',
+      userType: reg.user.userType,
+      status: reg.status,
+      registeredAt: reg.createdAt
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: 'Event registrations fetched successfully',
+      registrations: transformedRegistrations
+    });
+  } catch (err) {
+    console.error("❌ Error fetching event registrations:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error" 
+    });
   }
 };

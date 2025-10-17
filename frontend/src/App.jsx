@@ -9,58 +9,78 @@ import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
-import VerificationPending from './pages/VerificationPending';
+import PendingVerification from './pages/PendingVerification';
 import ProfessorEvents from './pages/ProfessorEvents';
+import ProfessorAllEvents from './pages/ProfessorAllEvents';
 import Events from './pages/Events';
 import GymSchedule from './pages/GymSchedule';
 import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
+import ProfessorGymSchedule from './pages/ProfessorGymSchedule';
 import Navbar from './components/Navbar';
-import CreateConference from "./pages/CreatConfrence";
+import VendorDashboard from './pages/VendorDashboard';
+import CreateConference from './pages/CreateConfrence';
+import EditConfrences from './pages/EditConfrences';
+import EventsList from './pages/EventsList';
 import CreateBazaar from "./pages/CreateBazaar";
 import CreateTrip from './pages/CreateTrip';
+import CreateBooth from './pages/CreateBooth';
 import EditBazaar from './pages/EditBazaar';
 import EditTrip from './pages/EditTrip';
-
+import VendorBazaars from './pages/VendorBazaars';
+import Confrences from './pages/Confrences';
+import VendorAccepted from './pages/VendorAccepted';
+import VendorRequests from './pages/VendorRequests';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
       }}>
         <div className="spinner"></div>
       </div>
     );
   }
-  
-  return user ? children : <Navigate to="/login" />;
+
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  // Check if user is verified (except for admin users who are always verified)
+  if (!user.isVerified && user.userType !== 'admin' && user.userType !== 'Admin') {
+    return <Navigate to="/pending-verification" />;
+  }
+
+  return children;
 };
 
 // Public Route Component (redirect to dashboard if already logged in)
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
       }}>
         <div className="spinner"></div>
       </div>
     );
   }
-  
-  return user ? <Navigate to="/dashboard" /> : children;
+
+  if (!user) return children;
+  if (user.userType === 'Vendor') return <Navigate to="/vendor" />;
+  return <Navigate to="/dashboard" />;
 };
 
 // Admin-only guard
@@ -69,19 +89,52 @@ const AdminOnly = ({ children }) => {
 
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
       }}>
         <div className="spinner"></div>
       </div>
     );
   }
 
-  const isAdmin = user && (user.role === 'admin' || user.userType === 'Admin');
+  const isAdmin = user && (
+    user.role === 'admin' || 
+    user.userType === 'Admin' || 
+    user.userType === 'admin'
+  );
   return isAdmin ? children : <Navigate to="/dashboard" />;
+};
+
+// Events Office guard
+const EventsOfficeOnly = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
+      }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  const isEventsOffice = user && (
+    user.userType === 'Event Office' ||
+    user.userType === 'Events Office' ||
+    user.userType === 'event_office' ||
+    user.role === 'event_office' ||
+    user.role === 'Event Office'
+  );
+  const isAdmin = user && (user.role === 'admin' || user.userType === 'Admin');
+
+  return (isEventsOffice || isAdmin) ? children : <Navigate to="/dashboard" />;
 };
 
 function App() {
@@ -92,81 +145,134 @@ function App() {
           <Navbar />
           <Routes>
             <Route path="/" element={<Navigate to="/login" />} />
-            <Route 
-              path="/login" 
+            <Route
+              path="/login"
               element={
                 <PublicRoute>
                   <Login />
                 </PublicRoute>
-              } 
+              }
             />
-            <Route 
-              path="/signup" 
+            <Route
+              path="/signup"
               element={
                 <PublicRoute>
                   <Signup />
                 </PublicRoute>
-              } 
+              }
             />
-            <Route 
-              path="/verification-pending" 
-              element={
-                <PublicRoute>
-                  <VerificationPending />
-                </PublicRoute>
-              } 
+            <Route
+              path="/pending-verification"
+              element={<PendingVerification />}
             />
-            <Route 
-              path="/dashboard" 
+            <Route
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/events" 
+            <Route
+              path="/vendor"
               element={
                 <ProtectedRoute>
-                  <Events />
+                  <VendorDashboard />
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/gym" 
+            <Route
+              path="/vendor/bazaars"
+              element={
+                <ProtectedRoute>
+                  <VendorBazaars />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vendor/accepted"
+              element={
+                <ProtectedRoute>
+                  <VendorAccepted />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vendor/requests"
+              element={
+                <ProtectedRoute>
+                  <VendorRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/event-office/vendor-requests"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <VendorRequests />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events"
+              element={
+                <ProtectedRoute>
+                  <EventsList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/gym"
               element={
                 <ProtectedRoute>
                   <GymSchedule />
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/gym/manage" 
+            <Route
+              path="/gym/manage"
               element={
                 <ProtectedRoute>
-                  {/* Allow Admin and Events Office */}
                   <GymManage />
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/professor/events" 
+            <Route
+              path="/professor/events"
               element={
                 <ProtectedRoute>
                   <ProfessorEvents />
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/professor/profile" 
+            <Route
+              path="/professor/all-events"
+              element={
+                <ProtectedRoute>
+                  <ProfessorAllEvents />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/professor/profile"
               element={
                 <ProtectedRoute>
                   <ProfessorProfile />
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/admin/users" 
+            <Route
+              path="/professor/gym-schedule"
+              element={
+                <ProtectedRoute>
+                  <ProfessorGymSchedule />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
               element={
                 <ProtectedRoute>
                   <AdminOnly>
@@ -175,8 +281,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/admin/vendors" 
+            <Route
+              path="/admin/vendors"
               element={
                 <ProtectedRoute>
                   <AdminOnly>
@@ -185,8 +291,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/admin/events" 
+            <Route
+              path="/admin/events"
               element={
                 <ProtectedRoute>
                   <AdminOnly>
@@ -195,8 +301,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/admin/manage" 
+            <Route
+              path="/admin/manage"
               element={
                 <ProtectedRoute>
                   <AdminOnly>
@@ -205,8 +311,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/admin/profile" 
+            <Route
+              path="/admin/profile"
               element={
                 <ProtectedRoute>
                   <AdminOnly>
@@ -215,15 +321,81 @@ function App() {
                 </ProtectedRoute>
               }
             />
-             <Route
-               path="/create-conference" 
-               element={
+            <Route
+              path="/create-conference"
+              element={
                 <ProtectedRoute>
-                  <AdminOnly>
+                  <EventsOfficeOnly>
                     <CreateConference />
-                  </AdminOnly>
-                </ProtectedRoute> } 
-              />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>}
+            />
+            <Route
+              path="/edit-conference/:id"
+              element={
+                <ProtectedRoute>
+                  <EditConfrences />
+                </ProtectedRoute>
+              } />
+            {/* ✅ ADD YOUR EVENT MANAGEMENT ROUTES HERE */}
+            <Route
+              path="/create-bazaar"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <CreateBazaar />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/create-trip"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <CreateTrip />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/create-booth"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <CreateBooth />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/edit-bazaar/:id"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <EditBazaar />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/edit-trip/:id"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <EditTrip />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/confrences"
+              element={
+                <ProtectedRoute>
+                  <Confrences />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </div>
       </Router>

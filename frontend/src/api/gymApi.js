@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const gymApi = axios.create({
-  baseURL: '/api/gym',
+  baseURL: 'http://localhost:5000/api/gym',
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' }
 });

@@ -1,177 +1,128 @@
+// controllers/workshopController.js
 const Workshop = require('../models/Workshop');
-const Professor = require('../models/Professor');
 
-// Get all workshops (Events Office)
+// Events Office: list all workshops
 const getAllWorkshops = async (req, res) => {
   try {
     const workshops = await Workshop.find().sort({ createdAt: -1 });
     res.json(workshops);
-  } catch (error) {
+  } catch (e) {
     res.status(500).json({ error: 'Failed to fetch workshops' });
   }
 };
 
-// Get professor's workshops
+// Professor: list *my* workshops
 const getMyWorkshops = async (req, res) => {
   try {
-    const professorId = req.headers['professor-id'];
-    
-    if (!professorId) {
-      return res.status(400).json({ error: 'Professor ID header required' });
+    if (req.user.userType !== 'Professor') {
+      return res.status(403).json({ error: 'Only professors can view their workshops' });
     }
-    
-    const workshops = await Workshop.find({ professorId }).sort({ createdAt: -1 });
+    const workshops = await Workshop.find({ professorId: req.user._id }).sort({ createdAt: -1 });
     res.json(workshops);
-  } catch (error) {
+  } catch (e) {
     res.status(500).json({ error: 'Failed to fetch workshops' });
   }
 };
 
-// Create workshop
+// Professor: create workshop
 const createWorkshop = async (req, res) => {
   try {
-    const professorId = req.headers['professor-id'];
-    
-    if (!professorId) {
-      return res.status(400).json({ error: 'Professor ID header required' });
+    if (req.user.userType !== 'Professor') {
+      return res.status(403).json({ error: 'Only professors can create workshops' });
     }
-    
-    // Verify professor exists
-    const professor = await Professor.findById(professorId);
-    if (!professor) {
-      return res.status(404).json({ error: 'Professor not found' });
-    }
-    
-    const workshopData = {
+
+    const workshop = new Workshop({
       ...req.body,
-      professorId
-    };
-    
-    const workshop = new Workshop(workshopData);
+      professorId: req.user._id,   // from JWT
+      status: 'pending'
+    });
     await workshop.save();
     res.status(201).json(workshop);
-  } catch (error) {
-    res.status(400).json({ error: 'Failed to create workshop' });
+  } catch (e) {
+    res.status(400).json({ error: 'Failed to create workshop', details: e.message });
   }
 };
 
-// Update workshop
+// Professor: update own workshop
 const updateWorkshop = async (req, res) => {
   try {
-    const professorId = req.headers['professor-id'];
-    
-    if (!professorId) {
-      return res.status(400).json({ error: 'Professor ID header required' });
+    if (req.user.userType !== 'Professor') {
+      return res.status(403).json({ error: 'Only professors can update workshops' });
     }
-    
+
     const workshop = await Workshop.findOneAndUpdate(
-      { _id: req.params.id, professorId },
+      { _id: req.params.id, professorId: req.user._id },
       { ...req.body, updatedAt: new Date() },
       { new: true }
     );
-    
-    if (!workshop) {
-      return res.status(404).json({ error: 'Workshop not found or not authorized' });
-    }
-    
+
+    if (!workshop) return res.status(404).json({ error: 'Workshop not found or not authorized' });
     res.json(workshop);
-  } catch (error) {
+  } catch (e) {
     res.status(400).json({ error: 'Failed to update workshop' });
   }
 };
 
-// Delete workshop
+// Professor: delete own workshop
 const deleteWorkshop = async (req, res) => {
   try {
-    const professorId = req.headers['professor-id'];
-    
-    if (!professorId) {
-      return res.status(400).json({ error: 'Professor ID header required' });
+    if (req.user.userType !== 'Professor') {
+      return res.status(403).json({ error: 'Only professors can delete workshops' });
     }
-    
+
     const workshop = await Workshop.findOneAndDelete({
       _id: req.params.id,
-      professorId
+      professorId: req.user._id
     });
-    
-    if (!workshop) {
-      return res.status(404).json({ error: 'Workshop not found or not authorized' });
-    }
-    
+
+    if (!workshop) return res.status(404).json({ error: 'Workshop not found or not authorized' });
     res.json({ message: 'Workshop deleted successfully', deletedWorkshop: workshop });
-  } catch (error) {
+  } catch (e) {
     res.status(400).json({ error: 'Failed to delete workshop' });
   }
 };
 
-// Approve workshop (Events Office)
+// Events Office/Admin: approve
 const approveWorkshop = async (req, res) => {
   try {
     const workshop = await Workshop.findByIdAndUpdate(
       req.params.id,
-      { 
-        status: 'approved',
-        rejectionReason: '',
-        editRequests: '',
-        updatedAt: new Date()
-      },
+      { status: 'approved', rejectionReason: '', editRequests: '' },
       { new: true }
     );
-    
-    if (!workshop) {
-      return res.status(404).json({ error: 'Workshop not found' });
-    }
-    
+    if (!workshop) return res.status(404).json({ error: 'Workshop not found' });
     res.json(workshop);
-  } catch (error) {
+  } catch (e) {
     res.status(400).json({ error: 'Failed to approve workshop' });
   }
 };
 
-// Reject workshop (Events Office)
+// Events Office/Admin: reject
 const rejectWorkshop = async (req, res) => {
   try {
     const workshop = await Workshop.findByIdAndUpdate(
       req.params.id,
-      { 
-        status: 'rejected',
-        rejectionReason: req.body.rejectionReason,
-        editRequests: '',
-        updatedAt: new Date()
-      },
+      { status: 'rejected', rejectionReason: req.body.rejectionReason || '', editRequests: '' },
       { new: true }
     );
-    
-    if (!workshop) {
-      return res.status(404).json({ error: 'Workshop not found' });
-    }
-    
+    if (!workshop) return res.status(404).json({ error: 'Workshop not found' });
     res.json(workshop);
-  } catch (error) {
+  } catch (e) {
     res.status(400).json({ error: 'Failed to reject workshop' });
   }
 };
 
-// Request edits (Events Office)
+// Events Office/Admin: request edits
 const requestEdits = async (req, res) => {
   try {
     const workshop = await Workshop.findByIdAndUpdate(
       req.params.id,
-      { 
-        status: 'needs_edits',
-        editRequests: req.body.editRequests,
-        rejectionReason: '',
-        updatedAt: new Date()
-      },
+      { status: 'needs_edits', editRequests: req.body.editRequests || '', rejectionReason: '' },
       { new: true }
     );
-    
-    if (!workshop) {
-      return res.status(404).json({ error: 'Workshop not found' });
-    }
-    
+    if (!workshop) return res.status(404).json({ error: 'Workshop not found' });
     res.json(workshop);
-  } catch (error) {
+  } catch (e) {
     res.status(400).json({ error: 'Failed to request edits' });
   }
 };

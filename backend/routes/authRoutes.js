@@ -7,13 +7,16 @@ const {
   verifyEmail,
   smtpStatus,
   sendTestEmail,
-  resendVerification
+  resendVerification,
+  updateProfile,
+  changePassword,
+  getCurrentUser
 } = require('../controllers/authController');
 
 // ==================== AUTH ROUTES ====================
 
 // 📝 User signup (with multer for file uploads)
-const { uploadVendorFiles } = require('../middleware/uploadMiddleware');
+const { uploadVendorFiles, uploadProfilePicture } = require('../middleware/uploadMiddleware');
 router.post('/signup', uploadVendorFiles, signup);
 
 // 🔑 User login
@@ -24,6 +27,13 @@ router.get('/verify-email', verifyEmail);
 
 // 🔁 Resend verification email (for unverified students)
 router.post('/resend-verification', resendVerification);
+
+// 👤 Update user profile
+const { protect } = require('../middleware/authMiddleware');
+router.put('/profile', protect, uploadProfilePicture, updateProfile);
+
+// 🔒 Change user password
+router.put('/change-password', protect, changePassword);
 
 // 🛠️ Dev-only diagnostic routes (optional)
 router.get('/smtp-status', smtpStatus);
@@ -85,7 +95,8 @@ router.post('/simple-signup', async (req, res) => {
       firstName,
       lastName,
       userType,
-      isVerified: true
+      isVerified: false,
+      status: 'blocked'
     };
     
     if (gucId) {
@@ -126,5 +137,8 @@ router.post('/simple-signup', async (req, res) => {
     });
   }
 });
+
+// 👤 Get current user info
+router.get('/me', protect, getCurrentUser);
 
 module.exports = router;

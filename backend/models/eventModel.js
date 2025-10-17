@@ -8,7 +8,7 @@ const eventSchema = new mongoose.Schema({
   description: String,
   type: {
     type: String,
-    enum: ['bazaar', 'trip', 'sports', 'seminar', 'workshop', 'other'],
+    enum: ['bazaar', 'trip', 'sports', 'seminar', 'workshop', 'conference', 'booth', 'other'],
     default: 'other',
   },
   startDate: {
@@ -19,6 +19,10 @@ const eventSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  registrationDeadline: {
+    type: Date,
+    required: false, // Optional for non-bazaar events
+  },
   location: {
     type: String,
     required: true,
@@ -27,19 +31,24 @@ const eventSchema = new mongoose.Schema({
     type: Number,
     default: 100,
   },
+  price: {
+    type: Number,
+    required: false, // Optional for non-trip events
+  },
   registeredCount: {
     type: Number,
     default: 0,
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'cancelled'],
+    enum: ['pending', 'approved', 'rejected', 'cancelled'],
     default: 'approved',
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  // Conference fields
   agenda: String, 
   website: String,
   budget: Number, 
@@ -48,7 +57,20 @@ const eventSchema = new mongoose.Schema({
     enum: ['external', 'GUC'],
     default: 'GUC'
   },
-  extraResources: String 
+  extraResources: String,
+  // Workshop-specific fields
+  faculty: {
+    type: String,
+    required: false, // Faculty responsible for workshop
+  },
+  professors: {
+    type: String,
+    required: false, // Professor(s) conducting workshop
+  },
+  bannerFile: {
+    type: String,
+    required: false, // Path to uploaded banner/flyer
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Event', eventSchema);

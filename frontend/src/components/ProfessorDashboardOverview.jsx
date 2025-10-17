@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { professorApiService } from '../api/professorApi';
 
 const ProfessorDashboardOverview = () => {
   const { user } = useAuth();
@@ -11,59 +12,44 @@ const ProfessorDashboardOverview = () => {
     pendingApprovals: 0,
   });
   const [notifications, setNotifications] = useState([]);
+  const [error, setError] = useState('');
 
-  // TODO: Replace with real API calls when backend endpoints are ready
+  // Fetch real dashboard data
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setStats({
-        totalEventsCreated: 12,
-        upcomingEvents: 4,
-        eventsParticipatingIn: 7,
-        pendingApprovals: 2,
-      });
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError('');
 
-      setNotifications([
-        {
-          id: 1,
-          type: 'approval',
-          title: 'Event Proposal Approved',
-          message: 'Your "ML Workshop" proposal was approved and is now scheduled.',
-          timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-          isRead: false,
-          priority: 'success',
-        },
-        {
-          id: 2,
-          type: 'announcement',
-          title: 'New Submission Guidelines',
-          message: 'Event Office updated the event submission guidelines for this term.',
-          timestamp: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
-          isRead: false,
-          priority: 'info',
-        },
-        {
-          id: 3,
-          type: 'reminder',
-          title: 'Event Starting Soon',
-          message: '“Data Science Seminar” starts in 2 hours.',
-          timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-          isRead: true,
-          priority: 'warning',
-        },
-        {
-          id: 4,
-          type: 'pending',
-          title: 'Proposal Under Review',
-          message: '“AI Ethics Discussion” is under review by Event Office.',
-          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          isRead: false,
-          priority: 'pending',
-        },
-      ]);
+        // Fetch stats and notifications in parallel
+        const [statsResult, notificationsResult] = await Promise.all([
+          professorApiService.getDashboardStats(),
+          professorApiService.getDashboardNotifications()
+        ]);
 
-      setLoading(false);
-    }, 700);
-    return () => clearTimeout(timer);
+        if (statsResult.success) {
+          setStats(statsResult.data.stats);
+        } else {
+          console.error('Failed to fetch stats:', statsResult.message);
+          setError('Failed to load dashboard statistics');
+        }
+
+        if (notificationsResult.success) {
+          setNotifications(notificationsResult.data.notifications);
+        } else {
+          console.error('Failed to fetch notifications:', notificationsResult.message);
+          setError('Failed to load notifications');
+        }
+
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
   }, []);
 
   const markAsRead = (id) => {
@@ -87,6 +73,22 @@ const ProfessorDashboardOverview = () => {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '2rem' }}>
         <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ marginTop: '2rem' }}>
+        <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
+          {error}
+        </div>
+        <button 
+          className="btn btn-primary" 
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </button>
       </div>
     );
   }

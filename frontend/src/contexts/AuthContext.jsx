@@ -34,14 +34,14 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await axios.post('/api/auth/login', {
+      const response = await axios.post('http://localhost:5000/api/auth/login', {
         email,
         password
       });
 
       const { user: userData, token } = response.data;
       
-      // Store token and user data
+      // Store token and user data for verified users
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
       
@@ -52,7 +52,24 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: userData };
     } catch (error) {
       console.error('Login error:', error);
-      
+
+      // Handle awaiting verification redirect
+      if (error.response?.status === 403 && error.response?.data?.code === 'AWAITING_VERIFICATION') {
+        // Try to get user data from the error response if available
+        const userData = error.response?.data?.user;
+        if (userData) {
+          // Store user data even if not verified (for pending verification page)
+          localStorage.setItem('user', JSON.stringify(userData));
+          setUser(userData);
+        }
+        return { 
+          success: false, 
+          message: 'Your account is awaiting verification. Redirecting...', 
+          redirect: '/pending-verification',
+          user: userData 
+        };
+      }
+
       if (error.response?.data?.message) {
         return { success: false, message: error.response.data.message };
       } else if (error.code === 'NETWORK_ERROR' || !error.response) {
@@ -65,7 +82,7 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (userData) => {
     try {
-      const response = await axios.post('/api/auth/signup', userData);
+      const response = await axios.post('http://localhost:5000/api/auth/signup', userData);
       
       const { user: newUser, token, requiresVerification } = response.data;
       

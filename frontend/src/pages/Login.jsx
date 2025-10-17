@@ -50,7 +50,7 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -60,14 +60,21 @@ const Login = () => {
 
     try {
       const result = await login(formData.email, formData.password);
-      
+
       if (result.success) {
         setMessage('Login successful! Redirecting...');
         setTimeout(() => {
-          navigate('/dashboard');
+          if (result.user?.userType === 'Vendor') {
+            navigate('/vendor');
+          } else {
+            navigate('/dashboard');
+          }
         }, 1000);
       } else {
         setMessage(result.message);
+        if (result.redirect) {
+          setTimeout(() => navigate(result.redirect), 1000);
+        }
       }
     } catch (error) {
       setMessage('An unexpected error occurred. Please try again.');
@@ -152,12 +159,12 @@ const Login = () => {
         <div className="text-center">
           <p style={{ color: 'var(--text-light)', marginBottom: '1rem' }}>
             Don't have an account?{' '}
-            <Link 
-              to="/signup" 
-              style={{ 
-                color: 'var(--guc-red)', 
-                textDecoration: 'none', 
-                fontWeight: '600' 
+            <Link
+              to="/signup"
+              style={{
+                color: 'var(--guc-red)',
+                textDecoration: 'none',
+                fontWeight: '600'
               }}
             >
               Sign up here

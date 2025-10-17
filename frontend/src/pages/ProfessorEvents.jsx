@@ -1,93 +1,101 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { professorApiService } from '../api/professorApi';
 
-const initialMockEvents = [
-  {
-    id: 'evt-1',
-    title: 'Machine Learning Workshop',
-    description: 'Hands-on intro to ML with Python.',
-    datetime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-    location: 'Room B-302',
-    category: 'Academic Talk',
-    status: 'approved',
-    participants: 42,
-    registrations: [
-      { id: 'r-1', name: 'Sara Kamal', email: 'sara.kamal@guc.edu', studentId: '19-1234', status: 'approved' },
-      { id: 'r-2', name: 'Ahmed Hassan', email: 'ahmed.hassan@guc.edu', studentId: '20-5678', status: 'approved' },
-      { id: 'r-3', name: 'Omar Ali', email: 'omar.ali@guc.edu', studentId: '21-4321', status: 'pending' },
-    ],
-    bannerName: '',
-  },
-  {
-    id: 'evt-2',
-    title: 'AI Ethics Discussion',
-    description: 'Panel on ethical AI practices.',
-    datetime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    location: 'Auditorium A',
-    category: 'Seminar',
-    status: 'pending',
-    participants: 15,
-    registrations: [
-      { id: 'r-4', name: 'Mona Adel', email: 'mona.adel@guc.edu', studentId: '19-7890', status: 'pending' },
-      { id: 'r-5', name: 'Youssef Zaki', email: 'youssef.zaki@guc.edu', studentId: '20-2468', status: 'pending' },
-      { id: 'r-6', name: 'Laila Nabil', email: 'laila.nabil@guc.edu', studentId: '18-1357', status: 'rejected' },
-    ],
-    bannerName: 'ethics-flyer.pdf',
-  },
-  {
-    id: 'evt-3',
-    title: 'Club Open Day',
-    description: 'Showcase of student clubs.',
-    datetime: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(),
-    location: 'Main Hall',
-    category: 'Club Event',
-    status: 'rejected',
-    participants: 0,
-    registrations: [],
-    bannerName: '',
-  },
-];
 
 const categories = [
-  'Academic Talk',
-  'Club Event',
-  'Seminar',
-  'Workshop',
+  'seminar',
+  'workshop',
+  'other',
+  'sports',
 ];
 
 const ProfessorEvents = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [events, setEvents] = useState(initialMockEvents);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditingId, setIsEditingId] = useState(null);
   const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
   const [participantsEventId, setParticipantsEventId] = useState(null);
+  const [participantsData, setParticipantsData] = useState([]);
+  const [participantsLoading, setParticipantsLoading] = useState(false);
+  const [participantsError, setParticipantsError] = useState('');
   const [isAnnouncementsOpen, setIsAnnouncementsOpen] = useState(false);
   const [announcementFormOpenForId, setAnnouncementFormOpenForId] = useState(null);
-  const [announcements, setAnnouncements] = useState([
-    { id: 'a-1', eventId: 'evt-1', title: 'Room Change', message: 'Workshop moved to Room B-302.', createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), source: 'Event Office' },
-    { id: 'a-2', eventId: 'evt-2', title: 'Guidelines Update', message: 'Please read the updated participation guidelines.', createdAt: new Date(Date.now() - 28 * 60 * 60 * 1000).toISOString(), source: 'Admin' },
-  ]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [announcementsLoading, setAnnouncementsLoading] = useState(false);
+  const [announcementsError, setAnnouncementsError] = useState('');
   const [newAnnouncement, setNewAnnouncement] = useState({ eventId: '', title: '', message: '' });
   const [announceError, setAnnounceError] = useState('');
   const [form, setForm] = useState({
     title: '',
     description: '',
-    datetime: '',
+    agenda: '',
+    faculty: '',
+    professors: '',
+    startDate: '',
+    endDate: '',
     location: '',
-    category: categories[0],
+    category: 'workshop',
     bannerFile: null,
   });
   const [formError, setFormError] = useState('');
+
+  // Fetch professor events on component mount
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        console.log('🎓 Fetching professor events...');
+        const result = await professorApiService.getMyEvents();
+        
+        if (result.success) {
+          console.log('✅ Events fetched successfully:', result.data.events);
+          // Transform backend data to match frontend format
+          const transformedEvents = result.data.events.map(event => ({
+            id: event._id,
+            title: event.title,
+            description: event.description || '',
+            agenda: event.agenda || '',
+            faculty: event.faculty || '',
+            professors: event.professors || '',
+            startDate: event.startDate,
+            endDate: event.endDate,
+            datetime: event.startDate,
+            location: event.location,
+            category: event.type || 'other',
+            status: event.status,
+            participants: event.registeredCount || 0,
+            registrations: [], // We'll fetch these separately if needed
+            bannerFile: event.bannerFile || null,
+            bannerName: event.bannerFile ? event.bannerFile.split('/').pop() : '', // Extract filename
+          }));
+          setEvents(transformedEvents);
+        } else {
+          setError(result.message || 'Failed to fetch events');
+        }
+      } catch (err) {
+        console.error('❌ Error fetching events:', err);
+        setError('Failed to fetch events. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, []);
 
   const sortedEvents = useMemo(() => {
     return [...events].sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
   }, [events]);
 
   const resetForm = () => {
-    setForm({ title: '', description: '', datetime: '', location: '', category: categories[0], bannerFile: null });
+    setForm({ title: '', description: '', agenda: '', faculty: '', professors: '', startDate: '', endDate: '', location: '', category: 'workshop', bannerFile: null });
     setFormError('');
     setIsEditingId(null);
   };
@@ -98,67 +106,182 @@ const ProfessorEvents = () => {
   };
 
   const openEdit = (evt) => {
+    console.log('🔍 Opening edit for event:', evt);
     setForm({
-      title: evt.title,
-      description: evt.description,
-      datetime: evt.datetime.slice(0, 16),
-      location: evt.location,
-      category: evt.category,
-      bannerFile: null,
+      title: evt.title || '',
+      description: evt.description || '',
+      agenda: evt.agenda || '',
+      faculty: evt.faculty || '',
+      professors: evt.professors || '',
+      startDate: evt.startDate ? new Date(evt.startDate).toISOString().slice(0, 16) : '',
+      endDate: evt.endDate ? new Date(evt.endDate).toISOString().slice(0, 16) : '',
+      location: evt.location || '',
+      category: evt.category || 'workshop',
+      bannerFile: null, // Reset file input
     });
     setIsEditingId(evt.id);
     setIsModalOpen(true);
   };
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
 
-    if (!form.title.trim() || !form.datetime || !form.location.trim() || !form.category) {
-      setFormError('Please fill in Title, Date & Time, Location, and Category.');
+    if (!form.title.trim() || !form.startDate || !form.endDate || !form.location.trim()) {
+      setFormError('Please fill in Workshop Name, Start & End, and Location.');
       return;
     }
 
-    const bannerName = form.bannerFile ? form.bannerFile.name : '';
+    console.log('👤 Current user:', user);
+    console.log('🔑 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
 
-    if (isEditingId) {
-      setEvents(prev => prev.map(ev => ev.id === isEditingId ? {
-        ...ev,
+    try {
+      const eventData = {
         title: form.title,
         description: form.description,
-        datetime: new Date(form.datetime).toISOString(),
+        agenda: form.agenda,
+        faculty: form.faculty,
+        professors: form.professors,
+        type: 'workshop',
+        startDate: new Date(form.startDate).toISOString(),
+        endDate: new Date(form.endDate).toISOString(),
         location: form.location,
-        category: form.category,
-        bannerName: bannerName || ev.bannerName,
-      } : ev));
-    } else {
-      const newEvent = {
-        id: `evt-${Math.random().toString(36).slice(2, 8)}`,
-        title: form.title,
-        description: form.description,
-        datetime: new Date(form.datetime).toISOString(),
-        location: form.location,
-        category: form.category,
-        status: 'pending', // submit for approval
-        participants: 0,
-        bannerName,
+        capacity: 100,
+        status: 'pending'
       };
-      setEvents(prev => [newEvent, ...prev]);
+
+      if (isEditingId) {
+        // Update existing event
+        const result = await professorApiService.updateEvent(isEditingId, eventData);
+        if (result.success) {
+          // Refresh events list
+          const fetchResult = await professorApiService.getMyEvents();
+          if (fetchResult.success) {
+            const transformedEvents = fetchResult.data.events.map(event => ({
+              id: event._id,
+              title: event.title,
+              description: event.description || '',
+              agenda: event.agenda || '',
+              faculty: event.faculty || '',
+              professors: event.professors || '',
+              startDate: event.startDate,
+              endDate: event.endDate,
+              datetime: event.startDate,
+              location: event.location,
+              category: event.type || 'other',
+              status: event.status,
+              participants: event.registeredCount || 0,
+              registrations: [],
+              bannerFile: event.bannerFile || null,
+              bannerName: event.bannerFile ? event.bannerFile.split('/').pop() : '',
+            }));
+            setEvents(transformedEvents);
+          }
+        } else {
+          setFormError(result.message || 'Failed to update event');
+          return;
+        }
+      } else {
+        // Create new event
+        console.log('🎯 Creating new event with data:', eventData);
+        const result = await professorApiService.createEvent(eventData);
+        console.log('📊 Create event result:', result);
+        if (result.success) {
+          // Refresh events list
+          const fetchResult = await professorApiService.getMyEvents();
+          if (fetchResult.success) {
+            const transformedEvents = fetchResult.data.events.map(event => ({
+              id: event._id,
+              title: event.title,
+              description: event.description || '',
+              agenda: event.agenda || '',
+              faculty: event.faculty || '',
+              professors: event.professors || '',
+              startDate: event.startDate,
+              endDate: event.endDate,
+              datetime: event.startDate,
+              location: event.location,
+              category: event.type || 'other',
+              status: event.status,
+              participants: event.registeredCount || 0,
+              registrations: [],
+              bannerFile: event.bannerFile || null,
+              bannerName: event.bannerFile ? event.bannerFile.split('/').pop() : '',
+            }));
+            setEvents(transformedEvents);
+          }
+        } else {
+          console.error('❌ Event creation failed:', result);
+          setFormError(result.message || 'Failed to create event');
+          return;
+        }
     }
 
     setIsModalOpen(false);
     resetForm();
+    } catch (err) {
+      console.error('❌ Error submitting event:', err);
+      setFormError('Failed to submit event. Please try again.');
+    }
   };
 
-  const onDelete = (id) => {
-    setEvents(prev => prev.filter(ev => ev.id !== id));
+  const onDelete = async (id) => {
+    try {
+      const result = await professorApiService.deleteEvent(id);
+      if (result.success) {
+        // Refresh events list
+        const fetchResult = await professorApiService.getMyEvents();
+        if (fetchResult.success) {
+          const transformedEvents = fetchResult.data.events.map(event => ({
+            id: event._id,
+            title: event.title,
+            description: event.description || '',
+            agenda: event.agenda || '',
+            faculty: event.faculty || '',
+            professors: event.professors || '',
+            startDate: event.startDate,
+            endDate: event.endDate,
+            datetime: event.startDate,
+            location: event.location,
+            category: event.type || 'other',
+            status: event.status,
+            participants: event.registeredCount || 0,
+            registrations: [],
+            bannerFile: event.bannerFile || null,
+            bannerName: event.bannerFile ? event.bannerFile.split('/').pop() : '',
+          }));
+          setEvents(transformedEvents);
+        }
+      } else {
+        alert(result.message || 'Failed to delete event');
+      }
+    } catch (err) {
+      console.error('❌ Error deleting event:', err);
+      alert('Failed to delete event. Please try again.');
+    }
   };
 
-  const canEdit = (status) => status === 'pending';
+  const canEdit = (status) => status === 'pending' || status === 'rejected';
 
-  const openParticipants = (eventId) => {
+  const openParticipants = async (eventId) => {
     setParticipantsEventId(eventId);
     setIsParticipantsOpen(true);
+    setParticipantsError('');
+    
+    try {
+      setParticipantsLoading(true);
+      const result = await professorApiService.getEventRegistrations(eventId);
+      if (result.success) {
+        setParticipantsData(result.data.registrations || []);
+      } else {
+        setParticipantsError(result.message || 'Failed to load participants');
+      }
+    } catch (err) {
+      console.error('❌ Error loading participants:', err);
+      setParticipantsError('Failed to load participants');
+    } finally {
+      setParticipantsLoading(false);
+    }
   };
 
   const updateRegistrationStatus = (eventId, regId, status) => {
@@ -218,8 +341,33 @@ const ProfessorEvents = () => {
     w.document.close();
   };
 
-  const openAnnouncements = () => setIsAnnouncementsOpen(true);
+  const openAnnouncements = async () => {
+    setIsAnnouncementsOpen(true);
+    await fetchAnnouncements();
+  };
+  
   const closeAnnouncements = () => setIsAnnouncementsOpen(false);
+
+  const fetchAnnouncements = async () => {
+    try {
+      setAnnouncementsLoading(true);
+      setAnnouncementsError('');
+      console.log('📢 Fetching announcements...');
+      const result = await professorApiService.getMyAnnouncements();
+      
+      if (result.success) {
+        console.log('✅ Announcements fetched successfully:', result.data.announcements);
+        setAnnouncements(result.data.announcements);
+      } else {
+        setAnnouncementsError(result.message || 'Failed to fetch announcements');
+      }
+    } catch (err) {
+      console.error('❌ Error fetching announcements:', err);
+      setAnnouncementsError('Failed to fetch announcements. Please try again.');
+    } finally {
+      setAnnouncementsLoading(false);
+    }
+  };
 
   const openAnnouncementForm = (eventId) => {
     setAnnouncementFormOpenForId(eventId);
@@ -227,7 +375,7 @@ const ProfessorEvents = () => {
     setAnnounceError('');
   };
 
-  const submitAnnouncement = (e) => {
+  const submitAnnouncement = async (e) => {
     e.preventDefault();
     setAnnounceError('');
     const { eventId, title, message } = newAnnouncement;
@@ -235,9 +383,24 @@ const ProfessorEvents = () => {
       setAnnounceError('Please fill Event, Title, and Message.');
       return;
     }
-    const created = { id: `a-${Math.random().toString(36).slice(2, 8)}`, eventId, title, message, createdAt: new Date().toISOString(), source: 'Professor' };
-    setAnnouncements(prev => [created, ...prev]);
+
+    try {
+      console.log('📢 Creating announcement:', newAnnouncement);
+      const result = await professorApiService.createAnnouncement(newAnnouncement);
+      
+      if (result.success) {
+        console.log('✅ Announcement created successfully');
+        // Refresh announcements list
+        await fetchAnnouncements();
     setAnnouncementFormOpenForId(null);
+        setNewAnnouncement({ eventId: '', title: '', message: '' });
+      } else {
+        setAnnounceError(result.message || 'Failed to create announcement');
+      }
+    } catch (err) {
+      console.error('❌ Error creating announcement:', err);
+      setAnnounceError('Failed to create announcement. Please try again.');
+    }
   };
 
   const notifyParticipants = (eventId) => {
@@ -256,9 +419,20 @@ const ProfessorEvents = () => {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div style={{ color: 'var(--text-light)' }}>Logged in as: {user?.firstName} {user?.lastName}</div>
-            <button className="btn btn-primary" onClick={openCreate}>+ Create Event</button>
+            <button className="btn btn-primary" onClick={openCreate}>+ Create Workshop</button>
           </div>
 
+          {error && (
+            <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
+              {error}
+            </div>
+          )}
+
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-light)' }}>
+              Loading your events...
+            </div>
+          ) : (
           <div className="card" style={{ backgroundColor: 'var(--light-gray)', marginBottom: '1rem' }}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -298,20 +472,8 @@ const ProfessorEvents = () => {
                         <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{ev.participants}</td>
                         <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <button className="btn btn-outline" onClick={() => openParticipants(ev.id)}>
-                              Participants
-                            </button>
-                            <button className="btn btn-outline" onClick={() => openAnnouncementForm(ev.id)}>
-                              + Announcement
-                            </button>
-                            <button className="btn btn-outline" onClick={() => notifyParticipants(ev.id)}>
-                              Notify Participants
-                            </button>
                             <button className="btn btn-outline" disabled={!canEdit(ev.status)} onClick={() => openEdit(ev)}>
                               Edit
-                            </button>
-                            <button className="btn btn-secondary" onClick={() => onDelete(ev.id)}>
-                              Delete
                             </button>
                           </div>
                         </td>
@@ -322,6 +484,7 @@ const ProfessorEvents = () => {
               </table>
             </div>
           </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
             <button className="btn btn-outline" onClick={openAnnouncements}>View Announcements</button>
@@ -329,38 +492,52 @@ const ProfessorEvents = () => {
 
           {/* Modal */}
           {isModalOpen && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
-              <div className="card" style={{ maxWidth: 640, width: '100%' }}>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '1rem', overflowY: 'auto' }}>
+              <div className="card" style={{ maxWidth: 640, width: '100%', maxHeight: '90vh', marginTop: '2rem', marginBottom: '2rem' }}>
                 <h3 style={{ color: 'var(--charcoal-black)', marginBottom: '1rem' }}>
-                  {isEditingId ? 'Edit Event' : 'Create Event'}
+                  {isEditingId ? 'Edit Workshop' : 'Create Workshop'}
                 </h3>
                 {formError && (
                   <div className="alert alert-error" style={{ marginBottom: '1rem' }}>{formError}</div>
                 )}
-                <form onSubmit={onSubmit}>
+                <form onSubmit={onSubmit} style={{ overflowY: 'auto', maxHeight: 'calc(90vh - 120px)' }}>
                   <div className="form-group">
-                    <label className="form-label">Event Title</label>
-                    <input className="form-input" type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Enter event title" />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Description</label>
-                    <textarea className="form-input" rows="4" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Describe the event (optional)" />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Date & Time</label>
-                    <input className="form-input" type="datetime-local" value={form.datetime} onChange={e => setForm({ ...form, datetime: e.target.value })} />
+                    <label className="form-label">Workshop Name</label>
+                    <input className="form-input" type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Enter workshop name" />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Location</label>
-                    <input className="form-input" type="text" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g., Room C-210" />
+                    <select className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })}>
+                      <option value="">Select location</option>
+                      <option value="GUC Cairo">GUC Cairo</option>
+                      <option value="GUC Berlin">GUC Berlin</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Start Date & Time</label>
+                      <input className="form-input" type="datetime-local" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">End Date & Time</label>
+                      <input className="form-input" type="datetime-local" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} />
+                    </div>
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Category</label>
-                    <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-                      {categories.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
+                    <label className="form-label">Short Description</label>
+                    <textarea className="form-input" rows="3" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Brief overview" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Full Agenda</label>
+                    <textarea className="form-input" rows="5" value={form.agenda} onChange={e => setForm({ ...form, agenda: e.target.value })} placeholder="Detailed agenda" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Faculty Responsible</label>
+                    <input className="form-input" type="text" value={form.faculty} onChange={e => setForm({ ...form, faculty: e.target.value })} placeholder="e.g., MET, IET" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Professor(s)</label>
+                    <input className="form-input" type="text" value={form.professors} onChange={e => setForm({ ...form, professors: e.target.value })} placeholder="Comma-separated names" />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Banner/Flyer (optional)</label>
@@ -371,7 +548,7 @@ const ProfessorEvents = () => {
                   </div>
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
                     <button type="submit" className="btn btn-primary">
-                      {isEditingId ? 'Save Changes' : 'Submit for Approval'}
+                      {isEditingId ? 'Save Changes' : 'Create Workshop'}
                     </button>
                     <button type="button" className="btn btn-secondary" onClick={() => { setIsModalOpen(false); resetForm(); }}>
                       Cancel
@@ -395,50 +572,67 @@ const ProfessorEvents = () => {
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button className="btn btn-outline" onClick={() => downloadCSV(participantsEventId)}>Download CSV</button>
                           <button className="btn btn-outline" onClick={() => downloadPDF(participantsEventId)}>Download PDF</button>
-                          <button className="btn btn-secondary" onClick={() => { setIsParticipantsOpen(false); setParticipantsEventId(null); }}>Close</button>
+                          <button className="btn btn-secondary" onClick={() => { 
+                            setIsParticipantsOpen(false); 
+                            setParticipantsEventId(null); 
+                            setParticipantsData([]);
+                            setParticipantsError('');
+                          }}>Close</button>
                         </div>
                       </div>
-                      <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                          <thead>
-                            <tr style={{ textAlign: 'left' }}>
-                              <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Name</th>
-                              <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Email</th>
-                              <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Student ID</th>
-                              <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Status</th>
-                              <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(ev?.registrations || []).length === 0 ? (
-                              <tr>
-                                <td colSpan="5" style={{ padding: '1rem', color: 'var(--text-light)', textAlign: 'center' }}>No registrations yet.</td>
+                      
+                      {participantsError && (
+                        <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
+                          {participantsError}
+                        </div>
+                      )}
+                      
+                      {participantsLoading ? (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-light)' }}>
+                          Loading participants...
+                        </div>
+                      ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ textAlign: 'left' }}>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Name</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Email</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Student ID</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>User Type</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Status</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>Registered At</th>
                               </tr>
-                            ) : (
-                              ev?.registrations?.map(r => (
-                                <tr key={r.id}>
-                                  <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{r.name}</td>
-                                  <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{r.email}</td>
-                                  <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{r.studentId}</td>
-                                  <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>
-                                    <span style={{
-                                      color: r.status === 'approved' ? 'var(--success-green)' : r.status === 'rejected' ? 'var(--error-red)' : 'var(--warning-yellow)'
-                                    }}>
-                                      {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>
-                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                      <button className="btn btn-primary" disabled={r.status === 'approved'} onClick={() => updateRegistrationStatus(ev.id, r.id, 'approved')}>Approve</button>
-                                      <button className="btn btn-secondary" disabled={r.status === 'rejected'} onClick={() => updateRegistrationStatus(ev.id, r.id, 'rejected')}>Reject</button>
-                                    </div>
-                                  </td>
+                            </thead>
+                            <tbody>
+                              {participantsData.length === 0 ? (
+                                <tr>
+                                  <td colSpan="6" style={{ padding: '1rem', color: 'var(--text-light)', textAlign: 'center' }}>No registrations yet.</td>
                                 </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                              ) : (
+                                participantsData.map(r => (
+                                  <tr key={r.id}>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{r.name}</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{r.email}</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{r.studentId || 'N/A'}</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{r.userType}</td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>
+                                      <span style={{
+                                        color: r.status === 'approved' ? 'var(--success-green)' : r.status === 'rejected' ? 'var(--error-red)' : 'var(--warning-yellow)'
+                                      }}>
+                                        {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                                      </span>
+                                    </td>
+                                    <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>
+                                      {new Date(r.registeredAt).toLocaleString()}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </>
                   );
                 })()}
@@ -448,36 +642,51 @@ const ProfessorEvents = () => {
 
           {/* Global Announcements Modal */}
           {isAnnouncementsOpen && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
-              <div className="card" style={{ maxWidth: 900, width: '100%' }}>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '1rem', overflowY: 'auto' }}>
+              <div className="card" style={{ maxWidth: 900, width: '100%', maxHeight: '90vh', marginTop: '2rem', marginBottom: '2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3 style={{ color: 'var(--charcoal-black)', margin: 0 }}>Announcements</h3>
                   <button className="btn btn-secondary" onClick={closeAnnouncements}>Close</button>
                 </div>
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
+                
+                {announcementsError && (
+                  <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
+                    {announcementsError}
+                  </div>
+                )}
+
+                {announcementsLoading ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-light)' }}>
+                    Loading announcements...
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gap: '0.75rem', overflowY: 'auto', maxHeight: 'calc(90vh - 120px)' }}>
                   {announcements.length === 0 ? (
                     <div style={{ textAlign: 'center', color: 'var(--text-light)', padding: '1rem' }}>No announcements yet.</div>
                   ) : (
                     announcements.map(a => (
-                      <div key={a.id} style={{ backgroundColor: 'var(--white)', border: '1px solid var(--medium-gray)', borderRadius: 8, padding: '1rem' }}>
+                        <div key={a._id} style={{ backgroundColor: 'var(--white)', border: '1px solid var(--medium-gray)', borderRadius: 8, padding: '1rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                           <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>{a.title}</div>
                           <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{new Date(a.createdAt).toLocaleString()}</div>
                         </div>
                         <div style={{ fontSize: 14, color: 'var(--text-light)', marginTop: 6 }}>{a.message}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 6 }}>Source: {a.source}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 6 }}>
+                            Source: {a.source} | Event: {a.eventId?.title || 'Unknown Event'}
+                          </div>
                       </div>
                     ))
                   )}
                 </div>
+                )}
               </div>
             </div>
           )}
 
           {/* New Announcement Form (per-event) */}
           {announcementFormOpenForId && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
-              <div className="card" style={{ maxWidth: 640, width: '100%' }}>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '1rem', overflowY: 'auto' }}>
+              <div className="card" style={{ maxWidth: 640, width: '100%', maxHeight: '90vh', marginTop: '2rem', marginBottom: '2rem' }}>
                 <h3 style={{ color: 'var(--charcoal-black)', marginBottom: '1rem' }}>New Announcement</h3>
                 {announceError && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>{announceError}</div>}
                 <form onSubmit={submitAnnouncement}>
@@ -513,5 +722,6 @@ const ProfessorEvents = () => {
 };
 
 export default ProfessorEvents;
+
 
 

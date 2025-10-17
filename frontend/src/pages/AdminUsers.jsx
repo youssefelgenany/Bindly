@@ -17,7 +17,7 @@ const AdminUsers = () => {
 
   const filteredUsers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return users;
+    if (!q) return users; // users are already filtered to exclude Admin/Event Office
 
     const match = (u) => {
       const name = `${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase();
@@ -39,9 +39,7 @@ const AdminUsers = () => {
     'Staff',
     'TA',
     'Professor',
-    'Vendor',
-    'Event Office',
-    'Admin'
+    'Vendor'
   ];
 
   // Load users on component mount
@@ -53,9 +51,50 @@ const AdminUsers = () => {
     try {
       setLoading(true);
       setError('');
+      console.log('🔍 Starting to load users...');
+      console.log('🔍 Current user:', user);
+      console.log('🔍 User type:', user?.userType);
+      console.log('🔍 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+      
       const result = await adminApiService.getAllUsers();
+      console.log('🔍 API result:', result);
+      
       if (result.success) {
-        setUsers(result.data.users || []);
+        console.log('🔍 Raw API response:', result);
+        console.log('🔍 All users from API:', result.data.users);
+        
+        // More comprehensive filtering - handle different possible variations
+        const filteredUsers = (result.data.users || []).filter(user => {
+          const userType = user.userType;
+          const userTypeLower = userType?.toLowerCase();
+          
+          // Check for various possible admin/event office variations
+          const isAdmin = userType === 'Admin' || 
+                         userType === 'admin' || 
+                         userTypeLower === 'admin';
+          
+          const isEventOffice = userType === 'Event Office' || 
+                               userType === 'event office' || 
+                               userType === 'Event_Office' ||
+                               userType === 'event_office' ||
+                               userTypeLower === 'event office';
+          
+          const shouldExclude = isAdmin || isEventOffice;
+          
+          console.log(`🔍 User: ${user.firstName} ${user.lastName}`);
+          console.log(`   - userType: "${userType}"`);
+          console.log(`   - userTypeLower: "${userTypeLower}"`);
+          console.log(`   - isAdmin: ${isAdmin}`);
+          console.log(`   - isEventOffice: ${isEventOffice}`);
+          console.log(`   - shouldExclude: ${shouldExclude}`);
+          console.log('---');
+          
+          return !shouldExclude;
+        });
+        
+        console.log('✅ Final filtered users count:', filteredUsers.length);
+        console.log('✅ Filtered users:', filteredUsers);
+        setUsers(filteredUsers);
       } else {
         setError(result.message);
       }
@@ -106,13 +145,21 @@ const AdminUsers = () => {
   const [togglingIds, setTogglingIds] = useState({}); // id -> boolean
   const [toggleMsgById, setToggleMsgById] = useState({}); // id -> message
 
+  // Verification controls
+  const [verificationStatusById, setVerificationStatusById] = useState({});
+  const [verifyingIds, setVerifyingIds] = useState({}); // id -> boolean
+  const [verifyMsgById, setVerifyMsgById] = useState({}); // id -> message
+
   // Update activeStatusById when users are loaded
   useEffect(() => {
     const initial = {};
+    const verificationInitial = {};
     users.forEach(u => { 
       initial[u._id || u.id] = u.status === 'active'; 
+      verificationInitial[u._id || u.id] = u.isVerified || false;
     });
     setActiveStatusById(initial);
+    setVerificationStatusById(verificationInitial);
   }, [users]);
 
   const handleToggleActive = async (userId) => {
@@ -139,10 +186,53 @@ const AdminUsers = () => {
     }
   };
 
+  const handleToggleVerification = async (userId) => {
+    console.log('🔍 handleToggleVerification called for userId:', userId);
+    console.log('🔍 Current user:', user);
+    console.log('🔍 User type:', user?.userType);
+    console.log('🔍 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+    
+    const newVerificationStatus = !verificationStatusById[userId];
+    console.log('🔍 New verification status:', newVerificationStatus);
+    
+    setVerifyingIds(prev => ({ ...prev, [userId]: true }));
+    setVerifyMsgById(prev => ({ ...prev, [userId]: '' }));
+    
+    try {
+      console.log('🔍 Calling updateUserVerification API...');
+      let confirmationPassword = '';
+      if (newVerificationStatus !== undefined) {
+        // For admin/event office targets, backend will require password
+        confirmationPassword = '123456';
+      }
+      const result = await adminApiService.updateUserVerification(userId, newVerificationStatus, confirmationPassword);
+      console.log('🔍 API result:', result);
+      
+      if (result.success) {
+        console.log('✅ Verification update successful');
+        setVerificationStatusById(prev => ({ ...prev, [userId]: newVerificationStatus }));
+        setVerifyMsgById(prev => ({ ...prev, [userId]: 'Verification updated.' }));
+        // Update the user in the local state
+        setUsers(prev => prev.map(u => 
+          u._id === userId ? { ...u, isVerified: newVerificationStatus } : u
+        ));
+      } else {
+        console.log('❌ Verification update failed:', result.message);
+        setVerifyMsgById(prev => ({ ...prev, [userId]: result.message || 'Failed to update verification.' }));
+      }
+    } catch (e) {
+      console.log('❌ Verification update error:', e);
+      const serverMessage = e?.response?.data?.message;
+      setVerifyMsgById(prev => ({ ...prev, [userId]: serverMessage || 'Failed to update verification.' }));
+    } finally {
+      setVerifyingIds(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+
   // Vendor-related controls removed per request
 
   // Basic guard (UI-level) to avoid rendering for non-admins
-  if (!(user?.userType === 'Admin')) {
+  if (!(user?.userType === 'admin' || user?.userType === 'Admin')) {
     return (
       <div style={{ padding: '2rem' }}>
         <div className="container">
@@ -244,6 +334,17 @@ const AdminUsers = () => {
                             <div style={{ color: 'var(--text-light)', fontSize: '12px' }}>
                               {(u.gucId && `GUC ID: ${u.gucId}`) || `ID: ${userId}`}
                             </div>
+                            <div style={{ 
+                              fontSize: '12px', 
+                              fontWeight: '500',
+                              color: u.userType === 'Admin' ? 'var(--guc-red)' : 
+                                     u.userType === 'Professor' ? 'var(--primary-blue)' :
+                                     u.userType === 'Student' ? 'var(--success-green)' :
+                                     u.userType === 'Vendor' ? 'var(--warning-yellow)' :
+                                     'var(--text-light)'
+                            }}>
+                              Role: {u.userType || 'Unknown'}
+                            </div>
                           </div>
                           <div style={{ textAlign: 'right' }}>
                             <div style={{ fontSize: '12px', color: u.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)' }}>
@@ -281,6 +382,30 @@ const AdminUsers = () => {
                           {messageById[userId] && (
                             <span style={{ marginLeft: '0.5rem', fontSize: '12px', color: messageById[userId].includes('success') ? 'var(--success-green)' : 'var(--guc-red)' }}>
                               {messageById[userId]}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Verification controls */}
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <button
+                            className={verificationStatusById[userId] ? 'btn btn-outline' : 'btn btn-primary'}
+                            onClick={() => handleToggleVerification(userId)}
+                            disabled={!!verifyingIds[userId]}
+                            style={{ backgroundColor: verificationStatusById[userId] ? 'var(--success-green)' : 'var(--warning-yellow)', color: 'white' }}
+                          >
+                            {verifyingIds[userId]
+                              ? 'Updating...'
+                              : verificationStatusById[userId]
+                                ? 'Unverify User'
+                                : 'Verify User'}
+                          </button>
+                          <span style={{ fontSize: '12px', color: verificationStatusById[userId] ? 'var(--success-green)' : 'var(--warning-yellow)' }}>
+                            {verificationStatusById[userId] ? 'Verified' : 'Pending'}
+                          </span>
+                          {verifyMsgById[userId] && (
+                            <span style={{ marginLeft: '0.5rem', fontSize: '12px', color: 'var(--text-light)' }}>
+                              {verifyMsgById[userId]}
                             </span>
                           )}
                         </div>

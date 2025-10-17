@@ -27,7 +27,35 @@ const AdminManagement = () => {
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, account: null });
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Activation state management
+  const [activatingIds, setActivatingIds] = useState({}); // id -> boolean
+  const [activationMessages, setActivationMessages] = useState({}); // id -> message
+
+  // Password confirmation modal state (used for activation and verification)
+  const [passwordConfirm, setPasswordConfirm] = useState({
+    show: false,
+    mode: 'activation', // 'activation' | 'verification'
+    accountId: null,
+    currentStatus: '', // 'active' | 'blocked'
+    currentVerified: false,
+    value: '',
+    error: '',
+    submitting: false
+  });
+
   const roleOptions = ['Admin', 'Event Office'];
+
+  // Helper function to format userType for display
+  const formatUserType = (userType) => {
+    switch (userType) {
+      case 'admin':
+        return 'Admin';
+      case 'event_office':
+        return 'Event Office';
+      default:
+        return userType;
+    }
+  };
 
   // Load admin accounts on component mount
   useEffect(() => {
@@ -40,9 +68,10 @@ const AdminManagement = () => {
       setError('');
       const result = await adminApiService.getAllUsers();
       if (result.success) {
-        // Filter for admin and event office accounts
+        // Filter for admin and event office accounts (handle both cases)
         const adminUsers = result.data.users.filter(user => 
-          user.userType === 'Admin' || user.userType === 'Event Office'
+          user.userType === 'Admin' || user.userType === 'admin' ||
+          user.userType === 'Event Office' || user.userType === 'event_office'
         );
         setAdminAccounts(adminUsers);
       } else {
@@ -82,10 +111,17 @@ const AdminManagement = () => {
     e.preventDefault();
     if (!validateForm()) return;
 
+    console.log('🔍 handleCreateAccount called');
+    console.log('🔍 Current user:', user);
+    console.log('🔍 User type:', user?.userType);
+    console.log('🔍 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+    console.log('🔍 Form data:', formData);
+
     setIsCreating(true);
     setCreateMessage('');
 
     try {
+      console.log('🔍 Calling createAdminAccount API...');
       const result = await adminApiService.createAdminAccount({
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -94,15 +130,20 @@ const AdminManagement = () => {
         role: formData.role
       });
       
+      console.log('🔍 API result:', result);
+      
       if (result.success) {
+        console.log('✅ Account creation successful');
         setCreateMessage('Account created successfully!');
         setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'Admin' });
         // Reload admin accounts to show the new one
         await loadAdminAccounts();
       } else {
+        console.log('❌ Account creation failed:', result.message);
         setCreateMessage(result.message || 'Failed to create account. Please try again.');
       }
     } catch (error) {
+      console.log('❌ Account creation error:', error);
       setCreateMessage('Failed to create account. Please try again.');
     } finally {
       setIsCreating(false);
@@ -141,8 +182,87 @@ const AdminManagement = () => {
     setDeleteConfirm({ show: false, account: null });
   };
 
+  const openActivationPasswordModal = (accountId, currentStatus) => {
+    setPasswordConfirm({
+      show: true,
+      mode: 'activation',
+      accountId,
+      currentStatus,
+      currentVerified: false,
+      value: '',
+      error: '',
+      submitting: false
+    });
+  };
+
+  const closeActivationPasswordModal = () => {
+    setPasswordConfirm(prev => ({ ...prev, show: false, value: '', error: '', submitting: false }));
+  };
+
+  const openVerificationPasswordModal = (accountId, currentVerified) => {
+    setPasswordConfirm({
+      show: true,
+      mode: 'verification',
+      accountId,
+      currentStatus: '',
+      currentVerified,
+      value: '',
+      error: '',
+      submitting: false
+    });
+  };
+
+  const submitPasswordConfirm = async () => {
+    const { mode, accountId, currentStatus, currentVerified, value } = passwordConfirm;
+    if (!value) {
+      setPasswordConfirm(prev => ({ ...prev, error: 'Password is required' }));
+      return;
+    }
+    setPasswordConfirm(prev => ({ ...prev, submitting: true, error: '' }));
+    setActivatingIds(prev => ({ ...prev, [accountId]: true }));
+    setActivationMessages(prev => ({ ...prev, [accountId]: '' }));
+
+    try {
+      if (mode === 'activation') {
+        const newStatus = currentStatus === 'active' ? false : true; // isActive parameter
+        const result = await adminApiService.updateUserStatus(accountId, newStatus, value);
+        if (result.success) {
+          setActivationMessages(prev => ({ ...prev, [accountId]: 'Status updated successfully' }));
+          setAdminAccounts(prev => prev.map(acc =>
+            (acc._id || acc.id) === accountId
+              ? { ...acc, status: newStatus ? 'active' : 'blocked' }
+              : acc
+          ));
+          closeActivationPasswordModal();
+        } else {
+          setPasswordConfirm(prev => ({ ...prev, error: result.message || 'Invalid password' }));
+        }
+      } else {
+        // verification
+        const newVerified = !currentVerified;
+        const result = await adminApiService.updateUserVerification(accountId, newVerified, value);
+        if (result.success) {
+          setActivationMessages(prev => ({ ...prev, [accountId]: 'Verification updated successfully' }));
+          setAdminAccounts(prev => prev.map(acc =>
+            (acc._id || acc.id) === accountId
+              ? { ...acc, isVerified: newVerified }
+              : acc
+          ));
+          closeActivationPasswordModal();
+        } else {
+          setPasswordConfirm(prev => ({ ...prev, error: result.message || 'Invalid password' }));
+        }
+      }
+    } catch (error) {
+      setPasswordConfirm(prev => ({ ...prev, error: 'Failed to update status' }));
+    } finally {
+      setActivatingIds(prev => ({ ...prev, [accountId]: false }));
+      setPasswordConfirm(prev => ({ ...prev, submitting: false }));
+    }
+  };
+
   // Basic guard (UI-level) to avoid rendering for non-admins
-  if (!(user?.userType === 'Admin')) {
+  if (!(user?.userType === 'Admin' || user?.userType === 'admin')) {
     return (
       <div style={{ padding: '2rem' }}>
         <div className="container">
@@ -356,17 +476,72 @@ const AdminManagement = () => {
                                 <div style={{ color: 'var(--text-light)', fontSize: '14px' }}>
                                   {account.email}
                                 </div>
-                                <div style={{ color: 'var(--text-light)', fontSize: '12px' }}>
-                                  Role: {account.userType} • Created: {new Date(account.createdAt).toLocaleDateString()}
+                                <div style={{ 
+                                  fontSize: '12px',
+                                  color: 'var(--text-light)'
+                                }}>
+                                  Role: {formatUserType(account.userType)} • Created: {new Date(account.createdAt).toLocaleDateString()}
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <span style={{ 
+                                  fontSize: '12px', 
+                                  color: account.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)' 
+                                }}>
+                                  {account.isVerified ? 'Verified' : 'Pending'}
+                                </span>
                                 <span style={{ 
                                   fontSize: '12px', 
                                   color: account.status === 'active' ? 'var(--success-green)' : 'var(--guc-red)' 
                                 }}>
-                                  {account.status === 'active' ? 'Active' : 'Inactive'}
+                                  {account.status === 'active' ? 'Active' : 'Blocked'}
                                 </span>
+                                
+                                {/* Activation/Deactivation Button */}
+                                {true && (
+                                  <button
+                                    className={account.status === 'active' ? 'btn btn-outline' : 'btn btn-primary'}
+                                    onClick={() => openActivationPasswordModal(accountId, account.status)}
+                                    disabled={activatingIds[accountId]}
+                                    style={{ 
+                                      padding: '4px 8px', 
+                                      fontSize: '12px',
+                                      backgroundColor: account.status === 'active' ? 'var(--guc-red)' : 'var(--success-green)',
+                                      color: 'white',
+                                      border: 'none'
+                                    }}
+                                    title={
+                                      account.status === 'active' 
+                                        ? 'Deactivate Account' 
+                                        : 'Activate Account'
+                                    }
+                                  >
+                                    {activatingIds[accountId] 
+                                      ? 'Updating...' 
+                                      : account.status === 'active' 
+                                        ? 'Deactivate' 
+                                        : 'Activate'
+                                    }
+                                  </button>
+                                )}
+
+                                {/* Verify/Unverify Button */}
+                                <button
+                                  className={account.isVerified ? 'btn btn-outline' : 'btn btn-primary'}
+                                  onClick={() => openVerificationPasswordModal(accountId, !!account.isVerified)}
+                                  disabled={activatingIds[accountId]}
+                                  style={{ 
+                                    padding: '4px 8px', 
+                                    fontSize: '12px',
+                                    backgroundColor: account.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)',
+                                    color: 'white',
+                                    border: 'none'
+                                  }}
+                                  title={account.isVerified ? 'Unverify Account' : 'Verify Account'}
+                                >
+                                  {account.isVerified ? 'Unverify' : 'Verify'}
+                                </button>
+                                
                                 <button
                                   className="btn btn-outline"
                                   onClick={() => handleDeleteClick(account)}
@@ -375,6 +550,17 @@ const AdminManagement = () => {
                                 >
                                   🗑️
                                 </button>
+                                
+                                {/* Status Message */}
+                                {activationMessages[accountId] && (
+                                  <span style={{ 
+                                    fontSize: '10px', 
+                                    color: activationMessages[accountId].includes('success') ? 'var(--success-green)' : 'var(--guc-red)',
+                                    marginLeft: '0.5rem'
+                                  }}>
+                                    {activationMessages[accountId]}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -441,6 +627,68 @@ const AdminManagement = () => {
                   style={{ backgroundColor: 'var(--guc-red)', borderColor: 'var(--guc-red)' }}
                 >
                   {isDeleting ? 'Deleting...' : 'Delete Account'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Password Modal (Activation / Verification) */}
+      {passwordConfirm.show && (
+        <>
+          <div
+            onClick={closeActivationPasswordModal}
+            style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 1000 }}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 'min(90vw, 400px)',
+              backgroundColor: 'var(--white)',
+              borderRadius: '8px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+              zIndex: 1001
+            }}
+          >
+            <div style={{ padding: '1rem', borderBottom: '1px solid var(--medium-gray)' }}>
+              <h3 style={{ color: 'var(--guc-red)', margin: 0 }}>
+                {passwordConfirm.mode === 'activation' ? 'Password Required' : 'Password Required (Verification)'}
+              </h3>
+            </div>
+            <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+              <div style={{ fontSize: '14px', color: 'var(--text-light)' }}>
+                Enter your admin password to confirm this action.
+              </div>
+              <input
+                type="password"
+                value={passwordConfirm.value}
+                onChange={(e) => setPasswordConfirm(prev => ({ ...prev, value: e.target.value, error: '' }))}
+                className="form-input"
+                placeholder="Enter password"
+                disabled={passwordConfirm.submitting}
+              />
+              {passwordConfirm.error && (
+                <div className="form-error" style={{ color: 'var(--guc-red)', fontSize: '12px' }}>
+                  {passwordConfirm.error}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                <button className="btn btn-outline" onClick={closeActivationPasswordModal} disabled={passwordConfirm.submitting}>
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={submitPasswordConfirm}
+                  disabled={passwordConfirm.submitting}
+                  style={{ backgroundColor: 'var(--guc-red)', borderColor: 'var(--guc-red)' }}
+                >
+                  {passwordConfirm.submitting ? 'Confirming...' : 'Confirm'}
                 </button>
               </div>
             </div>

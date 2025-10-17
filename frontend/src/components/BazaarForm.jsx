@@ -1,7 +1,7 @@
 import React from 'react';
 import '../styles/BazaarForm.css';
 
-const BazaarForm = ({ onSubmit, loading = false, initialData = {} }) => {
+const BazaarForm = ({ onSubmit, loading = false, initialData = {}, submitLabel = 'Create Bazaar', loadingLabel = 'Creating...' }) => {
   const [formData, setFormData] = React.useState({
     name: initialData.name || '',
     location: initialData.location || '',
@@ -104,7 +104,7 @@ const BazaarForm = ({ onSubmit, loading = false, initialData = {} }) => {
         className="btn btn-primary submit-btn"
         disabled={loading}
       >
-        {loading ? 'Creating...' : 'Create Bazaar'}
+        {loading ? loadingLabel : submitLabel}
       </button>
     </form>
   );
