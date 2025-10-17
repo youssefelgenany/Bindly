@@ -100,7 +100,11 @@ const AdminOnly = ({ children }) => {
     );
   }
 
-  const isAdmin = user && (user.role === 'admin' || user.userType === 'Admin');
+  const isAdmin = user && (
+    user.role === 'admin' || 
+    user.userType === 'Admin' || 
+    user.userType === 'admin'
+  );
   return isAdmin ? children : <Navigate to="/dashboard" />;
 };
 

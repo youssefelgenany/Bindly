@@ -231,7 +231,7 @@ const Navbar = () => {
             </div>
 
             <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-              {!(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'Event Office' || user.userType === 'event_office') && (
+              {!(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'admin' || user.userType === 'Event Office' || user.userType === 'event_office') && (
                 <Link
                   to="/gym"
                   className="btn btn-outline"
@@ -300,7 +300,7 @@ const Navbar = () => {
               
               {/* Hide Manage Gym for Event Office */}
               
-              {(user.role === 'admin' || user.userType === 'Admin') && (
+              {(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'admin') && (
                 <>
                   <Link
                     to="/admin/users"
