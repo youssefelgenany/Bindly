@@ -65,9 +65,12 @@ const permit = (...roles) => {
   };
 };
 
+<<<<<<< HEAD
+=======
 // Alias for compatibility
 
 
+>>>>>>> 3d44e049b711fdc9901d70135416234d35764b85
 module.exports = {
   protect,
   permit
