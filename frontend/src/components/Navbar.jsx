@@ -259,6 +259,17 @@ const Navbar = () => {
                   >
                     View Events
                   </Link>
+
+                  {/* Gym Schedule - visible to Event Office */}
+                  <Link
+                    to="/gym"                   // change route if your gymschedule route is different (e.g. "/gym/schedule")
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Gym Schedule
+                  </Link>
+
                   <Link
                     to="/event-office/vendor-requests"
                     className="btn btn-outline"
@@ -283,6 +294,17 @@ const Navbar = () => {
                   >
                     Create Trip
                   </Link>
+
+                  {/* Create Gym Session - visible to Event Office */}
+                  <Link
+                    to="/gym/manage"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Create Gym Session
+                  </Link>
+
                   <Link
                     to="/create-conference"
                     className="btn btn-primary"
