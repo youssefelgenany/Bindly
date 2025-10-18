@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { gymApiService } from '../api/gymApi';
+import gymApi from '../api/gymApi'; // axios instance
 
 const TYPES = [
   { label: 'Yoga', value: 'yoga' },
@@ -12,6 +12,22 @@ const TYPES = [
   { label: 'Cardio', value: 'cardio' },
   { label: 'Other', value: 'other' }
 ];
+
+const normalize = (s) => (s || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const isEventOfficeUser = (user) => {
+  if (!user) return false;
+  const type = normalize(user.userType);
+  const role = normalize(user.role);
+  return (
+    role === 'admin' ||
+    type.includes('event') && type.includes('office') ||
+    role === 'eventoffice' ||
+    role === 'event_office' ||
+    type === 'eventoffice' ||
+    type === 'event_office'
+  );
+};
 
 const GymManage = () => {
   const { user } = useAuth();
@@ -30,14 +46,7 @@ const GymManage = () => {
     setMessage('');
   }, [form]);
 
-  const canAccess = (
-    user?.userType === 'EventOffice' ||
-    user?.userType === 'Events Office' ||
-    user?.userType === 'event_office' ||
-    user?.role === 'event_office' ||
-    user?.role === 'admin' ||
-    user?.userType === 'Admin'
-  );
+  const canAccess = isEventOfficeUser(user);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -50,23 +59,43 @@ const GymManage = () => {
       setMessage('Max participants must be a positive number.');
       return;
     }
-    const selectedType = TYPES.find(t => t.value === form.type);
-    const payload = {
-      title: `${selectedType?.label || form.type} Session`,
-      date: form.date,
-      startTime: form.time,
-      durationMinutes: Number(form.durationMinutes) || 60,
-      type: form.type,
-      maxParticipants: Number(form.maxParticipants),
-    };
+
     setSubmitting(true);
-    const res = await gymApiService.createSession(payload);
-    setSubmitting(false);
-    if (res.success) {
-      setMessage('Session created successfully.');
-      setForm({ date: '', time: '', durationMinutes: 60, type: TYPES[0].value, instructor: '', maxParticipants: 30 });
-    } else {
-      setMessage(res.message);
+
+    try {
+      const selectedLabel = (TYPES.find(t => t.value === form.type) || {}).label || form.type;
+      // build ISO startTime from date and time
+      const timeStr = form.time.length === 5 ? `${form.time}:00` : form.time;
+      const startIso = new Date(`${form.date}T${timeStr}`).toISOString();
+
+      const payload = {
+        title: `${selectedLabel} Session`,
+        date: form.date,
+        time: form.time,
+        startTime: startIso,
+        durationMinutes: Number(form.durationMinutes) || 60,
+        maxParticipants: Number(form.maxParticipants),
+        type: form.type.toLowerCase(),
+        instructor: form.instructor ? String(form.instructor).trim() : undefined
+      };
+
+      console.log('Creating gym session payload:', payload);
+
+      const response = await gymApi.post('/sessions', payload);
+
+      console.log('Create session response:', response);
+      if (response.status >= 200 && response.status < 300) {
+        setMessage('Session created successfully.');
+        setForm({ date: '', time: '', durationMinutes: 60, type: TYPES[0].value, instructor: '', maxParticipants: 30 });
+      } else {
+        setMessage(response.data?.msg || 'Failed to create session');
+      }
+    } catch (err) {
+      console.error('create session error', err);
+      const serverMsg = err.response?.data?.msg || err.response?.data?.message || err.message;
+      setMessage(serverMsg || 'Failed to create session');
+    } finally {
+      setSubmitting(false);
     }
   };
 
