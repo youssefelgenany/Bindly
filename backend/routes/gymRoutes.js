@@ -3,16 +3,10 @@ const router = express.Router();
 const { createGymSession, viewGymScheduleMonth } = require("../controllers/gymController");
 const { protect, permit } = require("../middleware/authMiddleware");
 
-// keep the old root if you want (alias)
-router.post("/", protect, permit("event_office", "Event Office","Events Office", "admin"), createGymSession);
+// Event Office creates gym sessions (Req 84)
+router.post("/", protect, permit("event_office", "admin"), createGymSession);
 
-// new: explicit sessions endpoint (matches frontend/gymApi usage)
-router.post("/sessions", protect, permit("event_office", "Event Office","Events Office", "admin"), createGymSession);
-
-// list sessions — alias so frontend can GET /sessions
-router.get("/sessions", protect, viewGymScheduleMonth);
-
-// existing monthly endpoint
-router.get("/month", protect, permit("Student", "Staff", "TA", "Professor", "event_office","Event Office","Events Office", "admin"), viewGymScheduleMonth);
+// Everyone (student/staff/ta/professor/event_office) views schedule (Req 80)
+router.get("/month", protect, permit("Student", "Staff", "TA", "Professor", "event_office", "Event Office", "Events Office", "admin", "Admin"), viewGymScheduleMonth);
 
 module.exports = router;

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -16,9 +15,6 @@ const Navbar = () => {
     logout();
     navigate('/login');
   };
-
-  // Hide menu on vendor pages
-  const isVendorPage = location.pathname.startsWith('/vendor');
 
   const getUserTypeDisplay = (userType) => {
     const types = {
@@ -47,7 +43,7 @@ const Navbar = () => {
       }}>
         {/* Left group: brand only */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {user && !isVendorPage && (
+          {user && (
             <button
               onClick={toggleSidebar}
               className="btn btn-outline"
@@ -57,9 +53,9 @@ const Navbar = () => {
               ≡
             </button>
           )}
-          <Link
-            to={user ? (user.userType === 'Vendor' ? '/vendor' : '/dashboard') : '/'}
-            style={{
+          <Link 
+            to={user ? '/dashboard' : '/'} 
+            style={{ 
               textDecoration: 'none',
               display: 'flex',
               alignItems: 'center'
@@ -82,23 +78,23 @@ const Navbar = () => {
               {/* User Info */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: 'var(--text-dark)'
+                  <div style={{ 
+                    fontSize: '14px', 
+                    fontWeight: '600', 
+                    color: 'var(--text-dark)' 
                   }}>
                     {user.firstName} {user.lastName}
                   </div>
-                  <div style={{
-                    fontSize: '12px',
-                    color: 'var(--text-light)'
+                  <div style={{ 
+                    fontSize: '12px', 
+                    color: 'var(--text-light)' 
                   }}>
                     {getUserTypeDisplay(user.userType)}
                   </div>
                 </div>
                 {/* User Avatar */}
                 {user?.profilePicturePath ? (
-                  <img
+                  <img 
                     src={`http://localhost:5000${user.profilePicturePath}`}
                     alt={`${user.firstName} ${user.lastName}`}
                     style={{
@@ -127,23 +123,13 @@ const Navbar = () => {
                   fontWeight: '600',
                   fontSize: '16px'
                 }}>
-                  {user?.firstName?.charAt(0)?.toUpperCase() || 'U'}
+                   {user?.firstName?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
               </div>
 
-              {/* Event Office quick link */}
-              {(user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
-                <Link
-                  to="/events"
-                  className="btn btn-outline"
-                  style={{ padding: '8px 16px', fontSize: '14px' }}
-                >
-                  View Events
-                </Link>
-              )}
 
               {/* Logout Button */}
-              <button
+              <button 
                 onClick={handleLogout}
                 className="btn btn-outline"
                 style={{ padding: '8px 16px', fontSize: '14px' }}
@@ -154,10 +140,10 @@ const Navbar = () => {
           ) : (
             <>
               {/* Public Navigation */}
-              <Link
-                to="/login"
-                style={{
-                  color: 'var(--guc-red)',
+              <Link 
+                to="/login" 
+                style={{ 
+                  color: 'var(--guc-red)', 
                   textDecoration: 'none',
                   fontWeight: '600',
                   padding: '8px 16px',
@@ -169,8 +155,8 @@ const Navbar = () => {
               >
                 Sign In
               </Link>
-              <Link
-                to="/signup"
+              <Link 
+                to="/signup" 
                 className="btn btn-primary"
                 style={{ padding: '8px 16px', fontSize: '14px' }}
               >
@@ -182,7 +168,7 @@ const Navbar = () => {
       </div>
 
       {/* Right Sidebar Overlay */}
-      {user && !isVendorPage && (
+      {user && (
         <>
           {/* Dim Background */}
           <div
@@ -235,70 +221,8 @@ const Navbar = () => {
             </div>
 
             <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-              {/* Student Events View */}
-              {user.userType === 'Student' && (
-                <>
-                  <Link
-                    to="/student/events"
-                    className="btn btn-primary"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    📅 View Events
-                  </Link>
-                  <Link
-                    to="/student/my-registrations"
-                    className="btn btn-outline"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    📋 My Registrations
-                  </Link>
-                  <Link
-                    to="/student/courts"
-                    className="btn btn-outline"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    🏟️ View Courts
-                  </Link>
-                </>
-              )}
-
-              {/* Staff Events View */}
-              {user.userType === 'Staff' && (
-                <>
-                  <Link
-                    to="/staff/events"
-                    className="btn btn-primary"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    📅 View Events
-                  </Link>
-                  <Link
-                    to="/staff/my-registrations"
-                    className="btn btn-outline"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    📋 My Registrations
-                  </Link>
-                </>
-              )}
-
-              {/* Events - visible to all stakeholders */}
-              <Link
-                to="/events"
-                className="btn btn-outline"
-                style={{ width: '100%' }}
-                onClick={closeSidebar}
-              >
-                View All Events
-              </Link>
-
-              {/* Gym Schedule - visible to all stakeholders except Event Office and Admin */}
-              {!(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'admin' || user.userType === 'Event Office' || user.userType === 'event_office') && (
+              {/* Gym Schedule - visible to Student, Staff, TA, Professor, Event Office */}
+              {(user.userType === 'Student' || user.userType === 'Staff' || user.userType === 'TA' || user.userType === 'Professor' || user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
                 <Link
                   to="/gym"
                   className="btn btn-outline"
@@ -309,30 +233,31 @@ const Navbar = () => {
                 </Link>
               )}
 
-              {/* Conferences link moved into Events page filters */}
+              {/* Court Availability - visible to Student, Staff, TA */}
+              {(user.userType === 'Student' || user.userType === 'Staff' || user.userType === 'TA') && (
+                <Link
+                  to="/courts"
+                  className="btn btn-outline"
+                  style={{ width: '100%' }}
+                  onClick={closeSidebar}
+                >
+                  Court Availability
+                </Link>
+              )}
 
-              {/* EVENT OFFICE MANAGEMENT - visible to Event Office */}
+{/* Conferences link moved into Events page filters */}
+              
+              {/* EVENTS - visible to Event Office */}
               {(user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
                 <>
                   <Link
-                    to="/events/manage"
+                    to="/events"
                     className="btn btn-outline"
                     style={{ width: '100%' }}
                     onClick={closeSidebar}
                   >
-                    Manage Events
+                    View Events
                   </Link>
-
-                  {/* Gym Schedule - visible to Event Office */}
-                  <Link
-                    to="/gym"                   // change route if your gymschedule route is different (e.g. "/gym/schedule")
-                    className="btn btn-outline"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    Gym Schedule
-                  </Link>
-
                   <Link
                     to="/event-office/vendor-requests"
                     className="btn btn-outline"
@@ -357,17 +282,6 @@ const Navbar = () => {
                   >
                     Create Trip
                   </Link>
-
-                  {/* Create Gym Session - visible to Event Office */}
-                  <Link
-                    to="/gym/manage"
-                    className="btn btn-primary"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    Create Gym Session
-                  </Link>
-
                   <Link
                     to="/create-conference"
                     className="btn btn-primary"
@@ -386,9 +300,39 @@ const Navbar = () => {
                   </Link>
                 </>
               )}
-
+              
+              {/* Professor-specific actions */}
+              {user.userType === 'Professor' && (
+                <>
+                  <Link
+                    to="/professor/events"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Create Workshop
+                  </Link>
+                  <Link
+                    to="/professor/all-events"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    All Events & Bazaars
+                  </Link>
+                  <Link
+                    to="/professor/profile"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    Profile & Account Settings
+                  </Link>
+                </>
+              )}
+              
               {/* Hide Manage Gym for Event Office */}
-
+              
               {(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'admin') && (
                 <>
                   <Link
