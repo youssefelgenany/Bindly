@@ -15,7 +15,8 @@ const GymSchedule = () => {
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const res = await gymApiService.getMonthlySessions(year, month);
+      // month state is 0-11 (JS Date). Backend expects 1-12 — send month + 1.
+      const res = await gymApiService.getMonthlySessions(year, month + 1);
       if (res.success) {
         // Ensure sessions is an array and filter out invalid sessions
         const sessionsData = res.data.sessions || [];
@@ -159,38 +160,70 @@ const GymSchedule = () => {
                     <div style={{ display: 'grid', gap: '0.5rem' }}>
                       {list.map((s, idx) => {
                         try {
+                          if (!s) return null;
                           const sessionDate = new Date(s.date);
-                          // Skip if date is invalid
                           if (isNaN(sessionDate.getTime())) return null;
-                          
-                          // Add null checks for startTime
-                          const startTime = s.startTime || '00:00';
-                          const [hours, minutes] = startTime.split(':');
-                          const start = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate(), parseInt(hours) || 0, parseInt(minutes) || 0);
-                          const duration = s.durationMinutes || 60;
+
+                          // Determine start Date (prefer startTime, else use date+time or date)
+                          let start = null;
+                          if (s.startTime) {
+                            start = new Date(s.startTime);
+                            if (isNaN(start.getTime())) start = null;
+                          }
+                          if (!start) {
+                            if (s.time) {
+                              const [hh = '0', mm = '0'] = String(s.time).split(':');
+                              start = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate(), parseInt(hh, 10) || 0, parseInt(mm, 10) || 0);
+                            } else {
+                              start = new Date(sessionDate);
+                            }
+                          }
+
+                          const duration = Number(s.durationMinutes ?? s.duration ?? 60);
                           const end = new Date(start.getTime() + duration * 60000);
-                        return (
-                          <div key={s._id || s.id || idx} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', gap: '0.75rem', background: 'var(--white)', border: '1px solid var(--medium-gray)', borderRadius: 10, padding: '0.75rem 1rem' }}>
-                            <div style={{
-                              background: 'var(--guc-red)',
-                              color: 'var(--white)',
-                              fontWeight: 700,
-                              borderRadius: 8,
-                              padding: '6px 10px',
-                              minWidth: 80,
-                              textAlign: 'center'
-                            }}>
-                              {start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+
+                          const typeLabel = s.title || (s.type ? (s.type.charAt(0).toUpperCase() + s.type.slice(1)) : 'Session');
+
+                          // Prefer explicit instructor, then createdBy name, else 'TBD'
+                          const instructorName = (() => {
+                            if (s.instructor && String(s.instructor).trim()) return String(s.instructor).trim();
+                            if (s.createdBy) {
+                              if (typeof s.createdBy === 'string' && s.createdBy.trim()) return s.createdBy.trim();
+                              const fn = s.createdBy.firstName || s.createdBy.first || '';
+                              const ln = s.createdBy.lastName || s.createdBy.last || '';
+                              const full = `${fn} ${ln}`.trim();
+                              if (full) return full;
+                              if (s.createdBy.name && String(s.createdBy.name).trim()) return String(s.createdBy.name).trim();
+                            }
+                            return 'TBD';
+                          })();
+
+                          const participantsCount = Array.isArray(s.participants) ? s.participants.length : (s.participants ?? 0);
+
+                          return (
+                            <div key={s._id || s.id || idx} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', gap: '0.75rem', background: 'var(--white)', border: '1px solid var(--medium-gray)', borderRadius: 10, padding: '0.75rem 1rem' }}>
+                              <div style={{
+                                background: 'var(--guc-red)',
+                                color: 'var(--white)',
+                                fontWeight: 700,
+                                borderRadius: 8,
+                                padding: '6px 10px',
+                                minWidth: 80,
+                                textAlign: 'center'
+                              }}>
+                                {start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+
+                              <div>
+                                <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>{typeLabel}</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-light)' }}>👤 {instructorName} • ⏱ {duration} min • 👥 {participantsCount}/{s.maxParticipants ?? '—'}</div>
+                              </div>
+
+                              <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--text-light)' }}>
+                                Ends {end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
                             </div>
-                            <div>
-                              <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>{s.title || s.type.charAt(0).toUpperCase() + s.type.slice(1)}</div>
-                              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>👤 Instructor TBD • ⏱ {duration} min • 👥 {s.participants?.length || 0}/{s.maxParticipants}</div>
-                            </div>
-                            <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--text-light)' }}>
-                              Ends {end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </div>
-                          </div>
-                        );
+                          );
                         } catch (error) {
                           console.warn('Error rendering session:', s, error);
                           return null;
