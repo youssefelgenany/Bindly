@@ -235,12 +235,12 @@ const Dashboard = () => {
               <div style={{ display: 'grid', gap: '1rem' }}>
                 {user.userType === 'Student' && (
                   <>
-                    <button className="btn btn-outline" style={{ width: '100%' }}>
-                      Browse Trips
-                    </button>
-                    <button className="btn btn-outline" style={{ width: '100%' }}>
-                      View Bazaars
-                    </button>
+                    <Link to="/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      View All Events
+                    </Link>
+                    <Link to="/gym" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      Gym Schedule
+                    </Link>
                     <button className="btn btn-outline" style={{ width: '100%' }}>
                       My Bookings
                     </button>
@@ -249,12 +249,12 @@ const Dashboard = () => {
                 
                 {['Staff', 'TA', 'Professor'].includes(user.userType) && (
                   <>
-                    <button className="btn btn-outline" style={{ width: '100%' }}>
-                      Manage Trips
-                    </button>
-                    <button className="btn btn-outline" style={{ width: '100%' }}>
-                      Manage Bazaars
-                    </button>
+                    <Link to="/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      View All Events
+                    </Link>
+                    <Link to="/gym" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      Gym Schedule
+                    </Link>
                     <button className="btn btn-outline" style={{ width: '100%' }}>
                       View Reports
                     </button>
@@ -280,15 +280,46 @@ const Dashboard = () => {
 
                 {user.userType === 'Vendor' && (
                   <>
+                    <Link to="/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      View All Events
+                    </Link>
                     <button className="btn btn-outline" style={{ width: '100%' }}>
                       My Listings
                     </button>
                     <button className="btn btn-outline" style={{ width: '100%' }}>
                       Add New Listing
                     </button>
-                    <button className="btn btn-outline" style={{ width: '100%' }}>
-                      View Analytics
-                    </button>
+                  </>
+                )}
+
+                {(user.userType === 'Event Office' || user.userType === 'Events Office') && (
+                  <>
+                    <Link to="/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      View All Events
+                    </Link>
+                    <Link to="/events/manage" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      Manage Events
+                    </Link>
+                    <Link to="/gym/manage" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      Manage Gym Sessions
+                    </Link>
+                  </>
+                )}
+
+                {isAdmin && (
+                  <>
+                    <Link to="/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      View All Events
+                    </Link>
+                    <Link to="/admin/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      Manage Events
+                    </Link>
+                    <Link to="/admin/users" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      Manage Users
+                    </Link>
+                    <Link to="/admin/vendors" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
+                      Manage Vendors
+                    </Link>
                   </>
                 )}
               </div>

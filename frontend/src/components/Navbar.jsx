@@ -254,6 +254,14 @@ const Navbar = () => {
                   >
                     📋 My Registrations
                   </Link>
+                  <Link
+                    to="/student/courts"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    🏟️ View Courts
+                  </Link>
                 </>
               )}
 
@@ -279,6 +287,17 @@ const Navbar = () => {
                 </>
               )}
 
+              {/* Events - visible to all stakeholders */}
+              <Link
+                to="/events"
+                className="btn btn-outline"
+                style={{ width: '100%' }}
+                onClick={closeSidebar}
+              >
+                View All Events
+              </Link>
+
+              {/* Gym Schedule - visible to all stakeholders except Event Office and Admin */}
               {!(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'admin' || user.userType === 'Event Office' || user.userType === 'event_office') && (
                 <Link
                   to="/gym"
@@ -292,16 +311,16 @@ const Navbar = () => {
 
               {/* Conferences link moved into Events page filters */}
 
-              {/* EVENTS - visible to Event Office */}
+              {/* EVENT OFFICE MANAGEMENT - visible to Event Office */}
               {(user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
                 <>
                   <Link
-                    to="/events"
+                    to="/events/manage"
                     className="btn btn-outline"
                     style={{ width: '100%' }}
                     onClick={closeSidebar}
                   >
-                    View Events
+                    Manage Events
                   </Link>
 
                   {/* Gym Schedule - visible to Event Office */}

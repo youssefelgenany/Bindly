@@ -30,6 +30,7 @@ const professorRoutes = require("./routes/professorRoutes");
 const workshopRoutes = require("./routes/workshopRoutes");
 const vendorRoutes = require("./routes/vendorRoutes");
 const studentRegistrationRoutes = require("./routes/studentRegistrationRoutes");
+const courtRoutes = require("./routes/courtRoutes");
 const { verifyByToken } = require("./controllers/authVerifyController");
 
 // Mount routes
@@ -46,6 +47,7 @@ app.use("/api/trips", tripRoutes);
 app.use("/api/professors", professorRoutes);
 app.use("/api/workshops", workshopRoutes);
 app.use("/api/student-registrations", studentRegistrationRoutes);
+app.use("/api/courts", courtRoutes);
 
 // Email verification link route
 app.get("/api/verify", verifyByToken);

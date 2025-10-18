@@ -2,7 +2,32 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import gymApi from '../api/gymApi'; // axios instance
 
-const TYPES = ['Yoga', 'Pilates', 'Aerobics', 'Zumba', 'Cross Circuit', 'Kick-boxing', 'Crossfit', 'Strength', 'Cardio'];
+const TYPES = [
+  { label: 'Yoga', value: 'yoga' },
+  { label: 'Pilates', value: 'pilates' },
+  { label: 'Aerobics', value: 'aerobics' },
+  { label: 'Zumba', value: 'zumba' },
+  { label: 'Crossfit', value: 'crossfit' },
+  { label: 'Strength Training', value: 'strength' },
+  { label: 'Cardio', value: 'cardio' },
+  { label: 'Other', value: 'other' }
+];
+
+const normalize = (s) => (s || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const isEventOfficeUser = (user) => {
+  if (!user) return false;
+  const type = normalize(user.userType);
+  const role = normalize(user.role);
+  return (
+    role === 'admin' ||
+    type.includes('event') && type.includes('office') ||
+    role === 'eventoffice' ||
+    role === 'event_office' ||
+    type === 'eventoffice' ||
+    type === 'event_office'
+  );
+};
 
 const GymManage = () => {
   const { user } = useAuth();
@@ -10,7 +35,7 @@ const GymManage = () => {
     date: '',
     time: '',
     durationMinutes: 60,
-    type: TYPES[0],
+    type: TYPES[0].value,
     instructor: '',
     maxParticipants: 30,
   });
@@ -21,14 +46,7 @@ const GymManage = () => {
     setMessage('');
   }, [form]);
 
-  const canAccess = (
-    user?.userType === 'EventOffice' ||
-    user?.userType === 'Events Office' ||
-    user?.userType === 'event_office' ||
-    user?.role === 'event_office' ||
-    user?.role === 'admin' ||
-    user?.userType === 'Admin'
-  );
+  const canAccess = isEventOfficeUser(user);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -42,39 +60,38 @@ const GymManage = () => {
       return;
     }
 
-    const start = new Date(`${form.date}T${form.time}:00`);
-    const payload = {
-      title: `${form.type} Session`,
-      type: form.type.toLowerCase(),
-      durationMinutes: Number(form.durationMinutes) || 60,
-      // keep date/time in case backend expects them
-      date: form.date,
-      time: form.time,
-      startTime: start.toISOString(),
-      instructor: form.instructor || undefined,
-      maxParticipants: Number(form.maxParticipants),
-      capacity: Number(form.maxParticipants),
-    };
-
     setSubmitting(true);
 
     try {
+      const selectedLabel = (TYPES.find(t => t.value === form.type) || {}).label || form.type;
+      // build ISO startTime from date and time
+      const timeStr = form.time.length === 5 ? `${form.time}:00` : form.time;
+      const startIso = new Date(`${form.date}T${timeStr}`).toISOString();
+
+      const payload = {
+        title: `${selectedLabel} Session`,
+        date: form.date,
+        time: form.time,
+        startTime: startIso,
+        durationMinutes: Number(form.durationMinutes) || 60,
+        maxParticipants: Number(form.maxParticipants),
+        type: form.type.toLowerCase(),
+        instructor: form.instructor ? String(form.instructor).trim() : undefined
+      };
+
       console.log('Creating gym session payload:', payload);
 
-      // try POST to /sessions first (preferred). If your backend uses root '/', change to '/'
       const response = await gymApi.post('/sessions', payload);
 
       console.log('Create session response:', response);
-      // success status may be 201 or 200 depending on backend
       if (response.status >= 200 && response.status < 300) {
         setMessage('Session created successfully.');
-        setForm({ date: '', time: '', durationMinutes: 60, type: TYPES[0], instructor: '', maxParticipants: 30 });
+        setForm({ date: '', time: '', durationMinutes: 60, type: TYPES[0].value, instructor: '', maxParticipants: 30 });
       } else {
         setMessage(response.data?.msg || 'Failed to create session');
       }
     } catch (err) {
       console.error('create session error', err);
-      // prefer backend message if available
       const serverMsg = err.response?.data?.msg || err.response?.data?.message || err.message;
       setMessage(serverMsg || 'Failed to create session');
     } finally {
@@ -128,7 +145,7 @@ const GymManage = () => {
             <div className="form-group">
               <label className="form-label">Type</label>
               <select className="form-input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-                {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -141,7 +158,7 @@ const GymManage = () => {
             </div>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button className="btn btn-primary" type="submit" disabled={submitting}>{submitting ? 'Creating...' : 'Create Session'}</button>
-              <button className="btn btn-secondary" type="button" onClick={() => setForm({ date: '', time: '', durationMinutes: 60, type: TYPES[0], instructor: '', maxParticipants: 30 })}>Reset</button>
+              <button className="btn btn-secondary" type="button" onClick={() => setForm({ date: '', time: '', durationMinutes: 60, type: TYPES[0].value, instructor: '', maxParticipants: 30 })}>Reset</button>
             </div>
           </form>
         </div>

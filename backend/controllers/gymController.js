@@ -1,13 +1,15 @@
 const GymSession = require("../models/gymSessionModel");
 
-// Create a gym session (Event Office only)
+// Create a gym session
 exports.createGymSession = async (req, res) => {
   try {
+    // require authentication middleware to have set req.user
     if (!req.user || !req.user._id) {
       return res.status(401).json({ msg: "Authentication required" });
     }
 
-    const {
+    const body = req.body || {};
+    let {
       title,
       startTime,
       date,
@@ -18,44 +20,49 @@ exports.createGymSession = async (req, res) => {
       capacity,
       type,
       instructor
-    } = req.body || {};
+    } = body;
 
-    const dur = durationMinutes ?? duration;
-    const max = maxParticipants ?? capacity;
+    // normalize field names
+    durationMinutes = durationMinutes ?? duration;
+    maxParticipants = maxParticipants ?? capacity;
 
-    let resolvedStart = startTime;
-    if (!resolvedStart && date && time) {
+    // build ISO startTime if date + time provided
+    if (!startTime && date && time) {
       const timeStr = time.length === 5 ? `${time}:00` : time;
-      resolvedStart = new Date(`${date}T${timeStr}`).toISOString();
+      startTime = new Date(`${date}T${timeStr}`).toISOString();
     }
 
-    if (!title || !resolvedStart || !dur || !max) {
+    // validate required fields
+    if (!title || !startTime || !durationMinutes || !maxParticipants) {
       return res.status(400).json({
         msg: "Missing required fields",
-        required: ["title", "startTime OR (date+time)", "durationMinutes", "maxParticipants"]
+        required: ["title", "startTime OR (date + time)", "durationMinutes", "maxParticipants"]
       });
     }
 
-    const start = new Date(resolvedStart);
+    const start = new Date(startTime);
+    if (isNaN(start.getTime())) {
+      return res.status(400).json({ msg: "Invalid startTime/date+time format" });
+    }
+
     const dateOnly = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-    const timeOnly = time || start.toTimeString().slice(0,5);
+    const timeOnly = time || start.toTimeString().slice(0, 5);
 
     const newSession = new GymSession({
-      title: String(title),
+      title: String(title).trim(),
       date: dateOnly,
       time: timeOnly,
-      startTime: start,
-      durationMinutes: Number(dur),
-      maxParticipants: Number(max),
-      capacity: Number(max),
-      type: (type || 'yoga').toString().toLowerCase(),
-      instructor: instructor || null, // <- save instructor
+      startTime: start, // model may store string or date; this matches previous behavior
+      durationMinutes: Number(durationMinutes),
+      maxParticipants: Number(maxParticipants),
+      capacity: Number(maxParticipants),
+      type: (type || 'other').toString().toLowerCase(),
+      instructor: instructor ? String(instructor).trim() : null,
       createdBy: req.user._id
     });
 
     await newSession.save();
 
-    // return populated session so frontend can show names if needed
     const sessionPop = await GymSession.findById(newSession._id)
       .populate('createdBy', 'firstName lastName')
       .lean();
@@ -71,7 +78,7 @@ exports.createGymSession = async (req, res) => {
 exports.viewGymScheduleMonth = async (req, res) => {
   try {
     const year = parseInt(req.query.year, 10);
-    const month = parseInt(req.query.month, 10); // 1-12
+    const month = parseInt(req.query.month, 10); // expects 1-12
     if (!year || !month) {
       return res.status(400).json({ msg: "year and month query params required" });
     }
@@ -79,7 +86,6 @@ exports.viewGymScheduleMonth = async (req, res) => {
     const start = new Date(year, month - 1, 1);
     const end = new Date(year, month, 1);
 
-    // remove .select to ensure instructor isn't accidentally excluded and log results
     const sessions = await GymSession.find({
       date: { $gte: start, $lt: end }
     })
@@ -87,8 +93,7 @@ exports.viewGymScheduleMonth = async (req, res) => {
       .populate('createdBy', 'firstName lastName')
       .lean();
 
-    console.log('viewGymScheduleMonth - sessions fetched:', JSON.stringify(sessions, null, 2));
-
+    console.log('viewGymScheduleMonth - sessions fetched:', sessions.length);
     return res.json({ year, month, sessions });
   } catch (err) {
     console.error("viewGymScheduleMonth error:", err);

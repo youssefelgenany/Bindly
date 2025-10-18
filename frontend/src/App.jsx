@@ -21,6 +21,7 @@ import VendorDashboard from './pages/VendorDashboard';
 import CreateConference from './pages/CreateConfrence';
 import EditConfrences from './pages/EditConfrences';
 import EventsList from './pages/EventsList';
+import Events from './pages/Events';
 import CreateBazaar from "./pages/CreateBazaar";
 import CreateTrip from './pages/CreateTrip';
 import CreateBooth from './pages/CreateBooth';
@@ -32,6 +33,7 @@ import VendorAccepted from './pages/VendorAccepted';
 import VendorRequests from './pages/VendorRequests';
 import StudentEventsView from './pages/StudentEventsView';
 import StudentMyRegistrations from './pages/StudentMyRegistrations';
+import StudentCourtsView from './pages/StudentCourtsView';
 import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
 
@@ -264,6 +266,14 @@ function App() {
               path="/events"
               element={
                 <ProtectedRoute>
+                  <Events />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events/manage"
+              element={
+                <ProtectedRoute>
                   <EventsList />
                 </ProtectedRoute>
               }
@@ -284,6 +294,16 @@ function App() {
                 <ProtectedRoute>
                   <StudentOnly>
                     <StudentMyRegistrations />
+                  </StudentOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/courts"
+              element={
+                <ProtectedRoute>
+                  <StudentOnly>
+                    <StudentCourtsView />
                   </StudentOnly>
                 </ProtectedRoute>
               }

@@ -123,7 +123,7 @@ export const professorApiService = {
       const queryParams = new URLSearchParams();
       if (year) queryParams.append('year', year);
       if (month) queryParams.append('month', month);
-      const url = `/gym/month?${queryParams.toString()}`;
+      const url = `/api/gym/month?${queryParams.toString()}`;
       const response = await professorApi.get(url);
       return {
         success: true,
