@@ -7,13 +7,42 @@ const Event = require('../models/eventModel.js');
 module.exports.viewUpcomingEvents = async (req, res) => {
   try {
     const { type } = req.query;
-    if (!['bazaar', 'booth', 'trip'].includes(type)) {
+    if (!['bazaar', 'booth', 'trip', 'standaloneBooth'].includes(type)) {
       return res.status(400).json({ message: 'Invalid type' });
     }
 
     const now = new Date();
 
-    // Read from unified events collection
+    // Handle standaloneBooth type separately
+    if (type === 'standaloneBooth') {
+      const standaloneBooths = await Event.find({ 
+        type: 'standaloneBooth',
+        boothStatus: 'free' // Only show free booths
+      })
+        .populate('createdBy', 'name email')
+        .sort({ boothNumber: 1 })
+        .lean();
+      
+      // Map standalone booth structure to match frontend expectations
+      const mappedBooths = standaloneBooths.map(booth => ({
+        _id: booth._id,
+        name: `Booth ${booth.boothNumber} - ${booth.location}`,
+        title: `Booth ${booth.boothNumber} - ${booth.location}`,
+        boothNumber: booth.boothNumber,
+        location: booth.location,
+        description: booth.description,
+        boothSize: booth.boothSize,
+        capacity: booth.capacity,
+        price: booth.price,
+        amenities: booth.amenities,
+        status: booth.boothStatus,
+        type: 'standaloneBooth'
+      }));
+      
+      return res.json(mappedBooths);
+    }
+
+    // Read from unified events collection for other types
     const docs = await Event.find({
       type,
       startDate: { $gt: now },
@@ -141,11 +170,27 @@ module.exports.applyToEvent = async (req, res) => {
     // Attendees validated by frontend selection (max 5), no error message needed
     if (attendees.length > 5) return res.status(400).json({ message: 'Max 5 attendees exceeded' });
 
-    // Fetch event from 'events' collection based on type
-    const event = await Event.findById(eventId);
-    if (!event) return res.status(404).json({ message: 'Invalid event' });
-    if (event.type !== 'bazaar' && event.type !== 'booth') {
-      return res.status(400).json({ message: 'Event type must be bazaar or booth' });
+    // Fetch event from 'events' collection or standalone booth from 'booths' collection
+    let event = await Event.findById(eventId);
+    let isStandaloneBooth = false;
+    
+    // If not found in events, check if it's a standalone booth
+    if (!event) {
+      event = await Booth.findById(eventId);
+      if (event) {
+        isStandaloneBooth = true;
+        // Convert booth to event-like structure for compatibility
+        event = {
+          ...event.toObject(),
+          type: 'booth',
+          title: event.name
+        };
+      }
+    }
+    
+    if (!event) return res.status(404).json({ message: 'Invalid event or booth' });
+    if (event.type !== 'bazaar' && event.type !== 'booth' && event.type !== 'standaloneBooth') {
+      return res.status(400).json({ message: 'Event type must be bazaar, booth, or standaloneBooth' });
     }
 
     // Validate specific requirements based on event type
@@ -168,8 +213,25 @@ module.exports.applyToEvent = async (req, res) => {
         return res.status(400).json({ message: 'Invalid booth location. Please select from the provided options.' });
       }
     }
+    if (event.type === 'standaloneBooth') {
+      if (!durationWeeks || durationWeeks < 1 || durationWeeks > 4) {
+        return res.status(400).json({ message: 'Valid duration (1-4 weeks) required for standalone booth' });
+      }
+      
+      // Check if booth is actually available
+      if (event.boothStatus !== 'free') {
+        return res.status(400).json({ message: 'This booth is not available for application' });
+      }
+    }
 
-    const existingRequest = await VendorRequest.findOne({ vendor: vendorId, $or: [{ bazaar: eventId }, { booth: eventId }] });
+    const existingRequest = await VendorRequest.findOne({ 
+      vendor: vendorId, 
+      $or: [
+        { bazaar: eventId }, 
+        { booth: eventId },
+        { standaloneBooth: eventId }
+      ] 
+    });
     if (existingRequest) {
       // Update existing application instead of rejecting duplicates
       existingRequest.attendees = attendees;
@@ -183,18 +245,32 @@ module.exports.applyToEvent = async (req, res) => {
       return res.status(200).json({ message: 'Application updated' });
     }
 
-    const request = new VendorRequest({
+    const requestData = {
       vendor: vendorId,
-      [event.type === 'bazaar' ? 'bazaar' : 'booth']: eventId,
       attendees,
       boothSize: event.type === 'bazaar' ? boothSize : undefined,
-      durationWeeks: event.type === 'booth' ? durationWeeks : undefined,
+      durationWeeks: (event.type === 'booth' || event.type === 'standaloneBooth') ? durationWeeks : undefined,
       boothLocation: event.type === 'booth' ? boothLocation : undefined,
       message,
       // denormalized fields for quick access
       eventName: event.title || event.name,
       eventType: event.type,
-    });
+    };
+
+    // Set the correct reference field based on event type and source
+    if (event.type === 'bazaar') {
+      requestData.bazaar = eventId;
+    } else if (event.type === 'booth') {
+      if (isStandaloneBooth) {
+        requestData.standaloneBooth = eventId;
+      } else {
+        requestData.booth = eventId;
+      }
+    } else if (event.type === 'standaloneBooth') {
+      requestData.booth = eventId; // Use booth field for standaloneBooth events
+    }
+
+    const request = new VendorRequest(requestData);
     await request.save();
     res.status(201).json({ message: 'Application submitted' });
   } catch (error) {

@@ -8,6 +8,7 @@ module.exports = function(app) {
       changeOrigin: true,
       secure: false,
       ws: true,
+      logLevel: 'debug'
     })
   );
 };

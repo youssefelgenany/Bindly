@@ -1,0 +1,432 @@
+/* Vendor Bazaars Page Styles */
+
+/* Just make the page wider for laptop screens */
+.events-page {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.booths-grid {
+    display: grid;
+    gap: 0.75rem;
+}
+
+/* Header Styles */
+.events-header {
+    background: linear-gradient(135deg, var(--guc-red) 0%, #B00808 100%);
+    color: white;
+    padding: 3rem 2rem;
+    border-radius: 0 0 24px 24px;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(210, 10, 10, 0.3);
+}
+
+.header-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.header-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
+/* Tab Navigation */
+.tab-navigation {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    background-color: rgba(255,255,255,0.1);
+    padding: 0.5rem;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.tab-button {
+    background-color: transparent;
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 200px;
+    justify-content: center;
+}
+
+.tab-button.active {
+    background-color: rgba(255,255,255,0.2);
+}
+
+.tab-button:hover {
+    background-color: rgba(255,255,255,0.15);
+}
+
+/* Search Input */
+.search-container {
+    position: relative;
+    max-width: 500px;
+    width: 100%;
+}
+
+.search-input {
+    width: 100%;
+    padding: 1rem 1.5rem 1rem 3rem;
+    border: none;
+    border-radius: 25px;
+    font-size: 1rem;
+    background-color: rgba(255,255,255,0.9);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.2rem;
+    color: var(--text-light);
+}
+
+/* Bazaar Cards */
+.bazaar-card {
+    background-color: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border: 1px solid var(--medium-gray);
+    position: relative;
+}
+
+.bazaar-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+}
+
+.bazaar-header {
+    background: linear-gradient(135deg, var(--guc-red) 0%, #B00808 100%);
+    color: white;
+    padding: 1.5rem;
+    position: relative;
+}
+
+.bazaar-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.bazaar-type-badge {
+    background-color: rgba(255,255,255,0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.bazaar-stats {
+    background-color: rgba(255,255,255,0.2);
+    padding: 0.5rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.bazaar-content {
+    padding: 1.5rem;
+}
+
+.bazaar-description {
+    background-color: var(--light-gray);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--medium-gray);
+}
+
+.bazaar-actions {
+    padding: 1.5rem;
+    background-color: var(--light-gray);
+    border-top: 1px solid var(--medium-gray);
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Booth Cards */
+.booth-card {
+    background-color: white;
+    border: 2px solid var(--medium-gray);
+    border-radius: 12px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    position: relative;
+}
+
+.booth-card:hover {
+    border-color: var(--guc-red);
+    box-shadow: 0 4px 16px rgba(210, 10, 10, 0.15);
+    transform: translateY(-2px);
+}
+
+.booth-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.booth-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    color: var(--charcoal-black);
+}
+
+.booth-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.booth-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.booth-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.booth-badge.capacity {
+    background-color: #e3f2fd;
+    color: #1976d2;
+    border: 1px solid #bbdefb;
+}
+
+.booth-badge.price {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+}
+
+.booth-apply-button {
+    background-color: var(--guc-red);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(210, 10, 10, 0.3);
+}
+
+.booth-apply-button:hover {
+    background-color: #B00808;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(210, 10, 10, 0.4);
+}
+
+.booth-expand-icon {
+    color: var(--text-light);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.booth-expand-icon:hover {
+    background-color: var(--light-gray);
+}
+
+.booth-details {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 2px solid var(--light-gray);
+    background-color: var(--light-gray);
+    margin: 0.75rem -1rem -1rem -1rem;
+    padding: 1rem;
+    border-radius: 0 0 10px 10px;
+}
+
+/* Loading States */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--medium-gray);
+    border-top: 4px solid var(--guc-red);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Empty States */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.empty-state-title {
+    font-size: 1.5rem;
+    color: var(--charcoal-black);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-description {
+    color: var(--text-light);
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 1400px) {
+    .bazaars-grid {
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    }
+}
+
+@media (max-width: 1200px) {
+    .bazaars-grid {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .events-header {
+        padding: 2rem 1rem;
+    }
+    
+    .header-title {
+        font-size: 2rem;
+    }
+    
+    .header-subtitle {
+        font-size: 1rem;
+    }
+    
+    .tab-navigation {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .tab-button {
+        min-width: auto;
+        padding: 0.75rem 1rem;
+    }
+    
+    .bazaars-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .bazaar-header {
+        padding: 1rem;
+    }
+    
+    .bazaar-content {
+        padding: 1rem;
+    }
+    
+    .bazaar-actions {
+        padding: 1rem;
+    }
+    
+    .booth-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .booth-badges {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .events-header {
+        padding: 1.5rem 1rem;
+    }
+    
+    .header-title {
+        font-size: 1.75rem;
+    }
+    
+    .search-container {
+        max-width: 100%;
+    }
+    
+    .search-input {
+        padding: 0.75rem 1rem 0.75rem 2.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .bazaar-card {
+        border-radius: 12px;
+    }
+    
+    .booth-card {
+        padding: 0.75rem;
+    }
+    
+    .booth-title {
+        font-size: 0.9rem;
+    }
+    
+    .booth-badge {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+    }
+    
+    .booth-apply-button {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.8rem;
+    }
+}

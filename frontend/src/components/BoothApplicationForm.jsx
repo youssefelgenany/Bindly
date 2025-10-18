@@ -48,7 +48,8 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
             setSubmitMessage({ type: 'error', text: 'Please select duration of booth setup.' });
             return;
         }
-        if (!formData.boothLocation) {
+        // Only require booth location for bazaar booths, not standalone booths
+        if (booth.type !== 'standaloneBooth' && !formData.boothLocation) {
             setSubmitMessage({ type: 'error', text: 'Please select a booth location on the campus map.' });
             return;
         }
@@ -325,11 +326,13 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
                                 </p>
                             </div>
 
-                            {/* Booth Location */}
-                            <CampusMapSelector
-                                selectedLocation={formData.boothLocation}
-                                onLocationSelect={(location) => setFormData({ ...formData, boothLocation: location })}
-                            />
+                            {/* Booth Location - Only show for bazaar booths, not standalone booths */}
+                            {booth.type !== 'standaloneBooth' && (
+                                <CampusMapSelector
+                                    selectedLocation={formData.boothLocation}
+                                    onLocationSelect={(location) => setFormData({ ...formData, boothLocation: location })}
+                                />
+                            )}
 
                             {/* Additional Message */}
                             <div>

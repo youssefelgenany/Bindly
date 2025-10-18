@@ -2,13 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { vendorApi } from '../api/vendorApi';
 import BoothList from '../components/BoothList';
 import BoothApplicationForm from '../components/BoothApplicationForm';
-// Booths section removed per requirement to show only bazaars
+import StandaloneBoothsBrowser from '../components/StandaloneBoothsBrowser';
 
 const VendorBazaars = () => {
     const [bazaars, setBazaars] = useState([]);
+    const [standaloneBooths, setStandaloneBooths] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [boothsLoading, setBoothsLoading] = useState(true);
     const [error, setError] = useState('');
-    // Removed demo mode; only real data should be shown
+    const [boothsError, setBoothsError] = useState('');
+    const [activeTab, setActiveTab] = useState('bazaars'); // 'bazaars' or 'booths'
     const [query, setQuery] = useState('');
     const [activeBazaarId, setActiveBazaarId] = useState(null);
     const [formState, setFormState] = useState({
@@ -18,10 +21,10 @@ const VendorBazaars = () => {
     // Booth application form state
     const [selectedBooth, setSelectedBooth] = useState(null);
     const [showBoothForm, setShowBoothForm] = useState(false);
-    // Removed "My Accepted Upcoming" section from this page; available on /vendor/accepted
 
+    // Load bazaars
     useEffect(() => {
-        const load = async () => {
+        const loadBazaars = async () => {
             try {
                 setLoading(true);
                 setError('');
@@ -34,8 +37,6 @@ const VendorBazaars = () => {
                     )
                 );
                 setBazaars(filtered);
-
-                // trips removed per requirement
             } catch (e) {
                 setBazaars([]);
                 setError('Failed to load bazaars');
@@ -43,13 +44,45 @@ const VendorBazaars = () => {
                 setLoading(false);
             }
         };
-        load();
+        loadBazaars();
     }, [query]);
 
-    // Handle booth application
+    // Load standalone booths
+    useEffect(() => {
+        const loadStandaloneBooths = async () => {
+            try {
+                setBoothsLoading(true);
+                setBoothsError('');
+                const data = await vendorApi.listStandaloneBooths();
+                const list = Array.isArray(data) ? data : [];
+                setStandaloneBooths(list);
+            } catch (e) {
+                console.error('Error loading standalone booths:', e);
+                setStandaloneBooths([]);
+                setBoothsError('Failed to load standalone booths');
+            } finally {
+                setBoothsLoading(false);
+            }
+        };
+        loadStandaloneBooths();
+    }, []);
+
+    // Handle booth application (for both bazaar booths and standalone booths)
     const handleApplyToBooth = (booth) => {
-        const bazaar = bazaars.find(b => b.booths && b.booths.some(boothItem => boothItem._id === booth._id));
-        setSelectedBooth({ booth, bazaar });
+        // Normalize booth data structure (events have 'title', standalone booths have 'name')
+        const normalizedBooth = {
+            ...booth,
+            name: booth.name || booth.title
+        };
+        
+        // Check if it's a standalone booth
+        if (standaloneBooths.some(sb => sb._id === booth._id)) {
+            setSelectedBooth({ booth: normalizedBooth, bazaar: null, isStandalone: true });
+        } else {
+            // It's a bazaar booth
+            const bazaar = bazaars.find(b => b.booths && b.booths.some(boothItem => boothItem._id === booth._id));
+            setSelectedBooth({ booth: normalizedBooth, bazaar, isStandalone: false });
+        }
         setShowBoothForm(true);
     };
 
@@ -82,73 +115,139 @@ const VendorBazaars = () => {
     return (
         <div className="events-page">
             <div className="events-header">
-                <h1>Upcoming Bazaars & Booths</h1>
-                <p>Browse upcoming approved bazaars and apply for specific booths. View booth details, pricing, and submit applications with attendee information and booth preferences.</p>
+                <h1>Bazaars & Booths</h1>
+                <p>Browse upcoming bazaars and standalone booths. Apply for specific booths with detailed application forms including attendee information and booth preferences.</p>
+                
+                {/* Tab Navigation */}
                 <div style={{
-                    backgroundColor: '#d1ecf1',
-                    color: '#0c5460',
-                    padding: '0.75rem',
-                    borderRadius: '6px',
-                    border: '1px solid #bee5eb',
-                    marginTop: '1rem',
-                    fontSize: '0.9rem'
+                    display: 'flex',
+                    gap: '0.5rem',
+                    marginTop: '1.5rem',
+                    borderBottom: '2px solid var(--medium-gray)'
                 }}>
-                    <strong>🎭 Demo Mode:</strong> Mock booth data is displayed for demonstration purposes. Click "Apply" on any booth to see the comprehensive application form!
+                    <button
+                        onClick={() => setActiveTab('bazaars')}
+                        style={{
+                            backgroundColor: activeTab === 'bazaars' ? 'var(--guc-red)' : 'transparent',
+                            color: activeTab === 'bazaars' ? 'white' : 'var(--charcoal-black)',
+                            border: 'none',
+                            padding: '0.75rem 1.5rem',
+                            borderRadius: '6px 6px 0 0',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: '500',
+                            transition: 'all 0.3s ease'
+                        }}
+                    >
+                        🏪 Bazaars ({bazaars.length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('booths')}
+                        style={{
+                            backgroundColor: activeTab === 'booths' ? 'var(--guc-red)' : 'transparent',
+                            color: activeTab === 'booths' ? 'white' : 'var(--charcoal-black)',
+                            border: 'none',
+                            padding: '0.75rem 1.5rem',
+                            borderRadius: '6px 6px 0 0',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: '500',
+                            transition: 'all 0.3s ease'
+                        }}
+                    >
+                        🏢 Standalone Booths ({standaloneBooths.length})
+                    </button>
                 </div>
 
-                <div className="events-filters" style={{ marginTop: '1rem' }}>
-                    <input
-                        type="text"
-                        placeholder="Search bazaars..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        className="form-input"
-                        style={{ maxWidth: '320px' }}
-                    />
-                </div>
+                {/* Search for bazaars tab */}
+                {activeTab === 'bazaars' && (
+                    <div className="events-filters" style={{ marginTop: '1rem' }}>
+                        <input
+                            type="text"
+                            placeholder="Search bazaars..."
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            className="form-input"
+                            style={{ maxWidth: '320px' }}
+                        />
+                    </div>
+                )}
             </div>
 
+            {/* Error Messages */}
             {error && <div className="alert alert-error">{error}</div>}
-            {/* Demo mode removed */}
-            {/* my accepted section removed; see /vendor/accepted */}
+            {boothsError && <div className="alert alert-error">{boothsError}</div>}
 
-            {loading ? (
-                <div className="events-loading">
-                    <div className="loading-spinner"></div>
-                    <p>Loading events...</p>
-                </div>
-            ) : (
-                <div className="events-list" style={{ display: 'grid', gap: '1rem' }}>
-                    {/* Bazaars */}
-                    <div>
-                        <h2 style={{ marginBottom: '0.5rem' }}>Bazaars {bazaars.length ? `(${bazaars.length})` : ''}</h2>
+            {/* Tab Content */}
+            {activeTab === 'bazaars' && (
+                loading ? (
+                    <div className="events-loading">
+                        <div className="loading-spinner"></div>
+                        <p>Loading bazaars...</p>
+                    </div>
+                ) : (
+                    <div className="events-list">
+                        <h2 style={{ 
+                            marginBottom: '1.5rem', 
+                            color: 'var(--charcoal-black)',
+                            fontSize: '1.5rem',
+                            fontWeight: '600'
+                        }}>
+                            Bazaars {bazaars.length ? `(${bazaars.length})` : ''}
+                        </h2>
                         {bazaars.length === 0 ? (
-                            <div className="no-events">
-                                <p>No upcoming bazaars found.</p>
+                            <div style={{
+                                textAlign: 'center',
+                                padding: '3rem 1rem',
+                                backgroundColor: 'var(--light-gray)',
+                                borderRadius: '8px',
+                                border: '1px solid var(--medium-gray)'
+                            }}>
+                                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏪</div>
+                                <h3 style={{ color: 'var(--charcoal-black)', marginBottom: '0.5rem' }}>
+                                    No Bazaars Available
+                                </h3>
+                                <p style={{ color: 'var(--text-light)', margin: 0 }}>
+                                    No upcoming bazaars found. Check back later for new opportunities.
+                                </p>
                             </div>
                         ) : (
-                            bazaars.map(b => (
-                                <BazaarCard
-                                    key={`bazaar-${b._id}`}
-                                    bazaar={b}
-                                    activeBazaarId={activeBazaarId}
-                                    setActiveBazaarId={setActiveBazaarId}
-                                    formState={formState}
-                                    setFormState={setFormState}
-                                    onApplyToBooth={handleApplyToBooth}
-                                />
-                            ))
+                            <div style={{ 
+                                display: 'grid', 
+                                gap: '1.5rem', 
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))'
+                            }}>
+                                {bazaars.map(b => (
+                                    <BazaarCard
+                                        key={`bazaar-${b._id}`}
+                                        bazaar={b}
+                                        activeBazaarId={activeBazaarId}
+                                        setActiveBazaarId={setActiveBazaarId}
+                                        formState={formState}
+                                        setFormState={setFormState}
+                                        onApplyToBooth={handleApplyToBooth}
+                                    />
+                                ))}
+                            </div>
                         )}
                     </div>
-                    {/* Trips removed */}
-                </div>
+                )
+            )}
+
+            {activeTab === 'booths' && (
+                <StandaloneBoothsBrowser
+                    booths={standaloneBooths}
+                    loading={boothsLoading}
+                    error={boothsError}
+                    onApplyToBooth={handleApplyToBooth}
+                />
             )}
 
             {/* Booth Application Form Modal */}
             {showBoothForm && selectedBooth && (
                 <BoothApplicationForm
                     booth={selectedBooth.booth}
-                    bazaar={selectedBooth.bazaar}
+                    bazaar={selectedBooth.bazaar || { name: selectedBooth.booth.name }}
                     onClose={closeBoothForm}
                     onSubmit={handleBoothApplicationSubmit}
                 />
@@ -233,27 +332,146 @@ const BazaarCard = ({ bazaar, activeBazaarId, setActiveBazaarId, formState, setF
     };
 
     return (
-        <div className="event-card">
-            <div className="event-info">
-                <h3>{bazaar.name}</h3>
-                <p className="event-type">BAZAAR</p>
-                <p className="event-location">📍 {bazaar.location}</p>
-                <p className="event-date">
-                    🗓️ {new Date(bazaar.startDate).toLocaleDateString()} - {new Date(bazaar.endDate).toLocaleDateString()}
-                </p>
+        <div style={{
+            backgroundColor: 'var(--white)',
+            border: '1px solid var(--medium-gray)',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            transition: 'all 0.3s ease'
+        }}>
+            {/* Header */}
+            <div style={{
+                background: 'linear-gradient(135deg, var(--guc-red) 0%, #B00808 100%)',
+                color: 'white',
+                padding: '1.5rem',
+                textAlign: 'left'
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                    <div>
+                        <h3 style={{ 
+                            margin: '0 0 0.5rem 0', 
+                            fontSize: '1.4rem', 
+                            fontWeight: '700',
+                            color: 'white'
+                        }}>
+                            {bazaar.name}
+                        </h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{
+                                backgroundColor: 'rgba(255,255,255,0.2)',
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '12px',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                textTransform: 'uppercase'
+                            }}>
+                                🏪 BAZAAR
+                            </span>
+                        </div>
+                    </div>
+                    <div style={{
+                        backgroundColor: 'rgba(255,255,255,0.2)',
+                        padding: '0.75rem',
+                        borderRadius: '8px',
+                        textAlign: 'center'
+                    }}>
+                        <div style={{ fontSize: '0.8rem', opacity: '0.9' }}>Available Booths</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>
+                            {bazaar.booths ? bazaar.booths.length : 0}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '1rem'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '1.1rem' }}>📍</span>
+                        <span style={{ fontSize: '0.9rem', opacity: '0.9' }}>{bazaar.location}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '1.1rem' }}>🗓️</span>
+                        <span style={{ fontSize: '0.9rem', opacity: '0.9' }}>
+                            {new Date(bazaar.startDate).toLocaleDateString()} - {new Date(bazaar.endDate).toLocaleDateString()}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '1.5rem' }}>
                 {bazaar.description && (
-                    <p className="event-description">{bazaar.description}</p>
+                    <div style={{
+                        backgroundColor: 'var(--light-gray)',
+                        padding: '1rem',
+                        borderRadius: '8px',
+                        marginBottom: '1.5rem',
+                        border: '1px solid var(--medium-gray)'
+                    }}>
+                        <h4 style={{
+                            margin: '0 0 0.5rem 0',
+                            color: 'var(--charcoal-black)',
+                            fontSize: '1rem',
+                            fontWeight: '600'
+                        }}>
+                            📝 Description
+                        </h4>
+                        <p style={{
+                            margin: 0,
+                            color: 'var(--text-dark)',
+                            lineHeight: '1.5',
+                            fontSize: '0.9rem'
+                        }}>
+                            {bazaar.description}
+                        </p>
+                    </div>
                 )}
 
-                {/* Always display booth information section */}
+                {/* Booth information section */}
                 <BoothList
                     booths={bazaar.booths || []}
                     bazaarId={bazaar._id}
                     onApplyToBooth={onApplyToBooth}
                 />
             </div>
-            <div className="event-actions">
-                <button className="btn btn-primary" onClick={toggle}>
+
+            {/* Actions */}
+            <div style={{ 
+                padding: '1rem 1.5rem', 
+                backgroundColor: 'var(--light-gray)', 
+                borderTop: '1px solid var(--medium-gray)',
+                display: 'flex',
+                justifyContent: 'flex-end'
+            }}>
+                <button 
+                    className="btn btn-primary" 
+                    onClick={toggle}
+                    style={{
+                        backgroundColor: 'var(--guc-red)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.75rem 2rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        fontWeight: '600',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 4px 12px rgba(210, 10, 10, 0.3)'
+                    }}
+                    onMouseOver={(e) => {
+                        e.target.style.backgroundColor = '#B00808';
+                        e.target.style.transform = 'translateY(-2px)';
+                        e.target.style.boxShadow = '0 6px 20px rgba(210, 10, 10, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                        e.target.style.backgroundColor = 'var(--guc-red)';
+                        e.target.style.transform = 'translateY(0)';
+                        e.target.style.boxShadow = '0 4px 12px rgba(210, 10, 10, 0.3)';
+                    }}
+                >
                     Apply to this Bazaar
                 </button>
             </div>
