@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { gymApiService } from '../api/gymApi';
 
-const TYPES = ['Yoga', 'Pilates', 'Aerobics', 'Zumba', 'Crossfit', 'Strength', 'Cardio'];
+const TYPES = ['yoga', 'pilates', 'aerobics', 'zumba', 'crossfit', 'strength', 'cardio', 'other'];
 
 const GymSchedule = () => {
   const today = new Date();
@@ -14,8 +14,20 @@ const GymSchedule = () => {
 
   const load = async () => {
     setLoading(true); setError('');
-    const res = await gymApiService.getMonthlySessions(year, month);
-    if (res.success) setSessions(res.data.sessions || []); else setError(res.message);
+    try {
+      const res = await gymApiService.getMonthlySessions(year, month);
+      if (res.success) {
+        // Ensure sessions is an array and filter out invalid sessions
+        const sessionsData = res.data.sessions || [];
+        const validSessions = sessionsData.filter(s => s && s.date);
+        setSessions(validSessions);
+      } else {
+        setError(res.message);
+      }
+    } catch (error) {
+      console.error('Error loading gym sessions:', error);
+      setError('Failed to load gym sessions');
+    }
     setLoading(false);
   };
 
@@ -24,11 +36,23 @@ const GymSchedule = () => {
   const groupedByDay = useMemo(() => {
     const map = new Map();
     for (const s of sessions) {
+      // Skip sessions with invalid data
+      if (!s || !s.date) continue;
+      
       if (typeFilter !== 'all' && (s.type || '').toLowerCase() !== typeFilter.toLowerCase()) continue;
-      const d = new Date(s.date || s.startTime);
-      const key = d.toDateString();
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(s);
+      
+      try {
+        const d = new Date(s.date);
+        // Skip if date is invalid
+        if (isNaN(d.getTime())) continue;
+        
+        const key = d.toDateString();
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(s);
+      } catch (error) {
+        console.warn('Invalid session data:', s, error);
+        continue;
+      }
     }
     return Array.from(map.entries()).sort((a, b) => new Date(a[0]) - new Date(b[0]));
   }, [sessions, typeFilter]);
@@ -134,9 +158,17 @@ const GymSchedule = () => {
                     </div>
                     <div style={{ display: 'grid', gap: '0.5rem' }}>
                       {list.map((s, idx) => {
-                        const start = new Date(s.startTime || s.date);
-                        const duration = s.durationMinutes || s.duration || 60;
-                        const end = new Date(start.getTime() + duration * 60000);
+                        try {
+                          const sessionDate = new Date(s.date);
+                          // Skip if date is invalid
+                          if (isNaN(sessionDate.getTime())) return null;
+                          
+                          // Add null checks for startTime
+                          const startTime = s.startTime || '00:00';
+                          const [hours, minutes] = startTime.split(':');
+                          const start = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate(), parseInt(hours) || 0, parseInt(minutes) || 0);
+                          const duration = s.durationMinutes || 60;
+                          const end = new Date(start.getTime() + duration * 60000);
                         return (
                           <div key={s._id || s.id || idx} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', gap: '0.75rem', background: 'var(--white)', border: '1px solid var(--medium-gray)', borderRadius: 10, padding: '0.75rem 1rem' }}>
                             <div style={{
@@ -151,14 +183,18 @@ const GymSchedule = () => {
                               {start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                             </div>
                             <div>
-                              <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>{s.type}</div>
-                              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>👤 {s.instructor || 'TBD'} • ⏱ {duration} min</div>
+                              <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>{s.title || s.type.charAt(0).toUpperCase() + s.type.slice(1)}</div>
+                              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>👤 Instructor TBD • ⏱ {duration} min • 👥 {s.participants?.length || 0}/{s.maxParticipants}</div>
                             </div>
                             <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--text-light)' }}>
                               Ends {end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                             </div>
                           </div>
                         );
+                        } catch (error) {
+                          console.warn('Error rendering session:', s, error);
+                          return null;
+                        }
                       })}
                     </div>
                   </div>

@@ -4,20 +4,20 @@ const GymSession = require("../models/gymSessionModel");
 exports.createGymSession = async (req, res) => {
   console.log("🔹 Body received:", req.body);
   try {
-    const { date, time, duration, type, capacity } = req.body;
+    const { title, date, startTime, durationMinutes, type, maxParticipants } = req.body;
 
-    if (!date || !time || !duration || !type || !capacity)
+    if (!title || !date || !startTime || !durationMinutes || !type || !maxParticipants)
       return res.status(400).json({ msg: "Missing fields" });
 
-const session = await GymSession.create({
-  date: new Date(date),
-  time, // e.g. "17:00"
-  duration, // e.g. 60 (minutes)
-  type, // e.g. "zumba"
-  capacity // matches 'max number of participants'
-  
-});
-
+    const session = await GymSession.create({
+      title,
+      date: new Date(date),
+      startTime, // e.g. "17:00"
+      durationMinutes, // e.g. 60 (minutes)
+      type, // e.g. "cardio", "strength", "yoga", "pilates", "other"
+      maxParticipants, // matches 'max number of participants'
+      createdBy: req.user.id
+    });
 
     res.json({ msg: "Gym session created", session });
   } catch (err) {
