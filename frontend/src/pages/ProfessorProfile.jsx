@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { professorApiService } from '../api/professorApi';
+import professorApiService from '../api/professorApi';
 
 const ProfessorProfile = () => {
   const { user, logout, updateUser } = useAuth();

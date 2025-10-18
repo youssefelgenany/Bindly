@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { professorApiService } from '../api/professorApi';
+import professorApiService from '../api/professorApi';
 
 const ProfessorAllEvents = () => {
   const { user } = useAuth();

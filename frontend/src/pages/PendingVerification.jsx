@@ -1,17 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const PendingVerification = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [checkingStatus, setCheckingStatus] = useState(false);
 
   // Check verification status periodically
   const checkVerificationStatus = async () => {
     if (!user) return;
     
-    setCheckingStatus(true);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('http://localhost:5000/api/auth/me', {
@@ -32,14 +30,11 @@ const PendingVerification = () => {
           }
         }
       } else if (response.status === 401) {
-        // Token expired or invalid, logout
-        logout();
+        // Token expired or invalid, redirect to login
         navigate('/login');
       }
     } catch (error) {
       console.error('Error checking verification status:', error);
-    } finally {
-      setCheckingStatus(false);
     }
   };
 
@@ -48,16 +43,6 @@ const PendingVerification = () => {
     const interval = setInterval(checkVerificationStatus, 30000);
     return () => clearInterval(interval);
   }, [user]);
-
-  // Manual check button
-  const handleManualCheck = () => {
-    checkVerificationStatus();
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   return (
     <div style={{ 
@@ -74,15 +59,6 @@ const PendingVerification = () => {
         textAlign: 'center'
       }}>
         <div className="card-header">
-          {/* Icon */}
-          <div style={{
-            fontSize: '4rem',
-            marginBottom: '1.5rem',
-            color: 'var(--guc-red)'
-          }}>
-            ⏳
-          </div>
-
           {/* Title */}
           <h1 className="card-title">
             Account Pending Verification
@@ -99,62 +75,33 @@ const PendingVerification = () => {
           </p>
         </div>
 
-        {/* Status Info */}
+        {/* Login Link */}
         <div style={{
-          background: 'var(--light-gray)',
-          border: '1px solid var(--medium-gray)',
-          borderRadius: '8px',
-          padding: '1.5rem',
-          marginBottom: '2rem'
+          textAlign: 'center',
+          marginTop: '2rem'
         }}>
-          <h3 style={{
-            color: 'var(--charcoal-black)',
-            marginBottom: '1rem',
-            fontSize: '1.2rem'
-          }}>
-            What happens next?
-          </h3>
-          <ul style={{
-            textAlign: 'left',
-            color: 'var(--text-light)',
-            lineHeight: '1.8',
-            margin: 0,
-            paddingLeft: '1.5rem'
-          }}>
-            <li>An administrator will review your account</li>
-            <li>You'll receive access to all platform features</li>
-            <li>This page will automatically update when verified</li>
-          </ul>
-        </div>
-
-        {/* Action Buttons */}
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          justifyContent: 'center',
-          flexWrap: 'wrap'
-        }}>
-          <button
-            onClick={handleManualCheck}
-            disabled={checkingStatus}
-            className={checkingStatus ? 'btn btn-outline' : 'btn btn-primary'}
+          <a 
+            href="/login" 
             style={{
-              minWidth: '140px',
-              opacity: checkingStatus ? 0.6 : 1
+              color: 'var(--guc-red)',
+              textDecoration: 'none',
+              fontSize: '1.1rem',
+              fontWeight: '500',
+              borderBottom: '2px solid var(--guc-red)',
+              paddingBottom: '2px',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.color = 'var(--charcoal-black)';
+              e.target.style.borderBottomColor = 'var(--charcoal-black)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.color = 'var(--guc-red)';
+              e.target.style.borderBottomColor = 'var(--guc-red)';
             }}
           >
-            {checkingStatus ? 'Checking...' : 'Check Status'}
-          </button>
-
-          <button
-            onClick={handleLogout}
-            className="btn btn-outline"
-            style={{
-              minWidth: '140px'
-            }}
-          >
-            Logout
-          </button>
+            Go to Login Page
+          </a>
         </div>
 
         {/* Auto-refresh notice */}
