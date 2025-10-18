@@ -32,6 +32,7 @@ import VendorAccepted from './pages/VendorAccepted';
 import VendorRequests from './pages/VendorRequests';
 import StudentEventsView from './pages/StudentEventsView';
 import StudentMyRegistrations from './pages/StudentMyRegistrations';
+import StudentCourtsView from './pages/StudentCourtsView';
 import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
 
@@ -284,6 +285,16 @@ function App() {
                 <ProtectedRoute>
                   <StudentOnly>
                     <StudentMyRegistrations />
+                  </StudentOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/courts"
+              element={
+                <ProtectedRoute>
+                  <StudentOnly>
+                    <StudentCourtsView />
                   </StudentOnly>
                 </ProtectedRoute>
               }

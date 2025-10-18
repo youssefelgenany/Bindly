@@ -254,6 +254,14 @@ const Navbar = () => {
                   >
                     📋 My Registrations
                   </Link>
+                  <Link
+                    to="/student/courts"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    🏟️ View Courts
+                  </Link>
                 </>
               )}
 
