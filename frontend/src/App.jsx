@@ -30,6 +30,7 @@ import VendorBazaars from './pages/VendorBazaars';
 import Confrences from './pages/Confrences';
 import VendorAccepted from './pages/VendorAccepted';
 import VendorRequests from './pages/VendorRequests';
+import CourtAvailability from './pages/CourtAvailability';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {

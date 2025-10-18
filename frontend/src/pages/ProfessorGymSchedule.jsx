@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { professorApiService } from '../api/professorApi';
+import professorApiService from '../api/professorApi';
 
 const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { courtApiService } from '../api/courtApi';
+import courtApiService from '../api/courtsApi';
 
 const CourtAvailability = () => {
   const { user } = useAuth();
