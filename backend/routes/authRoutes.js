@@ -9,7 +9,8 @@ const {
   sendTestEmail,
   resendVerification,
   updateProfile,
-  changePassword
+  changePassword,
+  getCurrentUser
 } = require('../controllers/authController');
 
 // ==================== AUTH ROUTES ====================
@@ -136,5 +137,8 @@ router.post('/simple-signup', async (req, res) => {
     });
   }
 });
+
+// 👤 Get current user info
+router.get('/me', protect, getCurrentUser);
 
 module.exports = router;

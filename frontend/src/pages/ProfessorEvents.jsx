@@ -61,13 +61,19 @@ const ProfessorEvents = () => {
             id: event._id,
             title: event.title,
             description: event.description || '',
+            agenda: event.agenda || '',
+            faculty: event.faculty || '',
+            professors: event.professors || '',
+            startDate: event.startDate,
+            endDate: event.endDate,
             datetime: event.startDate,
             location: event.location,
             category: event.type || 'other',
             status: event.status,
             participants: event.registeredCount || 0,
             registrations: [], // We'll fetch these separately if needed
-            bannerName: '', // Placeholder for now
+            bannerFile: event.bannerFile || null,
+            bannerName: event.bannerFile ? event.bannerFile.split('/').pop() : '', // Extract filename
           }));
           setEvents(transformedEvents);
         } else {
@@ -100,13 +106,18 @@ const ProfessorEvents = () => {
   };
 
   const openEdit = (evt) => {
+    console.log('🔍 Opening edit for event:', evt);
     setForm({
-      title: evt.title,
-      description: evt.description,
-      datetime: evt.datetime.slice(0, 16),
-      location: evt.location,
-      category: evt.category,
-      bannerFile: null,
+      title: evt.title || '',
+      description: evt.description || '',
+      agenda: evt.agenda || '',
+      faculty: evt.faculty || '',
+      professors: evt.professors || '',
+      startDate: evt.startDate ? new Date(evt.startDate).toISOString().slice(0, 16) : '',
+      endDate: evt.endDate ? new Date(evt.endDate).toISOString().slice(0, 16) : '',
+      location: evt.location || '',
+      category: evt.category || 'workshop',
+      bannerFile: null, // Reset file input
     });
     setIsEditingId(evt.id);
     setIsModalOpen(true);
@@ -129,7 +140,8 @@ const ProfessorEvents = () => {
         title: form.title,
         description: form.description,
         agenda: form.agenda,
-        extraResources: { faculty: form.faculty, professors: form.professors },
+        faculty: form.faculty,
+        professors: form.professors,
         type: 'workshop',
         startDate: new Date(form.startDate).toISOString(),
         endDate: new Date(form.endDate).toISOString(),
@@ -149,13 +161,19 @@ const ProfessorEvents = () => {
               id: event._id,
               title: event.title,
               description: event.description || '',
+              agenda: event.agenda || '',
+              faculty: event.faculty || '',
+              professors: event.professors || '',
+              startDate: event.startDate,
+              endDate: event.endDate,
               datetime: event.startDate,
               location: event.location,
               category: event.type || 'other',
               status: event.status,
               participants: event.registeredCount || 0,
               registrations: [],
-              bannerName: '',
+              bannerFile: event.bannerFile || null,
+              bannerName: event.bannerFile ? event.bannerFile.split('/').pop() : '',
             }));
             setEvents(transformedEvents);
           }
@@ -176,13 +194,19 @@ const ProfessorEvents = () => {
               id: event._id,
               title: event.title,
               description: event.description || '',
+              agenda: event.agenda || '',
+              faculty: event.faculty || '',
+              professors: event.professors || '',
+              startDate: event.startDate,
+              endDate: event.endDate,
               datetime: event.startDate,
               location: event.location,
               category: event.type || 'other',
               status: event.status,
               participants: event.registeredCount || 0,
               registrations: [],
-              bannerName: '',
+              bannerFile: event.bannerFile || null,
+              bannerName: event.bannerFile ? event.bannerFile.split('/').pop() : '',
             }));
             setEvents(transformedEvents);
           }
@@ -212,13 +236,19 @@ const ProfessorEvents = () => {
             id: event._id,
             title: event.title,
             description: event.description || '',
+            agenda: event.agenda || '',
+            faculty: event.faculty || '',
+            professors: event.professors || '',
+            startDate: event.startDate,
+            endDate: event.endDate,
             datetime: event.startDate,
             location: event.location,
             category: event.type || 'other',
             status: event.status,
             participants: event.registeredCount || 0,
             registrations: [],
-            bannerName: '',
+            bannerFile: event.bannerFile || null,
+            bannerName: event.bannerFile ? event.bannerFile.split('/').pop() : '',
           }));
           setEvents(transformedEvents);
         }
@@ -442,20 +472,8 @@ const ProfessorEvents = () => {
                         <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>{ev.participants}</td>
                         <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--medium-gray)' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <button className="btn btn-outline" onClick={() => openParticipants(ev.id)}>
-                              Participants
-                            </button>
-                            <button className="btn btn-outline" onClick={() => openAnnouncementForm(ev.id)}>
-                              + Announcement
-                            </button>
-                            <button className="btn btn-outline" onClick={() => notifyParticipants(ev.id)}>
-                              Notify Participants
-                            </button>
                             <button className="btn btn-outline" disabled={!canEdit(ev.status)} onClick={() => openEdit(ev)}>
                               Edit
-                            </button>
-                            <button className="btn btn-secondary" onClick={() => onDelete(ev.id)}>
-                              Delete
                             </button>
                           </div>
                         </td>

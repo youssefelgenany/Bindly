@@ -12,8 +12,6 @@ import Dashboard from './pages/Dashboard';
 import PendingVerification from './pages/PendingVerification';
 import ProfessorEvents from './pages/ProfessorEvents';
 import ProfessorAllEvents from './pages/ProfessorAllEvents';
-import VerificationPending from './pages/VerificationPending';
-import Events from './pages/Events';
 import GymSchedule from './pages/GymSchedule';
 import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
@@ -23,12 +21,16 @@ import VendorDashboard from './pages/VendorDashboard';
 import CreateConference from './pages/CreateConfrence';
 import EditConfrences from './pages/EditConfrences';
 import EventsList from './pages/EventsList';
+import Events from './pages/Events';
 import CreateBazaar from "./pages/CreateBazaar";
 import CreateTrip from './pages/CreateTrip';
+import CreateBooth from './pages/CreateBooth';
 import EditBazaar from './pages/EditBazaar';
 import EditTrip from './pages/EditTrip';
 import VendorBazaars from './pages/VendorBazaars';
 import Confrences from './pages/Confrences';
+import VendorAccepted from './pages/VendorAccepted';
+import VendorRequests from './pages/VendorRequests';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -47,7 +49,16 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  return user ? children : <Navigate to="/login" />;
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  // Check if user is verified (except for admin users who are always verified)
+  if (!user.isVerified && user.userType !== 'admin' && user.userType !== 'Admin') {
+    return <Navigate to="/pending-verification" />;
+  }
+
+  return children;
 };
 
 // Public Route Component (redirect to dashboard if already logged in)
@@ -89,7 +100,11 @@ const AdminOnly = ({ children }) => {
     );
   }
 
-  const isAdmin = user && (user.role === 'admin' || user.userType === 'Admin');
+  const isAdmin = user && (
+    user.role === 'admin' ||
+    user.userType === 'Admin' ||
+    user.userType === 'admin'
+  );
   return isAdmin ? children : <Navigate to="/dashboard" />;
 };
 
@@ -110,7 +125,13 @@ const EventsOfficeOnly = ({ children }) => {
     );
   }
 
-  const isEventsOffice = user && (user.userType === 'Events Office' || user.role === 'event_office');
+  const isEventsOffice = user && (
+    user.userType === 'Event Office' ||
+    user.userType === 'Events Office' ||
+    user.userType === 'event_office' ||
+    user.role === 'event_office' ||
+    user.role === 'Event Office'
+  );
   const isAdmin = user && (user.role === 'admin' || user.userType === 'Admin');
 
   return (isEventsOffice || isAdmin) ? children : <Navigate to="/dashboard" />;
@@ -145,14 +166,6 @@ function App() {
               element={<PendingVerification />}
             />
             <Route
-              path="/verification-pending"
-              element={
-                <PublicRoute>
-                  <VerificationPending />
-                </PublicRoute>
-              }
-            />
-            <Route
               path="/dashboard"
               element={
                 <ProtectedRoute>
@@ -177,7 +190,41 @@ function App() {
               }
             />
             <Route
+              path="/vendor/accepted"
+              element={
+                <ProtectedRoute>
+                  <VendorAccepted />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vendor/requests"
+              element={
+                <ProtectedRoute>
+                  <VendorRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/event-office/vendor-requests"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <VendorRequests />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/events"
+              element={
+                <ProtectedRoute>
+                  <Events />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events/manage"
               element={
                 <ProtectedRoute>
                   <EventsList />
@@ -286,22 +333,18 @@ function App() {
               path="/create-conference"
               element={
                 <ProtectedRoute>
-                  <AdminOnly>
+                  <EventsOfficeOnly>
                     <CreateConference />
-                  </AdminOnly>
-                </ProtectedRoute>
-              }
+                  </EventsOfficeOnly>
+                </ProtectedRoute>}
             />
             <Route
               path="/edit-conference/:id"
               element={
                 <ProtectedRoute>
-                  <AdminOnly>
-                    <EditConfrences />
-                  </AdminOnly>
+                  <EditConfrences />
                 </ProtectedRoute>
-              }
-            />
+              } />
             {/* ✅ ADD YOUR EVENT MANAGEMENT ROUTES HERE */}
             <Route
               path="/create-bazaar"
@@ -319,6 +362,16 @@ function App() {
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <CreateTrip />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/create-booth"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <CreateBooth />
                   </EventsOfficeOnly>
                 </ProtectedRoute>
               }
@@ -347,9 +400,7 @@ function App() {
               path="/confrences"
               element={
                 <ProtectedRoute>
-
                   <Confrences />
-
                 </ProtectedRoute>
               }
             />

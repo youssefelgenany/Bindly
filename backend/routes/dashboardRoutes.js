@@ -13,8 +13,8 @@ router.get('/professor/stats', protect, permit('Professor'), getProfessorDashboa
 router.get('/professor/notifications', protect, permit('Professor'), getProfessorNotifications);
 
 // Admin dashboard routes
-router.get('/admin/stats', protect, permit('Admin'), getAdminDashboardStats);
-router.get('/admin/activity', protect, permit('Admin'), getRecentActivity);
+router.get('/admin/stats', protect, permit('admin'), getAdminDashboardStats);
+router.get('/admin/activity', protect, permit('admin'), getRecentActivity);
 
 module.exports = router;
 

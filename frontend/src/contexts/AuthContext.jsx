@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
     if (token) {
       // Set default authorization header
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
+
       // You could verify the token here by making an API call
       // For now, we'll just set the user from localStorage
       const userData = localStorage.getItem('user');
@@ -34,20 +34,20 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await axios.post('/api/auth/login', {
+      const response = await axios.post('http://localhost:5000/api/auth/login', {
         email,
         password
       });
 
       const { user: userData, token } = response.data;
-      
-      // Store token and user data
+
+      // Store token and user data for verified users
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
-      
+
       // Set default authorization header
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
+
       setUser(userData);
       return { success: true, user: userData };
     } catch (error) {
@@ -55,7 +55,19 @@ export const AuthProvider = ({ children }) => {
 
       // Handle awaiting verification redirect
       if (error.response?.status === 403 && error.response?.data?.code === 'AWAITING_VERIFICATION') {
-        return { success: false, message: 'Your account is awaiting verification. Redirecting...', redirect: '/pending-verification' };
+        // Try to get user data from the error response if available
+        const userData = error.response?.data?.user;
+        if (userData) {
+          // Store user data even if not verified (for pending verification page)
+          localStorage.setItem('user', JSON.stringify(userData));
+          setUser(userData);
+        }
+        return {
+          success: false,
+          message: 'Your account is awaiting verification. Redirecting...',
+          redirect: '/pending-verification',
+          user: userData
+        };
       }
 
       if (error.response?.data?.message) {
@@ -70,22 +82,22 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (userData) => {
     try {
-      const response = await axios.post('/api/auth/signup', userData);
-      
-      const { user: newUser, token, requiresVerification } = response.data;
-      
+      const response = await axios.post('http://localhost:5000/api/auth/signup', userData);
+
+      const { user: newUser, requiresVerification } = response.data;
+
       // Don't automatically log in the user after signup
       // Just return success - user will need to login manually
-      
-      return { 
-        success: true, 
-        user: newUser, 
+
+      return {
+        success: true,
+        user: newUser,
         message: 'Account created successfully',
         requiresVerification: requiresVerification || false
       };
     } catch (error) {
       console.error('Signup error:', error);
-      
+
       // Handle different types of errors
       if (error.response?.data?.errors) {
         // Validation errors from backend

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: '/api/vendor',
+    baseURL: 'http://localhost:5000/api/vendor',
     timeout: 10000
 });
 
@@ -32,6 +32,26 @@ export const vendorApi = {
             message
         });
         return res.data;
+    },
+
+    // List upcoming events the current vendor is accepted for
+    listMyAccepted: async (type) => {
+        const res = await api.get('/my/upcoming', { params: { type } });
+        return res.data;
+    },
+
+    // List pending or rejected upcoming requests (optional filter by type)
+    listMyRequests: async ({ status = 'pending', type } = {}) => {
+        console.log('🔍 vendorApi.listMyRequests - Making request with params:', { status, type });
+        try {
+            const res = await api.get('/my/requests', { params: { status, type } });
+            console.log('✅ vendorApi.listMyRequests - Response:', res.data);
+            return res.data;
+        } catch (error) {
+            console.error('❌ vendorApi.listMyRequests - Error:', error);
+            console.error('❌ vendorApi.listMyRequests - Error response:', error.response?.data);
+            throw error;
+        }
     }
 };
 

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { adminApiService } from '../api/adminApi';
-
+//test
 const AdminEvents = () => {
   const { user } = useAuth();
   

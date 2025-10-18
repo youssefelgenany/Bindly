@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { professorApiService } from '../api/professorApi';
 
 const ProfessorDashboardOverview = () => {
-  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalEventsCreated: 0,
@@ -83,8 +82,8 @@ const ProfessorDashboardOverview = () => {
         <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
           {error}
         </div>
-        <button 
-          className="btn btn-primary" 
+        <button
+          className="btn btn-primary"
           onClick={() => window.location.reload()}
         >
           Retry
@@ -138,7 +137,7 @@ const ProfessorDashboardOverview = () => {
           ) : (
             notifications.map(n => (
               <div key={n.id} onClick={() => !n.isRead && markAsRead(n.id)}
-                   style={{ display: 'flex', gap: '0.9rem', alignItems: 'flex-start', padding: '1rem', backgroundColor: n.isRead ? 'var(--white)' : '#f8f9ff', borderRadius: '8px', border: `1px solid ${n.isRead ? 'var(--medium-gray)' : 'var(--alert-blue)'}`, cursor: 'pointer', opacity: n.isRead ? 0.85 : 1 }}>
+                style={{ display: 'flex', gap: '0.9rem', alignItems: 'flex-start', padding: '1rem', backgroundColor: n.isRead ? 'var(--white)' : '#f8f9ff', borderRadius: '8px', border: `1px solid ${n.isRead ? 'var(--medium-gray)' : 'var(--alert-blue)'}`, cursor: 'pointer', opacity: n.isRead ? 0.85 : 1 }}>
                 <div style={{ fontSize: '1.1rem', marginTop: '0.15rem' }}>{priorityIcon(n.priority)}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>

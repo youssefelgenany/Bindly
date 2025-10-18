@@ -7,33 +7,37 @@ const { getAllUsers, updateUserRole, updateUserStatus, changePassword, updatePro
 const { createAdminOrEventOffice, deleteAdminOrEventOffice } = require('../controllers/adminAccountsController');
 
 // Admin routes
-router.get('/users', protect, permit('Admin'), getAllUsers);
-router.put('/users/:userId/role', protect, permit('Admin'), updateUserRole);
-router.patch('/users/:userId/status', protect, permit('Admin'), updateUserStatus);
-router.put('/users/:userId/verification', protect, permit('Admin'), (req, res, next) => {
+router.get('/users', protect, permit('admin'), getAllUsers);
+router.put('/users/:userId/role', protect, permit('admin'), updateUserRole);
+router.patch('/users/:userId/status', protect, permit('admin'), updateUserStatus);
+router.put('/users/:userId/verification', protect, permit('admin'), (req, res, next) => {
   console.log('🚀 User verification route hit:', req.params.userId, req.body);
   next();
 }, updateUserVerification);
 
 // Admin account management routes
-router.post('/accounts', protect, permit('Admin'), createAdminOrEventOffice);
-router.delete('/accounts/:id', protect, permit('Admin'), deleteAdminOrEventOffice);
+router.post('/accounts', protect, permit('admin'), createAdminOrEventOffice);
+router.delete('/accounts/:id', protect, permit('admin'), deleteAdminOrEventOffice);
 
 // Admin password change
-router.put('/change-password', protect, permit('Admin'), changePassword);
+router.put('/change-password', protect, permit('admin'), changePassword);
 
 // Admin profile update
-router.put('/profile', protect, permit('Admin'), updateProfile);
+router.put('/profile', protect, permit('admin'), updateProfile);
 
 // Vendor management routes
-router.get('/vendors', protect, permit('Admin'), getAllVendors);
-router.put('/vendors/:vendorId/verification', protect, permit('Admin'), (req, res, next) => {
+router.get('/vendors', protect, permit('admin'), getAllVendors);
+router.put('/vendors/:vendorId/verification', protect, permit('admin'), (req, res, next) => {
   console.log('🚀 Vendor verification route hit:', req.params.vendorId, req.body);
   next();
 }, updateVendorVerification);
-router.put('/vendors/:vendorId/status', protect, permit('Admin'), (req, res, next) => {
+router.put('/vendors/:vendorId/status', protect, permit('admin'), (req, res, next) => {
   console.log('🚀 Vendor status route hit:', req.params.vendorId, req.body);
   next();
 }, updateVendorStatus);
+
+// Gym routes
+router.post("/gym-sessions", protect, permit("event_office"), createGymSession);
+router.get("/gym-schedule/month", protect, permit("student","staff","ta","professor","event_office"), viewGymScheduleMonth);
 
 module.exports = router;

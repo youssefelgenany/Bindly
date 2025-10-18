@@ -261,7 +261,7 @@ const Signup = () => {
         if (result.requiresVerification) {
           setMessage('Account created successfully! Redirecting to verification page...');
           setTimeout(() => {
-            navigate('/verification-pending');
+            navigate('/pending-verification');
           }, 1000);
         } else {
           setMessage('Account created successfully! Redirecting to login...');

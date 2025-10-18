@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Base URL for professor API endpoints
-const PROFESSOR_API_BASE = '/api';
+const PROFESSOR_API_BASE = 'http://localhost:5000/api';
 
 // Create axios instance with default config
 const professorApi = axios.create({

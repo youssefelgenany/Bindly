@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { adminApiService } from '../api/adminApi';
-import axios from 'axios';
 
 
 const AdminProfile = () => {
@@ -50,7 +49,7 @@ const AdminProfile = () => {
     }
   };
 
-  const handlePasswordChange = async(e) => {
+  const handlePasswordChange = async (e) => {
     const { name, value } = e.target;
     setPasswordData(prev => ({ ...prev, [name]: value }));
     if (passwordErrors[name]) {
@@ -102,7 +101,7 @@ const AdminProfile = () => {
         lastName: profileData.lastName,
         email: profileData.email
       });
-      
+
       if (result.success) {
         setProfileMessage('Profile updated successfully!');
         // Update the user context with new data
@@ -129,7 +128,7 @@ const AdminProfile = () => {
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword
       });
-      
+
       if (result.success) {
         setPasswordMessage('Password changed successfully!');
         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -220,7 +219,7 @@ const AdminProfile = () => {
                   <h3 style={{ color: 'var(--charcoal-black)', marginBottom: '1rem' }}>
                     Edit Admin Profile
                   </h3>
-                  
+
                   {profileMessage && (
                     <div className={`alert ${profileMessage.includes('successfully') ? 'alert-success' : 'alert-error'}`}>
                       {profileMessage}
@@ -300,7 +299,7 @@ const AdminProfile = () => {
                   <h3 style={{ color: 'var(--charcoal-black)', marginBottom: '1rem' }}>
                     Change Password
                   </h3>
-                  
+
                   {passwordMessage && (
                     <div className={`alert ${passwordMessage.includes('successfully') ? 'alert-success' : 'alert-error'}`}>
                       {passwordMessage}
@@ -380,7 +379,7 @@ const AdminProfile = () => {
                   <h3 style={{ color: 'var(--charcoal-black)', marginBottom: '1rem' }}>
                     System Settings
                   </h3>
-                  
+
                   {settingsMessage && (
                     <div className={`alert ${settingsMessage.includes('successfully') ? 'alert-success' : 'alert-error'}`}>
                       {settingsMessage}

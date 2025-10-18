@@ -22,7 +22,7 @@ const { protect, permit } = require("../middleware/authMiddleware");
 router.post(
   "/",
   protect,
-  permit("Event Office", "Admin", "Professor"),
+  permit("event_office", "admin", "Professor"),
   createEvent
 );
 
@@ -30,7 +30,7 @@ router.post(
 router.get("/", protect, getAllEvents);
 
 // 📅 Get all events for admin management (including pending)
-router.get("/admin/all", protect, permit("Admin"), getAllEventsForAdmin);
+router.get("/admin/all", protect, permit("admin"), getAllEventsForAdmin);
 
 // 👤 Get logged-in user's event registrations
 router.get("/my/registrations", protect, getMyRegistrations);
@@ -48,7 +48,7 @@ router.get("/:id", protect, getEventById);
 router.put(
   "/:id",
   protect,
-  permit("Event Office", "Admin", "Professor"),
+  permit("event_office", "admin", "Professor"),
   updateEvent
 );
 
@@ -56,7 +56,7 @@ router.put(
 router.delete(
   "/:id",
   protect,
-  permit("Event Office", "Admin", "Professor"),
+  permit("event_office", "admin", "Professor"),
   deleteEvent
 );
 
@@ -72,7 +72,7 @@ router.post(
 router.post(
   "/conference",
   protect,
-  permit("Event Office", "Admin"),
+  permit("event_office", "admin"),
   createConference
 );
 

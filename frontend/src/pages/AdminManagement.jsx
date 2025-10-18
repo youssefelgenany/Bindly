@@ -45,6 +45,18 @@ const AdminManagement = () => {
 
   const roleOptions = ['Admin', 'Event Office'];
 
+  // Helper function to format userType for display
+  const formatUserType = (userType) => {
+    switch (userType) {
+      case 'admin':
+        return 'Admin';
+      case 'event_office':
+        return 'Event Office';
+      default:
+        return userType;
+    }
+  };
+
   // Load admin accounts on component mount
   useEffect(() => {
     loadAdminAccounts();
@@ -56,9 +68,10 @@ const AdminManagement = () => {
       setError('');
       const result = await adminApiService.getAllUsers();
       if (result.success) {
-        // Filter for admin and event office accounts
+        // Filter for admin and event office accounts (handle both cases)
         const adminUsers = result.data.users.filter(user => 
-          user.userType === 'Admin' || user.userType === 'Event Office'
+          user.userType === 'Admin' || user.userType === 'admin' ||
+          user.userType === 'Event Office' || user.userType === 'event_office'
         );
         setAdminAccounts(adminUsers);
       } else {
@@ -249,7 +262,7 @@ const AdminManagement = () => {
   };
 
   // Basic guard (UI-level) to avoid rendering for non-admins
-  if (!(user?.userType === 'Admin')) {
+  if (!(user?.userType === 'Admin' || user?.userType === 'admin')) {
     return (
       <div style={{ padding: '2rem' }}>
         <div className="container">
@@ -467,15 +480,21 @@ const AdminManagement = () => {
                                   fontSize: '12px',
                                   color: 'var(--text-light)'
                                 }}>
-                                  Role: {account.userType} • Created: {new Date(account.createdAt).toLocaleDateString()}
+                                  Role: {formatUserType(account.userType)} • Created: {new Date(account.createdAt).toLocaleDateString()}
                                 </div>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                                 <span style={{ 
                                   fontSize: '12px', 
+                                  color: account.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)' 
+                                }}>
+                                  {account.isVerified ? 'Verified' : 'Pending'}
+                                </span>
+                                <span style={{ 
+                                  fontSize: '12px', 
                                   color: account.status === 'active' ? 'var(--success-green)' : 'var(--guc-red)' 
                                 }}>
-                                  {account.status === 'active' ? 'Active' : 'Inactive'}
+                                  {account.status === 'active' ? 'Active' : 'Blocked'}
                                 </span>
                                 
                                 {/* Activation/Deactivation Button */}

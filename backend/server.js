@@ -10,10 +10,13 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+app.use(cors({
+  origin: 'http://localhost:3000', // React app URL
+  credentials: true
+}));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Import routes once only
+// Import routes
 const adminRoutes = require("./routes/adminRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const authRoutes = require('./routes/authRoutes');
@@ -45,15 +48,15 @@ app.use("/api/workshops", workshopRoutes);
 // Email verification link route
 app.get("/api/verify", verifyByToken);
 
-// Test route
-app.get('/', (req, res) => {
-  res.send('Server is running and connected to MongoDB');
-});
-
 // Connect to MongoDB Atlas
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ Connected to MongoDB Atlas'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
+
+// Test route
+app.get('/', (req, res) => {
+  res.send('Server is running and connected to MongoDB');
+});
 
 // Start server
 const PORT = process.env.PORT || 5000;

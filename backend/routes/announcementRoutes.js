@@ -15,13 +15,13 @@ const { protect, permit } = require("../middleware/authMiddleware");
 router.get("/my/announcements", protect, permit("Professor"), getMyAnnouncements);
 
 // 📢 Create a new announcement
-router.post("/", protect, permit("Professor", "Admin", "Event Office"), createAnnouncement);
+router.post("/", protect, permit("Professor", "admin", "event_office"), createAnnouncement);
 
 // 📢 Update an announcement
-router.put("/:id", protect, permit("Professor", "Admin", "Event Office"), updateAnnouncement);
+router.put("/:id", protect, permit("Professor", "admin", "event_office"), updateAnnouncement);
 
 // 📢 Delete an announcement
-router.delete("/:id", protect, permit("Professor", "Admin", "Event Office"), deleteAnnouncement);
+router.delete("/:id", protect, permit("Professor", "admin", "event_office"), deleteAnnouncement);
 
 module.exports = router;
 

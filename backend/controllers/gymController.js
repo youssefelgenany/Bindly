@@ -21,8 +21,8 @@ exports.createGymSession = async (req, res) => {
 
     res.json({ msg: "Gym session created", session });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: "Server error" });
+    console.error("createGymSession error:", err);
+    return res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
 

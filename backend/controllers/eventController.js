@@ -4,7 +4,20 @@ const Trip = require("../models/tripModel");
 // 🎯 Create a new event (Admin or Event Office)
 exports.createEvent = async (req, res) => {
   try {
-    const { title, description, type, startDate, endDate, location, capacity } = req.body;
+    const { 
+      title, 
+      description, 
+      type, 
+      startDate, 
+      endDate, 
+      location, 
+      capacity,
+      agenda,
+      faculty,
+      professors,
+      extraResources,
+      bannerFile
+    } = req.body;
 
     if (!title || !type || !startDate || !endDate || !location) {
       return res.status(400).json({ msg: "Missing required fields" });
@@ -19,7 +32,13 @@ exports.createEvent = async (req, res) => {
       location,
       capacity: capacity || 100,
       createdBy: req.user._id,
-      status: req.user.userType === "Professor" ? "pending" : "approved" // Professors submit for approval
+      status: req.user.userType === "Professor" ? "pending" : "approved", // Professors submit for approval
+      // Workshop-specific fields
+      agenda,
+      faculty,
+      professors,
+      extraResources,
+      bannerFile
     });
 
     await newEvent.save();
@@ -111,12 +130,23 @@ exports.getAllEvents = async (req, res) => {
         type: 1,
         startDate: 1,
         endDate: 1,
+        registrationDeadline: 1,
         location: 1,
         capacity: 1,
+        price: 1,
         registeredCount: 1,
         status: 1,
         createdAt: 1,
         updatedAt: 1,
+        agenda: 1,
+        website: 1,
+        budget: 1,
+        fundingSource: 1,
+        extraResources: 1,
+        // Workshop-specific fields
+        faculty: 1,
+        professors: 1,
+        bannerFile: 1,
         createdBy: {
           _id: '$creator._id',
           firstName: '$creator.firstName',
@@ -128,15 +158,69 @@ exports.getAllEvents = async (req, res) => {
     );
 
     const events = await Event.aggregate(pipeline);
-    const withCreator = events.map(e => ({
-      ...e,
-      creatorName: e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null,
-      creatorRole: e.createdBy ? (e.createdBy.userType || null) : null,
-      creatorFirstName: e.createdBy?.firstName || null,
-      creatorLastName: e.createdBy?.lastName || null,
+    
+    // For bazaars and booths, get vendor information
+    const eventsWithVendors = await Promise.all(events.map(async (e) => {
+      const baseEvent = {
+        ...e,
+        creatorName: e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null,
+        creatorRole: e.createdBy ? (e.createdBy.userType || null) : null,
+        creatorFirstName: e.createdBy?.firstName || null,
+        creatorLastName: e.createdBy?.lastName || null,
+      };
+
+      // Add vendor information for bazaars and booths
+      if (e.type === 'bazaar' || e.type === 'booth') {
+        try {
+          const VendorRequest = require('../models/vendorRequest');
+          const vendorRequests = await VendorRequest.find({
+            [e.type]: e._id,
+            status: 'accepted'
+          }).populate('vendor', 'firstName lastName companyName email').lean();
+
+          baseEvent.vendors = vendorRequests.map(vr => ({
+            _id: vr.vendor._id,
+            name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+            companyName: vr.vendor.companyName,
+            contactName: `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+            email: vr.vendor.email,
+            boothSize: vr.boothSize,
+            durationWeeks: vr.durationWeeks,
+            boothLocation: vr.boothLocation,
+            attendees: vr.attendees || []
+          }));
+
+          // For bazaars, also get related booth events
+          if (e.type === 'bazaar') {
+            const boothEvents = await Event.find({
+              type: 'booth',
+              location: e.location,
+              startDate: { $gte: e.startDate },
+              endDate: { $lte: e.endDate },
+              status: 'approved'
+            }).lean();
+
+            baseEvent.booths = boothEvents.map(booth => ({
+              _id: booth._id,
+              title: booth.title,
+              description: booth.description,
+              startDate: booth.startDate,
+              endDate: booth.endDate,
+              location: booth.location,
+              capacity: booth.capacity,
+              price: booth.price
+            }));
+          }
+        } catch (vendorError) {
+          console.error('Error fetching vendor info for event:', e._id, vendorError);
+          baseEvent.vendors = [];
+        }
+      }
+
+      return baseEvent;
     }));
 
-    res.json(withCreator);
+    res.json(eventsWithVendors);
   } catch (err) {
     console.error("❌ Error fetching events:", err);
     res.status(500).json({ msg: "Server error" });

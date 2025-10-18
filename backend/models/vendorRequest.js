@@ -8,15 +8,16 @@ const vendorRequestSchema = new mongoose.Schema({
   },
   bazaar: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Bazaar", // Assuming bazaarModel exists, ref to Bazaar model
-    required: true,
+    ref: "Event", // points to Event when type='bazaar'
   },
   // For booth requests, we'll handle separately in controller
   booth: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Booth",
-    required: function() { return !this.bazaar; }, // Either bazaar or booth, not both
+    ref: "Event", // points to Event when type='booth'
   },
+  // Denormalized event info for easy rendering without populate
+  eventName: { type: String },
+  eventType: { type: String, enum: ['bazaar', 'booth'] },
   attendees: [
     {
       name: { type: String, required: true },
@@ -27,7 +28,24 @@ const vendorRequestSchema = new mongoose.Schema({
   boothSize: {
     type: String,
     enum: ["2x2", "4x4"],
-    required: true,
+    required: false,
+  },
+  // Duration of booth setup (for booth applications)
+  durationWeeks: {
+    type: Number,
+    min: 1,
+    max: 4,
+    required: false,
+  },
+  // Location of booth setup (for booth applications) - must be from predefined platform locations
+  boothLocation: {
+    type: String,
+    required: false,
+    enum: [
+      'main-entrance', 'food-court', 'central-plaza', 'student-center',
+      'library-area', 'gym-entrance', 'parking-lot', 'garden-section',
+      'auditorium-hall', 'cafeteria-area'
+    ]
   },
   // Optional message or notes from the vendor
   message: {

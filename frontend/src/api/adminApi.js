@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Base URL for admin API endpoints
-const ADMIN_API_BASE = '/api/admin';
+const ADMIN_API_BASE = 'http://localhost:5000/api/admin';
 
 // Create axios instance with default config
 const adminApi = axios.create({
@@ -188,11 +188,10 @@ export const adminApiService = {
       if (filters.type) queryParams.append('type', filters.type);
       if (filters.status) queryParams.append('status', filters.status);
       
-      const url = `/api/events/admin/all?${queryParams}`;
+      const url = `http://localhost:5000/api/events/admin/all?${queryParams}`;
       console.log('🌐 Making API call to:', url);
       console.log('🔑 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
       
-      // Use the events API directly since it's not under /api/admin
       const response = await axios.get(url, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -219,7 +218,7 @@ export const adminApiService = {
   // Update event status
   updateEventStatus: async (eventId, status) => {
     try {
-      const url = `/api/events/${eventId}`;
+      const url = `http://localhost:5000/api/events/${eventId}`;
       const data = { status };
       console.log('🌐 Making event status update API call to:', url);
       console.log('📊 Event ID:', eventId);
@@ -254,7 +253,7 @@ export const adminApiService = {
   // Delete event
   deleteEvent: async (eventId) => {
     try {
-      const response = await axios.delete(`/api/events/${eventId}`, {
+      const response = await axios.delete(`http://localhost:5000/api/events/${eventId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',

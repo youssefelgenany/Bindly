@@ -10,7 +10,7 @@ router.get('/', protect, getAllBazaars);
 router.post('/:id/register', protect, registerForBazaar);
 
 // Bazaar management routes - Event Office / Admin
-router.post('/', protect, permit('Event Office', 'Admin'), createBazaar);
-router.put('/:id', protect, permit('Event Office', 'Admin'), editBazaar);
+router.post('/', protect, permit('event_office', 'admin'), createBazaar);
+router.put('/:id', protect, permit('event_office', 'admin'), editBazaar);
 
 module.exports = router;

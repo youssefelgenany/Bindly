@@ -1,0 +1,15 @@
+{
+  "short_name": "Bindly",
+  "name": "Bindly - GUC Platform",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#D20A0A",
+  "background_color": "#F8F9FA"
+}
