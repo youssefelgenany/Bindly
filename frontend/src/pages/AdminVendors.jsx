@@ -5,9 +5,8 @@ import { adminApiService } from '../api/adminApi';
 const AdminVendors = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchField, setSearchField] = useState('all'); // all | name | email | company
   const [statusFilter, setStatusFilter] = useState('all'); // all | verified | pending | active | blocked
-  
+
   // Vendors state - will be loaded from API
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -154,7 +153,7 @@ const AdminVendors = () => {
                 <div className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
                   <div style={{ padding: '1rem', color: 'var(--guc-red)', textAlign: 'center' }}>
                     {error}
-                    <button 
+                    <button
                       onClick={loadVendors}
                       className="btn btn-outline"
                       style={{ marginLeft: '1rem', padding: '4px 8px' }}
@@ -203,28 +202,28 @@ const AdminVendors = () => {
                           <button className="btn btn-outline" style={{ fontSize: '12px' }}>
                             View Documents
                           </button>
-                          <button 
-                            className={v.isVerified ? 'btn btn-outline' : 'btn btn-primary'} 
+                          <button
+                            className={v.isVerified ? 'btn btn-outline' : 'btn btn-primary'}
                             style={{ fontSize: '12px' }}
                             onClick={() => handleVerificationToggle(vendorId, v.isVerified)}
                             disabled={!!processingIds[vendorId]}
                           >
                             {processingIds[vendorId] ? 'Processing...' : (v.isVerified ? 'Unverify' : 'Verify')}
                           </button>
-                          <button 
-                            className={v.status === 'active' ? 'btn btn-outline' : 'btn btn-primary'} 
+                          <button
+                            className={v.status === 'active' ? 'btn btn-outline' : 'btn btn-primary'}
                             style={{ fontSize: '12px' }}
                             onClick={() => handleStatusToggle(vendorId, v.status)}
                             disabled={!!processingIds[vendorId]}
                           >
                             {processingIds[vendorId] ? 'Processing...' : (v.status === 'active' ? 'Block' : 'Activate')}
                           </button>
-                          
+
                           {actionMessages[vendorId] && (
-                            <span style={{ 
-                              marginLeft: '0.5rem', 
-                              fontSize: '12px', 
-                              color: actionMessages[vendorId].includes('successfully') ? 'var(--success-green)' : 'var(--guc-red)' 
+                            <span style={{
+                              marginLeft: '0.5rem',
+                              fontSize: '12px',
+                              color: actionMessages[vendorId].includes('successfully') ? 'var(--success-green)' : 'var(--guc-red)'
                             }}>
                               {actionMessages[vendorId]}
                             </span>

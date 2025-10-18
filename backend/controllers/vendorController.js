@@ -19,7 +19,7 @@ module.exports.viewUpcomingEvents = async (req, res) => {
       startDate: { $gt: now },
       status: 'approved',
     })
-      .select('title startDate endDate location description _id')
+      .select('title startDate endDate location description _id capacity price')
       .sort({ startDate: 1 })
       .lean();
 
@@ -31,7 +31,89 @@ module.exports.viewUpcomingEvents = async (req, res) => {
       description: e.description,
       startDate: e.startDate,
       endDate: e.endDate,
+      capacity: e.capacity,
+      price: e.price,
     }));
+
+    // If type is 'bazaar', also include related booth information
+    if (type === 'bazaar') {
+      const bazaarsWithBooths = await Promise.all(
+        mapped.map(async (bazaar) => {
+          // Find booth events that are related to this bazaar
+          const boothEvents = await Event.find({
+            type: 'booth',
+            location: bazaar.location,
+            startDate: { $gte: bazaar.startDate },
+            endDate: { $lte: bazaar.endDate },
+            status: 'approved'
+          }).select('title description startDate endDate location capacity price').lean();
+
+          // If no real booths found, add mock booths for demonstration
+          let booths = boothEvents.map(booth => ({
+            _id: booth._id,
+            name: booth.title,
+            description: booth.description,
+            startDate: booth.startDate,
+            endDate: booth.endDate,
+            location: booth.location,
+            capacity: booth.capacity,
+            price: booth.price
+          }));
+
+          // Add mock booths if none exist
+          if (booths.length === 0) {
+            booths = [
+              {
+                _id: `mock-booth-1-${bazaar._id}`,
+                name: 'Premium Booth A',
+                description: 'Large premium booth with excellent visibility and foot traffic. Perfect for established vendors.',
+                startDate: bazaar.startDate,
+                endDate: bazaar.endDate,
+                location: bazaar.location,
+                capacity: 50,
+                price: 200
+              },
+              {
+                _id: `mock-booth-2-${bazaar._id}`,
+                name: 'Standard Booth B',
+                description: 'Standard sized booth perfect for most vendors. Good balance of space and cost.',
+                startDate: bazaar.startDate,
+                endDate: bazaar.endDate,
+                location: bazaar.location,
+                capacity: 30,
+                price: 150
+              },
+              {
+                _id: `mock-booth-3-${bazaar._id}`,
+                name: 'Economy Booth C',
+                description: 'Budget-friendly booth option for small vendors and startups.',
+                startDate: bazaar.startDate,
+                endDate: bazaar.endDate,
+                location: bazaar.location,
+                capacity: 20,
+                price: 100
+              },
+              {
+                _id: `mock-booth-4-${bazaar._id}`,
+                name: 'Corner Booth D',
+                description: 'Prime corner location with maximum visibility and foot traffic.',
+                startDate: bazaar.startDate,
+                endDate: bazaar.endDate,
+                location: bazaar.location,
+                capacity: 40,
+                price: 180
+              }
+            ];
+          }
+
+          return {
+            ...bazaar,
+            booths: booths
+          };
+        })
+      );
+      return res.json(bazaarsWithBooths);
+    }
 
     return res.json(mapped);
   } catch (error) {
@@ -47,7 +129,7 @@ module.exports.applyToEvent = async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
     }
-    
+
     const vendorId = req.user._id || req.user.id;
     const { eventId, attendees, boothSize, durationWeeks, boothLocation, message, eventType } = req.body;
 
@@ -72,7 +154,18 @@ module.exports.applyToEvent = async (req, res) => {
     }
     if (event.type === 'booth') {
       if (!durationWeeks || !boothLocation || durationWeeks < 1 || durationWeeks > 4) {
-        return res.status(400).json({ message: 'Valid duration (1-4 weeks) and location required for booth' });
+        return res.status(400).json({ message: 'Valid duration (1-4 weeks) and platform location required for booth' });
+      }
+
+      // Validate booth location is from predefined list
+      const validLocations = [
+        'main-entrance', 'food-court', 'central-plaza', 'student-center',
+        'library-area', 'gym-entrance', 'parking-lot', 'garden-section',
+        'auditorium-hall', 'cafeteria-area'
+      ];
+
+      if (!validLocations.includes(boothLocation)) {
+        return res.status(400).json({ message: 'Invalid booth location. Please select from the provided options.' });
       }
     }
 

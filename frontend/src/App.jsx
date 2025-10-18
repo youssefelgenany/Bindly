@@ -12,7 +12,6 @@ import Dashboard from './pages/Dashboard';
 import PendingVerification from './pages/PendingVerification';
 import ProfessorEvents from './pages/ProfessorEvents';
 import ProfessorAllEvents from './pages/ProfessorAllEvents';
-import Events from './pages/Events';
 import GymSchedule from './pages/GymSchedule';
 import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
@@ -101,8 +100,8 @@ const AdminOnly = ({ children }) => {
   }
 
   const isAdmin = user && (
-    user.role === 'admin' || 
-    user.userType === 'Admin' || 
+    user.role === 'admin' ||
+    user.userType === 'Admin' ||
     user.userType === 'admin'
   );
   return isAdmin ? children : <Navigate to="/dashboard" />;

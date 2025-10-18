@@ -30,6 +30,23 @@ const vendorRequestSchema = new mongoose.Schema({
     enum: ["2x2", "4x4"],
     required: false,
   },
+  // Duration of booth setup (for booth applications)
+  durationWeeks: {
+    type: Number,
+    min: 1,
+    max: 4,
+    required: false,
+  },
+  // Location of booth setup (for booth applications) - must be from predefined platform locations
+  boothLocation: {
+    type: String,
+    required: false,
+    enum: [
+      'main-entrance', 'food-court', 'central-plaza', 'student-center',
+      'library-area', 'gym-entrance', 'parking-lot', 'garden-section',
+      'auditorium-hall', 'cafeteria-area'
+    ]
+  },
   // Optional message or notes from the vendor
   message: {
     type: String,

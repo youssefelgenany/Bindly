@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { vendorApi } from '../api/vendorApi';
+import BoothList from '../components/BoothList';
+import BoothApplicationForm from '../components/BoothApplicationForm';
 // Booths section removed per requirement to show only bazaars
 
 const VendorBazaars = () => {
@@ -13,6 +15,9 @@ const VendorBazaars = () => {
         attendees: [{ name: '', email: '' }],
         boothSize: ''
     });
+    // Booth application form state
+    const [selectedBooth, setSelectedBooth] = useState(null);
+    const [showBoothForm, setShowBoothForm] = useState(false);
     // Removed "My Accepted Upcoming" section from this page; available on /vendor/accepted
 
     useEffect(() => {
@@ -41,13 +46,55 @@ const VendorBazaars = () => {
         load();
     }, [query]);
 
+    // Handle booth application
+    const handleApplyToBooth = (booth) => {
+        const bazaar = bazaars.find(b => b.booths && b.booths.some(boothItem => boothItem._id === booth._id));
+        setSelectedBooth({ booth, bazaar });
+        setShowBoothForm(true);
+    };
+
+    const handleBoothApplicationSubmit = async (applicationData) => {
+        try {
+            // Check if it's a mock booth (for demonstration)
+            if (applicationData.eventId.startsWith('mock-booth-')) {
+                // Simulate successful application for mock booths
+                return {
+                    success: true,
+                    message: 'Booth application submitted successfully! (Demo Mode)'
+                };
+            }
+
+            // Real API call for actual booths
+            const result = await vendorApi.applyToEvent(applicationData);
+            return result;
+        } catch (error) {
+            throw error;
+        }
+    };
+
+    const closeBoothForm = () => {
+        setShowBoothForm(false);
+        setSelectedBooth(null);
+    };
+
     // my accepted section moved to dedicated page
 
     return (
         <div className="events-page">
             <div className="events-header">
-                <h1>Upcoming Bazaars</h1>
-                <p>Browse upcoming approved bazaars. Vendors have read-only access here.</p>
+                <h1>Upcoming Bazaars & Booths</h1>
+                <p>Browse upcoming approved bazaars and apply for specific booths. View booth details, pricing, and submit applications with attendee information and booth preferences.</p>
+                <div style={{
+                    backgroundColor: '#d1ecf1',
+                    color: '#0c5460',
+                    padding: '0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid #bee5eb',
+                    marginTop: '1rem',
+                    fontSize: '0.9rem'
+                }}>
+                    <strong>🎭 Demo Mode:</strong> Mock booth data is displayed for demonstration purposes. Click "Apply" on any booth to see the comprehensive application form!
+                </div>
 
                 <div className="events-filters" style={{ marginTop: '1rem' }}>
                     <input
@@ -88,6 +135,7 @@ const VendorBazaars = () => {
                                     setActiveBazaarId={setActiveBazaarId}
                                     formState={formState}
                                     setFormState={setFormState}
+                                    onApplyToBooth={handleApplyToBooth}
                                 />
                             ))
                         )}
@@ -95,11 +143,21 @@ const VendorBazaars = () => {
                     {/* Trips removed */}
                 </div>
             )}
+
+            {/* Booth Application Form Modal */}
+            {showBoothForm && selectedBooth && (
+                <BoothApplicationForm
+                    booth={selectedBooth.booth}
+                    bazaar={selectedBooth.bazaar}
+                    onClose={closeBoothForm}
+                    onSubmit={handleBoothApplicationSubmit}
+                />
+            )}
         </div>
     );
 };
 
-const BazaarCard = ({ bazaar, activeBazaarId, setActiveBazaarId, formState, setFormState }) => {
+const BazaarCard = ({ bazaar, activeBazaarId, setActiveBazaarId, formState, setFormState, onApplyToBooth }) => {
     const isOpen = activeBazaarId === bazaar._id;
     const [submitting, setSubmitting] = useState(false);
     const [submitMessage, setSubmitMessage] = useState({ type: '', text: '' });
@@ -186,6 +244,13 @@ const BazaarCard = ({ bazaar, activeBazaarId, setActiveBazaarId, formState, setF
                 {bazaar.description && (
                     <p className="event-description">{bazaar.description}</p>
                 )}
+
+                {/* Always display booth information section */}
+                <BoothList
+                    booths={bazaar.booths || []}
+                    bazaarId={bazaar._id}
+                    onApplyToBooth={onApplyToBooth}
+                />
             </div>
             <div className="event-actions">
                 <button className="btn btn-primary" onClick={toggle}>
@@ -211,8 +276,12 @@ const BazaarCard = ({ bazaar, activeBazaarId, setActiveBazaarId, formState, setF
                         <div className="card" style={{ backgroundColor: 'var(--white)', padding: 0, borderRadius: '10px', boxShadow: '0 10px 24px rgba(0,0,0,0.15)', overflow: 'hidden' }}>
                             <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--light-gray)', padding: '1rem 1.25rem', borderBottom: '1px solid var(--medium-gray)' }}>
                                 <div>
-                                    <h2 className="card-title" style={{ margin: 0 }}>Apply to {bazaar.name}</h2>
-                                    <p className="card-subtitle" style={{ marginTop: '4px' }}>Provide your booth size and attendee details.</p>
+                                    <h2 className="card-title" style={{ margin: 0, color: '#007bff' }}>
+                                        Apply to {bazaar.name}
+                                    </h2>
+                                    <p className="card-subtitle" style={{ marginTop: '4px', color: '#6c757d' }}>
+                                        {bazaar.location} • {new Date(bazaar.startDate).toLocaleDateString()} - {new Date(bazaar.endDate).toLocaleDateString()}
+                                    </p>
                                 </div>
                                 <button
                                     type="button"
@@ -221,82 +290,194 @@ const BazaarCard = ({ bazaar, activeBazaarId, setActiveBazaarId, formState, setF
                                     style={{
                                         border: 'none',
                                         background: 'transparent',
-                                        fontSize: '22px',
-                                        lineHeight: 1,
+                                        fontSize: '1.5rem',
                                         cursor: 'pointer',
-                                        color: 'var(--charcoal-black)'
+                                        color: '#6c757d'
                                     }}
                                 >
                                     ×
                                 </button>
                             </div>
 
-                            <div style={{ maxHeight: '80vh', overflowY: 'auto', padding: '1.25rem' }}>
+                            {/* Form Content */}
+                            <div style={{ padding: '1.5rem' }}>
+                                {/* Bazaar Information */}
+                                <div style={{
+                                    backgroundColor: '#f8f9fa',
+                                    padding: '1rem',
+                                    borderRadius: '8px',
+                                    marginBottom: '1.5rem',
+                                    border: '1px solid #e9ecef'
+                                }}>
+                                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#495057' }}>Bazaar Details</h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem' }}>
+                                        <div><strong>Location:</strong> {bazaar.location}</div>
+                                        <div><strong>Dates:</strong> {new Date(bazaar.startDate).toLocaleDateString()} - {new Date(bazaar.endDate).toLocaleDateString()}</div>
+                                    </div>
+                                    {bazaar.description && (
+                                        <p style={{ margin: '0.5rem 0 0 0', color: '#6c757d', fontSize: '0.9rem' }}>
+                                            {bazaar.description}
+                                        </p>
+                                    )}
+                                </div>
+
                                 {submitMessage.text && (
-                                    <div className={`alert ${submitMessage.type === 'success' ? 'alert-success' : 'alert-error'}`} style={{ marginBottom: '1rem' }}>
+                                    <div style={{
+                                        padding: '0.75rem',
+                                        borderRadius: '4px',
+                                        marginBottom: '1rem',
+                                        backgroundColor: submitMessage.type === 'success' ? '#d4edda' : '#f8d7da',
+                                        color: submitMessage.type === 'success' ? '#155724' : '#721c24',
+                                        border: `1px solid ${submitMessage.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`
+                                    }}>
                                         {submitMessage.text}
                                     </div>
                                 )}
-                                <div style={{ display: 'grid', gap: '1rem' }}>
-                                    <div>
-                                        <label className="form-label">Booth Size</label>
+                                {/* Attendees Section */}
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                    <h4 style={{ margin: '0 0 1rem 0', color: '#495057' }}>
+                                        Attendees (Maximum 5)
+                                    </h4>
+                                    {formState.attendees.map((attendee, idx) => (
+                                        <div key={idx} style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: '1fr 1fr auto',
+                                            gap: '0.5rem',
+                                            marginBottom: '0.5rem',
+                                            alignItems: 'end'
+                                        }}>
+                                            <input
+                                                type="text"
+                                                placeholder="Full Name"
+                                                value={attendee.name}
+                                                onChange={(e) => setAttendee(idx, 'name', e.target.value)}
+                                                style={{
+                                                    padding: '0.5rem',
+                                                    border: '1px solid #ced4da',
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.9rem'
+                                                }}
+                                                required
+                                            />
+                                            <input
+                                                type="email"
+                                                placeholder="Email Address"
+                                                value={attendee.email}
+                                                onChange={(e) => setAttendee(idx, 'email', e.target.value)}
+                                                style={{
+                                                    padding: '0.5rem',
+                                                    border: '1px solid #ced4da',
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.9rem'
+                                                }}
+                                                required
+                                            />
+                                            {formState.attendees.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeAttendee(idx)}
+                                                    style={{
+                                                        backgroundColor: '#dc3545',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        padding: '0.5rem',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.8rem'
+                                                    }}
+                                                >
+                                                    Remove
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {formState.attendees.length < 5 && (
+                                        <button
+                                            type="button"
+                                            onClick={addAttendee}
+                                            style={{
+                                                backgroundColor: '#28a745',
+                                                color: 'white',
+                                                border: 'none',
+                                                padding: '0.5rem 1rem',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '0.9rem'
+                                            }}
+                                        >
+                                            + Add Attendee
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Booth Configuration */}
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                    <h4 style={{ margin: '0 0 1rem 0', color: '#495057' }}>Booth Configuration</h4>
+
+                                    {/* Booth Size */}
+                                    <div style={{ marginBottom: '1rem' }}>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                                            Booth Size *
+                                        </label>
                                         <select
-                                            className="form-input"
                                             value={formState.boothSize}
                                             onChange={(e) => setFormState({ ...formState, boothSize: e.target.value })}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.5rem',
+                                                border: '1px solid #ced4da',
+                                                borderRadius: '4px',
+                                                fontSize: '0.9rem'
+                                            }}
+                                            required
                                         >
-                                            <option value="">Select size</option>
-                                            <option value="2x2">2x2</option>
-                                            <option value="4x4">4x4</option>
+                                            <option value="">Select booth size</option>
+                                            <option value="2x2">2x2 meters (Small Booth)</option>
+                                            <option value="4x4">4x4 meters (Large Booth)</option>
                                         </select>
-                                        <small style={{ color: 'var(--text-light)' }}>Choose your preferred booth footprint.</small>
+                                        <p style={{
+                                            margin: '0.25rem 0 0 0',
+                                            color: '#6c757d',
+                                            fontSize: '0.8rem',
+                                            fontStyle: 'italic'
+                                        }}>
+                                            📏 Choose the size of your booth space in meters
+                                        </p>
                                     </div>
+                                </div>
 
-                                    <div>
-                                        <label className="form-label">Attendees</label>
-                                        <small style={{ color: 'var(--text-light)', display: 'block', marginBottom: '0.5rem' }}>Add up to 5 attendee names and emails.</small>
-                                        {formState.attendees.map((a, idx) => (
-                                            <div key={idx} className="card" style={{ padding: '0.75rem', background: 'var(--light-gray)', marginBottom: '0.5rem' }}>
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.5rem', alignItems: 'center' }}>
-                                                    <div>
-                                                        <label className="form-label" style={{ fontSize: '12px' }}>Full name</label>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="e.g. Ahmed Ali"
-                                                            className="form-input"
-                                                            value={a.name}
-                                                            onChange={(e) => setAttendee(idx, 'name', e.target.value)}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="form-label" style={{ fontSize: '12px' }}>Email</label>
-                                                        <input
-                                                            type="email"
-                                                            placeholder="email@example.com"
-                                                            className="form-input"
-                                                            value={a.email}
-                                                            onChange={(e) => setAttendee(idx, 'email', e.target.value)}
-                                                        />
-                                                    </div>
-                                                    <button type="button" className="btn btn-outline" onClick={() => removeAttendee(idx)} aria-label={`Remove attendee ${idx + 1}`}>✕</button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {formState.attendees.length < 5 && (
-                                            <button type="button" className="btn btn-secondary" onClick={addAttendee}>Add Attendee</button>
-                                        )}
-                                    </div>
-
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                                        <button type="button" className="btn btn-outline" onClick={toggle}>Cancel</button>
-                                        <button
-                                            type="submit"
-                                            className="btn btn-primary"
-                                            disabled={submitting || !formState.boothSize || formState.attendees.filter(a => a.name && a.email).length === 0}
-                                        >
-                                            {submitting ? 'Submitting…' : 'Submit Application'}
-                                        </button>
-                                    </div>
+                                {/* Submit Button */}
+                                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                                    <button
+                                        type="button"
+                                        onClick={toggle}
+                                        style={{
+                                            backgroundColor: '#6c757d',
+                                            color: 'white',
+                                            border: 'none',
+                                            padding: '0.75rem 1.5rem',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontSize: '0.9rem'
+                                        }}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={submitting}
+                                        style={{
+                                            backgroundColor: submitting ? '#6c757d' : '#007bff',
+                                            color: 'white',
+                                            border: 'none',
+                                            padding: '0.75rem 1.5rem',
+                                            borderRadius: '4px',
+                                            cursor: submitting ? 'not-allowed' : 'pointer',
+                                            fontSize: '0.9rem'
+                                        }}
+                                    >
+                                        {submitting ? 'Submitting...' : 'Submit Application'}
+                                    </button>
                                 </div>
                             </div>
                         </div>

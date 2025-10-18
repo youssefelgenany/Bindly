@@ -15,13 +15,6 @@ router.put('/users/:userId/verification', protect, permit('admin'), (req, res, n
   next();
 }, updateUserVerification);
 
-<<<<<<< HEAD
-// Gym routes
-router.post("/gym-sessions", protect, permit("event_office"), createGymSession);
-router.get("/gym-schedule/month", protect, permit("student","staff","ta","professor","event_office"), viewGymScheduleMonth);
-
-module.exports = router;
-=======
 // Admin account management routes
 router.post('/accounts', protect, permit('admin'), createAdminOrEventOffice);
 router.delete('/accounts/:id', protect, permit('admin'), deleteAdminOrEventOffice);
@@ -43,5 +36,8 @@ router.put('/vendors/:vendorId/status', protect, permit('admin'), (req, res, nex
   next();
 }, updateVendorStatus);
 
+// Gym routes
+router.post("/gym-sessions", protect, permit("event_office"), createGymSession);
+router.get("/gym-schedule/month", protect, permit("student","staff","ta","professor","event_office"), viewGymScheduleMonth);
+
 module.exports = router;
->>>>>>> 3d44e049b711fdc9901d70135416234d35764b85

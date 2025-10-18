@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -15,6 +16,9 @@ const Navbar = () => {
     logout();
     navigate('/login');
   };
+
+  // Hide menu on vendor pages
+  const isVendorPage = location.pathname.startsWith('/vendor');
 
   const getUserTypeDisplay = (userType) => {
     const types = {
@@ -43,7 +47,7 @@ const Navbar = () => {
       }}>
         {/* Left group: brand only */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {user && (
+          {user && !isVendorPage && (
             <button
               onClick={toggleSidebar}
               className="btn btn-outline"
@@ -53,9 +57,9 @@ const Navbar = () => {
               ≡
             </button>
           )}
-          <Link 
-            to={user ? '/dashboard' : '/'} 
-            style={{ 
+          <Link
+            to={user ? (user.userType === 'Vendor' ? '/vendor' : '/dashboard') : '/'}
+            style={{
               textDecoration: 'none',
               display: 'flex',
               alignItems: 'center'
@@ -78,23 +82,23 @@ const Navbar = () => {
               {/* User Info */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ 
-                    fontSize: '14px', 
-                    fontWeight: '600', 
-                    color: 'var(--text-dark)' 
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: 'var(--text-dark)'
                   }}>
                     {user.firstName} {user.lastName}
                   </div>
-                  <div style={{ 
-                    fontSize: '12px', 
-                    color: 'var(--text-light)' 
+                  <div style={{
+                    fontSize: '12px',
+                    color: 'var(--text-light)'
                   }}>
                     {getUserTypeDisplay(user.userType)}
                   </div>
                 </div>
                 {/* User Avatar */}
                 {user?.profilePicturePath ? (
-                  <img 
+                  <img
                     src={`http://localhost:5000${user.profilePicturePath}`}
                     alt={`${user.firstName} ${user.lastName}`}
                     style={{
@@ -123,14 +127,14 @@ const Navbar = () => {
                   fontWeight: '600',
                   fontSize: '16px'
                 }}>
-                   {user?.firstName?.charAt(0)?.toUpperCase() || 'U'}
+                  {user?.firstName?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
               </div>
 
               {/* Event Office quick link */}
               {(user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
-                <Link 
-                  to="/events" 
+                <Link
+                  to="/events"
                   className="btn btn-outline"
                   style={{ padding: '8px 16px', fontSize: '14px' }}
                 >
@@ -139,7 +143,7 @@ const Navbar = () => {
               )}
 
               {/* Logout Button */}
-              <button 
+              <button
                 onClick={handleLogout}
                 className="btn btn-outline"
                 style={{ padding: '8px 16px', fontSize: '14px' }}
@@ -150,10 +154,10 @@ const Navbar = () => {
           ) : (
             <>
               {/* Public Navigation */}
-              <Link 
-                to="/login" 
-                style={{ 
-                  color: 'var(--guc-red)', 
+              <Link
+                to="/login"
+                style={{
+                  color: 'var(--guc-red)',
                   textDecoration: 'none',
                   fontWeight: '600',
                   padding: '8px 16px',
@@ -165,8 +169,8 @@ const Navbar = () => {
               >
                 Sign In
               </Link>
-              <Link 
-                to="/signup" 
+              <Link
+                to="/signup"
                 className="btn btn-primary"
                 style={{ padding: '8px 16px', fontSize: '14px' }}
               >
@@ -178,7 +182,7 @@ const Navbar = () => {
       </div>
 
       {/* Right Sidebar Overlay */}
-      {user && (
+      {user && !isVendorPage && (
         <>
           {/* Dim Background */}
           <div
@@ -242,8 +246,8 @@ const Navbar = () => {
                 </Link>
               )}
 
-{/* Conferences link moved into Events page filters */}
-              
+              {/* Conferences link moved into Events page filters */}
+
               {/* EVENTS - visible to Event Office */}
               {(user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
                 <>
@@ -297,9 +301,9 @@ const Navbar = () => {
                   </Link>
                 </>
               )}
-              
+
               {/* Hide Manage Gym for Event Office */}
-              
+
               {(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'admin') && (
                 <>
                   <Link

@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 
 const Confrences = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [conferences, setConferences] = useState([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');

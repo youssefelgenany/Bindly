@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import BazaarForm from '../components/BazaarForm';
-<<<<<<< HEAD
-import { bazaarApi } from '../api/eventsApi';
-=======
 import { bazaarApi } from '../api/eventManagementApi';
->>>>>>> 3d44e049b711fdc9901d70135416234d35764b85
 import '../styles/EditBazaar.css';
 
 const EditBazaar = () => {
@@ -21,7 +17,7 @@ const EditBazaar = () => {
     // In a real app, you'd fetch the bazaar data by ID
     // For now, we'll simulate loading existing data
     setLoadingData(true);
-    
+
     // Simulate API call to get bazaar data
     setTimeout(() => {
       setBazaarData({
@@ -42,23 +38,23 @@ const EditBazaar = () => {
 
     try {
       const result = await bazaarApi.update(id, updatedData);
-      
+
       if (result.message && result.message.includes('successfully')) {
-        setMessage({ 
-          type: 'success', 
-          text: 'Bazaar updated successfully! Redirecting...' 
+        setMessage({
+          type: 'success',
+          text: 'Bazaar updated successfully! Redirecting...'
         });
         setTimeout(() => navigate('/events'), 2000);
       } else {
-        setMessage({ 
-          type: 'error', 
-          text: result.message || 'Error updating bazaar' 
+        setMessage({
+          type: 'error',
+          text: result.message || 'Error updating bazaar'
         });
       }
     } catch (error) {
-      setMessage({ 
-        type: 'error', 
-        text: 'Network error. Please try again.' 
+      setMessage({
+        type: 'error',
+        text: 'Network error. Please try again.'
       });
     } finally {
       setLoading(false);
@@ -82,7 +78,7 @@ const EditBazaar = () => {
         <h1 className="page-title">Edit Bazaar</h1>
         <p className="page-subtitle">Update the details for this bazaar event</p>
       </div>
-      
+
       {message.text && (
         <div className={`alert alert-${message.type}`}>
           {message.text}
@@ -90,7 +86,7 @@ const EditBazaar = () => {
       )}
 
       <div className="form-container">
-        <BazaarForm 
+        <BazaarForm
           onSubmit={handleUpdateBazaar}
           loading={loading}
           initialData={bazaarData}
