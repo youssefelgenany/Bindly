@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { eventsApiService } from '../api/eventsApi';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,6 +6,7 @@ import '../styles/EventsList.css';
 import BazaarForm from '../components/BazaarForm';
 import ConferenceForm from '../components/ConferenceForm';
 import TripForm from '../components/TripForm';
+import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
 
 const EventsList = () => {
   const { user } = useAuth();
@@ -24,6 +25,9 @@ const EventsList = () => {
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState(null);
   const [tripSaving, setTripSaving] = useState(false);
+  const [isWorkshopModalOpen, setIsWorkshopModalOpen] = useState(false);
+  const [editingWorkshop, setEditingWorkshop] = useState(null);
+  const [workshopSaving, setWorkshopSaving] = useState(false);
   const [processingIds, setProcessingIds] = useState({}); // For tracking processing states
   const [actionMessages, setActionMessages] = useState({}); // For showing action feedback
 
@@ -555,7 +559,18 @@ const EventsList = () => {
                           Trip has started
                         </span>
                       )
-                    ) : null}
+                    ) : event.type === 'workshop' && (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          console.log('Edit button clicked, event:', event);
+                          setEditingWorkshop(event);
+                          setIsWorkshopModalOpen(true);
+                        }}
+                      >
+                        Edit
+                      </button>
+                    )}
 
                     {/* Delete Button */}
                     <button 
@@ -725,6 +740,20 @@ const EventsList = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {isWorkshopModalOpen && editingWorkshop && (
+        <WorkshopEditRequestModal
+          open={isWorkshopModalOpen}
+          workshop={editingWorkshop}
+          onClose={() => { setIsWorkshopModalOpen(false); setEditingWorkshop(null); }}
+          onSubmitted={async (data) => {
+            // refresh list and close modal
+            setIsWorkshopModalOpen(false);
+            setEditingWorkshop(null);
+            await loadEvents();
+          }}
+        />
       )}
     </div>
   );
