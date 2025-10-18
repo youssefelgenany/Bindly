@@ -425,24 +425,26 @@ const EventsList = () => {
               <div className="event-info">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                 <h3>{event.name}</h3>
-                  {/* Status Badge */}
-                  <span style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    fontSize: '11px',
-                    fontWeight: '700',
-                    backgroundColor: event.status === 'approved' ? 'var(--success-green)' : 
-                                   event.status === 'rejected' ? 'var(--guc-red)' : 
-                                   event.status === 'pending' ? 'var(--warning-yellow)' : 'var(--text-light)',
-                    color: event.status === 'pending' ? 'var(--charcoal-black)' : 'white',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                  }}>
-                    {event.status === 'approved' ? '✓ APPROVED' : 
-                     event.status === 'rejected' ? '✗ REJECTED' : 
-                     event.status === 'pending' ? '⏳ PENDING' : 'UNKNOWN'}
-                  </span>
+                  {/* Status Badge - Only show for workshops and other non-trip/bazaar/conference events */}
+                  {event.type !== 'trip' && event.type !== 'bazaar' && event.type !== 'conference' && (
+                    <span style={{
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      backgroundColor: event.status === 'approved' ? 'var(--success-green)' : 
+                                     event.status === 'rejected' ? 'var(--guc-red)' : 
+                                     event.status === 'pending' ? 'var(--warning-yellow)' : 'var(--text-light)',
+                      color: event.status === 'pending' ? 'var(--charcoal-black)' : 'white',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}>
+                      {event.status === 'approved' ? '✓ APPROVED' : 
+                       event.status === 'rejected' ? '✗ REJECTED' : 
+                       event.status === 'pending' ? '⏳ PENDING' : 'UNKNOWN'}
+                    </span>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <p className="event-type">{event.type.toUpperCase()}</p>
@@ -487,31 +489,35 @@ const EventsList = () => {
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     {/* Debug logging */}
                     {console.log('🔍 Event status for buttons:', event.id, event.status)}
-                    {/* Status Management Buttons - Always show Accept/Reject for event office */}
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => handleEventStatusChange(event.id, 'approved')}
-                      disabled={!!processingIds[event.id] || event.status === 'approved'}
-                      style={{ 
-                        fontSize: '12px',
-                        opacity: event.status === 'approved' ? 0.6 : 1
-                      }}
-                    >
-                      {processingIds[event.id] ? 'Processing...' : '✓ Accept'}
-                    </button>
-                    <button
-                      className="btn btn-outline"
-                      onClick={() => handleEventStatusChange(event.id, 'rejected')}
-                      disabled={!!processingIds[event.id] || event.status === 'rejected'}
-                      style={{ 
-                        fontSize: '12px', 
-                        color: 'var(--guc-red)', 
-                        borderColor: 'var(--guc-red)',
-                        opacity: event.status === 'rejected' ? 0.6 : 1
-                      }}
-                    >
-                      {processingIds[event.id] ? 'Processing...' : '✗ Reject'}
-                    </button>
+                    {/* Status Management Buttons - Show Accept/Reject only for workshops and other non-trip/bazaar/conference events */}
+                    {event.type !== 'trip' && event.type !== 'bazaar' && event.type !== 'conference' && (
+                      <>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleEventStatusChange(event.id, 'approved')}
+                          disabled={!!processingIds[event.id] || event.status === 'approved'}
+                          style={{ 
+                            fontSize: '12px',
+                            opacity: event.status === 'approved' ? 0.6 : 1
+                          }}
+                        >
+                          {processingIds[event.id] ? 'Processing...' : '✓ Accept'}
+                        </button>
+                        <button
+                          className="btn btn-outline"
+                          onClick={() => handleEventStatusChange(event.id, 'rejected')}
+                          disabled={!!processingIds[event.id] || event.status === 'rejected'}
+                          style={{ 
+                            fontSize: '12px', 
+                            color: 'var(--guc-red)', 
+                            borderColor: 'var(--guc-red)',
+                            opacity: event.status === 'rejected' ? 0.6 : 1
+                          }}
+                        >
+                          {processingIds[event.id] ? 'Processing...' : '✗ Reject'}
+                        </button>
+                      </>
+                    )}
 
                     {/* Edit Button */}
                     {event.type === 'bazaar' ? (

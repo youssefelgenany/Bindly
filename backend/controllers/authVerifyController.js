@@ -8,13 +8,13 @@ exports.verifyByToken = async (req, res) => {
 
     const user = await User.findOne({
       verificationToken: token,
-      verificationExpires: { $gt: new Date() },
+      verificationExpiresAt: { $gt: new Date() },
     });
     if (!user) return res.status(400).send("Link invalid or expired");
 
-    user.verified = true;
+    user.isVerified = true;
     user.verificationToken = null;
-    user.verificationExpires = null;
+    user.verificationExpiresAt = null;
     await user.save();
 
     const redirectUrl = process.env.APP_LOGIN_URL || "http://localhost:3000/login";

@@ -149,6 +149,10 @@ const AdminUsers = () => {
   const [verificationStatusById, setVerificationStatusById] = useState({});
   const [verifyingIds, setVerifyingIds] = useState({}); // id -> boolean
   const [verifyMsgById, setVerifyMsgById] = useState({}); // id -> message
+  
+  // Verification email state
+  const [sendingEmailIds, setSendingEmailIds] = useState({}); // id -> boolean
+  const [emailMsgById, setEmailMsgById] = useState({}); // id -> message
 
   // Update activeStatusById when users are loaded
   useEffect(() => {
@@ -226,6 +230,30 @@ const AdminUsers = () => {
       setVerifyMsgById(prev => ({ ...prev, [userId]: serverMessage || 'Failed to update verification.' }));
     } finally {
       setVerifyingIds(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  // Send verification email handler
+  const handleSendVerificationEmail = async (userId) => {
+    setSendingEmailIds(prev => ({ ...prev, [userId]: true }));
+    setEmailMsgById(prev => ({ ...prev, [userId]: '' }));
+
+    try {
+      const result = await adminApiService.sendVerificationEmail(userId);
+      if (result.success) {
+        setEmailMsgById(prev => ({ ...prev, [userId]: 'Verification email sent successfully!' }));
+        // Clear message after 3 seconds
+        setTimeout(() => {
+          setEmailMsgById(prev => ({ ...prev, [userId]: '' }));
+        }, 3000);
+      } else {
+        setEmailMsgById(prev => ({ ...prev, [userId]: result.message || 'Failed to send email.' }));
+      }
+    } catch (e) {
+      const serverMessage = e?.response?.data?.message;
+      setEmailMsgById(prev => ({ ...prev, [userId]: serverMessage || 'Failed to send verification email.' }));
+    } finally {
+      setSendingEmailIds(prev => ({ ...prev, [userId]: false }));
     }
   };
 
@@ -429,6 +457,36 @@ const AdminUsers = () => {
                           {toggleMsgById[userId] && (
                             <span style={{ marginLeft: '0.5rem', fontSize: '12px', color: 'var(--text-light)' }}>
                               {toggleMsgById[userId]}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Verification Email controls */}
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <button
+                            className="btn btn-primary"
+                            onClick={() => handleSendVerificationEmail(userId)}
+                            disabled={!!sendingEmailIds[userId] || !verificationStatusById[userId] || !activeStatusById[userId]}
+                            style={{ 
+                              backgroundColor: (verificationStatusById[userId] && activeStatusById[userId]) ? 'var(--primary-blue)' : 'var(--text-light)',
+                              cursor: (verificationStatusById[userId] && activeStatusById[userId]) ? 'pointer' : 'not-allowed'
+                            }}
+                          >
+                            {sendingEmailIds[userId] ? 'Sending...' : '📧 Send Verification Email'}
+                          </button>
+                          <span style={{ 
+                            fontSize: '12px', 
+                            color: (verificationStatusById[userId] && activeStatusById[userId]) ? 'var(--success-green)' : 'var(--text-light)' 
+                          }}>
+                            {(verificationStatusById[userId] && activeStatusById[userId]) ? 'Can send email' : 'User must be verified & active'}
+                          </span>
+                          {emailMsgById[userId] && (
+                            <span style={{ 
+                              marginLeft: '0.5rem', 
+                              fontSize: '12px', 
+                              color: emailMsgById[userId].includes('success') ? 'var(--success-green)' : 'var(--guc-red)' 
+                            }}>
+                              {emailMsgById[userId]}
                             </span>
                           )}
                         </div>

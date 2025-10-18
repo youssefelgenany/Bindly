@@ -539,3 +539,71 @@ exports.updateUserVerification = async (req, res) => {
     });
   }
 };
+
+// Send verification email to user
+exports.sendVerificationEmail = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    console.log('📧 Sending verification email for user:', userId);
+
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if user is verified and active
+    if (!user.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'User must be verified before sending verification email'
+      });
+    }
+
+    if (user.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'User must be active before sending verification email'
+      });
+    }
+
+    // Generate a new verification token
+    const verificationToken = crypto.randomBytes(24).toString('hex');
+    user.verificationToken = verificationToken;
+    user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await user.save();
+
+    // Send verification email
+    const name = user.firstName ? `${user.firstName} ${user.lastName}` : user.name || 'User';
+
+    console.log('📧 Sending verification email to:', user.email);
+    console.log('📧 Verification token:', verificationToken);
+
+    await sendVerificationEmail(user.email, verificationToken, name);
+
+    res.status(200).json({
+      success: true,
+      message: 'Verification email sent successfully',
+      user: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        userType: user.userType,
+        isVerified: user.isVerified,
+        status: user.status,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error sending verification email:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to send verification email",
+      error: error.message,
+    });
+  }
+};

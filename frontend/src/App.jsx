@@ -31,6 +31,10 @@ import VendorBazaars from './pages/VendorBazaars';
 import Confrences from './pages/Confrences';
 import VendorAccepted from './pages/VendorAccepted';
 import VendorRequests from './pages/VendorRequests';
+import StudentEventsView from './pages/StudentEventsView';
+import StudentMyRegistrations from './pages/StudentMyRegistrations';
+import StaffEventsView from './pages/StaffEventsView';
+import StaffMyRegistrations from './pages/StaffMyRegistrations';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -137,6 +141,48 @@ const EventsOfficeOnly = ({ children }) => {
   return (isEventsOffice || isAdmin) ? children : <Navigate to="/dashboard" />;
 };
 
+// Student-only guard
+const StudentOnly = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
+      }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  const isStudent = user && user.userType === 'Student';
+  return isStudent ? children : <Navigate to="/dashboard" />;
+};
+
+// Staff-only guard
+const StaffOnly = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
+      }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  const isStaff = user && user.userType === 'Staff';
+  return isStaff ? children : <Navigate to="/dashboard" />;
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -228,6 +274,46 @@ function App() {
               element={
                 <ProtectedRoute>
                   <EventsList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/events"
+              element={
+                <ProtectedRoute>
+                  <StudentOnly>
+                    <StudentEventsView />
+                  </StudentOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/my-registrations"
+              element={
+                <ProtectedRoute>
+                  <StudentOnly>
+                    <StudentMyRegistrations />
+                  </StudentOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/events"
+              element={
+                <ProtectedRoute>
+                  <StaffOnly>
+                    <StaffEventsView />
+                  </StaffOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/my-registrations"
+              element={
+                <ProtectedRoute>
+                  <StaffOnly>
+                    <StaffMyRegistrations />
+                  </StaffOnly>
                 </ProtectedRoute>
               }
             />

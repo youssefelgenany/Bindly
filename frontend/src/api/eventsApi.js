@@ -97,6 +97,28 @@ export const eventsApiService = {
         error: error.response?.data || error.message,
       };
     }
+  },
+  // Fetch events for students with vendor details for bazaars
+  getStudentEvents: async (filters = {}) => {
+    try {
+      const query = new URLSearchParams();
+      if (filters.q) query.append('q', filters.q);
+      if (filters.type) query.append('type', filters.type);
+      if (filters.status) query.append('status', filters.status);
+      
+      const suffix = query.toString() ? `?${query.toString()}` : '';
+      const url = `/student${suffix}`;
+      console.log('🔍 API call URL:', url);
+      const response = await eventsApi.get(url);
+      return { success: true, data: response.data.events || [] };
+    } catch (error) {
+      console.error('🔍 API error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch student events',
+        error: error.response?.data || error.message,
+      };
+    }
   }
 };
 
