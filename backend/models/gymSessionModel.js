@@ -21,7 +21,7 @@ const gymSessionSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['cardio', 'strength', 'yoga', 'pilates', 'other']
+    enum: ['cardio', 'strength', 'yoga', 'pilates', 'aerobics', 'zumba', 'crossfit', 'other']
   },
   maxParticipants: {
     type: Number,

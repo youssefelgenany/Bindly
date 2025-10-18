@@ -21,6 +21,7 @@ import VendorDashboard from './pages/VendorDashboard';
 import CreateConference from './pages/CreateConfrence';
 import EditConfrences from './pages/EditConfrences';
 import EventsList from './pages/EventsList';
+import Events from './pages/Events';
 import CreateBazaar from "./pages/CreateBazaar";
 import CreateTrip from './pages/CreateTrip';
 import CreateBooth from './pages/CreateBooth';
@@ -263,6 +264,14 @@ function App() {
             />
             <Route
               path="/events"
+              element={
+                <ProtectedRoute>
+                  <Events />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events/manage"
               element={
                 <ProtectedRoute>
                   <EventsList />

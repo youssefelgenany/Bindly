@@ -19,7 +19,7 @@ export const gymApiService = {
       const qs = new URLSearchParams();
       if (year) qs.append('year', year);
       if (month !== undefined) qs.append('month', month);
-      const res = await gymApi.get(`/sessions?${qs.toString()}`);
+      const res = await gymApi.get(`/month?${qs.toString()}`);
       return { success: true, data: res.data };
     } catch (error) {
       return { success: false, message: error.response?.data?.message || 'Failed to load gym sessions' };
@@ -28,7 +28,7 @@ export const gymApiService = {
 
   createSession: async (payload) => {
     try {
-      const res = await gymApi.post('/sessions', payload);
+      const res = await gymApi.post('/', payload);
       return { success: true, data: res.data };
     } catch (error) {
       return { success: false, message: error.response?.data?.message || 'Failed to create session' };

@@ -2,7 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { gymApiService } from '../api/gymApi';
 
-const TYPES = ['Yoga', 'Pilates', 'Aerobics', 'Zumba', 'Cross Circuit', 'Kick-boxing', 'Crossfit', 'Strength', 'Cardio'];
+const TYPES = [
+  { label: 'Yoga', value: 'yoga' },
+  { label: 'Pilates', value: 'pilates' },
+  { label: 'Aerobics', value: 'aerobics' },
+  { label: 'Zumba', value: 'zumba' },
+  { label: 'Crossfit', value: 'crossfit' },
+  { label: 'Strength Training', value: 'strength' },
+  { label: 'Cardio', value: 'cardio' },
+  { label: 'Other', value: 'other' }
+];
 
 const GymManage = () => {
   const { user } = useAuth();
@@ -10,7 +19,7 @@ const GymManage = () => {
     date: '',
     time: '',
     durationMinutes: 60,
-    type: TYPES[0],
+    type: TYPES[0].value,
     instructor: '',
     maxParticipants: 30,
   });
@@ -41,21 +50,21 @@ const GymManage = () => {
       setMessage('Max participants must be a positive number.');
       return;
     }
-    const start = new Date(`${form.date}T${form.time}:00`);
+    const selectedType = TYPES.find(t => t.value === form.type);
     const payload = {
-      type: form.type,
+      title: `${selectedType?.label || form.type} Session`,
+      date: form.date,
+      startTime: form.time,
       durationMinutes: Number(form.durationMinutes) || 60,
-      startTime: start.toISOString(),
-      instructor: form.instructor || undefined,
+      type: form.type,
       maxParticipants: Number(form.maxParticipants),
-      capacity: Number(form.maxParticipants),
     };
     setSubmitting(true);
     const res = await gymApiService.createSession(payload);
     setSubmitting(false);
     if (res.success) {
       setMessage('Session created successfully.');
-      setForm({ date: '', time: '', durationMinutes: 60, type: TYPES[0], instructor: '', maxParticipants: 30 });
+      setForm({ date: '', time: '', durationMinutes: 60, type: TYPES[0].value, instructor: '', maxParticipants: 30 });
     } else {
       setMessage(res.message);
     }
@@ -107,7 +116,7 @@ const GymManage = () => {
             <div className="form-group">
               <label className="form-label">Type</label>
               <select className="form-input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-                {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -120,7 +129,7 @@ const GymManage = () => {
             </div>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button className="btn btn-primary" type="submit" disabled={submitting}>{submitting ? 'Creating...' : 'Create Session'}</button>
-              <button className="btn btn-secondary" type="button" onClick={() => setForm({ date: '', time: '', durationMinutes: 60, type: TYPES[0], instructor: '', maxParticipants: 30 })}>Reset</button>
+              <button className="btn btn-secondary" type="button" onClick={() => setForm({ date: '', time: '', durationMinutes: 60, type: TYPES[0].value, instructor: '', maxParticipants: 30 })}>Reset</button>
             </div>
           </form>
         </div>
