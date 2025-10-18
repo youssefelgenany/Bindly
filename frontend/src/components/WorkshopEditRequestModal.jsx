@@ -31,45 +31,11 @@ const WorkshopEditRequestModal = ({ open, onClose, workshop, onSubmitted }) => {
     setForm(prev => ({ ...prev, [field]: e.target.value }));
   };
 
-  const submitRequest = async (e) => {
+  // Close immediately on submit, do not send or modify the workshop
+  const submitRequest = (e) => {
     e.preventDefault();
-    setLoading(true);
-    setMessage('');
-    try {
-      const id = workshop._id || workshop.id;
-      if (!id) throw new Error('Invalid workshop id');
-
-      const payload = {
-        title: form.title,
-        location: form.location,
-        description: form.description,
-        startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
-        endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
-        capacity: form.capacity ? Number(form.capacity) : undefined
-        // note: professor/instructor is intentionally not sent (read-only)
-      };
-
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/events/workshops/${id}/edit-requests`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.msg || data?.message || 'Failed to submit request');
-
-      setMessage('Request submitted successfully.');
-      if (typeof onSubmitted === 'function') onSubmitted(data);
-    } catch (err) {
-      console.error('Edit request error', err);
-      setMessage(err.message || 'Submission failed');
-    } finally {
-      setLoading(false);
-    }
+    if (typeof onClose === 'function') onClose();
+    // do nothing else — workshop remains unchanged and no network request is made
   };
 
   const professor = workshop?.professorName || workshop?.instructor || '—';
