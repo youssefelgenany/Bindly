@@ -184,6 +184,27 @@ const StaffOnly = ({ children }) => {
   return isStaff ? children : <Navigate to="/dashboard" />;
 };
 
+// Staff and TA guard
+const StaffAndTAOnly = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
+      }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  const isStaffOrTA = user && (user.userType === 'Staff' || user.userType === 'TA');
+  return isStaffOrTA ? children : <Navigate to="/dashboard" />;
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -312,9 +333,9 @@ function App() {
               path="/staff/events"
               element={
                 <ProtectedRoute>
-                  <StaffOnly>
+                  <StaffAndTAOnly>
                     <StaffEventsView />
-                  </StaffOnly>
+                  </StaffAndTAOnly>
                 </ProtectedRoute>
               }
             />
@@ -322,9 +343,9 @@ function App() {
               path="/staff/my-registrations"
               element={
                 <ProtectedRoute>
-                  <StaffOnly>
+                  <StaffAndTAOnly>
                     <StaffMyRegistrations />
-                  </StaffOnly>
+                  </StaffAndTAOnly>
                 </ProtectedRoute>
               }
             />

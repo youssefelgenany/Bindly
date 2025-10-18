@@ -1,17 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/StudentMyRegistrations.css';
 
 const StudentMyRegistrations = () => {
+  const { user } = useAuth();
   const [registrations, setRegistrations] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [email, setEmail] = useState('');
-  const [searchEmail, setSearchEmail] = useState('');
 
-  const handleSearch = async () => {
-    if (!searchEmail.trim()) {
-      setError('Please enter your email address');
+  useEffect(() => {
+    if (user && user.email) {
+      loadMyRegistrations();
+    }
+  }, [user]);
+
+  const loadMyRegistrations = async () => {
+    if (!user?.email) {
+      setError('User email not available');
+      setLoading(false);
       return;
     }
 
@@ -19,13 +26,12 @@ const StudentMyRegistrations = () => {
     setError('');
 
     try {
-      console.log('🔍 Searching for registrations with email:', searchEmail.trim());
-      const result = await studentRegistrationApi.getMyRegistrations(searchEmail.trim());
+      console.log('🔍 Loading registrations for user:', user.email);
+      const result = await studentRegistrationApi.getMyRegistrations(user.email);
       console.log('🔍 API result:', result);
       
       if (result.success) {
         setRegistrations(result.data.registrations || []);
-        setEmail(searchEmail.trim());
         console.log('🔍 Set registrations:', result.data.registrations);
       } else {
         setError(result.message || 'Failed to fetch registrations');
@@ -175,26 +181,18 @@ const StudentMyRegistrations = () => {
       <div className="page-header">
         <h1>📋 My Event Registrations</h1>
         <p>View all your registered workshops and trips</p>
+        {user?.email && (
+          <div className="user-info">
+            <p><strong>Logged in as:</strong> {user.email}</p>
+          </div>
+        )}
       </div>
 
-      <div className="search-section">
-        <div className="search-form">
-          <div className="form-group">
-            <label htmlFor="email">Enter your email address to view registrations:</label>
-            <div className="input-group">
-              <input
-                type="email"
-                id="email"
-                placeholder="your.email@example.com"
-                value={searchEmail}
-                onChange={(e) => setSearchEmail(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              />
-              <button onClick={handleSearch}>🔍 Search</button>
-            </div>
-          </div>
+      {loading && (
+        <div className="loading-message">
+          <p>Loading your registrations...</p>
         </div>
-      </div>
+      )}
 
       {error && (
         <div className="error-message">
@@ -202,18 +200,18 @@ const StudentMyRegistrations = () => {
         </div>
       )}
 
-      {email && (
+      {!loading && user?.email && (
         <div className="results-header">
-          <h2>Registrations for {email}</h2>
+          <h2>Your Registrations</h2>
           <p>Found {registrations.length} registration{registrations.length !== 1 ? 's' : ''}</p>
         </div>
       )}
 
       <div className="registrations-grid">
-        {registrations.length === 0 && email ? (
+        {!loading && registrations.length === 0 && user?.email ? (
           <div className="no-registrations">
-            <p>No registrations found for this email address.</p>
-            <p>Make sure you've registered for workshops or trips using this email.</p>
+            <p>No registrations found for your account.</p>
+            <p>Make sure you've registered for workshops or trips using your email.</p>
           </div>
         ) : (
           registrations.map(registration => (

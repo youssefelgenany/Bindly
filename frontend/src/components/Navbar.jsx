@@ -287,6 +287,28 @@ const Navbar = () => {
                 </>
               )}
 
+              {/* TA Events View */}
+              {user.userType === 'TA' && (
+                <>
+                  <Link
+                    to="/staff/events"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📅 View Events
+                  </Link>
+                  <Link
+                    to="/staff/my-registrations"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📋 My Registrations
+                  </Link>
+                </>
+              )}
+
               {/* Events - visible to all stakeholders */}
               <Link
                 to="/events"
