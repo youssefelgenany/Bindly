@@ -17,11 +17,15 @@ const ProfessorGymSchedule = () => {
       setError('');
       const result = await professorApiService.getGymScheduleMonth({ year: y, month: m });
       if (result.success) {
-        setSessions(result.data.sessions || []);
+        // Ensure sessions is an array and filter out invalid sessions
+        const sessionsData = result.data.sessions || [];
+        const validSessions = sessionsData.filter(s => s && s.date);
+        setSessions(validSessions);
       } else {
         setError(result.message || 'Failed to load gym schedule');
       }
     } catch (e) {
+      console.error('Error loading gym schedule:', e);
       setError('Failed to load gym schedule');
     } finally {
       setLoading(false);
@@ -50,10 +54,21 @@ const ProfessorGymSchedule = () => {
   const sessionsByDate = useMemo(() => {
     const map = {};
     sessions.forEach(s => {
-      const d = new Date(s.date);
-      const key = d.toISOString().slice(0,10);
-      if (!map[key]) map[key] = [];
-      map[key].push(s);
+      // Skip sessions with invalid data
+      if (!s || !s.date) return;
+      
+      try {
+        const d = new Date(s.date);
+        // Skip if date is invalid
+        if (isNaN(d.getTime())) return;
+        
+        const key = d.toISOString().slice(0,10);
+        if (!map[key]) map[key] = [];
+        map[key].push(s);
+      } catch (error) {
+        console.warn('Invalid session data:', s, error);
+        return;
+      }
     });
     return map;
   }, [sessions]);
@@ -101,13 +116,20 @@ const ProfessorGymSchedule = () => {
                       {daySessions.length === 0 ? (
                         <div style={{ fontSize: 12, color: 'var(--text-light)', textAlign: 'center', marginTop: '0.5rem' }}>No sessions</div>
                       ) : (
-                        daySessions.map((s) => (
-                          <div key={s._id} style={{ border: '1px solid var(--medium-gray)', borderRadius: 6, padding: '0.5rem' }}>
-                            <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>{s.title || s.type}</div>
-                            <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{s.startTime} • {s.durationMinutes || s.duration} mins</div>
-                            <div style={{ fontSize: 12, color: 'var(--text-light)' }}>Capacity: {s.maxParticipants || s.capacity}</div>
-                          </div>
-                        ))
+                        daySessions.map((s) => {
+                          try {
+                            return (
+                              <div key={s._id} style={{ border: '1px solid var(--medium-gray)', borderRadius: 6, padding: '0.5rem' }}>
+                                <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>{s.title || s.type.charAt(0).toUpperCase() + s.type.slice(1)}</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{s.startTime || 'TBD'} • {s.durationMinutes || 60} mins</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-light)' }}>Capacity: {s.maxParticipants || 'TBD'}</div>
+                              </div>
+                            );
+                          } catch (error) {
+                            console.warn('Error rendering session:', s, error);
+                            return null;
+                          }
+                        })
                       )}
                     </div>
                   );

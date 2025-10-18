@@ -46,18 +46,27 @@ export const eventsApiService = {
   // Authenticated: fetch events visible to logged-in users
   getAllEventsAuthenticated: async (params = {}) => {
     try {
+      console.log('getAllEventsAuthenticated called with params:', params);
       const query = new URLSearchParams();
       if (params.q) query.append('q', params.q);
       if (params.type) query.append('type', params.type);
       if (params.status) query.append('status', params.status);
 
       const suffix = query.toString() ? `?${query.toString()}` : '';
-      const response = await eventsApi.get(`/${suffix}`);
+      const url = `/${suffix}`;
+      console.log('Making request to:', url);
+      
+      const response = await eventsApi.get(url);
+      console.log('Response received:', response.status, response.data);
+      
       const payload = response.data;
       // Backend getAllEvents returns an array; admin endpoint returns { events }
       const events = Array.isArray(payload) ? payload : (payload?.events || []);
       return { success: true, data: events };
     } catch (error) {
+      console.error('getAllEventsAuthenticated error:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
       return {
         success: false,
         message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch events',
