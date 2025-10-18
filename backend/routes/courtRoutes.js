@@ -1,22 +1,15 @@
 const express = require('express');
 const router = express.Router();
+const { protect, permit } = require('../middleware/authMiddleware');
 const {
   getCourtsForStudents,
   getCourtById,
   getCourtsByType
 } = require('../controllers/courtController');
 
-const { protect, permit } = require('../middleware/authMiddleware');
-
-// ================== COURT ROUTES ==================
-
-// Get all courts for students
-router.get('/student', protect, permit('Student'), getCourtsForStudents);
-
-// Get court by ID
-router.get('/:courtId', protect, permit('Student'), getCourtById);
-
-// Get courts by type
-router.get('/type/:type', protect, permit('Student'), getCourtsByType);
+// Public routes
+router.get('/', getCourtsForStudents);
+router.get('/:courtId', getCourtById);
+router.get('/type/:type', getCourtsByType);
 
 module.exports = router;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { professorApiService } from '../api/professorApi';
+import professorApiService from '../api/professorApi';
 
 const ProfessorDashboardOverview = () => {
   const [loading, setLoading] = useState(true);

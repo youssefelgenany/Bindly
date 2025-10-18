@@ -21,7 +21,6 @@ import VendorDashboard from './pages/VendorDashboard';
 import CreateConference from './pages/CreateConfrence';
 import EditConfrences from './pages/EditConfrences';
 import EventsList from './pages/EventsList';
-import Events from './pages/Events';
 import CreateBazaar from "./pages/CreateBazaar";
 import CreateTrip from './pages/CreateTrip';
 import CreateBooth from './pages/CreateBooth';
@@ -31,11 +30,7 @@ import VendorBazaars from './pages/VendorBazaars';
 import Confrences from './pages/Confrences';
 import VendorAccepted from './pages/VendorAccepted';
 import VendorRequests from './pages/VendorRequests';
-import StudentEventsView from './pages/StudentEventsView';
-import StudentMyRegistrations from './pages/StudentMyRegistrations';
-import StudentCourtsView from './pages/StudentCourtsView';
-import StaffEventsView from './pages/StaffEventsView';
-import StaffMyRegistrations from './pages/StaffMyRegistrations';
+import CourtAvailability from './pages/CourtAvailability';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -58,8 +53,13 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" />;
   }
 
-  // Check if user is verified (except for admin users who are always verified)
-  if (!user.isVerified && user.userType !== 'admin' && user.userType !== 'Admin') {
+  // Check if user is verified (except for admin users, students, and vendors who are always verified)
+  const isAutoVerified = user.userType === 'admin' || 
+                        user.userType === 'Admin' || 
+                        user.userType === 'Student' || 
+                        user.userType === 'Vendor';
+  
+  if (!user.isVerified && !isAutoVerified) {
     return <Navigate to="/pending-verification" />;
   }
 
@@ -106,8 +106,8 @@ const AdminOnly = ({ children }) => {
   }
 
   const isAdmin = user && (
-    user.role === 'admin' ||
-    user.userType === 'Admin' ||
+    user.role === 'admin' || 
+    user.userType === 'Admin' || 
     user.userType === 'admin'
   );
   return isAdmin ? children : <Navigate to="/dashboard" />;
@@ -266,65 +266,7 @@ function App() {
               path="/events"
               element={
                 <ProtectedRoute>
-                  <Events />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/events/manage"
-              element={
-                <ProtectedRoute>
                   <EventsList />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/student/events"
-              element={
-                <ProtectedRoute>
-                  <StudentOnly>
-                    <StudentEventsView />
-                  </StudentOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/student/my-registrations"
-              element={
-                <ProtectedRoute>
-                  <StudentOnly>
-                    <StudentMyRegistrations />
-                  </StudentOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/student/courts"
-              element={
-                <ProtectedRoute>
-                  <StudentOnly>
-                    <StudentCourtsView />
-                  </StudentOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/events"
-              element={
-                <ProtectedRoute>
-                  <StaffOnly>
-                    <StaffEventsView />
-                  </StaffOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/my-registrations"
-              element={
-                <ProtectedRoute>
-                  <StaffOnly>
-                    <StaffMyRegistrations />
-                  </StaffOnly>
                 </ProtectedRoute>
               }
             />
@@ -333,6 +275,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <GymSchedule />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/courts"
+              element={
+                <ProtectedRoute>
+                  <CourtAvailability />
                 </ProtectedRoute>
               }
             />
