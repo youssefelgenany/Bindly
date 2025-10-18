@@ -397,6 +397,37 @@ export const adminApiService = {
       };
     }
   },
+
+  // Send verification email to user
+  sendVerificationEmail: async (userId) => {
+    try {
+      const url = `/users/${userId}/send-verification-email`;
+      console.log('🌐 Making send verification email API call to:', url);
+      console.log('📊 User ID:', userId);
+      console.log('🔑 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+      console.log('🔑 Full URL will be:', `/api/admin${url}`);
+      
+      const response = await adminApi.post(url);
+      
+      console.log('✅ Send Verification Email Response:', response.data);
+      console.log('✅ Response Status:', response.status);
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('❌ Error sending verification email:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Full error object:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to send verification email',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
 };
 
 export default adminApiService;

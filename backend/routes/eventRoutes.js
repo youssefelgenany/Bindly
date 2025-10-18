@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   createEvent,
   getAllEvents,
+  getAllEventsForStudents,
   getAllEventsForAdmin,
   getEventById,
   updateEvent,
@@ -28,6 +29,9 @@ router.post(
 
 // 📅 Get all events (everyone logged in)
 router.get("/", protect, getAllEvents);
+
+// 📅 Get all events for students and staff with vendor details
+router.get("/student", protect, permit("Student", "Staff"), getAllEventsForStudents);
 
 // 📅 Get all events for admin management (including pending)
 router.get("/admin/all", protect, permit("admin"), getAllEventsForAdmin);

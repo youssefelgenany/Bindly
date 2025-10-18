@@ -235,6 +235,50 @@ const Navbar = () => {
             </div>
 
             <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+              {/* Student Events View */}
+              {user.userType === 'Student' && (
+                <>
+                  <Link
+                    to="/student/events"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📅 View Events
+                  </Link>
+                  <Link
+                    to="/student/my-registrations"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📋 My Registrations
+                  </Link>
+                </>
+              )}
+
+              {/* Staff Events View */}
+              {user.userType === 'Staff' && (
+                <>
+                  <Link
+                    to="/staff/events"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📅 View Events
+                  </Link>
+                  <Link
+                    to="/staff/my-registrations"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📋 My Registrations
+                  </Link>
+                </>
+              )}
+
               {!(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'admin' || user.userType === 'Event Office' || user.userType === 'event_office') && (
                 <Link
                   to="/gym"

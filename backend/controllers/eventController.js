@@ -1,6 +1,7 @@
 const Event = require("../models/eventModel");
 const Registration = require("../models/registrationModel");
 const Trip = require("../models/tripModel");
+const VendorRequest = require("../models/vendorRequest");
 // 🎯 Create a new event (Admin or Event Office)
 exports.createEvent = async (req, res) => {
   try {
@@ -170,6 +171,157 @@ exports.getAllEvents = async (req, res) => {
   } catch (err) {
     console.error("❌ Error fetching events:", err);
     res.status(500).json({ msg: "Server error" });
+  }
+};
+
+// 📅 Get all events for students with vendor details for bazaars
+exports.getAllEventsForStudents = async (req, res) => {
+  try {
+    const { q, type, status } = req.query;
+    
+    console.log('🔍 Student search query:', q);
+    
+    // Build filter for approved events that haven't started yet
+    const filter = { 
+      status: 'approved',
+      startDate: { $gt: new Date() } // Only events that start in the future
+    };
+    
+    if (type && type !== 'all') filter.type = type;
+
+    // Get events with creator information
+    const pipeline = [
+      { $match: filter },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'creator'
+        }
+      },
+      { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
+      // Add creator name fields for easier searching
+      {
+        $addFields: {
+          creatorFullName: {
+            $concat: [
+              { $ifNull: ['$creator.firstName', ''] },
+              ' ',
+              { $ifNull: ['$creator.lastName', ''] }
+            ]
+          }
+        }
+      },
+      // Apply search filter after adding creator name
+      ...(q ? [{
+        $match: {
+          $or: [
+            { title: new RegExp(q, "i") },
+            { description: new RegExp(q, "i") },
+            { location: new RegExp(q, "i") },
+            { faculty: new RegExp(q, "i") },
+            { professors: new RegExp(q, "i") },
+            { creatorFullName: new RegExp(q, "i") }
+          ]
+        }
+      }] : []),
+      { $sort: { startDate: 1 } },
+      {
+        $project: {
+          _id: 1,
+          title: 1,
+          description: 1,
+          type: 1,
+          startDate: 1,
+          endDate: 1,
+          registrationDeadline: 1,
+          location: 1,
+          capacity: 1,
+          price: 1,
+          registeredCount: 1,
+          status: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          agenda: 1,
+          website: 1,
+          budget: 1,
+          fundingSource: 1,
+          extraResources: 1,
+          faculty: 1,
+          professors: 1,
+          bannerFile: 1,
+          createdBy: {
+            _id: '$creator._id',
+            firstName: '$creator.firstName',
+            lastName: '$creator.lastName',
+            email: '$creator.email',
+            userType: '$creator.userType'
+          }
+        }
+      }
+    ];
+
+    const events = await Event.aggregate(pipeline);
+    
+    console.log('🔍 Found events:', events.length);
+    if (q) {
+      console.log('🔍 Search results for query "' + q + '":', events.map(e => ({
+        title: e.title,
+        creatorName: e.creatorFullName,
+        creator: e.createdBy
+      })));
+    }
+    
+    // For each event, get vendor details if it's a bazaar
+    const eventsWithVendors = await Promise.all(
+      events.map(async (event) => {
+        let vendors = [];
+        
+        if (event.type === 'bazaar') {
+          try {
+            const vendorRequests = await VendorRequest.find({
+              bazaar: event._id,
+              status: 'accepted'
+            })
+            .populate('vendor', 'companyName firstName lastName email')
+            .select('vendor attendees boothSize createdAt');
+            
+            vendors = vendorRequests.map(req => ({
+              id: req._id,
+              companyName: req.vendor?.companyName || `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim(),
+              email: req.vendor?.email || '',
+              attendees: req.attendees || [],
+              boothSize: req.boothSize || null,
+              joinedAt: req.createdAt
+            }));
+          } catch (vendorErr) {
+            console.error('Error fetching vendors for bazaar:', vendorErr);
+            vendors = [];
+          }
+        }
+        
+        return {
+          ...event,
+          vendors,
+          creatorName: event.createdBy ? `${event.createdBy.firstName || ''} ${event.createdBy.lastName || ''}`.trim() : null,
+          creatorRole: event.createdBy ? (event.createdBy.userType || null) : null,
+          creatorFirstName: event.createdBy?.firstName || null,
+          creatorLastName: event.createdBy?.lastName || null,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      events: eventsWithVendors
+    });
+  } catch (err) {
+    console.error("❌ Error fetching events for students:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error" 
+    });
   }
 };
 
