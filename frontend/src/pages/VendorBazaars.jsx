@@ -24,6 +24,7 @@ const VendorBazaars = () => {
 
     // Load bazaars
     useEffect(() => {
+        
         const loadBazaars = async () => {
             try {
                 setLoading(true);
