@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { gymApiService } from '../api/gymApi';
+import gymApi from '../api/gymApi'; // axios instance
 
 const TYPES = ['Yoga', 'Pilates', 'Aerobics', 'Zumba', 'Cross Circuit', 'Kick-boxing', 'Crossfit', 'Strength', 'Cardio'];
 
@@ -41,23 +41,44 @@ const GymManage = () => {
       setMessage('Max participants must be a positive number.');
       return;
     }
+
     const start = new Date(`${form.date}T${form.time}:00`);
     const payload = {
-      type: form.type,
+      title: `${form.type} Session`,
+      type: form.type.toLowerCase(),
       durationMinutes: Number(form.durationMinutes) || 60,
+      // keep date/time in case backend expects them
+      date: form.date,
+      time: form.time,
       startTime: start.toISOString(),
       instructor: form.instructor || undefined,
       maxParticipants: Number(form.maxParticipants),
       capacity: Number(form.maxParticipants),
     };
+
     setSubmitting(true);
-    const res = await gymApiService.createSession(payload);
-    setSubmitting(false);
-    if (res.success) {
-      setMessage('Session created successfully.');
-      setForm({ date: '', time: '', durationMinutes: 60, type: TYPES[0], instructor: '', maxParticipants: 30 });
-    } else {
-      setMessage(res.message);
+
+    try {
+      console.log('Creating gym session payload:', payload);
+
+      // try POST to /sessions first (preferred). If your backend uses root '/', change to '/'
+      const response = await gymApi.post('/sessions', payload);
+
+      console.log('Create session response:', response);
+      // success status may be 201 or 200 depending on backend
+      if (response.status >= 200 && response.status < 300) {
+        setMessage('Session created successfully.');
+        setForm({ date: '', time: '', durationMinutes: 60, type: TYPES[0], instructor: '', maxParticipants: 30 });
+      } else {
+        setMessage(response.data?.msg || 'Failed to create session');
+      }
+    } catch (err) {
+      console.error('create session error', err);
+      // prefer backend message if available
+      const serverMsg = err.response?.data?.msg || err.response?.data?.message || err.message;
+      setMessage(serverMsg || 'Failed to create session');
+    } finally {
+      setSubmitting(false);
     }
   };
 

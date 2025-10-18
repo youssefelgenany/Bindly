@@ -138,6 +138,21 @@ const GymSchedule = () => {
                         const start = new Date(s.startTime || s.date);
                         const duration = s.durationMinutes || s.duration || 60;
                         const end = new Date(start.getTime() + duration * 60000);
+
+                        // prefer explicit instructor, then createdBy name, else 'TBD'
+                        const instructorName = (() => {
+                          if (s.instructor && String(s.instructor).trim()) return String(s.instructor).trim();
+                          if (s.createdBy) {
+                            if (typeof s.createdBy === 'string' && s.createdBy.trim()) return s.createdBy.trim();
+                            const fn = s.createdBy.firstName || s.createdBy.first || '';
+                            const ln = s.createdBy.lastName || s.createdBy.last || '';
+                            const full = `${fn} ${ln}`.trim();
+                            if (full) return full;
+                            if (s.createdBy.name && String(s.createdBy.name).trim()) return String(s.createdBy.name).trim();
+                          }
+                          return 'TBD';
+                        })();
+
                         return (
                           <div key={s._id || s.id || idx} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', gap: '0.75rem', background: 'var(--white)', border: '1px solid var(--medium-gray)', borderRadius: 10, padding: '0.75rem 1rem' }}>
                             <div style={{
@@ -153,7 +168,7 @@ const GymSchedule = () => {
                             </div>
                             <div>
                               <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>{s.type}</div>
-                              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>👤 {s.instructor || 'TBD'} • ⏱ {duration} min</div>
+                              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>👤 {instructorName} • ⏱ {duration} min</div>
                             </div>
                             <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--text-light)' }}>
                               Ends {end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}

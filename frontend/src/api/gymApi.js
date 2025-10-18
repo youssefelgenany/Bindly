@@ -6,12 +6,12 @@ const gymApi = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
-// Attach token if available (some endpoints may require auth)
+// attach bearer token if stored in localStorage (optional)
 gymApi.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
-});
+}, (err) => Promise.reject(err));
 
 export const gymApiService = {
   getMonthlySessions: async (year, month) => {
@@ -36,6 +36,7 @@ export const gymApiService = {
   },
 };
 
-export default gymApiService;
+// Export axios instance as default so other files can call gymApi.post(...)
+export default gymApi;
 
 
