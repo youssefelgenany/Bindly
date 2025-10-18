@@ -425,8 +425,8 @@ const EventsList = () => {
               <div className="event-info">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                 <h3>{event.name}</h3>
-                  {/* Status Badge - Only show for non-trip and non-bazaar events */}
-                  {event.type !== 'trip' && event.type !== 'bazaar' && (
+                  {/* Status Badge - Only show for workshops and other non-trip/bazaar/conference events */}
+                  {event.type !== 'trip' && event.type !== 'bazaar' && event.type !== 'conference' && (
                     <span style={{
                       padding: '6px 12px',
                       borderRadius: '6px',
@@ -489,8 +489,8 @@ const EventsList = () => {
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     {/* Debug logging */}
                     {console.log('🔍 Event status for buttons:', event.id, event.status)}
-                    {/* Status Management Buttons - Show Accept/Reject only for non-trip and non-bazaar events */}
-                    {event.type !== 'trip' && event.type !== 'bazaar' && (
+                    {/* Status Management Buttons - Show Accept/Reject only for workshops and other non-trip/bazaar/conference events */}
+                    {event.type !== 'trip' && event.type !== 'bazaar' && event.type !== 'conference' && (
                       <>
                         <button
                           className="btn btn-primary"
