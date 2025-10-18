@@ -14,7 +14,8 @@ const GymSchedule = () => {
 
   const load = async () => {
     setLoading(true); setError('');
-    const res = await gymApiService.getMonthlySessions(year, month);
+    // send month as 1-12 to backend (component keeps 0-11 for Date APIs)
+    const res = await gymApiService.getMonthlySessions(year, month + 1);
     if (res.success) setSessions(res.data.sessions || []); else setError(res.message);
     setLoading(false);
   };
