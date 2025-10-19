@@ -31,7 +31,7 @@ router.post(
 router.get("/", protect, getAllEvents);
 
 // 📅 Get all events for students and staff with vendor details
-router.get("/student", protect, permit("Student", "Staff", "TA", "Professor", "Event Office"), getAllEventsForStudents);
+router.get("/student", protect, permit("Student", "Staff", "TA", "Professor", "Event Office", "Events Office", "event_office"), getAllEventsForStudents);
 
 // 📅 Get all events for admin management (including pending)
 router.get("/admin/all", protect, permit("admin"), getAllEventsForAdmin);

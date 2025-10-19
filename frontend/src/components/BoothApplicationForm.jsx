@@ -65,13 +65,14 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
         try {
             setSubmitting(true);
             const result = await onSubmit({
-                eventType: 'booth',
+                eventType: booth.type === 'standaloneBooth' ? 'standaloneBooth' : 'booth',
                 eventId: booth._id,
                 attendees: cleanAttendees,
                 boothSize: formData.boothSize,
                 durationWeeks: formData.durationWeeks,
                 boothLocation: formData.boothLocation,
-                message: formData.message
+                message: formData.message,
+                isStandalone: booth.type === 'standaloneBooth'
             });
 
             const successText = result?.message || 'Booth application submitted successfully!';

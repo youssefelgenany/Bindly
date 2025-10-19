@@ -16,27 +16,26 @@ module.exports.viewUpcomingEvents = async (req, res) => {
     // Handle standaloneBooth type separately
     if (type === 'standaloneBooth') {
       const standaloneBooths = await Event.find({ 
-        type: 'standaloneBooth',
-        boothStatus: 'free' // Only show free booths
+        type: 'booth', // Changed from 'standaloneBooth' to 'booth' to show real booth events
+        status: 'approved' // Show approved booth events
       })
-        .populate('createdBy', 'name email')
-        .sort({ boothNumber: 1 })
+        .populate('createdBy', 'firstName lastName email')
+        .sort({ startDate: 1 })
         .lean();
       
-      // Map standalone booth structure to match frontend expectations
+      // Map booth events structure to match frontend expectations
       const mappedBooths = standaloneBooths.map(booth => ({
         _id: booth._id,
-        name: `Booth ${booth.boothNumber} - ${booth.location}`,
-        title: `Booth ${booth.boothNumber} - ${booth.location}`,
-        boothNumber: booth.boothNumber,
-        location: booth.location,
+        name: booth.title,
+        title: booth.title,
         description: booth.description,
-        boothSize: booth.boothSize,
+        startDate: booth.startDate,
+        endDate: booth.endDate,
+        location: booth.location,
         capacity: booth.capacity,
         price: booth.price,
-        amenities: booth.amenities,
-        status: booth.boothStatus,
-        type: 'standaloneBooth'
+        status: booth.status,
+        type: 'standaloneBooth' // Keep the frontend type as standaloneBooth for compatibility
       }));
       
       return res.json(mappedBooths);
@@ -160,7 +159,7 @@ module.exports.applyToEvent = async (req, res) => {
     }
 
     const vendorId = req.user._id || req.user.id;
-    const { eventId, attendees, boothSize, durationWeeks, boothLocation, message, eventType } = req.body;
+    const { eventId, attendees, boothSize, durationWeeks, boothLocation, message, eventType, isStandalone } = req.body;
 
     // Validate vendor role
     const vendor = await User.findById(vendorId);
@@ -198,19 +197,31 @@ module.exports.applyToEvent = async (req, res) => {
       return res.status(400).json({ message: 'Booth size required for bazaar' });
     }
     if (event.type === 'booth') {
-      if (!durationWeeks || !boothLocation || durationWeeks < 1 || durationWeeks > 4) {
-        return res.status(400).json({ message: 'Valid duration (1-4 weeks) and platform location required for booth' });
-      }
+      // Check if this is a standalone booth event
+      // Can be determined by either isStandalone parameter or eventType
+      const isStandaloneBooth = isStandalone === true || eventType === 'standaloneBooth';
+      
+      if (isStandaloneBooth) {
+        // For standalone booth events, only duration is required
+        if (!durationWeeks || durationWeeks < 1 || durationWeeks > 4) {
+          return res.status(400).json({ message: 'Valid duration (1-4 weeks) required for standalone booth' });
+        }
+      } else {
+        // For regular booth events, both duration and location are required
+        if (!durationWeeks || !boothLocation || durationWeeks < 1 || durationWeeks > 4) {
+          return res.status(400).json({ message: 'Valid duration (1-4 weeks) and platform location required for booth' });
+        }
 
-      // Validate booth location is from predefined list
-      const validLocations = [
-        'main-entrance', 'food-court', 'central-plaza', 'student-center',
-        'library-area', 'gym-entrance', 'parking-lot', 'garden-section',
-        'auditorium-hall', 'cafeteria-area'
-      ];
+        // Validate booth location is from predefined list
+        const validLocations = [
+          'main-entrance', 'food-court', 'central-plaza', 'student-center',
+          'library-area', 'gym-entrance', 'parking-lot', 'garden-section',
+          'auditorium-hall', 'cafeteria-area'
+        ];
 
-      if (!validLocations.includes(boothLocation)) {
-        return res.status(400).json({ message: 'Invalid booth location. Please select from the provided options.' });
+        if (!validLocations.includes(boothLocation)) {
+          return res.status(400).json({ message: 'Invalid booth location. Please select from the provided options.' });
+        }
       }
     }
     if (event.type === 'standaloneBooth') {
@@ -261,6 +272,9 @@ module.exports.applyToEvent = async (req, res) => {
     if (event.type === 'bazaar') {
       requestData.bazaar = eventId;
     } else if (event.type === 'booth') {
+      // Check if this is a standalone booth event
+      const isStandaloneBooth = isStandalone === true || eventType === 'standaloneBooth';
+      
       if (isStandaloneBooth) {
         requestData.standaloneBooth = eventId;
       } else {

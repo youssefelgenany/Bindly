@@ -1,37 +1,37 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ConferenceForm from '../components/ConferenceForm';
-import axios from 'axios';
-import '../styles/CreateBazaar.css';
+import GymSessionForm from '../components/GymSessionForm';
+import { gymSessionApi } from '../api/gymSessionApi';
+import '../styles/CreateGymSession.css';
 
-const CreateConference = () => {
+const CreateGymSession = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  const handleCreateConference = async (conferenceData) => {
+  const handleCreateGymSession = async (gymSessionData) => {
     setLoading(true);
     setMessage({ type: '', text: '' });
 
     try {
-      const result = await axios.post("http://localhost:5000/api/events/conference", conferenceData);
+      const result = await gymSessionApi.create(gymSessionData);
       
-      if (result.data.msg && result.data.msg.includes('successfully')) {
+      if (result.success) {
         setMessage({ 
           type: 'success', 
-          text: 'Conference created successfully! Redirecting...' 
+          text: 'Gym session created successfully! Redirecting...' 
         });
         setTimeout(() => navigate('/student/events'), 2000);
       } else {
         setMessage({ 
           type: 'error', 
-          text: result.data.msg || 'Error creating conference' 
+          text: result.message || 'Error creating gym session' 
         });
       }
     } catch (error) {
       setMessage({ 
         type: 'error', 
-        text: error.response?.data?.msg || 'Network error. Please try again.' 
+        text: 'Network error. Please try again.' 
       });
     } finally {
       setLoading(false);
@@ -39,10 +39,10 @@ const CreateConference = () => {
   };
 
   return (
-    <div className="create-bazaar-page">
+    <div className="create-gym-session-page">
       <div className="page-header">
-        <h1 className="page-title">Create New Conference</h1>
-        <p className="page-subtitle">Add all the details for your new conference event</p>
+        <h1 className="page-title">Create Gym Session</h1>
+        <p className="page-subtitle">Add all the details for your new gym session</p>
       </div>
       
       {message.text && (
@@ -52,10 +52,10 @@ const CreateConference = () => {
       )}
 
       <div className="form-container">
-        <ConferenceForm 
-          onSubmit={handleCreateConference}
+        <GymSessionForm 
+          onSubmit={handleCreateGymSession}
           loading={loading}
-          submitLabel="Create Conference"
+          submitLabel="Create Gym Session"
           loadingLabel="Creating..."
         />
       </div>
@@ -63,4 +63,4 @@ const CreateConference = () => {
   );
 };
 
-export default CreateConference;
+export default CreateGymSession;

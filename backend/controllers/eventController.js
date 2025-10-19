@@ -234,14 +234,35 @@ exports.getAllEventsForStudents = async (req, res) => {
     const { q, type, status } = req.query;
     
     console.log('🔍 Student search query:', q);
+    console.log('🔍 User type:', req.user.userType);
+    console.log('🔍 User role:', req.user.role);
+    console.log('🔍 User ID:', req.user._id);
+    console.log('🔍 Event type filter:', type);
+    console.log('🔍 Status filter:', status);
     
-    // Build filter for approved events that haven't started yet
+    // Build filter - Event Office users can see all events, others only see approved
     const filter = { 
-      status: 'approved',
       startDate: { $gt: new Date() } // Only events that start in the future
     };
     
+    // Only filter by status for non-Event Office users
+    const isEventOffice = req.user.userType === 'Event Office' || 
+                         req.user.userType === 'Events Office' || 
+                         req.user.userType === 'event_office' || 
+                         req.user.role === 'event_office' || 
+                         req.user.role === 'Event Office' ||
+                         req.user.userType === 'event office' ||
+                         req.user.role === 'event office';
+    
+    if (!isEventOffice) {
+      filter.status = 'approved';
+      console.log('🔍 Non-Event Office user - filtering to approved only');
+    } else {
+      console.log('🔍 Event Office user - showing all statuses');
+    }
+    
     if (type && type !== 'all') filter.type = type;
+    console.log('🔍 Final filter:', filter);
 
     // Get events with creator information
     const pipeline = [
@@ -326,6 +347,16 @@ exports.getAllEventsForStudents = async (req, res) => {
         creator: e.createdBy
       })));
     }
+    
+    console.log('🔍 Found events:', events.length);
+    console.log('🔍 Events by type:', events.reduce((acc, ev) => {
+      acc[ev.type] = (acc[ev.type] || 0) + 1;
+      return acc;
+    }, {}));
+    console.log('🔍 Events by status:', events.reduce((acc, ev) => {
+      acc[ev.status] = (acc[ev.status] || 0) + 1;
+      return acc;
+    }, {}));
     
     // For each event, get vendor details if it's a bazaar
     const eventsWithVendors = await Promise.all(
@@ -446,6 +477,10 @@ exports.updateEvent = async (req, res) => {
       console.log('❌ Event not found:', id);
       return res.status(404).json({ msg: "Event not found" });
     }
+
+    console.log('🔍 Event type:', event.type);
+    console.log('🔍 Title field:', updates.title);
+    console.log('🔍 Name field:', updates.name);
 
     // Check if professor is trying to edit someone else's event
     if (req.user.userType === "Professor" && event.createdBy.toString() !== req.user._id.toString()) {
