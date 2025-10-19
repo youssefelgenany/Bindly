@@ -43,7 +43,7 @@ const Navbar = () => {
       }}>
         {/* Left group: brand only */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {user && (
+          {user && user.userType !== 'Vendor' && (
             <button
               onClick={toggleSidebar}
               className="btn btn-outline"
@@ -168,7 +168,7 @@ const Navbar = () => {
       </div>
 
       {/* Right Sidebar Overlay */}
-      {user && (
+      {user && user.userType !== 'Vendor' && (
         <>
           {/* Dim Background */}
           <div
@@ -317,17 +317,6 @@ const Navbar = () => {
                 </>
               )}
 
-              {/* Events - visible to all stakeholders except admin, TA, Staff, Student, Professor, and Event Office */}
-              {!(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'admin' || user.userType === 'TA' || user.userType === 'Staff' || user.userType === 'Student' || user.userType === 'Professor' || user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
-                <Link
-                  to="/events"
-                  className="btn btn-outline"
-                  style={{ width: '100%' }}
-                  onClick={closeSidebar}
-                >
-                  View All Events
-                </Link>
-              )}
 
               {/* Gym Schedule - visible to Student, Staff, TA, Professor, Event Office */}
               {(user.userType === 'Student' || user.userType === 'Staff' || user.userType === 'TA' || user.userType === 'Professor' || user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (

@@ -219,8 +219,8 @@ module.exports.applyToEvent = async (req, res) => {
           'auditorium-hall', 'cafeteria-area'
         ];
 
-        if (!validLocations.includes(boothLocation)) {
-          return res.status(400).json({ message: 'Invalid booth location. Please select from the provided options.' });
+        if (!boothLocation || boothLocation.trim() === '' || !validLocations.includes(boothLocation)) {
+          return res.status(400).json({ message: 'Valid booth location is required. Please select from the provided options.' });
         }
       }
     }
@@ -249,7 +249,7 @@ module.exports.applyToEvent = async (req, res) => {
       existingRequest.boothSize = boothSize;
       if (eventType === 'booth') {
         existingRequest.durationWeeks = durationWeeks;
-        existingRequest.boothLocation = boothLocation;
+        existingRequest.boothLocation = (boothLocation && boothLocation.trim() !== '') ? boothLocation : undefined;
       }
       if (typeof message === 'string') existingRequest.message = message;
       await existingRequest.save();
@@ -261,7 +261,7 @@ module.exports.applyToEvent = async (req, res) => {
       attendees,
       boothSize: event.type === 'bazaar' ? boothSize : undefined,
       durationWeeks: (event.type === 'booth' || event.type === 'standaloneBooth') ? durationWeeks : undefined,
-      boothLocation: event.type === 'booth' ? boothLocation : undefined,
+      boothLocation: (event.type === 'booth' && boothLocation && boothLocation.trim() !== '') ? boothLocation : undefined,
       message,
       // denormalized fields for quick access
       eventName: event.title || event.name,

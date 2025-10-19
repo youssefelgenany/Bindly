@@ -453,7 +453,7 @@ const VendorDashboard = () => {
                                             e.currentTarget.style.background = 'var(--guc-red)';
                                         }}
                                     >
-                                        Browse Upcoming Bazaars
+                                        Browse Upcoming Events
                                     </div>
                                 </Link>
                             </div>
