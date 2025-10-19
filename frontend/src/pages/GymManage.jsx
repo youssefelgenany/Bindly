@@ -7,7 +7,8 @@ const TYPES = [
   { label: 'Pilates', value: 'pilates' },
   { label: 'Aerobics', value: 'aerobics' },
   { label: 'Zumba', value: 'zumba' },
-  { label: 'Crossfit', value: 'crossfit' },
+  { label: 'Cross Circuit', value: 'cross circuit' },
+  { label: 'Kick-boxing', value: 'kick-boxing' },
   { label: 'Strength Training', value: 'strength' },
   { label: 'Cardio', value: 'cardio' },
   { label: 'Other', value: 'other' }

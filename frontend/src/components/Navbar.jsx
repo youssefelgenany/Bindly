@@ -329,8 +329,8 @@ const Navbar = () => {
                 </Link>
               )}
 
-              {/* Gym Schedule - visible to Student, Staff, Professor, Event Office */}
-              {(user.userType === 'Student' || user.userType === 'Staff' || user.userType === 'Professor' || user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
+              {/* Gym Schedule - visible to Student, Staff, TA, Professor, Event Office */}
+              {(user.userType === 'Student' || user.userType === 'Staff' || user.userType === 'TA' || user.userType === 'Professor' || user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
                 <Link
                   to="/gym"
                   className="btn btn-outline"
