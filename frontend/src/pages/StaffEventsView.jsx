@@ -35,9 +35,38 @@ const StaffEventsView = () => {
     try {
       setError('');
       console.log('🔍 Frontend search query:', searchQuery);
+      
+      // Check if search query matches an event type
+      const queryLower = searchQuery.toLowerCase().trim();
+      let searchType = filter;
+      let searchQueryProcessed = searchQuery;
+      
+      // Auto-detect event type from search query
+      if (queryLower === 'trip' || queryLower === 'trips') {
+        searchType = 'trip';
+        searchQueryProcessed = ''; // Clear the search query since we're filtering by type
+        setFilter('trip'); // Update the filter state to reflect the active filter
+        setSearchQuery(''); // Clear the search input to show the filter is applied
+      } else if (queryLower === 'workshop' || queryLower === 'workshops') {
+        searchType = 'workshop';
+        searchQueryProcessed = ''; // Clear the search query since we're filtering by type
+        setFilter('workshop'); // Update the filter state to reflect the active filter
+        setSearchQuery(''); // Clear the search input to show the filter is applied
+      } else if (queryLower === 'bazaar' || queryLower === 'bazaars') {
+        searchType = 'bazaar';
+        searchQueryProcessed = ''; // Clear the search query since we're filtering by type
+        setFilter('bazaar'); // Update the filter state to reflect the active filter
+        setSearchQuery(''); // Clear the search input to show the filter is applied
+      } else if (queryLower === 'conference' || queryLower === 'conferences') {
+        searchType = 'conference';
+        searchQueryProcessed = ''; // Clear the search query since we're filtering by type
+        setFilter('conference'); // Update the filter state to reflect the active filter
+        setSearchQuery(''); // Clear the search input to show the filter is applied
+      }
+      
       const result = await eventsApiService.getStudentEvents({
-        q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
-        type: filter !== 'all' ? filter : undefined
+        q: searchQueryProcessed && searchQueryProcessed.trim() ? searchQueryProcessed.trim() : undefined,
+        type: searchType !== 'all' ? searchType : undefined
       });
       
       if (result.success) {
@@ -394,7 +423,7 @@ const StaffEventsView = () => {
         <div className="search-bar">
           <input
             type="text"
-            placeholder="Search by event name, professor name, location, or description..."
+            placeholder="Search by event name, professor name, location, description, or type (trip, workshop, bazaar, conference)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -464,6 +493,11 @@ const StaffEventsView = () => {
             {searchQuery && ` matching "${searchQuery}"`}
             {filter !== 'all' && ` in ${filter} category`}
           </p>
+          {filter !== 'all' && (
+            <p style={{ fontSize: '14px', color: '#6c757d', marginTop: '5px' }}>
+              💡 Tip: You can also type "{filter}" in the search box to filter by event type
+            </p>
+          )}
         </div>
       )}
 
