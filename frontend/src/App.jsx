@@ -24,6 +24,7 @@ import EventsList from './pages/EventsList';
 import CreateBazaar from "./pages/CreateBazaar";
 import CreateTrip from './pages/CreateTrip';
 import CreateBooth from './pages/CreateBooth';
+import CreateGymSession from './pages/CreateGymSession';
 import EditBazaar from './pages/EditBazaar';
 import EditTrip from './pages/EditTrip';
 import VendorBazaars from './pages/VendorBazaars';
@@ -505,6 +506,16 @@ function App() {
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <CreateBooth />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/create-gym-session"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <CreateGymSession />
                   </EventsOfficeOnly>
                 </ProtectedRoute>
               }

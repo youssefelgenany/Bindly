@@ -21,7 +21,7 @@ const CreateTrip = () => {
           type: 'success', 
           text: 'Trip created successfully! Redirecting...' 
         });
-        setTimeout(() => navigate('/events'), 2000);
+        setTimeout(() => navigate('/student/events'), 2000);
       } else {
         setMessage({ 
           type: 'error', 

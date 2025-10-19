@@ -32,6 +32,7 @@ const vendorRoutes = require("./routes/vendorRoutes");
 const studentRegistrationRoutes = require("./routes/studentRegistrationRoutes");
 const courtRoutes = require("./routes/courtRoutes");
 const boothRoutes = require("./routes/boothRoutes");
+const gymSessionRoutes = require("./routes/gymSessionRoutes");
 const { verifyByToken } = require("./controllers/authVerifyController");
 
 // Mount routes
@@ -50,6 +51,7 @@ app.use("/api/workshops", workshopRoutes);
 app.use("/api/student-registrations", studentRegistrationRoutes);
 app.use("/api/courts", courtRoutes);
 app.use("/api/booths", boothRoutes);
+app.use("/api/gym-sessions", gymSessionRoutes);
 
 // Email verification link route
 app.get("/api/verify", verifyByToken);

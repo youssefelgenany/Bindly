@@ -1,51 +1,68 @@
 const mongoose = require('mongoose');
 
 const gymSessionSchema = new mongoose.Schema({
-  title: {
-    type: String,
-    required: true,
-    trim: true
-  },
   date: {
     type: Date,
     required: true
   },
-  startTime: {
+  time: {
     type: String,
     required: true
   },
-  durationMinutes: {
-    type: Number,
+  duration: {
+    type: Number, // Duration in minutes
     required: true
   },
   type: {
     type: String,
     required: true,
-    enum: ['cardio', 'strength', 'yoga', 'pilates', 'aerobics', 'zumba', 'crossfit', 'other']
+    enum: ['yoga', 'pilates', 'aerobics', 'zumba', 'cross circuit', 'kick-boxing']
   },
   maxParticipants: {
     type: Number,
     required: true,
     min: 1
   },
+  currentParticipants: {
+    type: Number,
+    default: 0
+  },
   instructor: {
     type: String,
-    trim: true,
-    default: null
+    default: ''
+  },
+  location: {
+    type: String,
+    default: 'Gym'
+  },
+  description: {
+    type: String,
+    default: ''
+  },
+  status: {
+    type: String,
+    enum: ['active', 'cancelled', 'completed'],
+    default: 'active'
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  participants: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
   }
+});
+
+// Update the updatedAt field before saving
+gymSessionSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
 });
 
 module.exports = mongoose.model('GymSession', gymSessionSchema);
