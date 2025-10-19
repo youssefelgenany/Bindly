@@ -9,7 +9,7 @@ const AdminEvents = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
-  const [organizerFilter, setOrganizerFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
 
   // Action states
   const [processingIds, setProcessingIds] = useState({}); // id -> boolean
@@ -25,10 +25,11 @@ const AdminEvents = () => {
     try {
       setLoading(true);
       setError('');
-      console.log('Loading events with filters:', { q: searchQuery, status: statusFilter });
+      console.log('Loading events with filters:', { q: searchQuery, status: statusFilter, type: typeFilter });
       const result = await adminApiService.getAllEvents({
         q: searchQuery,
-        status: statusFilter
+        status: statusFilter,
+        ...(typeFilter !== 'all' && { type: typeFilter })
       });
       console.log('Events API result:', result);
       if (result.success) {
@@ -44,18 +45,13 @@ const AdminEvents = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, typeFilter]);
 
   // Load events on component mount and when filters change
   useEffect(() => {
     loadEvents();
   }, [loadEvents]);
 
-  // Get unique organizers for filter
-  const organizers = useMemo(() => {
-    const unique = [...new Set(events.map(e => e.createdBy?.firstName + ' ' + e.createdBy?.lastName || 'Unknown'))];
-    return unique.sort();
-  }, [events]);
 
   // Filter events based on current filters
   const filteredEvents = useMemo(() => {
@@ -80,31 +76,35 @@ const AdminEvents = () => {
     // Date filter
     if (dateFilter !== 'all') {
       const now = new Date();
+      console.log('📅 Applying date filter:', dateFilter, 'Current time:', now);
       filtered = filtered.filter(event => {
-        const eventDate = new Date(event.date);
+        const eventDate = new Date(event.startDate);
+        console.log('📅 Event date:', eventDate, 'Event title:', event.title);
+        let matches = false;
         switch (dateFilter) {
           case 'upcoming':
-            return eventDate > now;
+            matches = eventDate > now;
+            break;
           case 'past':
-            return eventDate < now;
+            matches = eventDate < now;
+            break;
           case 'today':
-            return eventDate.toDateString() === now.toDateString();
+            matches = eventDate.toDateString() === now.toDateString();
+            break;
           case 'this-week':
             const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-            return eventDate >= now && eventDate <= weekFromNow;
+            matches = eventDate >= now && eventDate <= weekFromNow;
+            break;
           default:
-            return true;
+            matches = true;
         }
+        console.log('📅 Event matches filter:', matches);
+        return matches;
       });
     }
 
-    // Organizer filter
-    if (organizerFilter !== 'all') {
-      filtered = filtered.filter(event => event.organizer === organizerFilter);
-    }
-
     return filtered;
-  }, [events, searchQuery, statusFilter, dateFilter, organizerFilter]);
+  }, [events, searchQuery, statusFilter, dateFilter]);
 
   const handleStatusChange = async (eventId, newStatus) => {
     setProcessingIds(prev => ({ ...prev, [eventId]: true }));
@@ -248,17 +248,20 @@ const AdminEvents = () => {
                     </select>
                   </div>
 
+
                   <div className="form-group">
-                    <label className="form-label">Organizer</label>
+                    <label className="form-label">Event Type</label>
                     <select
                       className="form-input"
-                      value={organizerFilter}
-                      onChange={(e) => setOrganizerFilter(e.target.value)}
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value)}
                     >
-                      <option value="all">All Organizers</option>
-                      {organizers.map(organizer => (
-                        <option key={organizer} value={organizer}>{organizer}</option>
-                      ))}
+                      <option value="all">All Types</option>
+                      <option value="bazaar">Bazaar</option>
+                      <option value="trip">Trip</option>
+                      <option value="conference">Conference</option>
+                      <option value="workshop">Workshop</option>
+                      <option value="booth">Booth</option>
                     </select>
                   </div>
                 </div>
@@ -305,6 +308,18 @@ const AdminEvents = () => {
                             <div style={{ fontWeight: 600, color: 'var(--charcoal-black)', fontSize: '18px' }}>
                               {event.title}
                             </div>
+                            <div style={{ 
+                              fontSize: '12px', 
+                              color: 'var(--guc-blue)', 
+                              fontWeight: '600',
+                              backgroundColor: 'var(--light-blue)',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              display: 'inline-block',
+                              width: 'fit-content'
+                            }}>
+                              📋 {event.type?.toUpperCase() || 'UNKNOWN'}
+                            </div>
                             <div style={{ color: 'var(--text-light)', fontSize: '14px' }}>
                               {event.description}
                             </div>
@@ -334,49 +349,6 @@ const AdminEvents = () => {
 
                       {/* Action Buttons */}
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {event.status === 'pending' && (
-                          <>
-                            <button
-                              className="btn btn-primary"
-                              onClick={() => handleStatusChange(eventId, 'approved')}
-                              disabled={!!processingIds[eventId]}
-                              style={{ fontSize: '12px' }}
-                            >
-                              {processingIds[eventId] ? 'Processing...' : '✓ Approve'}
-                            </button>
-                            <button
-                              className="btn btn-outline"
-                              onClick={() => handleStatusChange(eventId, 'rejected')}
-                              disabled={!!processingIds[eventId]}
-                              style={{ fontSize: '12px', color: 'var(--guc-red)', borderColor: 'var(--guc-red)' }}
-                            >
-                              {processingIds[eventId] ? 'Processing...' : '✗ Reject'}
-                            </button>
-                          </>
-                        )}
-                        
-                        {event.status === 'approved' && (
-                          <button
-                            className="btn btn-outline"
-                            onClick={() => handleStatusChange(eventId, 'rejected')}
-                            disabled={!!processingIds[eventId]}
-                            style={{ fontSize: '12px', color: 'var(--guc-red)', borderColor: 'var(--guc-red)' }}
-                          >
-                            {processingIds[eventId] ? 'Processing...' : '✗ Reject'}
-                          </button>
-                        )}
-
-                        {event.status === 'rejected' && (
-                          <button
-                            className="btn btn-primary"
-                            onClick={() => handleStatusChange(eventId, 'approved')}
-                            disabled={!!processingIds[eventId]}
-                            style={{ fontSize: '12px' }}
-                          >
-                            {processingIds[eventId] ? 'Processing...' : '✓ Approve'}
-                          </button>
-                        )}
-
                         <button
                           className="btn btn-outline"
                           onClick={() => handleDeleteClick(event)}

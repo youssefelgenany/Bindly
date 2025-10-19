@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { eventsApiService } from '../api/eventsApi';
+import { bazaarApi } from '../api/bazaarApi';
 import StudentRegistrationForm from '../components/StudentRegistrationForm';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/StudentEventsView.css';
 
 const StudentEventsView = () => {
+  const { user } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,6 +15,8 @@ const StudentEventsView = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
   const [registrationEvent, setRegistrationEvent] = useState(null);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editEvent, setEditEvent] = useState(null);
 
   useEffect(() => {
     loadEvents();
@@ -88,6 +93,31 @@ const StudentEventsView = () => {
   const handleRegisterClick = (event) => {
     setRegistrationEvent(event);
     setShowRegistrationForm(true);
+  };
+
+  const handleEditClick = (event) => {
+    setEditEvent(event);
+    setShowEditForm(true);
+  };
+
+  const handleStatusUpdate = async (eventId, newStatus) => {
+    try {
+      setLoading(true);
+      const result = await eventsApiService.updateEventStatus(eventId, { status: newStatus });
+      
+      if (result.success) {
+        // Refresh the events list to show updated status
+        await loadEvents();
+        alert(`Workshop ${newStatus} successfully!`);
+      } else {
+        alert(`Failed to ${newStatus} workshop: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error updating workshop status:', error);
+      alert(`Error updating workshop status: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRegistrationSuccess = (registrationData) => {
@@ -203,7 +233,7 @@ const StudentEventsView = () => {
         </div>
       )}
 
-      {(event.type === 'workshop' || event.type === 'trip') && (
+      {(event.type === 'workshop' || event.type === 'trip') && !(user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office') && (
         <div className="registration-section">
           <button 
             className="register-btn"
@@ -214,6 +244,52 @@ const StudentEventsView = () => {
           >
             📝 Register for {event.type === 'workshop' ? 'Workshop' : 'Trip'}
           </button>
+        </div>
+      )}
+
+      {(event.type === 'bazaar' || event.type === 'trip' || event.type === 'conference') && (user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office') && (
+        <div className="edit-section">
+          <button 
+            className="edit-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEditClick(event);
+            }}
+          >
+            ✏️ Edit {event.type === 'bazaar' ? 'Bazaar' : event.type === 'trip' ? 'Trip' : 'Conference'}
+          </button>
+        </div>
+      )}
+
+      {event.type === 'workshop' && (user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office') && (
+        <div className="status-section">
+          <div className="status-buttons">
+            <button 
+              className="accept-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleStatusUpdate(event.id, 'approved');
+              }}
+              disabled={event.status === 'approved'}
+            >
+              ✅ Accept
+            </button>
+            <button 
+              className="reject-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleStatusUpdate(event.id, 'rejected');
+              }}
+              disabled={event.status === 'rejected'}
+            >
+              ❌ Reject
+            </button>
+          </div>
+          <div className="current-status">
+            <span className={`status-badge ${event.status}`}>
+              Status: {event.status || 'pending'}
+            </span>
+          </div>
         </div>
       )}
     </div>
@@ -479,6 +555,227 @@ const StudentEventsView = () => {
               onClose={handleCloseRegistrationForm}
               onSuccess={handleRegistrationSuccess}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Edit Form Modal */}
+      {showEditForm && editEvent && (
+        <div className="modal-overlay" onClick={() => setShowEditForm(false)}>
+          <div className="modal-content edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit {editEvent.type === 'bazaar' ? 'Bazaar' : editEvent.type === 'trip' ? 'Trip' : 'Conference'}</h2>
+              <button 
+                className="close-btn" 
+                onClick={() => setShowEditForm(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <form className="edit-form">
+                <div className="form-group">
+                  <label htmlFor="title">Title:</label>
+                  <input 
+                    type="text" 
+                    id="title" 
+                    defaultValue={editEvent.title}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="description">Description:</label>
+                  <textarea 
+                    id="description" 
+                    defaultValue={editEvent.description}
+                    className="form-textarea"
+                    rows="4"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="location">Location:</label>
+                  <input 
+                    type="text" 
+                    id="location" 
+                    defaultValue={editEvent.location}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="startDate">Start Date:</label>
+                  <input 
+                    type="datetime-local" 
+                    id="startDate" 
+                    defaultValue={editEvent.startDate ? new Date(editEvent.startDate).toISOString().slice(0, 16) : ''}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="endDate">End Date:</label>
+                  <input 
+                    type="datetime-local" 
+                    id="endDate" 
+                    defaultValue={editEvent.endDate ? new Date(editEvent.endDate).toISOString().slice(0, 16) : ''}
+                    className="form-input"
+                  />
+                </div>
+                {editEvent.type === 'trip' && (
+                  <>
+                    <div className="form-group">
+                      <label htmlFor="capacity">Capacity:</label>
+                      <input 
+                        type="number" 
+                        id="capacity" 
+                        defaultValue={editEvent.capacity}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="price">Price:</label>
+                      <input 
+                        type="number" 
+                        id="price" 
+                        step="0.01"
+                        defaultValue={editEvent.price}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="registrationDeadline">Registration Deadline:</label>
+                      <input 
+                        type="datetime-local" 
+                        id="registrationDeadline" 
+                        defaultValue={editEvent.registrationDeadline ? new Date(editEvent.registrationDeadline).toISOString().slice(0, 16) : ''}
+                        className="form-input"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {editEvent.type === 'conference' && (
+                  <>
+                    <div className="form-group">
+                      <label htmlFor="capacity">Capacity:</label>
+                      <input 
+                        type="number" 
+                        id="capacity" 
+                        defaultValue={editEvent.capacity}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="price">Price:</label>
+                      <input 
+                        type="number" 
+                        id="price" 
+                        step="0.01"
+                        defaultValue={editEvent.price}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="registrationDeadline">Registration Deadline:</label>
+                      <input 
+                        type="datetime-local" 
+                        id="registrationDeadline" 
+                        defaultValue={editEvent.registrationDeadline ? new Date(editEvent.registrationDeadline).toISOString().slice(0, 16) : ''}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="website">Website:</label>
+                      <input 
+                        type="url" 
+                        id="website" 
+                        defaultValue={editEvent.website}
+                        className="form-input"
+                        placeholder="https://example.com"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="agenda">Agenda:</label>
+                      <textarea 
+                        id="agenda" 
+                        defaultValue={editEvent.agenda}
+                        className="form-textarea"
+                        rows="4"
+                        placeholder="Conference agenda and schedule"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="budget">Budget:</label>
+                      <input 
+                        type="number" 
+                        id="budget" 
+                        step="0.01"
+                        defaultValue={editEvent.budget}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="fundingSource">Funding Source:</label>
+                      <input 
+                        type="text" 
+                        id="fundingSource" 
+                        defaultValue={editEvent.fundingSource}
+                        className="form-input"
+                        placeholder="e.g., University, Grant, Sponsors"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="extraResources">Extra Resources:</label>
+                      <textarea 
+                        id="extraResources" 
+                        defaultValue={editEvent.extraResources}
+                        className="form-textarea"
+                        rows="3"
+                        placeholder="Additional resources or requirements"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="faculty">Faculty:</label>
+                      <input 
+                        type="text" 
+                        id="faculty" 
+                        defaultValue={editEvent.faculty}
+                        className="form-input"
+                        placeholder="Faculty members involved"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="professors">Professors:</label>
+                      <input 
+                        type="text" 
+                        id="professors" 
+                        defaultValue={editEvent.professors}
+                        className="form-input"
+                        placeholder="Professor names"
+                      />
+                    </div>
+                  </>
+                )}
+                <div className="form-actions">
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary"
+                    onClick={() => setShowEditForm(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      // TODO: Implement save functionality
+                      alert('Save functionality will be implemented');
+                    }}
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

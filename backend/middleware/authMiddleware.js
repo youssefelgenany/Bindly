@@ -15,13 +15,21 @@ const protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // decoded.userId must match what you sign in your login
-    const user = await User.findById(decoded.userId).select('-password');
+    // Try to find user in User model first
+    let user = await User.findById(decoded.userId).select('-password');
+    
+    // If not found in User model, try Admin model
+    if (!user) {
+      user = await Admin.findById(decoded.userId).select('-password');
+    }
+    
     if (!user) return res.status(401).json({ msg: 'User not found' });
 
     // normalize the shape used everywhere
     req.user = {
       _id: user._id,
-      userType: user.userType,   // e.g., "Professor", "Student", ...
+      userType: user.userType || user.role,   // Use userType if available, otherwise use role
+      role: decoded.role,        // Include role from JWT token
       email: user.email
     };
     next();
@@ -29,14 +37,6 @@ const protect = async (req, res, next) => {
     console.error('auth error:', e);
     res.status(401).json({ msg: 'Invalid/expired token' });
   }
-};
-
-exports.permit = (...allowed) => (req, res, next) => {
-  const role = req.user?.userType;       // single source of truth
-  if (!role || !allowed.includes(role)) {
-    return res.status(403).json({ msg: 'Forbidden' });
-  }
-  next();
 };
 
 // Normalize role strings for comparison (case-insensitive, unify spacing/underscores)

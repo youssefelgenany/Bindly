@@ -33,7 +33,7 @@ exports.createAdminOrEventOffice = async (req, res) => {
     });
 
     // Map human role to schema enum and satisfy required fields
-    const mappedUserType = (role === 'Admin' || role === 'admin') ? 'admin' : 'event_office';
+    const mappedUserType = (role === 'Admin' || role === 'admin') ? 'Admin' : 'event_office';
 
     // Build payload; for admin/event_office the schema requires `name`
     const fullName = `${firstName} ${lastName}`.trim();
@@ -42,8 +42,8 @@ exports.createAdminOrEventOffice = async (req, res) => {
       email,
       password,
       userType: mappedUserType,
-      isVerified: false, // All accounts start unverified
-      status: 'blocked' // All accounts start blocked until verified
+      isVerified: true, // All admin and event office accounts are auto-verified
+      status: 'active' // All admin and event office accounts are auto-activated
     };
 
     const newUser = await User.create(payload);
@@ -57,11 +57,11 @@ exports.createAdminOrEventOffice = async (req, res) => {
     });
     console.log('🔍 Verification Status:', newUser.isVerified ? 'VERIFIED' : 'UNVERIFIED');
     console.log('🔍 Account Status:', newUser.status);
-    console.log('🚨 EXPECTED: isVerified should be FALSE, status should be BLOCKED');
+    console.log('✅ EXPECTED: isVerified should be TRUE, status should be ACTIVE');
 
     res.status(201).json({
       success: true,
-      message: "Account created successfully. The account is pending verification and will be activated by an administrator.",
+      message: "Admin account created successfully and is ready to use.",
       user: {
         id: newUser._id,
         name: newUser.name,

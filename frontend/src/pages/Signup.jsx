@@ -14,10 +14,6 @@ const Signup = () => {
     gucId: '',
     companyName: ''
   });
-  const [files, setFiles] = useState({
-    vendorLogo: null,
-    vendorTaxCard: null
-  });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -111,20 +107,6 @@ const Signup = () => {
     }
   };
 
-  const handleFileChange = (e) => {
-    const { name, files: fileList } = e.target;
-    setFiles(prev => ({
-      ...prev,
-      [name]: fileList[0] || null
-    }));
-    // Clear error when user selects file
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -158,11 +140,11 @@ const Signup = () => {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
-    if (!formData.firstName.trim()) {
+    if (!formData.firstName.trim() && formData.userType !== 'Vendor') {
       newErrors.firstName = 'First name is required';
     }
 
-    if (!formData.lastName.trim()) {
+    if (!formData.lastName.trim() && formData.userType !== 'Vendor') {
       newErrors.lastName = 'Last name is required';
     }
 
@@ -189,13 +171,6 @@ const Signup = () => {
         newErrors.companyName = 'Company name is required';
       }
 
-      if (!files.vendorLogo) {
-        newErrors.vendorLogo = 'Company logo is required';
-      }
-
-      if (!files.vendorTaxCard) {
-        newErrors.vendorTaxCard = 'Tax card is required';
-      }
     }
 
     setErrors(newErrors);
@@ -221,8 +196,13 @@ const Signup = () => {
       // Add form fields
       submitData.append('email', formData.email);
       submitData.append('password', formData.password);
-      submitData.append('firstName', formData.firstName);
-      submitData.append('lastName', formData.lastName);
+      
+      // Only add firstName and lastName for non-vendor users
+      if (actualUserType !== 'Vendor') {
+        submitData.append('firstName', formData.firstName);
+        submitData.append('lastName', formData.lastName);
+      }
+      
       submitData.append('userType', actualUserType);
       
       if (formData.gucId) {
@@ -233,26 +213,15 @@ const Signup = () => {
         submitData.append('companyName', formData.companyName);
       }
 
-      // Add files for vendors
-      if (actualUserType === 'Vendor') {
-        if (files.vendorLogo) {
-          submitData.append('vendorLogo', files.vendorLogo);
-        }
-        if (files.vendorTaxCard) {
-          submitData.append('vendorTaxCard', files.vendorTaxCard);
-        }
-      }
 
       // Debug: Log the form data being sent
       console.log('Form data being sent:', {
         userType: actualUserType,
         email: formData.email,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        firstName: actualUserType !== 'Vendor' ? formData.firstName : 'Not sent for vendors',
+        lastName: actualUserType !== 'Vendor' ? formData.lastName : 'Not sent for vendors',
         gucId: formData.gucId,
-        companyName: formData.companyName,
-        hasLogo: !!files.vendorLogo,
-        hasTaxCard: !!files.vendorTaxCard
+        companyName: formData.companyName
       });
 
       const result = await signup(submitData);
@@ -372,38 +341,40 @@ const Signup = () => {
           </div>
         )}
 
-          {/* Personal Information */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="form-group">
-              <label htmlFor="firstName" className="form-label">First Name</label>
-              <input
-                type="text"
-                id="firstName"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
-                className={`form-input ${errors.firstName ? 'error' : ''}`}
-                placeholder="First name"
-                disabled={loading}
-              />
-              {errors.firstName && <div className="form-error">{errors.firstName}</div>}
-            </div>
+          {/* Personal Information - Hidden for Vendors */}
+          {formData.userType !== 'Vendor' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-group">
+                <label htmlFor="firstName" className="form-label">First Name</label>
+                <input
+                  type="text"
+                  id="firstName"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  className={`form-input ${errors.firstName ? 'error' : ''}`}
+                  placeholder="First name"
+                  disabled={loading}
+                />
+                {errors.firstName && <div className="form-error">{errors.firstName}</div>}
+              </div>
 
-            <div className="form-group">
-              <label htmlFor="lastName" className="form-label">Last Name</label>
-              <input
-                type="text"
-                id="lastName"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleChange}
-                className={`form-input ${errors.lastName ? 'error' : ''}`}
-                placeholder="Last name"
-                disabled={loading}
-              />
-              {errors.lastName && <div className="form-error">{errors.lastName}</div>}
+              <div className="form-group">
+                <label htmlFor="lastName" className="form-label">Last Name</label>
+                <input
+                  type="text"
+                  id="lastName"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  className={`form-input ${errors.lastName ? 'error' : ''}`}
+                  placeholder="Last name"
+                  disabled={loading}
+                />
+                {errors.lastName && <div className="form-error">{errors.lastName}</div>}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Email */}
           <div className="form-group">
@@ -581,38 +552,6 @@ const Signup = () => {
             {errors.confirmPassword && <div className="form-error">{errors.confirmPassword}</div>}
           </div>
 
-          {/* File Uploads for Vendors */}
-          {formData.userType === 'Vendor' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="form-group">
-                <label htmlFor="vendorLogo" className="form-label">Company Logo</label>
-                <input
-                  type="file"
-                  id="vendorLogo"
-                  name="vendorLogo"
-                  onChange={handleFileChange}
-                  accept="image/*"
-                  className={`form-input ${errors.vendorLogo ? 'error' : ''}`}
-                  disabled={loading}
-                />
-                {errors.vendorLogo && <div className="form-error">{errors.vendorLogo}</div>}
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="vendorTaxCard" className="form-label">Tax Card</label>
-                <input
-                  type="file"
-                  id="vendorTaxCard"
-                  name="vendorTaxCard"
-                  onChange={handleFileChange}
-                  accept="image/*,.pdf"
-                  className={`form-input ${errors.vendorTaxCard ? 'error' : ''}`}
-                  disabled={loading}
-                />
-                {errors.vendorTaxCard && <div className="form-error">{errors.vendorTaxCard}</div>}
-              </div>
-            </div>
-          )}
 
           <button
             type="submit"

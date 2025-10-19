@@ -101,11 +101,19 @@ const signup = async (req, res) => {
 
     const { email, password, firstName, lastName, userType, gucId, companyName } = req.body;
 
-    // Basic validation
-    if (!email || !password || !firstName || !lastName || !userType) {
+    // Basic validation - firstName and lastName not required for vendors
+    if (!email || !password || !userType) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Missing required fields: email, password, firstName, lastName, userType' 
+        message: 'Missing required fields: email, password, userType' 
+      });
+    }
+
+    // Additional validation for non-vendor users
+    if (userType !== 'Vendor' && (!firstName || !lastName)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields: firstName, lastName' 
       });
     }
 
@@ -128,12 +136,16 @@ const signup = async (req, res) => {
     const userData = { 
       email, 
       password, 
-      firstName, 
-      lastName, 
       userType,
       isVerified: false, // All users need admin verification by default
       status: 'blocked' // All users start as blocked until verified
     };
+
+    // Add firstName and lastName for non-vendor users
+    if (userType !== 'Vendor') {
+      userData.firstName = firstName;
+      userData.lastName = lastName;
+    }
 
     // Add GUC ID for academic users
     if (['Student', 'Staff', 'TA', 'Professor'].includes(userType)) {
@@ -177,8 +189,6 @@ const signup = async (req, res) => {
     const userResponse = {
       id: newUser._id,
       email: newUser.email,
-      firstName: newUser.firstName,
-      lastName: newUser.lastName,
       userType: newUser.userType,
       gucId: newUser.gucId,
       department: newUser.department,
@@ -187,6 +197,12 @@ const signup = async (req, res) => {
       isVerified: newUser.isVerified,
       createdAt: newUser.createdAt
     };
+
+    // Add firstName and lastName for non-vendor users
+    if (newUser.userType !== 'Vendor') {
+      userResponse.firstName = newUser.firstName;
+      userResponse.lastName = newUser.lastName;
+    }
 
     // Generate JWT token for immediate login
     const token = jwt.sign(
@@ -265,6 +281,7 @@ const login = async (req, res) => {
         lastName: user.lastName,
         name: user.name, // For admin accounts
         userType: user.userType,
+        role: user.role || user.userType, // Include role for Admin model users, or userType for User model users
         gucId: user.gucId,
         companyName: user.companyName,
         isVerified: user.isVerified,
@@ -289,6 +306,7 @@ const login = async (req, res) => {
         lastName: user.lastName,
         name: user.name, // For admin accounts
         userType: user.userType,
+        role: user.role || user.userType, // Include role for Admin model users, or userType for User model users
         gucId: user.gucId,
         companyName: user.companyName,
         isVerified: user.isVerified,
@@ -315,7 +333,9 @@ const login = async (req, res) => {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      name: user.name, // For admin accounts
       userType: user.userType,
+      role: user.role || user.userType, // Include role for Admin model users, or userType for User model users
       gucId: user.gucId,
       department: user.department,
       profilePicturePath: user.profilePicturePath,

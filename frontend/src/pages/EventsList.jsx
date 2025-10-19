@@ -324,9 +324,11 @@ const EventsList = () => {
           </div>
           
           <div className="events-actions">
-          <button className="btn btn-outline" onClick={handleViewAll}>
-            View All Events
-          </button>
+          {!(user?.role === 'admin' || user?.userType === 'Admin' || user?.userType === 'admin') && (
+            <button className="btn btn-outline" onClick={handleViewAll}>
+              View All Events
+            </button>
+          )}
           {!(user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office') && (
             <Link to="/create-bazaar" className="btn btn-primary">
               Create New Bazaar

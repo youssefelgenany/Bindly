@@ -32,7 +32,7 @@ const VendorRequests = () => {
                   user.role === 'Event Office'
                 );
 
-                if (isEventsOffice || (user && (user.role === 'admin' || user.userType === 'Admin'))) {
+                if (isEventsOffice || (user && (user.role === 'admin' || user.role === 'Admin' || user.userType === 'Admin' || user.userType === 'admin'))) {
                     // Fetch all vendor requests (event office view)
                     const token = localStorage.getItem('token');
                     const res = await axios.get('http://localhost:5000/api/vendor-requests', {
@@ -151,7 +151,7 @@ const VendorRequests = () => {
       user.userType === 'event_office' ||
       user.role === 'event_office' ||
       user.role === 'Event Office' ||
-      user.role === 'admin' || user.userType === 'Admin'
+      user.role === 'admin' || user.role === 'Admin' || user.userType === 'Admin' || user.userType === 'admin'
     );
 
     const handleUpdateStatus = async (requestId, newStatus) => {

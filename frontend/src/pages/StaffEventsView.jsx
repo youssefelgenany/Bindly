@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { eventsApiService } from '../api/eventsApi';
+import { useAuth } from '../contexts/AuthContext';
 import StudentRegistrationForm from '../components/StudentRegistrationForm';
 import '../styles/StudentEventsView.css';
 
 const StaffEventsView = () => {
+  const { user } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,7 +42,7 @@ const StaffEventsView = () => {
       
       if (result.success) {
         console.log('🔍 Staff events data:', result.data);
-        const mapped = (result.data || []).map(ev => ({
+        let mapped = (result.data || []).map(ev => ({
           id: ev._id || ev.id,
           title: ev.title,
           type: ev.type,
@@ -65,6 +67,17 @@ const StaffEventsView = () => {
           creatorRole: ev.creatorRole,
           vendors: ev.vendors || []
         }));
+
+        // Filter events for TA users to only show workshops and trips
+        if (user?.userType === 'TA') {
+          mapped = mapped.filter(ev => ev.type === 'workshop' || ev.type === 'trip');
+        }
+
+        // Filter events for Professor users to only show workshops and trips
+        if (user?.userType === 'Professor') {
+          mapped = mapped.filter(ev => ev.type === 'workshop' || ev.type === 'trip');
+        }
+
         setEvents(mapped);
       } else {
         setEvents([]);
@@ -408,12 +421,14 @@ const StaffEventsView = () => {
           >
             All Events
           </button>
-          <button 
-            className={filter === 'bazaar' ? 'active' : ''} 
-            onClick={() => setFilter('bazaar')}
-          >
-            Bazaars
-          </button>
+          {user?.userType !== 'TA' && user?.userType !== 'Professor' && (
+            <button 
+              className={filter === 'bazaar' ? 'active' : ''} 
+              onClick={() => setFilter('bazaar')}
+            >
+              Bazaars
+            </button>
+          )}
           <button 
             className={filter === 'trip' ? 'active' : ''} 
             onClick={() => setFilter('trip')}
@@ -426,12 +441,14 @@ const StaffEventsView = () => {
           >
             Workshops
           </button>
-          <button 
-            className={filter === 'conference' ? 'active' : ''} 
-            onClick={() => setFilter('conference')}
-          >
-            Conferences
-          </button>
+          {user?.userType !== 'TA' && user?.userType !== 'Professor' && (
+            <button 
+              className={filter === 'conference' ? 'active' : ''} 
+              onClick={() => setFilter('conference')}
+            >
+              Conferences
+            </button>
+          )}
         </div>
       </div>
 

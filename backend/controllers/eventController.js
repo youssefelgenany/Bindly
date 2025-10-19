@@ -394,7 +394,7 @@ exports.getAllEventsForAdmin = async (req, res) => {
         { location: new RegExp(q, "i") },
       ];
     }
-    if (type) filter.type = type;
+    if (type && type !== 'all') filter.type = type;
     if (status && status !== 'all') filter.status = status;
 
     console.log('🔍 Filter applied:', filter);
@@ -469,20 +469,38 @@ exports.updateEvent = async (req, res) => {
 // ❌ Delete an event
 exports.deleteEvent = async (req, res) => {
   try {
+    console.log('🗑️ Delete event request:', { eventId: req.params.id, user: req.user });
+    
     const event = await Event.findById(req.params.id);
-    if (!event) return res.status(404).json({ msg: "Event not found" });
+    if (!event) {
+      console.log('❌ Event not found:', req.params.id);
+      return res.status(404).json({ msg: "Event not found" });
+    }
+
+    console.log('📊 Event found:', { 
+      id: event._id, 
+      title: event.title, 
+      registeredCount: event.registeredCount,
+      createdBy: event.createdBy,
+      userType: req.user.userType,
+      userId: req.user._id
+    });
 
     // Professors may only delete events they created
     if (req.user && req.user.userType === "Professor" && event.createdBy?.toString() !== req.user._id.toString()) {
+      console.log('❌ Professor trying to delete event they did not create');
       return res.status(403).json({ msg: "You can only delete your own events" });
     }
 
     // Do not allow delete if people already registered
     if (event.registeredCount && event.registeredCount > 0) {
+      console.log('❌ Cannot delete event: users already registered:', event.registeredCount);
       return res.status(400).json({ msg: "Cannot delete event: users already registered." });
     }
 
+    console.log('✅ Proceeding with event deletion');
     await event.deleteOne();
+    console.log('✅ Event deleted successfully');
     res.json({ msg: "Event deleted successfully" });
   } catch (err) {
     console.error("❌ Error deleting event:", err);

@@ -295,18 +295,42 @@ const Navbar = () => {
                 </>
               )}
 
-              {/* Events - visible to all stakeholders */}
-              <Link
-                to="/events"
-                className="btn btn-outline"
-                style={{ width: '100%' }}
-                onClick={closeSidebar}
-              >
-                View All Events
-              </Link>
+              {/* Professor Events View */}
+              {user.userType === 'Professor' && (
+                <>
+                  <Link
+                    to="/staff/events"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📅 View Events
+                  </Link>
+                  <Link
+                    to="/staff/my-registrations"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📋 My Registrations
+                  </Link>
+                </>
+              )}
 
-              {/* Gym Schedule - visible to Student, Staff, TA, Professor, Event Office */}
-              {(user.userType === 'Student' || user.userType === 'Staff' || user.userType === 'TA' || user.userType === 'Professor' || user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
+              {/* Events - visible to all stakeholders except admin, TA, Staff, Student, Professor, and Event Office */}
+              {!(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'admin' || user.userType === 'TA' || user.userType === 'Staff' || user.userType === 'Student' || user.userType === 'Professor' || user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
+                <Link
+                  to="/events"
+                  className="btn btn-outline"
+                  style={{ width: '100%' }}
+                  onClick={closeSidebar}
+                >
+                  View All Events
+                </Link>
+              )}
+
+              {/* Gym Schedule - visible to Student, Staff, Professor, Event Office */}
+              {(user.userType === 'Student' || user.userType === 'Staff' || user.userType === 'Professor' || user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
                 <Link
                   to="/gym"
                   className="btn btn-outline"
@@ -317,17 +341,6 @@ const Navbar = () => {
                 </Link>
               )}
 
-              {/* Court Availability - visible to Student, Staff, TA */}
-              {(user.userType === 'Student' || user.userType === 'Staff' || user.userType === 'TA') && (
-                <Link
-                  to="/courts"
-                  className="btn btn-outline"
-                  style={{ width: '100%' }}
-                  onClick={closeSidebar}
-                >
-                  Court Availability
-                </Link>
-              )}
 
 {/* Conferences link moved into Events page filters */}
               
@@ -335,12 +348,12 @@ const Navbar = () => {
               {(user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
                 <>
                   <Link
-                    to="/events"
-                    className="btn btn-outline"
+                    to="/student/events"
+                    className="btn btn-primary"
                     style={{ width: '100%' }}
                     onClick={closeSidebar}
                   >
-                    View Events
+                    📅 View Events
                   </Link>
                   <Link
                     to="/event-office/vendor-requests"
@@ -397,14 +410,6 @@ const Navbar = () => {
                     Create Workshop
                   </Link>
                   <Link
-                    to="/professor/all-events"
-                    className="btn btn-outline"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    All Events & Bazaars
-                  </Link>
-                  <Link
                     to="/professor/profile"
                     className="btn btn-outline"
                     style={{ width: '100%' }}
@@ -417,7 +422,7 @@ const Navbar = () => {
               
               {/* Hide Manage Gym for Event Office */}
               
-              {(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'admin') && (
+              {(user.role === 'admin' || user.role === 'Admin' || user.userType === 'Admin' || user.userType === 'admin') && (
                 <>
                   <Link
                     to="/admin/users"
@@ -426,14 +431,6 @@ const Navbar = () => {
                     onClick={closeSidebar}
                   >
                     View Users
-                  </Link>
-                  <Link
-                    to="/admin/vendors"
-                    className="btn btn-outline"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    View Vendors
                   </Link>
                   <Link
                     to="/event-office/vendor-requests"
@@ -449,7 +446,7 @@ const Navbar = () => {
                     style={{ width: '100%' }}
                     onClick={closeSidebar}
                   >
-                    Manage Events
+                    View Events
                   </Link>
                   <Link
                     to="/admin/manage"

@@ -253,21 +253,29 @@ export const adminApiService = {
   // Delete event
   deleteEvent: async (eventId) => {
     try {
+      console.log('🗑️ Deleting event:', eventId);
+      console.log('🔑 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+      
       const response = await axios.delete(`http://localhost:5000/api/events/${eventId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         }
       });
+      
+      console.log('✅ Event deleted successfully:', response.data);
       return {
         success: true,
         data: response.data,
       };
     } catch (error) {
-      console.error('Error deleting event:', error);
+      console.error('❌ Error deleting event:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      console.error('❌ Error message:', error.message);
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to delete event',
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to delete event',
         error: error.response?.data || error.message,
       };
     }

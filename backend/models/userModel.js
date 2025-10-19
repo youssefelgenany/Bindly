@@ -30,13 +30,13 @@ const userSchema = new mongoose.Schema({
    name: {
     type: String,
     required: function() {
-      return ['admin', 'event_office'].includes(this.userType);
+      return ['Admin', 'event_office'].includes(this.userType);
     }
   },
   userType: {
     type: String,
     required: true,
-    enum: ['Student', 'Staff', 'TA', 'Professor', 'Vendor','event_office','admin']
+    enum: ['Student', 'Staff', 'TA', 'Professor', 'Vendor','event_office','Admin']
   },
   // For GUC users (Student, Staff, TA, Professor)
   gucId: {

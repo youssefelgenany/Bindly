@@ -61,6 +61,8 @@ const ProtectedRoute = ({ children }) => {
   // Check if user is verified (except for admin users, students, and vendors who are always verified)
   const isAutoVerified = user.userType === 'admin' || 
                         user.userType === 'Admin' || 
+                        user.role === 'admin' ||
+                        user.role === 'Admin' ||
                         user.userType === 'Student' || 
                         user.userType === 'Vendor';
   
@@ -112,6 +114,7 @@ const AdminOnly = ({ children }) => {
 
   const isAdmin = user && (
     user.role === 'admin' || 
+    user.role === 'Admin' ||
     user.userType === 'Admin' || 
     user.userType === 'admin'
   );
@@ -142,7 +145,7 @@ const EventsOfficeOnly = ({ children }) => {
     user.role === 'event_office' ||
     user.role === 'Event Office'
   );
-  const isAdmin = user && (user.role === 'admin' || user.userType === 'Admin');
+  const isAdmin = user && (user.role === 'admin' || user.role === 'Admin' || user.userType === 'Admin' || user.userType === 'admin');
 
   return (isEventsOffice || isAdmin) ? children : <Navigate to="/dashboard" />;
 };
@@ -164,8 +167,15 @@ const StudentOnly = ({ children }) => {
     );
   }
 
-  const isStudent = user && user.userType === 'Student';
-  return isStudent ? children : <Navigate to="/dashboard" />;
+  const isStudentOrEventOffice = user && (
+    user.userType === 'Student' || 
+    user.userType === 'Event Office' || 
+    user.userType === 'Events Office' || 
+    user.userType === 'event_office' || 
+    user.role === 'event_office' || 
+    user.role === 'Event Office'
+  );
+  return isStudentOrEventOffice ? children : <Navigate to="/dashboard" />;
 };
 
 // Staff-only guard
@@ -206,8 +216,8 @@ const StaffAndTAOnly = ({ children }) => {
     );
   }
 
-  const isStaffOrTA = user && (user.userType === 'Staff' || user.userType === 'TA');
-  return isStaffOrTA ? children : <Navigate to="/dashboard" />;
+  const isStaffOrTAOrProfessor = user && (user.userType === 'Staff' || user.userType === 'TA' || user.userType === 'Professor');
+  return isStaffOrTAOrProfessor ? children : <Navigate to="/dashboard" />;
 };
 
 function App() {
