@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { eventsApiService } from '../api/eventsApi';
 import { bazaarApi, tripApi } from '../api/eventManagementApi';
 import StudentRegistrationForm from '../components/StudentRegistrationForm';
+import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
 import { useAuth } from '../contexts/AuthContext';
 import '../styles/StudentEventsView.css';
 
@@ -22,6 +23,8 @@ const StudentEventsView = () => {
   const [editFormData, setEditFormData] = useState({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showWorkshopEditModal, setShowWorkshopEditModal] = useState(false);
+  const [selectedWorkshop, setSelectedWorkshop] = useState(null);
 
   const loadEvents = useCallback(async () => {
     try {
@@ -242,6 +245,16 @@ const StudentEventsView = () => {
     }
   };
 
+  const handleWorkshopEditRequest = (event) => {
+    setSelectedWorkshop(event);
+    setShowWorkshopEditModal(true);
+  };
+
+  const handleCloseWorkshopEditModal = () => {
+    setShowWorkshopEditModal(false);
+    setSelectedWorkshop(null);
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
     const date = new Date(dateString);
@@ -455,6 +468,27 @@ const StudentEventsView = () => {
                       event.status === 'pending' ? '⏳ Pending' : 
                       event.status || '⏳ Pending'}
             </span>
+          </div>
+          <div className="request-edits-section" style={{ marginTop: '8px' }}>
+            <button 
+              className="request-edits-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleWorkshopEditRequest(event);
+              }}
+              style={{
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                marginRight: '8px'
+              }}
+            >
+              ✏️ Request Edits
+            </button>
           </div>
           <div className="delete-section" style={{ marginTop: '8px' }}>
             <button 
@@ -969,6 +1003,16 @@ const StudentEventsView = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Workshop Edit Request Modal */}
+      {showWorkshopEditModal && selectedWorkshop && (
+        <WorkshopEditRequestModal
+          open={showWorkshopEditModal}
+          onClose={handleCloseWorkshopEditModal}
+          workshop={selectedWorkshop}
+          onSubmitted={handleCloseWorkshopEditModal}
+        />
       )}
     </div>
   );
