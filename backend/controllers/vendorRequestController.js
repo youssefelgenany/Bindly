@@ -7,11 +7,13 @@ const Event = require('../models/eventModel');
 // @access Events Office / Admin
 const getAllVendorRequests = async (req, res) => {
   try {
+    console.log('🔍 getAllVendorRequests - Fetching all vendor requests');
     const requests = await VendorRequest.find()
       .populate('vendor', 'companyName firstName lastName email')
       .populate('bazaar', 'title name location startDate endDate description')
       .populate('booth', 'title name location startDate endDate description')
       .lean();
+    console.log('🔍 getAllVendorRequests - Found requests:', requests.length);
 
     // Enrich any missing event data from Event collection (for legacy docs where populate fails)
     const missingEventIds = [];
@@ -59,7 +61,7 @@ const getAllVendorRequests = async (req, res) => {
           startDate: event.startDate,
           endDate: event.endDate,
           description: event.description,
-          type: r.bazaar ? 'bazaar' : (r.booth ? 'booth' : r.eventType),
+          type: r.bazaar ? 'bazaar' : (r.booth ? (r.eventType || 'booth') : r.eventType),
         } : null,
         // raw fields that might be useful
         bazaar: r.bazaar || null,
