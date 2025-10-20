@@ -64,11 +64,12 @@ exports.updateUserRole = async (req, res) => {
       });
     }
 
-    const allowedRoles = ['Student', 'Staff', 'TA', 'Professor', 'Vendor', 'Event Office', 'Admin'];
-    if (!allowedRoles.includes(role)) {
+    // Only allow updating into TA/Staff/Professor
+    const allowedAssignableRoles = ['Staff', 'TA', 'Professor'];
+    if (!allowedAssignableRoles.includes(role)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid role'
+        message: 'Invalid role. Admin can only assign roles: TA, Staff, Professor.'
       });
     }
 
@@ -80,7 +81,16 @@ exports.updateUserRole = async (req, res) => {
       });
     }
 
-    // Update user type (role)
+    // Only allow updating users who originally signed as TA/Staff/Professor
+    const updatableOriginRoles = ['Staff', 'TA', 'Professor'];
+    if (!updatableOriginRoles.includes(user.userType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'This user is not eligible for role update (only TA/Staff/Professor accounts can be updated)'
+      });
+    }
+
+    // Update user type (role) within the allowed set
     user.userType = role;
     await user.save();
 

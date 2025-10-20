@@ -179,6 +179,30 @@ exports.getAllEvents = async (req, res) => {
             status: 'accepted'
           }).populate('vendor', 'firstName lastName companyName email').lean();
 
+          // For booth events, include full vendor request details
+          if (e.type === 'booth') {
+            baseEvent.vendorRequests = vendorRequests.map(vr => ({
+              _id: vr._id,
+              vendor: {
+                _id: vr.vendor._id,
+                name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+                companyName: vr.vendor.companyName,
+                contactName: `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+                email: vr.vendor.email,
+              },
+              boothSize: vr.boothSize,
+              durationWeeks: vr.durationWeeks,
+              boothLocation: vr.boothLocation,
+              attendees: vr.attendees || [],
+              message: vr.message || '',
+              status: vr.status,
+              createdAt: vr.createdAt,
+              eventName: vr.eventName,
+              eventType: vr.eventType
+            }));
+          }
+
+          // Keep the original vendors array for backward compatibility
           baseEvent.vendors = vendorRequests.map(vr => ({
             _id: vr.vendor._id,
             name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,

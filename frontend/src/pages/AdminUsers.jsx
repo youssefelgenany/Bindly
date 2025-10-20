@@ -34,12 +34,11 @@ const AdminUsers = () => {
     return users.filter(match);
   }, [searchQuery, searchField, users]);
 
+  // Only allow assigning academic roles
   const roleOptions = [
-    'Student',
     'Staff',
     'TA',
-    'Professor',
-    'Vendor'
+    'Professor'
   ];
 
   // Load users on component mount
@@ -384,7 +383,8 @@ const AdminUsers = () => {
                           </div>
                         </div>
 
-                        {/* Role controls */}
+                        {/* Role controls (hidden for Students and Vendors) */}
+                        {!(u.userType === 'Student' || u.userType === 'Vendor') && (
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                           <select
                             className="form-input"
@@ -404,7 +404,7 @@ const AdminUsers = () => {
                             onClick={() => handleUpdateRole(userId)}
                             disabled={!!updatingIds[userId]}
                           >
-                            {updatingIds[userId] ? 'Updating...' : 'Update Role'}
+                            {updatingIds[userId] ? 'Assigning...' : 'Assign Role'}
                           </button>
 
                           {messageById[userId] && (
@@ -413,6 +413,7 @@ const AdminUsers = () => {
                             </span>
                           )}
                         </div>
+                        )}
 
                         {/* Verification controls */}
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
