@@ -101,9 +101,6 @@ const getVendorRequestById = async (req, res) => {
 // @access Vendor
 const createVendorRequest = async (req, res) => {
   try {
-    console.log('Creating vendor request:', req.body);
-    console.log('User:', req.user);
-    
     const {
       eventType,
       attendees,
@@ -116,8 +113,7 @@ const createVendorRequest = async (req, res) => {
     } = req.body;
 
     // Get vendor ID from authenticated user
-    const vendorId = req.user._id;
-    console.log('Vendor ID:', vendorId);
+    const vendorId = req.user.id;
 
     // Create the vendor request
     const vendorRequest = new VendorRequest({
