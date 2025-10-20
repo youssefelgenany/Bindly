@@ -204,7 +204,7 @@ const signup = async (req, res) => {
       userResponse.lastName = newUser.lastName;
     }
 
-    // Generate JWT token for immediate login
+    // Generate JWT token (will be returned only if user is verified and active)
     const token = jwt.sign(
       { 
         userId: newUser._id, 
@@ -216,14 +216,17 @@ const signup = async (req, res) => {
     );
 
     // Determine response message based on user type
-    let responseMessage = 'Account created successfully. Your account is pending admin verification. You will receive an email once verified.';
-    
+    const isReady = Boolean(newUser.isVerified && String(newUser.status) === 'active');
+    let responseMessage = isReady
+      ? 'Account created successfully.'
+      : 'Account created successfully. Your account is pending admin verification. You will receive an email once verified.';
+
     const responseBody = {
       success: true,
       message: responseMessage,
       user: userResponse,
-      token: null, // No token for unverified accounts
-      requiresVerification: true // All accounts require verification
+      token: isReady ? token : null,
+      requiresVerification: !isReady
     };
 
     res.status(201).json(responseBody);

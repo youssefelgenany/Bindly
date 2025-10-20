@@ -228,15 +228,17 @@ const Signup = () => {
       
       if (result.success) {
         if (result.requiresVerification) {
-          setMessage('Account created successfully! Redirecting to verification page...');
-          setTimeout(() => {
-            navigate('/pending-verification');
-          }, 1000);
-        } else {
-          setMessage('Account created successfully! Redirecting to login...');
+          // Students/Vendors should not require verification per backend rules,
+          // but keep fallback just in case server says requiresVerification.
+          setMessage('Account created successfully! Redirecting...');
           setTimeout(() => {
             navigate('/login');
-          }, 1000);
+          }, 800);
+        } else {
+          setMessage('Account created successfully! Redirecting...');
+          setTimeout(() => {
+            navigate('/login');
+          }, 800);
         }
       } else {
         setMessage(result.message);

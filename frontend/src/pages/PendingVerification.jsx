@@ -40,6 +40,19 @@ const PendingVerification = () => {
 
   // Check status every 30 seconds
   useEffect(() => {
+    // Immediate redirect if already verified and active in current context
+    if (user && user.isVerified && (user.status === 'active' || !user.status)) {
+      if (user.userType === 'Vendor') {
+        navigate('/vendor');
+      } else {
+        navigate('/dashboard');
+      }
+      return;
+    }
+
+    // Also trigger an immediate server check once
+    checkVerificationStatus();
+
     const interval = setInterval(checkVerificationStatus, 30000);
     return () => clearInterval(interval);
   }, [user]);

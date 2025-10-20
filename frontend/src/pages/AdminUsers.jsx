@@ -415,7 +415,8 @@ const AdminUsers = () => {
                         </div>
                         )}
 
-                        {/* Verification controls */}
+                        {/* Verification controls (only for TA/Staff/Professor) */}
+                        {(['TA', 'Staff', 'Professor'].includes(u.userType)) && (
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                           <button
                             className={verificationStatusById[userId] ? 'btn btn-outline' : 'btn btn-primary'}
@@ -438,59 +439,11 @@ const AdminUsers = () => {
                             </span>
                           )}
                         </div>
+                        )}
 
-                        {/* Activation controls */}
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <button
-                            className={activeStatusById[userId] ? 'btn btn-outline' : 'btn btn-primary'}
-                            onClick={() => handleToggleActive(userId)}
-                            disabled={!!togglingIds[userId]}
-                          >
-                            {togglingIds[userId]
-                              ? 'Updating...'
-                              : activeStatusById[userId]
-                                ? 'Deactivate User'
-                                : 'Activate User'}
-                          </button>
-                          <span style={{ fontSize: '12px', color: activeStatusById[userId] ? 'var(--success-green)' : 'var(--guc-red)' }}>
-                            {activeStatusById[userId] ? 'Active' : 'Disabled'}
-                          </span>
-                          {toggleMsgById[userId] && (
-                            <span style={{ marginLeft: '0.5rem', fontSize: '12px', color: 'var(--text-light)' }}>
-                              {toggleMsgById[userId]}
-                            </span>
-                          )}
-                        </div>
+                        {/* Activation controls removed as requested */}
 
-                        {/* Verification Email controls */}
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <button
-                            className="btn btn-primary"
-                            onClick={() => handleSendVerificationEmail(userId)}
-                            disabled={!!sendingEmailIds[userId] || !verificationStatusById[userId] || !activeStatusById[userId]}
-                            style={{ 
-                              backgroundColor: (verificationStatusById[userId] && activeStatusById[userId]) ? 'var(--primary-blue)' : 'var(--text-light)',
-                              cursor: (verificationStatusById[userId] && activeStatusById[userId]) ? 'pointer' : 'not-allowed'
-                            }}
-                          >
-                            {sendingEmailIds[userId] ? 'Sending...' : '📧 Send Verification Email'}
-                          </button>
-                          <span style={{ 
-                            fontSize: '12px', 
-                            color: (verificationStatusById[userId] && activeStatusById[userId]) ? 'var(--success-green)' : 'var(--text-light)' 
-                          }}>
-                            {(verificationStatusById[userId] && activeStatusById[userId]) ? 'Can send email' : 'User must be verified & active'}
-                          </span>
-                          {emailMsgById[userId] && (
-                            <span style={{ 
-                              marginLeft: '0.5rem', 
-                              fontSize: '12px', 
-                              color: emailMsgById[userId].includes('success') ? 'var(--success-green)' : 'var(--guc-red)' 
-                            }}>
-                              {emailMsgById[userId]}
-                            </span>
-                          )}
-                        </div>
+                        {/* Verification email controls removed as requested */}
                       </div>
                     </div>
                   );

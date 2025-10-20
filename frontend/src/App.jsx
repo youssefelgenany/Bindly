@@ -59,15 +59,12 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" />;
   }
 
-  // Check if user is verified (except for admin users, students, and vendors who are always verified)
-  const isAutoVerified = user.userType === 'admin' || 
-                        user.userType === 'Admin' || 
-                        user.role === 'admin' ||
-                        user.role === 'Admin' ||
-                        user.userType === 'Student' || 
-                        user.userType === 'Vendor';
-  
-  if (!user.isVerified && !isAutoVerified) {
+  // If user is not verified and not auto-verified by type, redirect to pending
+  const autoVerifiedTypes = ['Student', 'Vendor'];
+  const isAdminType = user.userType === 'admin' || user.userType === 'Admin' || user.role === 'admin' || user.role === 'Admin';
+  const isAutoVerified = isAdminType || autoVerifiedTypes.includes(user.userType);
+
+  if (user.isVerified === false && !isAutoVerified) {
     return <Navigate to="/pending-verification" />;
   }
 
