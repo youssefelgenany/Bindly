@@ -64,8 +64,16 @@ async function sendVerificationEmail(toEmail, token) {
 const signupValidation = [
   body('email').isEmail().withMessage('Please provide a valid email address'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
-  body('firstName').trim().isLength({ min: 1 }).withMessage('First name is required'),
-  body('lastName').trim().isLength({ min: 1 }).withMessage('Last name is required'),
+  body('firstName')
+    .if(body('userType').not().equals('Vendor'))
+    .trim()
+    .isLength({ min: 1 })
+    .withMessage('First name is required for non-vendor users'),
+  body('lastName')
+    .if(body('userType').not().equals('Vendor'))
+    .trim()
+    .isLength({ min: 1 })
+    .withMessage('Last name is required for non-vendor users'),
   body('userType').isIn(['Student', 'Staff', 'TA', 'Professor', 'Vendor'])
     .withMessage('User type must be one of: Student, Staff, TA, Professor, Vendor'),
   body('gucId')
@@ -102,10 +110,18 @@ const signup = async (req, res) => {
     const { email, password, firstName, lastName, userType, gucId, companyName } = req.body;
 
     // Basic validation
-    if (!email || !password || !firstName || !lastName || !userType) {
+    if (!email || !password || !userType) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Missing required fields: email, password, firstName, lastName, userType' 
+        message: 'Missing required fields: email, password, userType' 
+      });
+    }
+
+    // First name and last name are only required for non-vendors
+    if (userType !== 'Vendor' && (!firstName || !lastName)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'First name and last name are required for non-vendor users' 
       });
     }
 
@@ -128,12 +144,16 @@ const signup = async (req, res) => {
     const userData = { 
       email, 
       password, 
-      firstName, 
-      lastName, 
       userType,
       isVerified: false, // All users need admin verification by default
       status: 'blocked' // All users start as blocked until verified
     };
+
+    // Add first and last name only for non-vendors
+    if (userType !== 'Vendor') {
+      userData.firstName = firstName;
+      userData.lastName = lastName;
+    }
 
     // Add GUC ID for academic users
     if (['Student', 'Staff', 'TA', 'Professor'].includes(userType)) {
@@ -177,8 +197,6 @@ const signup = async (req, res) => {
     const userResponse = {
       id: newUser._id,
       email: newUser.email,
-      firstName: newUser.firstName,
-      lastName: newUser.lastName,
       userType: newUser.userType,
       gucId: newUser.gucId,
       department: newUser.department,
@@ -187,6 +205,12 @@ const signup = async (req, res) => {
       isVerified: newUser.isVerified,
       createdAt: newUser.createdAt
     };
+
+    // Only include first and last name for non-vendors
+    if (newUser.userType !== 'Vendor') {
+      userResponse.firstName = newUser.firstName;
+      userResponse.lastName = newUser.lastName;
+    }
 
     // Generate JWT token for immediate login
     const token = jwt.sign(

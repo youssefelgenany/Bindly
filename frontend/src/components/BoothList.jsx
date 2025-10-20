@@ -56,23 +56,6 @@ const BoothList = ({ booths, bazaarId, onApplyToBooth }) => {
 
     return (
         <div style={{ marginTop: '1rem' }}>
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                marginBottom: '0.75rem'
-            }}>
-                <span style={{ fontSize: '1.2rem' }}>🏪</span>
-                <h4 style={{
-                    margin: 0,
-                    color: '#495057',
-                    fontSize: '1rem',
-                    fontWeight: '600'
-                }}>
-                    Available Booths ({booths.length})
-                </h4>
-            </div>
-
             <div style={{ display: 'grid', gap: '0.5rem' }}>
                 {booths.map((booth) => (
                     <div
@@ -115,19 +98,6 @@ const BoothList = ({ booths, bazaarId, onApplyToBooth }) => {
                                 alignItems: 'center',
                                 gap: '0.5rem'
                             }}>
-                                {booth.capacity && (
-                                    <span style={{
-                                        backgroundColor: '#e3f2fd',
-                                        color: '#1976d2',
-                                        padding: '0.25rem 0.5rem',
-                                        borderRadius: '4px',
-                                        fontSize: '0.75rem',
-                                        fontWeight: '500'
-                                    }}>
-                                        Capacity: {booth.capacity}
-                                    </span>
-                                )}
-
                                 {booth.price && (
                                     <span style={{
                                         backgroundColor: '#e8f5e8',

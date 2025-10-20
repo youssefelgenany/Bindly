@@ -31,6 +31,7 @@ import Confrences from './pages/Confrences';
 import VendorAccepted from './pages/VendorAccepted';
 import VendorRequests from './pages/VendorRequests';
 import CourtAvailability from './pages/CourtAvailability';
+import PlatformBoothReservation from './pages/PlatformBoothReservation';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -249,6 +250,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <VendorRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vendor/platform-booth"
+              element={
+                <ProtectedRoute>
+                  <PlatformBoothReservation />
                 </ProtectedRoute>
               }
             />

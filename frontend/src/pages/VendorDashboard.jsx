@@ -456,6 +456,42 @@ const VendorDashboard = () => {
                                         Browse Upcoming Bazaars
                                     </div>
                                 </Link>
+
+                                <Link
+                                    to="/vendor/platform-booth"
+                                    style={{
+                                        textDecoration: 'none',
+                                        display: 'block'
+                                    }}
+                                >
+                                    <div style={{
+                                        padding: '1.25rem',
+                                        background: 'var(--guc-red)',
+                                        color: 'white',
+                                        borderRadius: '12px',
+                                        textAlign: 'center',
+                                        fontWeight: '600',
+                                        fontSize: '1.1rem',
+                                        boxShadow: '0 6px 20px rgba(210, 10, 10, 0.3)',
+                                        transition: 'all 0.3s ease',
+                                        cursor: 'pointer',
+                                        position: 'relative',
+                                        overflow: 'hidden'
+                                    }}
+                                        onMouseOver={(e) => {
+                                            e.currentTarget.style.transform = 'translateY(-3px)';
+                                            e.currentTarget.style.boxShadow = '0 10px 25px rgba(210, 10, 10, 0.4)';
+                                            e.currentTarget.style.background = '#b80a0a';
+                                        }}
+                                        onMouseOut={(e) => {
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(210, 10, 10, 0.3)';
+                                            e.currentTarget.style.background = 'var(--guc-red)';
+                                        }}
+                                    >
+                                        Platform Booth Reservation
+                                    </div>
+                                </Link>
                             </div>
                         </div>
                     </div>

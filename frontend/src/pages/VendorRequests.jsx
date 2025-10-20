@@ -316,6 +316,17 @@ const VendorRequests = () => {
                                           </div>
                                         )}
 
+                                        {/* Platform booth details if present */}
+                                        {ev.boothId && (
+                                          <div className="card" style={{ background: '#fff', padding: '0.75rem', borderRadius: 8, border: '1px solid var(--medium-gray)', marginTop: '0.5rem' }}>
+                                            <div style={{ fontWeight: 600, color: 'var(--charcoal-black)', marginBottom: 4 }}>Platform Booth Details</div>
+                                            <div style={{ color: 'var(--text-light)' }}>🏪 Booth ID: {ev.boothId}</div>
+                                            {ev.startDate && <div style={{ color: 'var(--text-light)' }}>📅 Start Date: {new Date(ev.startDate).toLocaleDateString()}</div>}
+                                            {ev.durationWeeks && <div style={{ color: 'var(--text-light)' }}>⏱️ Duration: {ev.durationWeeks} week{ev.durationWeeks > 1 ? 's' : ''}</div>}
+                                            {ev.boothLocation && <div style={{ color: 'var(--text-light)' }}>📍 Location: {ev.boothLocation}</div>}
+                                          </div>
+                                        )}
+
                                         {/* Actions for Event Office/Admin */}
                                         {isEventsOffice && (
                                           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}>

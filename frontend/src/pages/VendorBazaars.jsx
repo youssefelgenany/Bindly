@@ -118,7 +118,7 @@ const VendorBazaars = () => {
                     <p>Loading events...</p>
                 </div>
             ) : (
-                <div className="events-list" style={{ display: 'grid', gap: '1rem' }}>
+                <div className="events-list" style={{ display: 'grid', gap: '2rem' }}>
                     {/* Bazaars */}
                     <div>
                         <h2 style={{ marginBottom: '0.5rem' }}>Bazaars {bazaars.length ? `(${bazaars.length})` : ''}</h2>
@@ -245,12 +245,6 @@ const BazaarCard = ({ bazaar, activeBazaarId, setActiveBazaarId, formState, setF
                     <p className="event-description">{bazaar.description}</p>
                 )}
 
-                {/* Always display booth information section */}
-                <BoothList
-                    booths={bazaar.booths || []}
-                    bazaarId={bazaar._id}
-                    onApplyToBooth={onApplyToBooth}
-                />
             </div>
             <div className="event-actions">
                 <button className="btn btn-primary" onClick={toggle}>

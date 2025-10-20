@@ -158,12 +158,15 @@ const Signup = () => {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = 'First name is required';
-    }
+    // First name and last name are only required for non-vendors
+    if (formData.userType !== 'Vendor') {
+      if (!formData.firstName.trim()) {
+        newErrors.firstName = 'First name is required';
+      }
 
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
+      if (!formData.lastName.trim()) {
+        newErrors.lastName = 'Last name is required';
+      }
     }
 
     // Employee type validation
@@ -221,8 +224,13 @@ const Signup = () => {
       // Add form fields
       submitData.append('email', formData.email);
       submitData.append('password', formData.password);
-      submitData.append('firstName', formData.firstName);
-      submitData.append('lastName', formData.lastName);
+      
+      // Only add first and last name for non-vendors
+      if (actualUserType !== 'Vendor') {
+        submitData.append('firstName', formData.firstName);
+        submitData.append('lastName', formData.lastName);
+      }
+      
       submitData.append('userType', actualUserType);
       
       if (formData.gucId) {
@@ -372,42 +380,44 @@ const Signup = () => {
           </div>
         )}
 
-          {/* Personal Information */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="form-group">
-              <label htmlFor="firstName" className="form-label">First Name</label>
-              <input
-                type="text"
-                id="firstName"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
-                className={`form-input ${errors.firstName ? 'error' : ''}`}
-                placeholder="First name"
-                disabled={loading}
-              />
-              {errors.firstName && <div className="form-error">{errors.firstName}</div>}
-            </div>
+          {/* Personal Information - Only for non-vendors */}
+          {formData.userType !== 'Vendor' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-group">
+                <label htmlFor="firstName" className="form-label">First Name <span style={{ color: 'red' }}>*</span></label>
+                <input
+                  type="text"
+                  id="firstName"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  className={`form-input ${errors.firstName ? 'error' : ''}`}
+                  placeholder="First name"
+                  disabled={loading}
+                />
+                {errors.firstName && <div className="form-error">{errors.firstName}</div>}
+              </div>
 
-            <div className="form-group">
-              <label htmlFor="lastName" className="form-label">Last Name</label>
-              <input
-                type="text"
-                id="lastName"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleChange}
-                className={`form-input ${errors.lastName ? 'error' : ''}`}
-                placeholder="Last name"
-                disabled={loading}
-              />
-              {errors.lastName && <div className="form-error">{errors.lastName}</div>}
+              <div className="form-group">
+                <label htmlFor="lastName" className="form-label">Last Name <span style={{ color: 'red' }}>*</span></label>
+                <input
+                  type="text"
+                  id="lastName"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  className={`form-input ${errors.lastName ? 'error' : ''}`}
+                  placeholder="Last name"
+                  disabled={loading}
+                />
+                {errors.lastName && <div className="form-error">{errors.lastName}</div>}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Email */}
           <div className="form-group">
-            <label htmlFor="email" className="form-label">Email Address</label>
+            <label htmlFor="email" className="form-label">Email Address <span style={{ color: 'red' }}>*</span></label>
             <input
               type="email"
               id="email"
@@ -432,7 +442,7 @@ const Signup = () => {
           {/* GUC ID for GUC users */}
           {(formData.userType === 'Student' || (formData.userType === 'Employee' && formData.employeeType)) && (
             <div className="form-group">
-              <label htmlFor="gucId" className="form-label">GUC ID</label>
+              <label htmlFor="gucId" className="form-label">GUC ID <span style={{ color: 'red' }}>*</span></label>
               <input
                 type="text"
                 id="gucId"
@@ -451,7 +461,7 @@ const Signup = () => {
           {/* Company Name for Vendors */}
           {formData.userType === 'Vendor' && (
             <div className="form-group">
-              <label htmlFor="companyName" className="form-label">Company Name</label>
+              <label htmlFor="companyName" className="form-label">Company Name <span style={{ color: 'red' }}>*</span></label>
               <input
                 type="text"
                 id="companyName"
@@ -468,7 +478,7 @@ const Signup = () => {
 
           {/* Password Field */}
           <div className="form-group">
-            <label htmlFor="password" className="form-label">Password</label>
+            <label htmlFor="password" className="form-label">Password <span style={{ color: 'red' }}>*</span></label>
             <div style={{ position: 'relative' }}>
               <input
                 type={showPassword ? "text" : "password"}
@@ -542,7 +552,7 @@ const Signup = () => {
 
           {/* Confirm Password Field */}
           <div className="form-group">
-            <label htmlFor="confirmPassword" className="form-label">Confirm Password</label>
+            <label htmlFor="confirmPassword" className="form-label">Confirm Password <span style={{ color: 'red' }}>*</span></label>
             <div style={{ position: 'relative' }}>
               <input
                 type={showConfirmPassword ? "text" : "password"}
@@ -585,7 +595,7 @@ const Signup = () => {
           {formData.userType === 'Vendor' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
-                <label htmlFor="vendorLogo" className="form-label">Company Logo</label>
+                <label htmlFor="vendorLogo" className="form-label">Company Logo <span style={{ color: 'red' }}>*</span></label>
                 <input
                   type="file"
                   id="vendorLogo"
@@ -599,7 +609,7 @@ const Signup = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="vendorTaxCard" className="form-label">Tax Card</label>
+                <label htmlFor="vendorTaxCard" className="form-label">Tax Card <span style={{ color: 'red' }}>*</span></label>
                 <input
                   type="file"
                   id="vendorTaxCard"

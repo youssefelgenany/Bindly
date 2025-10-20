@@ -18,14 +18,16 @@ const userSchema = new mongoose.Schema({
     required: function() {
       return ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
     },
-    trim: true
+    trim: true,
+    default: null
   },
   lastName: {
     type: String,
     required: function() {
       return ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
     },
-    trim: true
+    trim: true,
+    default: null
   },
    name: {
     type: String,
