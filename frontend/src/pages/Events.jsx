@@ -47,6 +47,9 @@ const Events = () => {
     // In case backend doesn't filter everything yet
     let list = events || [];
     
+    // Exclude 'other' type events
+    list = list.filter(e => e.type !== 'other');
+    
     // Search by event name or professor name
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
