@@ -123,7 +123,7 @@ const AdminUsers = () => {
     try {
       const result = await adminApiService.updateUserRole(userId, selectedRole);
       if (result.success) {
-        setMessageById(prev => ({ ...prev, [userId]: 'Role updated and verification email sent successfully.' }));
+        setMessageById(prev => ({ ...prev, [userId]: 'Role updated successfully.' }));
         // Update the user in the local state
         setUsers(prev => prev.map(u => 
           u._id === userId ? { ...u, userType: selectedRole } : u
@@ -365,8 +365,12 @@ const AdminUsers = () => {
                             </div>
                           </div>
                           <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '12px', color: u.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)' }}>
-                              {u.isVerified ? 'Verified' : 'Pending'}
+                            <div style={{ 
+                              fontSize: '12px', 
+                              color: u.status === 'active' ? 'var(--success-green)' : 'var(--guc-red)',
+                              fontWeight: '500'
+                            }}>
+                              {u.status === 'active' ? 'Active' : 'Blocked'}
                             </div>
                             <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
                               {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : ''}
@@ -374,8 +378,8 @@ const AdminUsers = () => {
                           </div>
                         </div>
 
-                        {/* Role controls (hidden for Students and Vendors) */}
-                        {!(u.userType === 'Student' || u.userType === 'Vendor') && (
+                        {/* Role controls (only for unverified TA/Staff/Professor) */}
+                        {!(u.userType === 'Student' || u.userType === 'Vendor') && !verificationStatusById[userId] && (
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                           <select
                             className="form-input"

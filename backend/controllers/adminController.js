@@ -92,19 +92,11 @@ exports.updateUserRole = async (req, res) => {
 
     // Update user type (role) within the allowed set
     user.userType = role;
-    
-    // Generate verification token and send verification email
-    user.verificationToken = crypto.randomBytes(24).toString("hex");
-    user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     await user.save();
-
-    // Send verification email
-    const name = user.firstName ? `${user.firstName} ${user.lastName}` : user.name || 'User';
-    await sendVerificationEmail(user.email, user.verificationToken, name);
 
     res.status(200).json({
       success: true,
-      message: 'User role updated successfully and verification email sent',
+      message: 'User role updated successfully',
       user: {
         id: user._id,
         firstName: user.firstName,
@@ -492,7 +484,7 @@ exports.updateVendorStatus = async (req, res) => {
 // This endpoint is kept for backward compatibility but should not be used
 exports.updateUserVerification = async (req, res) => {
   return res.status(403).json({
-    success: false,
+        success: false,
     message: "Direct user verification is disabled. Users must verify via email verification link.",
   });
 };
