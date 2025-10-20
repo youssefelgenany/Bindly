@@ -461,10 +461,72 @@ exports.getAllEventsForAdmin = async (req, res) => {
     console.log('📊 Found events:', events.length);
     console.log('📊 Events data:', events);
 
+    // Add vendor information for workshops and booths
+    const eventsWithVendors = await Promise.all(events.map(async (event) => {
+      const baseEvent = event.toObject();
+      
+      // Add vendor information for workshops, booths, and bazaars
+      if (event.type === 'workshop' || event.type === 'booth' || event.type === 'bazaar') {
+        try {
+          const VendorRequest = require('../models/vendorRequest');
+          const vendorRequests = await VendorRequest.find({
+            [event.type]: event._id,
+            status: 'accepted'
+          }).populate('vendor', 'firstName lastName companyName email phone userType').lean();
+
+          // For booth events, include full vendor request details
+          if (event.type === 'booth') {
+            baseEvent.vendorRequests = vendorRequests.map(vr => ({
+              _id: vr._id,
+              vendor: {
+                _id: vr.vendor._id,
+                name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+                companyName: vr.vendor.companyName,
+                contactName: `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+                email: vr.vendor.email,
+              },
+              boothSize: vr.boothSize,
+              durationWeeks: vr.durationWeeks,
+              boothLocation: vr.boothLocation,
+              attendees: vr.attendees || [],
+              message: vr.message || '',
+              status: vr.status,
+              createdAt: vr.createdAt,
+              eventName: vr.eventName,
+              eventType: vr.eventType
+            }));
+          }
+
+          // Keep the original vendors array for backward compatibility
+          baseEvent.vendors = vendorRequests.map(vr => ({
+            id: vr._id,
+            companyName: vr.vendor?.companyName || `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+            contactName: `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+            email: vr.vendor?.email || '',
+            phone: vr.vendor?.phone || '',
+            userType: vr.vendor?.userType || '',
+            boothSize: vr.boothSize || null,
+            durationWeeks: vr.durationWeeks || null,
+            boothLocation: vr.boothLocation || null,
+            attendees: vr.attendees || [],
+            message: vr.message || '',
+            status: vr.status,
+            joinedAt: vr.createdAt
+          }));
+        } catch (vendorError) {
+          console.error('Error fetching vendor information:', vendorError);
+          baseEvent.vendors = [];
+          baseEvent.vendorRequests = [];
+        }
+      }
+
+      return baseEvent;
+    }));
+
     res.status(200).json({
       success: true,
       message: 'Events fetched successfully',
-      events
+      events: eventsWithVendors
     });
   } catch (err) {
     console.error("❌ Error fetching events for admin:", err);
