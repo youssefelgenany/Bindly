@@ -400,11 +400,11 @@ const Navbar = () => {
                 <>
                   <Link
                     to="/professor/events"
-                    className="btn btn-outline"
+                    className="btn btn-primary"
                     style={{ width: '100%' }}
                     onClick={closeSidebar}
                   >
-                    Create Workshop
+                    📚 My Workshops
                   </Link>
                   <Link
                     to="/professor/profile"
