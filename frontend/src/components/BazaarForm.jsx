@@ -11,6 +11,20 @@ const BazaarForm = ({ onSubmit, loading = false, initialData = {}, submitLabel =
     registrationDeadline: initialData.registrationDeadline || ''
   });
 
+  // Update form data when initialData changes (for editing)
+  React.useEffect(() => {
+    if (initialData && Object.keys(initialData).length > 0) {
+      setFormData({
+        name: initialData.name || '',
+        location: initialData.location || '',
+        description: initialData.description || '',
+        startDate: initialData.startDate || '',
+        endDate: initialData.endDate || '',
+        registrationDeadline: initialData.registrationDeadline || ''
+      });
+    }
+  }, [initialData]);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,

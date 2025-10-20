@@ -17,8 +17,8 @@ exports.verifyByToken = async (req, res) => {
     user.verificationExpiresAt = null;
     await user.save();
 
-    const redirectUrl = process.env.APP_LOGIN_URL || "http://localhost:3000/login";
-    res.redirect(redirectUrl);
+    const redirectUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    res.redirect(`${redirectUrl}/login`);
   } catch (err) {
     console.error(err);
     res.status(500).send("Server error");

@@ -56,7 +56,7 @@ const Navbar = () => {
       }}>
         {/* Left group: brand only */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {user && (
+          {user && user.userType !== 'Vendor' && (
             <button
               onClick={toggleSidebar}
               className="btn btn-outline"
@@ -181,7 +181,7 @@ const Navbar = () => {
       </div>
 
       {/* Right Sidebar Overlay */}
-      {user && (
+      {user && user.userType !== 'Vendor' && (
         <>
           {/* Dim Background */}
           <div
@@ -234,6 +234,103 @@ const Navbar = () => {
             </div>
 
             <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+              {/* Student Events View */}
+              {user.userType === 'Student' && (
+                <>
+                  <Link
+                    to="/student/events"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📅 View Events
+                  </Link>
+                  <Link
+                    to="/student/my-registrations"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📋 My Registrations
+                  </Link>
+                  <Link
+                    to="/student/courts"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    🏟️ View Courts
+                  </Link>
+                </>
+              )}
+
+              {/* Staff Events View */}
+              {user.userType === 'Staff' && (
+                <>
+                  <Link
+                    to="/staff/events"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📅 View Events
+                  </Link>
+                  <Link
+                    to="/staff/my-registrations"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📋 My Registrations
+                  </Link>
+                </>
+              )}
+
+              {/* TA Events View */}
+              {user.userType === 'TA' && (
+                <>
+                  <Link
+                    to="/staff/events"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📅 View Events
+                  </Link>
+                  <Link
+                    to="/staff/my-registrations"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📋 My Registrations
+                  </Link>
+                </>
+              )}
+
+              {/* Professor Events View */}
+              {user.userType === 'Professor' && (
+                <>
+                  <Link
+                    to="/staff/events"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📅 View Events
+                  </Link>
+                  <Link
+                    to="/staff/my-registrations"
+                    className="btn btn-outline"
+                    style={{ width: '100%' }}
+                    onClick={closeSidebar}
+                  >
+                    📋 My Registrations
+                  </Link>
+                </>
+              )}
+
+
               {/* Gym Schedule - visible to Student, Staff, TA, Professor, Event Office */}
               {(user.userType === 'Student' || user.userType === 'Staff' || user.userType === 'TA' || user.userType === 'Professor' || user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
                 <Link
@@ -246,17 +343,6 @@ const Navbar = () => {
                 </Link>
               )}
 
-              {/* Court Availability - visible to Student, Staff, TA */}
-              {(user.userType === 'Student' || user.userType === 'Staff' || user.userType === 'TA') && (
-                <Link
-                  to="/courts"
-                  className="btn btn-outline"
-                  style={{ width: '100%' }}
-                  onClick={closeSidebar}
-                >
-                  Court Availability
-                </Link>
-              )}
 
 {/* Conferences link moved into Events page filters */}
               
@@ -264,12 +350,12 @@ const Navbar = () => {
               {(user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office') && (
                 <>
                   <Link
-                    to="/events"
-                    className="btn btn-outline"
+                    to="/student/events"
+                    className="btn btn-primary"
                     style={{ width: '100%' }}
                     onClick={closeSidebar}
                   >
-                    View Events
+                    📅 View Events
                   </Link>
                   <Link
                     to="/event-office/vendor-requests"
@@ -311,6 +397,14 @@ const Navbar = () => {
                   >
                     Create Booth
                   </Link>
+                  <Link
+                    to="/create-gym-session"
+                    className="btn btn-primary"
+                    style={{ width: '100%', backgroundColor: '#28a745', borderColor: '#28a745' }}
+                    onClick={closeSidebar}
+                  >
+                    🏋️ Create Gym Session
+                  </Link>
                 </>
               )}
               
@@ -319,19 +413,11 @@ const Navbar = () => {
                 <>
                   <Link
                     to="/professor/events"
-                    className="btn btn-outline"
+                    className="btn btn-primary"
                     style={{ width: '100%' }}
                     onClick={closeSidebar}
                   >
-                    Create Workshop
-                  </Link>
-                  <Link
-                    to="/professor/all-events"
-                    className="btn btn-outline"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    All Events & Bazaars
+                    📚 My Workshops
                   </Link>
                   <Link
                     to="/professor/profile"
@@ -346,7 +432,7 @@ const Navbar = () => {
               
               {/* Hide Manage Gym for Event Office */}
               
-              {(user.role === 'admin' || user.userType === 'Admin' || user.userType === 'admin') && (
+              {(user.role === 'admin' || user.role === 'Admin' || user.userType === 'Admin' || user.userType === 'admin') && (
                 <>
                   <Link
                     to="/admin/users"
@@ -355,14 +441,6 @@ const Navbar = () => {
                     onClick={closeSidebar}
                   >
                     View Users
-                  </Link>
-                  <Link
-                    to="/admin/vendors"
-                    className="btn btn-outline"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    View Vendors
                   </Link>
                   <Link
                     to="/event-office/vendor-requests"
@@ -378,7 +456,7 @@ const Navbar = () => {
                     style={{ width: '100%' }}
                     onClick={closeSidebar}
                   >
-                    Manage Events
+                    View Events
                   </Link>
                   <Link
                     to="/admin/manage"

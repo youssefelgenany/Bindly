@@ -21,6 +21,40 @@ export const vendorApi = {
         return res.data;
     },
 
+    // Fetch standalone booths from the events collection
+    listStandaloneBooths: async (filters = {}) => {
+        try {
+            // Use the existing vendor API endpoint to fetch standaloneBooth type
+            const res = await api.get('/events/upcoming', { params: { type: 'standaloneBooth' } });
+            let booths = res.data || [];
+            
+            // Apply client-side filtering if needed
+            if (filters.q) {
+                const query = filters.q.toLowerCase();
+                booths = booths.filter(booth => 
+                    (booth.name || booth.title || '').toLowerCase().includes(query) ||
+                    (booth.description || '').toLowerCase().includes(query) ||
+                    (booth.location || '').toLowerCase().includes(query)
+                );
+            }
+            
+            if (filters.location) {
+                booths = booths.filter(booth => 
+                    (booth.location || '').toLowerCase().includes(filters.location.toLowerCase())
+                );
+            }
+            
+            if (filters.status) {
+                booths = booths.filter(booth => booth.status === filters.status);
+            }
+            
+            return booths;
+        } catch (error) {
+            console.error('Error fetching standalone booths:', error);
+            throw error;
+        }
+    },
+
     applyToEvent: async ({ eventType, eventId, attendees, boothSize, durationWeeks, boothLocation, message }) => {
         const res = await api.post('/apply', {
             eventType,

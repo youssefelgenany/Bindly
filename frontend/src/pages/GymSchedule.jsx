@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { gymApiService } from '../api/gymApi';
 
-const TYPES = ['yoga', 'pilates', 'aerobics', 'zumba', 'crossfit', 'strength', 'cardio', 'other'];
+const TYPES = ['yoga', 'pilates', 'aerobics', 'zumba', 'cross circuit', 'kick-boxing', 'strength', 'cardio', 'other'];
 
 const GymSchedule = () => {
   const today = new Date();

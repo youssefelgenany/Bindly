@@ -9,7 +9,7 @@ const AdminEvents = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
-  const [organizerFilter, setOrganizerFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
 
   // Action states
   const [processingIds, setProcessingIds] = useState({}); // id -> boolean
@@ -25,10 +25,11 @@ const AdminEvents = () => {
     try {
       setLoading(true);
       setError('');
-      console.log('Loading events with filters:', { q: searchQuery, status: statusFilter });
+      console.log('Loading events with filters:', { q: searchQuery, status: statusFilter, type: typeFilter });
       const result = await adminApiService.getAllEvents({
         q: searchQuery,
-        status: statusFilter
+        status: statusFilter,
+        ...(typeFilter !== 'all' && { type: typeFilter })
       });
       console.log('Events API result:', result);
       if (result.success) {
@@ -44,22 +45,20 @@ const AdminEvents = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, typeFilter]);
 
   // Load events on component mount and when filters change
   useEffect(() => {
     loadEvents();
   }, [loadEvents]);
 
-  // Get unique organizers for filter
-  const organizers = useMemo(() => {
-    const unique = [...new Set(events.map(e => e.createdBy?.firstName + ' ' + e.createdBy?.lastName || 'Unknown'))];
-    return unique.sort();
-  }, [events]);
 
   // Filter events based on current filters
   const filteredEvents = useMemo(() => {
     let filtered = events;
+
+    // Exclude 'other' type events
+    filtered = filtered.filter(event => event.type !== 'other');
 
     // Search filter
     if (searchQuery.trim()) {
@@ -80,31 +79,35 @@ const AdminEvents = () => {
     // Date filter
     if (dateFilter !== 'all') {
       const now = new Date();
+      console.log('📅 Applying date filter:', dateFilter, 'Current time:', now);
       filtered = filtered.filter(event => {
-        const eventDate = new Date(event.date);
+        const eventDate = new Date(event.startDate);
+        console.log('📅 Event date:', eventDate, 'Event title:', event.title);
+        let matches = false;
         switch (dateFilter) {
           case 'upcoming':
-            return eventDate > now;
+            matches = eventDate > now;
+            break;
           case 'past':
-            return eventDate < now;
+            matches = eventDate < now;
+            break;
           case 'today':
-            return eventDate.toDateString() === now.toDateString();
+            matches = eventDate.toDateString() === now.toDateString();
+            break;
           case 'this-week':
             const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-            return eventDate >= now && eventDate <= weekFromNow;
+            matches = eventDate >= now && eventDate <= weekFromNow;
+            break;
           default:
-            return true;
+            matches = true;
         }
+        console.log('📅 Event matches filter:', matches);
+        return matches;
       });
     }
 
-    // Organizer filter
-    if (organizerFilter !== 'all') {
-      filtered = filtered.filter(event => event.organizer === organizerFilter);
-    }
-
     return filtered;
-  }, [events, searchQuery, statusFilter, dateFilter, organizerFilter]);
+  }, [events, searchQuery, statusFilter, dateFilter]);
 
   const handleStatusChange = async (eventId, newStatus) => {
     setProcessingIds(prev => ({ ...prev, [eventId]: true }));
@@ -248,17 +251,20 @@ const AdminEvents = () => {
                     </select>
                   </div>
 
+
                   <div className="form-group">
-                    <label className="form-label">Organizer</label>
+                    <label className="form-label">Event Type</label>
                     <select
                       className="form-input"
-                      value={organizerFilter}
-                      onChange={(e) => setOrganizerFilter(e.target.value)}
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value)}
                     >
-                      <option value="all">All Organizers</option>
-                      {organizers.map(organizer => (
-                        <option key={organizer} value={organizer}>{organizer}</option>
-                      ))}
+                      <option value="all">All Types</option>
+                      <option value="bazaar">Bazaar</option>
+                      <option value="trip">Trip</option>
+                      <option value="conference">Conference</option>
+                      <option value="workshop">Workshop</option>
+                      <option value="booth">Booth</option>
                     </select>
                   </div>
                 </div>
@@ -305,12 +311,108 @@ const AdminEvents = () => {
                             <div style={{ fontWeight: 600, color: 'var(--charcoal-black)', fontSize: '18px' }}>
                               {event.title}
                             </div>
+                            <div style={{ 
+                              fontSize: '12px', 
+                              color: 'var(--guc-blue)', 
+                              fontWeight: '600',
+                              backgroundColor: 'var(--light-blue)',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              display: 'inline-block',
+                              width: 'fit-content'
+                            }}>
+                              📋 {event.type?.toUpperCase() || 'UNKNOWN'}
+                            </div>
                             <div style={{ color: 'var(--text-light)', fontSize: '14px' }}>
                               {event.description}
                             </div>
                             <div style={{ color: 'var(--text-light)', fontSize: '12px' }}>
                               📍 {event.location} • 👥 {event.registeredCount || 0}/{event.capacity} attendees
                             </div>
+                            
+                            {/* Participating Vendors for Workshops, Booths, and Bazaars */}
+                            {(event.type === 'workshop' || event.type === 'booth' || event.type === 'bazaar') && event.vendors && event.vendors.length > 0 && (
+                              <div style={{ marginTop: '0.5rem' }}>
+                                <div style={{ 
+                                  fontSize: '12px', 
+                                  color: 'var(--guc-blue)', 
+                                  fontWeight: '600',
+                                  marginBottom: '0.5rem'
+                                }}>
+                                  🏪 Participating Vendors ({event.vendors.length})
+                                </div>
+                                <div style={{ 
+                                  display: 'grid', 
+                                  gap: '0.5rem',
+                                  maxHeight: '200px',
+                                  overflowY: 'auto',
+                                  backgroundColor: 'rgba(0, 123, 255, 0.05)',
+                                  padding: '0.5rem',
+                                  borderRadius: '8px',
+                                  border: '1px solid var(--light-blue)'
+                                }}>
+                                  {event.vendors.map((vendor, index) => (
+                                    <div key={vendor.id || index} style={{
+                                      backgroundColor: 'white',
+                                      padding: '0.5rem',
+                                      borderRadius: '6px',
+                                      border: '1px solid var(--light-blue)',
+                                      fontSize: '11px'
+                                    }}>
+                                      <div style={{ fontWeight: '600', color: 'var(--charcoal-black)', marginBottom: '0.25rem' }}>
+                                        {vendor.companyName || vendor.contactName}
+                                      </div>
+                                      <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                        📧 {vendor.email}
+                                      </div>
+                                      {vendor.phone && (
+                                        <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                          📞 {vendor.phone}
+                                        </div>
+                                      )}
+                                      {vendor.contactName && vendor.contactName !== vendor.companyName && (
+                                        <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                          👤 Contact: {vendor.contactName}
+                                        </div>
+                                      )}
+                                      {vendor.boothSize && (
+                                        <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                          📏 {event.type === 'bazaar' ? 'Booth Size' : 'Booth Size'}: {vendor.boothSize}
+                                        </div>
+                                      )}
+                                      {vendor.durationWeeks && (
+                                        <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                          ⏱️ Duration: {vendor.durationWeeks} week{vendor.durationWeeks !== 1 ? 's' : ''}
+                                        </div>
+                                      )}
+                                      {vendor.boothLocation && (
+                                        <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                          📍 {event.type === 'bazaar' ? 'Booth Location' : 'Location'}: {vendor.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                        </div>
+                                      )}
+                                      {vendor.attendees && vendor.attendees.length > 0 && (
+                                        <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                          👥 Attendees: {vendor.attendees.length}
+                                          <div style={{ marginLeft: '0.5rem', fontSize: '10px' }}>
+                                            {vendor.attendees.map((attendee, idx) => (
+                                              <div key={idx}>• {attendee.name} ({attendee.email})</div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {vendor.message && (
+                                        <div style={{ color: 'var(--text-light)', fontStyle: 'italic', fontSize: '10px' }}>
+                                          💬 "{vendor.message}"
+                                        </div>
+                                      )}
+                                      <div style={{ color: 'var(--text-light)', fontSize: '10px', marginTop: '0.25rem' }}>
+                                        📅 Applied: {new Date(vendor.joinedAt).toLocaleDateString()}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         <div style={{ textAlign: 'right', display: 'grid', gap: '0.25rem' }}>
                           <div style={{ 
@@ -334,49 +436,6 @@ const AdminEvents = () => {
 
                       {/* Action Buttons */}
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {event.status === 'pending' && (
-                          <>
-                            <button
-                              className="btn btn-primary"
-                              onClick={() => handleStatusChange(eventId, 'approved')}
-                              disabled={!!processingIds[eventId]}
-                              style={{ fontSize: '12px' }}
-                            >
-                              {processingIds[eventId] ? 'Processing...' : '✓ Approve'}
-                            </button>
-                            <button
-                              className="btn btn-outline"
-                              onClick={() => handleStatusChange(eventId, 'rejected')}
-                              disabled={!!processingIds[eventId]}
-                              style={{ fontSize: '12px', color: 'var(--guc-red)', borderColor: 'var(--guc-red)' }}
-                            >
-                              {processingIds[eventId] ? 'Processing...' : '✗ Reject'}
-                            </button>
-                          </>
-                        )}
-                        
-                        {event.status === 'approved' && (
-                          <button
-                            className="btn btn-outline"
-                            onClick={() => handleStatusChange(eventId, 'rejected')}
-                            disabled={!!processingIds[eventId]}
-                            style={{ fontSize: '12px', color: 'var(--guc-red)', borderColor: 'var(--guc-red)' }}
-                          >
-                            {processingIds[eventId] ? 'Processing...' : '✗ Reject'}
-                          </button>
-                        )}
-
-                        {event.status === 'rejected' && (
-                          <button
-                            className="btn btn-primary"
-                            onClick={() => handleStatusChange(eventId, 'approved')}
-                            disabled={!!processingIds[eventId]}
-                            style={{ fontSize: '12px' }}
-                          >
-                            {processingIds[eventId] ? 'Processing...' : '✓ Approve'}
-                          </button>
-                        )}
-
                         <button
                           className="btn btn-outline"
                           onClick={() => handleDeleteClick(event)}

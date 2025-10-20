@@ -1,0 +1,154 @@
+[
+  {
+    "vendor": "507f1f77bcf86cd799439011",
+    "eventName": "Spring Festival Booth - Premium Location",
+    "eventType": "booth",
+    "attendees": [
+      {
+        "name": "John Smith",
+        "email": "john.smith@example.com"
+      },
+      {
+        "name": "Sarah Johnson",
+        "email": "sarah.johnson@example.com"
+      }
+    ],
+    "boothSize": "4x4",
+    "durationWeeks": 3,
+    "boothLocation": "main-entrance",
+    "message": "We are a local food vendor specializing in organic smoothies and healthy snacks. Looking forward to participating!",
+    "status": "pending",
+    "createdAt": "2024-02-15T10:30:00.000Z"
+  },
+  {
+    "vendor": "507f1f77bcf86cd799439012",
+    "eventName": "Tech Expo Booth - Innovation Hub",
+    "eventType": "booth",
+    "attendees": [
+      {
+        "name": "Mike Chen",
+        "email": "mike.chen@techstartup.com"
+      }
+    ],
+    "boothSize": "2x2",
+    "durationWeeks": 1,
+    "boothLocation": "central-plaza",
+    "message": "We are showcasing our new mobile app for student productivity. Excited to demo to the tech-savvy audience!",
+    "status": "accepted",
+    "createdAt": "2024-02-20T14:15:00.000Z"
+  },
+  {
+    "vendor": "507f1f77bcf86cd799439013",
+    "eventName": "Art & Craft Fair Booth - Gallery Space",
+    "eventType": "booth",
+    "attendees": [
+      {
+        "name": "Emma Wilson",
+        "email": "emma.wilson@artstudio.com"
+      },
+      {
+        "name": "David Brown",
+        "email": "david.brown@artstudio.com"
+      }
+    ],
+    "boothSize": "4x4",
+    "durationWeeks": 2,
+    "boothLocation": "library-area",
+    "message": "We create handmade jewelry and art pieces. Perfect opportunity to reach art enthusiasts!",
+    "status": "pending",
+    "createdAt": "2024-02-25T09:45:00.000Z"
+  },
+  {
+    "vendor": "507f1f77bcf86cd799439014",
+    "eventName": "Summer Bazaar Booth - Food Court",
+    "eventType": "booth",
+    "attendees": [
+      {
+        "name": "Maria Garcia",
+        "email": "maria.garcia@foodtruck.com"
+      },
+      {
+        "name": "Carlos Rodriguez",
+        "email": "carlos.rodriguez@foodtruck.com"
+      }
+    ],
+    "boothSize": "4x4",
+    "durationWeeks": 2,
+    "boothLocation": "food-court",
+    "message": "Authentic Mexican cuisine food truck looking to serve delicious tacos and burritos to students!",
+    "status": "accepted",
+    "createdAt": "2024-03-01T11:20:00.000Z"
+  },
+  {
+    "vendor": "507f1f77bcf86cd799439015",
+    "eventName": "Health & Wellness Booth - Gym Area",
+    "eventType": "booth",
+    "attendees": [
+      {
+        "name": "Dr. Lisa Thompson",
+        "email": "lisa.thompson@wellness.com"
+      }
+    ],
+    "boothSize": "2x2",
+    "durationWeeks": 1,
+    "boothLocation": "gym-entrance",
+    "message": "Nutritional supplements and wellness products for health-conscious students and faculty.",
+    "status": "pending",
+    "createdAt": "2024-03-05T16:30:00.000Z"
+  },
+  {
+    "vendor": "507f1f77bcf86cd799439016",
+    "eventName": "Book Fair Booth - Library Entrance",
+    "eventType": "booth",
+    "attendees": [
+      {
+        "name": "Robert Kim",
+        "email": "robert.kim@bookstore.com"
+      },
+      {
+        "name": "Jennifer Lee",
+        "email": "jennifer.lee@bookstore.com"
+      }
+    ],
+    "boothSize": "4x4",
+    "durationWeeks": 2,
+    "boothLocation": "library-area",
+    "message": "Academic textbooks, novels, and educational materials for students and faculty.",
+    "status": "accepted",
+    "createdAt": "2024-03-10T13:45:00.000Z"
+  },
+  {
+    "vendor": "507f1f77bcf86cd799439017",
+    "eventName": "Cultural Festival Booth - Auditorium",
+    "eventType": "booth",
+    "attendees": [
+      {
+        "name": "Ahmed Hassan",
+        "email": "ahmed.hassan@cultural.com"
+      }
+    ],
+    "boothSize": "2x2",
+    "durationWeeks": 1,
+    "boothLocation": "auditorium-hall",
+    "message": "Traditional Middle Eastern crafts, textiles, and cultural artifacts for the festival.",
+    "status": "pending",
+    "createdAt": "2024-03-12T08:15:00.000Z"
+  },
+  {
+    "vendor": "507f1f77bcf86cd799439018",
+    "eventName": "Spring Festival Booth - Standard Location",
+    "eventType": "booth",
+    "attendees": [
+      {
+        "name": "Student Entrepreneur Group",
+        "email": "startup@studentgroup.com"
+      }
+    ],
+    "boothSize": "2x2",
+    "durationWeeks": 1,
+    "boothLocation": "student-center",
+    "message": "Student-run startup showcasing innovative tech solutions and seeking feedback from the community.",
+    "status": "rejected",
+    "createdAt": "2024-03-08T12:00:00.000Z"
+  }
+]

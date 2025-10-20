@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
 import '../styles/StudentRegistrationForm.css';
 
 const StudentRegistrationForm = ({ event, onClose, onSuccess }) => {
+  const { user } = useAuth();
+  const isStaff = user?.userType === 'Staff';
   const [formData, setFormData] = useState({
     studentName: '',
     studentId: '',
@@ -99,7 +102,7 @@ const StudentRegistrationForm = ({ event, onClose, onSuccess }) => {
 
       <form onSubmit={handleSubmit} className="registration-form">
         <div className="form-section">
-          <h3>Student Information</h3>
+          <h3>{isStaff ? 'Staff Information' : 'Student Information'}</h3>
           
           <div className="form-group">
             <label htmlFor="studentName">Full Name *</label>
@@ -115,7 +118,7 @@ const StudentRegistrationForm = ({ event, onClose, onSuccess }) => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="studentId">Student ID *</label>
+            <label htmlFor="studentId">{isStaff ? 'Staff ID *' : 'Student ID *'}</label>
             <input
               type="text"
               id="studentId"
@@ -123,7 +126,7 @@ const StudentRegistrationForm = ({ event, onClose, onSuccess }) => {
               value={formData.studentId}
               onChange={handleInputChange}
               required
-              placeholder="Enter your student ID"
+              placeholder={isStaff ? 'Enter your staff ID' : 'Enter your student ID'}
             />
           </div>
 

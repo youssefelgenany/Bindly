@@ -1,17 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/StudentMyRegistrations.css';
 
 const StaffMyRegistrations = () => {
+  const { user } = useAuth();
   const [registrations, setRegistrations] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [email, setEmail] = useState('');
-  const [searchEmail, setSearchEmail] = useState('');
 
-  const handleSearch = async () => {
-    if (!searchEmail.trim()) {
-      setError('Please enter your email address');
+  useEffect(() => {
+    if (user && user.email) {
+      loadMyRegistrations();
+    }
+  }, [user]);
+
+  const loadMyRegistrations = async () => {
+    if (!user?.email) {
+      setError('User email not available');
+      setLoading(false);
       return;
     }
 
@@ -19,13 +26,12 @@ const StaffMyRegistrations = () => {
     setError('');
 
     try {
-      console.log('🔍 Searching for registrations with email:', searchEmail.trim());
-      const result = await studentRegistrationApi.getMyRegistrations(searchEmail.trim());
+      console.log('🔍 Loading registrations for user:', user.email);
+      const result = await studentRegistrationApi.getMyRegistrations(user.email);
       console.log('🔍 API result:', result);
       
       if (result.success) {
         setRegistrations(result.data.registrations || []);
-        setEmail(searchEmail.trim());
         console.log('🔍 Set registrations:', result.data.registrations);
         console.log('🔍 Sample registration emergency contact:', result.data.registrations[0]?.emergencyContact);
       } else {
@@ -82,36 +88,39 @@ const StaffMyRegistrations = () => {
     <div className="my-registrations-container">
       <div className="page-header">
         <h1>📋 My Event Registrations</h1>
-        <p>Enter your email to view all events you've registered for.</p>
-      </div>
-
-      <div className="search-section">
-        <form onSubmit={(e) => { e.preventDefault(); handleSearch(); }} className="search-form">
-          <div className="input-group">
-            <input
-              type="email"
-              placeholder="Enter your registration email"
-              value={searchEmail}
-              onChange={(e) => setSearchEmail(e.target.value)}
-              required
-            />
-            <button type="submit" disabled={loading}>
-              {loading ? 'Searching...' : '🔍 Search Registrations'}
-            </button>
+        <p>View all your registered workshops and trips</p>
+        {user?.email && (
+          <div className="user-info">
+            <p><strong>Logged in as:</strong> {user.email}</p>
           </div>
-        </form>
+        )}
       </div>
 
-      {error && <div className="error-message">❌ {error}</div>}
+      {loading && (
+        <div className="loading-message">
+          <p>Loading your registrations...</p>
+        </div>
+      )}
 
-      {loading && <div className="loading">Loading registrations...</div>}
+      {error && (
+        <div className="error-message">
+          ❌ {error}
+        </div>
+      )}
 
-      {!loading && email && registrations.length === 0 && !error && (
+      {!loading && user?.email && registrations.length === 0 && !error && (
         <div className="no-registrations">
-          <p>No registrations found for the provided email.</p>
+          <p>No registrations found for your account.</p>
           <p style={{ fontSize: '14px', color: '#6c757d', marginTop: '10px' }}>
-            Please ensure you entered the correct email address.
+            Make sure you've registered for workshops or trips using your email.
           </p>
+        </div>
+      )}
+
+      {registrations.length > 0 && (
+        <div className="results-header">
+          <h2>Your Registrations</h2>
+          <p>Found {registrations.length} registration{registrations.length !== 1 ? 's' : ''}</p>
         </div>
       )}
 

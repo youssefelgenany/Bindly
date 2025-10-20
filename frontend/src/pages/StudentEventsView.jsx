@@ -1,9 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { eventsApiService } from '../api/eventsApi';
+import { bazaarApi, tripApi } from '../api/eventManagementApi';
 import StudentRegistrationForm from '../components/StudentRegistrationForm';
+import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/StudentEventsView.css';
 
 const StudentEventsView = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,27 +18,20 @@ const StudentEventsView = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
   const [registrationEvent, setRegistrationEvent] = useState(null);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editEvent, setEditEvent] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showWorkshopEditModal, setShowWorkshopEditModal] = useState(false);
+  const [selectedWorkshop, setSelectedWorkshop] = useState(null);
 
-  useEffect(() => {
-    loadEvents();
-  }, [filter]);
-
-  // Auto-search with debounce
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchQuery !== '') {
-        setLoading(true);
-        loadEvents();
-      }
-    }, 500); // 500ms delay
-
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
-
-  const loadEvents = async () => {
+  const loadEvents = useCallback(async () => {
     try {
       setError('');
       console.log('🔍 Frontend search query:', searchQuery);
+      console.log('🔍 Frontend filter:', filter);
+      console.log('🔍 User type:', user?.userType);
       const result = await eventsApiService.getStudentEvents({
         q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
         type: filter !== 'all' ? filter : undefined
@@ -40,11 +39,13 @@ const StudentEventsView = () => {
       
       if (result.success) {
         console.log('🔍 Student events data:', result.data);
+        console.log('🔍 Number of events received:', result.data?.length);
+        console.log('🔍 Workshop events:', result.data?.filter(ev => ev.type === 'workshop'));
         const mapped = (result.data || []).map(ev => ({
           id: ev._id || ev.id,
           title: ev.title,
           type: ev.type,
-          status: ev.status || 'approved',
+          status: ev.status || 'pending',
           location: ev.location,
           startDate: ev.startDate,
           endDate: ev.endDate,
@@ -78,7 +79,11 @@ const StudentEventsView = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchQuery, filter]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [filter, loadEvents]);
 
   const handleSearch = () => {
     setLoading(true);
@@ -90,6 +95,69 @@ const StudentEventsView = () => {
     setShowRegistrationForm(true);
   };
 
+  const handleEditClick = (event) => {
+    // Open edit modal for bazaar, trip, and conference
+    if (event.type === 'bazaar' || event.type === 'trip' || event.type === 'conference') {
+      setEditEvent(event);
+      
+      // Use different field names based on event type
+      if (event.type === 'conference') {
+        setEditFormData({
+          title: event.title || '',  // Use 'title' for conferences
+          location: event.location || '',
+          description: event.description || '',
+          startDate: event.startDate ? new Date(event.startDate).toISOString().slice(0, 16) : '',
+          endDate: event.endDate ? new Date(event.endDate).toISOString().slice(0, 16) : '',
+          registrationDeadline: event.registrationDeadline ? new Date(event.registrationDeadline).toISOString().slice(0, 16) : '',
+          capacity: event.capacity || '',
+          price: event.price || '',
+          agenda: event.agenda || '',
+          website: event.website || '',
+          budget: event.budget || '',
+          fundingSource: event.fundingSource || 'GUC',
+          extraResources: event.extraResources || ''
+        });
+      } else {
+        // For bazaars and trips, use 'name' field
+        setEditFormData({
+          name: event.title || '',
+          location: event.location || '',
+          description: event.description || '',
+          startDate: event.startDate ? new Date(event.startDate).toISOString().slice(0, 16) : '',
+          endDate: event.endDate ? new Date(event.endDate).toISOString().slice(0, 16) : '',
+          registrationDeadline: event.registrationDeadline ? new Date(event.registrationDeadline).toISOString().slice(0, 16) : '',
+          capacity: event.capacity || '',
+          price: event.price || ''
+        });
+      }
+      
+      setShowEditForm(true);
+    } else if (event.type === 'booth') {
+      // For booths, show alert that booth editing is not yet implemented
+      alert('Booth editing functionality is not yet implemented');
+    }
+  };
+
+  const handleStatusUpdate = async (eventId, newStatus) => {
+    try {
+      setLoading(true);
+      const result = await eventsApiService.updateEventStatus(eventId, { status: newStatus });
+      
+      if (result.success) {
+        // Refresh the events list to show updated status
+        await loadEvents();
+        alert(`Workshop ${newStatus} successfully!`);
+      } else {
+        alert(`Failed to ${newStatus} workshop: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error updating workshop status:', error);
+      alert(`Error updating workshop status: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRegistrationSuccess = (registrationData) => {
     console.log('Registration successful:', registrationData);
     // You could show a success message or refresh the events list
@@ -98,6 +166,93 @@ const StudentEventsView = () => {
   const handleCloseRegistrationForm = () => {
     setShowRegistrationForm(false);
     setRegistrationEvent(null);
+  };
+
+  const handleEditFormChange = (field, value) => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleEditFormSubmit = async (e) => {
+    e.preventDefault();
+    if (!editEvent) return;
+
+    setSaving(true);
+    try {
+      let result;
+      if (editEvent.type === 'bazaar') {
+        result = await bazaarApi.update(editEvent.id, editFormData);
+      } else if (editEvent.type === 'trip') {
+        // For trips, use the trip API
+        result = await tripApi.update(editEvent.id, editFormData);
+      } else if (editEvent.type === 'conference') {
+        // For conferences, we'll use the events API
+        result = await eventsApiService.updateEvent(editEvent.id, editFormData);
+      }
+
+      if (result.success || result.message?.includes('successfully') || result.msg?.includes('successfully')) {
+        alert(`${editEvent.type.charAt(0).toUpperCase() + editEvent.type.slice(1)} updated successfully!`);
+        setShowEditForm(false);
+        setEditEvent(null);
+        setEditFormData({});
+        // Refresh the events list
+        await loadEvents();
+      } else {
+        alert(`Error updating ${editEvent.type}: ${result.message || result.msg || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error updating event:', error);
+      alert(`Error updating ${editEvent.type}: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCloseEditForm = () => {
+    setShowEditForm(false);
+    setEditEvent(null);
+    setEditFormData({});
+  };
+
+  const handleDeleteEvent = async (event) => {
+    if (!event) return;
+
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${event.title}"?\n\nThis action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const result = await eventsApiService.deleteEvent(event.id);
+      
+      if (result.success) {
+        alert(`${event.type.charAt(0).toUpperCase() + event.type.slice(1)} deleted successfully!`);
+        // Refresh the events list
+        await loadEvents();
+      } else {
+        alert(`Error deleting ${event.type}: ${result.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      alert(`Error deleting ${event.type}: ${error.message}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleWorkshopEditRequest = (event) => {
+    setSelectedWorkshop(event);
+    setShowWorkshopEditModal(true);
+  };
+
+  const handleCloseWorkshopEditModal = () => {
+    setShowWorkshopEditModal(false);
+    setSelectedWorkshop(null);
   };
 
   const formatDate = (dateString) => {
@@ -146,7 +301,10 @@ const StudentEventsView = () => {
           {event.type.toUpperCase()}
         </div>
         <div className="event-status">
-          {event.status === 'approved' ? '✅ Approved' : event.status}
+          {event.status === 'approved' ? '✅ Approved' : 
+           event.status === 'rejected' ? '❌ Rejected' : 
+           event.status === 'pending' ? '⏳ Pending' : 
+           event.status || '⏳ Pending'}
         </div>
       </div>
       
@@ -195,6 +353,34 @@ const StudentEventsView = () => {
         </div>
       )}
 
+      {event.type === 'booth' && event.extraResources && (
+        <div className="booth-details">
+          {(() => {
+            try {
+              const boothData = JSON.parse(event.extraResources);
+              return (
+                <div className="booth-info">
+                  {boothData.boothSize && <span className="booth-detail">📏 Size: {boothData.boothSize}</span>}
+                  {boothData.durationWeeks && <span className="booth-detail">⏱️ Duration: {boothData.durationWeeks} weeks</span>}
+                  {boothData.boothLocation && <span className="booth-detail">📍 Location: {boothData.boothLocation}</span>}
+                  {boothData.attendees && boothData.attendees.length > 0 && (
+                    <span className="booth-detail">👥 Attendees: {boothData.attendees.length} registered</span>
+                  )}
+                </div>
+              );
+            } catch (e) {
+              return null;
+            }
+          })()}
+        </div>
+      )}
+
+      {event.type === 'booth' && event.vendors && event.vendors.length > 0 && (
+        <div className="vendors-preview">
+          <span className="vendors-count">🏪 {event.vendors.length} vendor{event.vendors.length !== 1 ? 's' : ''} participating</span>
+        </div>
+      )}
+
       {event.creatorName && (
         <div className="event-creator">
           <span className="detail-label">👤 Organized by:</span>
@@ -203,7 +389,7 @@ const StudentEventsView = () => {
         </div>
       )}
 
-      {(event.type === 'workshop' || event.type === 'trip') && (
+      {(event.type === 'workshop' || event.type === 'trip') && !(user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office') && (
         <div className="registration-section">
           <button 
             className="register-btn"
@@ -214,6 +400,118 @@ const StudentEventsView = () => {
           >
             📝 Register for {event.type === 'workshop' ? 'Workshop' : 'Trip'}
           </button>
+        </div>
+      )}
+
+      {(event.type === 'bazaar' || event.type === 'trip' || event.type === 'conference' || event.type === 'booth') && (user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office') && (
+        <div className="edit-section">
+          <button 
+            className="edit-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEditClick(event);
+            }}
+          >
+            ✏️ Edit {event.type === 'bazaar' ? 'Bazaar' : event.type === 'trip' ? 'Trip' : event.type === 'conference' ? 'Conference' : 'Booth'}
+          </button>
+          <button 
+            className="delete-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteEvent(event);
+            }}
+            disabled={deleting}
+            style={{
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              cursor: deleting ? 'not-allowed' : 'pointer',
+              opacity: deleting ? 0.6 : 1,
+              marginLeft: '8px'
+            }}
+          >
+            {deleting ? '🗑️ Deleting...' : '🗑️ Delete'}
+          </button>
+        </div>
+      )}
+
+      {event.type === 'workshop' && (user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office') && (
+        <div className="status-section">
+          <div className="status-buttons">
+            <button 
+              className="accept-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleStatusUpdate(event.id, 'approved');
+              }}
+              disabled={event.status === 'approved'}
+            >
+              ✅ Accept
+            </button>
+            <button 
+              className="reject-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleStatusUpdate(event.id, 'rejected');
+              }}
+              disabled={event.status === 'rejected'}
+            >
+              ❌ Reject
+            </button>
+          </div>
+          <div className="current-status">
+            <span className={`status-badge ${event.status}`}>
+              Status: {event.status === 'approved' ? '✅ Approved' : 
+                      event.status === 'rejected' ? '❌ Rejected' : 
+                      event.status === 'pending' ? '⏳ Pending' : 
+                      event.status || '⏳ Pending'}
+            </span>
+          </div>
+          <div className="request-edits-section" style={{ marginTop: '8px' }}>
+            <button 
+              className="request-edits-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleWorkshopEditRequest(event);
+              }}
+              style={{
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                marginRight: '8px'
+              }}
+            >
+              ✏️ Request Edits
+            </button>
+          </div>
+          <div className="delete-section" style={{ marginTop: '8px' }}>
+            <button 
+              className="delete-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteEvent(event);
+              }}
+              disabled={deleting}
+              style={{
+                backgroundColor: '#dc3545',
+                color: 'white',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                cursor: deleting ? 'not-allowed' : 'pointer',
+                opacity: deleting ? 0.6 : 1,
+                fontSize: '12px'
+              }}
+            >
+              {deleting ? '🗑️ Deleting...' : '🗑️ Delete Workshop'}
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -311,6 +609,36 @@ const StudentEventsView = () => {
                       <h4>{vendor.companyName}</h4>
                       {vendor.email && <p className="vendor-email">{vendor.email}</p>}
                       {vendor.boothSize && <p className="vendor-booth">Booth Size: {vendor.boothSize}</p>}
+                      {vendor.attendees && vendor.attendees.length > 0 && (
+                        <div className="vendor-attendees">
+                          <p className="attendees-label">Attendees:</p>
+                          <ul>
+                            {vendor.attendees.map((attendee, idx) => (
+                              <li key={idx}>{attendee.name} ({attendee.email})</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {event.type === 'booth' && event.vendors && event.vendors.length > 0 && (
+              <div className="info-section">
+                <h3>🏪 Participating Vendors</h3>
+                <div className="vendors-grid">
+                  {event.vendors.map((vendor, index) => (
+                    <div key={vendor.id || index} className="vendor-card">
+                      <h4>{vendor.companyName || vendor.name}</h4>
+                      {vendor.email && <p className="vendor-email">{vendor.email}</p>}
+                      {vendor.contactName && vendor.contactName !== vendor.companyName && (
+                        <p className="vendor-contact">Contact: {vendor.contactName}</p>
+                      )}
+                      {vendor.boothSize && <p className="vendor-booth">Booth Size: {vendor.boothSize}</p>}
+                      {vendor.durationWeeks && <p className="vendor-duration">Duration: {vendor.durationWeeks} weeks</p>}
+                      {vendor.boothLocation && <p className="vendor-location">Location: {vendor.boothLocation}</p>}
                       {vendor.attendees && vendor.attendees.length > 0 && (
                         <div className="vendor-attendees">
                           <p className="attendees-label">Attendees:</p>
@@ -432,6 +760,12 @@ const StudentEventsView = () => {
           >
             Conferences
           </button>
+          <button 
+            className={filter === 'booth' ? 'active' : ''} 
+            onClick={() => setFilter('booth')}
+          >
+            Booths
+          </button>
         </div>
       </div>
 
@@ -481,6 +815,204 @@ const StudentEventsView = () => {
             />
           </div>
         </div>
+      )}
+
+      {/* Edit Form Modal */}
+      {showEditForm && editEvent && (
+        <div className="modal-overlay" onClick={handleCloseEditForm}>
+          <div className="modal-content edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit {editEvent.type === 'bazaar' ? 'Bazaar' : editEvent.type === 'trip' ? 'Trip' : 'Conference'}</h2>
+              <button 
+                className="close-btn" 
+                onClick={handleCloseEditForm}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <form className="edit-form" onSubmit={handleEditFormSubmit}>
+                <div className="form-group">
+                  <label htmlFor="title">Title:</label>
+                  <input 
+                    type="text" 
+                    id="title" 
+                    value={editFormData.title || editFormData.name || ''}
+                    onChange={(e) => handleEditFormChange(editEvent.type === 'conference' ? 'title' : 'name', e.target.value)}
+                    className="form-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="description">Description:</label>
+                  <textarea 
+                    id="description" 
+                    value={editFormData.description}
+                    onChange={(e) => handleEditFormChange('description', e.target.value)}
+                    className="form-textarea"
+                    rows="4"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="location">Location:</label>
+                  <input 
+                    type="text" 
+                    id="location" 
+                    value={editFormData.location}
+                    onChange={(e) => handleEditFormChange('location', e.target.value)}
+                    className="form-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="startDate">Start Date:</label>
+                  <input 
+                    type="datetime-local" 
+                    id="startDate" 
+                    value={editFormData.startDate}
+                    onChange={(e) => handleEditFormChange('startDate', e.target.value)}
+                    className="form-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="endDate">End Date:</label>
+                  <input 
+                    type="datetime-local" 
+                    id="endDate" 
+                    value={editFormData.endDate}
+                    onChange={(e) => handleEditFormChange('endDate', e.target.value)}
+                    className="form-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="registrationDeadline">Registration Deadline:</label>
+                  <input 
+                    type="datetime-local" 
+                    id="registrationDeadline" 
+                    value={editFormData.registrationDeadline}
+                    onChange={(e) => handleEditFormChange('registrationDeadline', e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+                {(editEvent.type === 'trip' || editEvent.type === 'conference') && (
+                  <>
+                    <div className="form-group">
+                      <label htmlFor="capacity">Capacity:</label>
+                      <input 
+                        type="number" 
+                        id="capacity" 
+                        value={editFormData.capacity}
+                        onChange={(e) => handleEditFormChange('capacity', e.target.value)}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="price">Price:</label>
+                      <input 
+                        type="number" 
+                        id="price" 
+                        step="0.01"
+                        value={editFormData.price}
+                        onChange={(e) => handleEditFormChange('price', e.target.value)}
+                        className="form-input"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Additional fields for conferences */}
+                {editEvent.type === 'conference' && (
+                  <>
+                    <div className="form-group">
+                      <label htmlFor="agenda">Agenda:</label>
+                      <textarea 
+                        id="agenda" 
+                        value={editFormData.agenda || ''}
+                        onChange={(e) => handleEditFormChange('agenda', e.target.value)}
+                        className="form-textarea"
+                        rows="3"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="website">Website:</label>
+                      <input 
+                        type="url" 
+                        id="website" 
+                        value={editFormData.website || ''}
+                        onChange={(e) => handleEditFormChange('website', e.target.value)}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="budget">Budget:</label>
+                      <input 
+                        type="number" 
+                        id="budget" 
+                        step="0.01"
+                        value={editFormData.budget || ''}
+                        onChange={(e) => handleEditFormChange('budget', e.target.value)}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="fundingSource">Funding Source:</label>
+                      <select 
+                        id="fundingSource" 
+                        value={editFormData.fundingSource || 'GUC'}
+                        onChange={(e) => handleEditFormChange('fundingSource', e.target.value)}
+                        className="form-input"
+                      >
+                        <option value="GUC">GUC</option>
+                        <option value="External">External</option>
+                        <option value="Mixed">Mixed</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="extraResources">Extra Resources:</label>
+                      <textarea 
+                        id="extraResources" 
+                        value={editFormData.extraResources || ''}
+                        onChange={(e) => handleEditFormChange('extraResources', e.target.value)}
+                        className="form-textarea"
+                        rows="3"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="form-actions">
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary"
+                    onClick={handleCloseEditForm}
+                    disabled={saving}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary"
+                    disabled={saving}
+                  >
+                    {saving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Workshop Edit Request Modal */}
+      {showWorkshopEditModal && selectedWorkshop && (
+        <WorkshopEditRequestModal
+          open={showWorkshopEditModal}
+          onClose={handleCloseWorkshopEditModal}
+          workshop={selectedWorkshop}
+          onSubmitted={handleCloseWorkshopEditModal}
+        />
       )}
     </div>
   );

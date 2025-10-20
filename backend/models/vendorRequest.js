@@ -10,14 +10,20 @@ const vendorRequestSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Event", // points to Event when type='bazaar'
   },
-  // For booth requests, we'll handle separately in controller
+  // For booth requests, can reference either Event or Booth
   booth: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Event", // points to Event when type='booth'
+    ref: "Event", // points to Event when type='booth' (for bazaar booths)
+  },
+  // For standalone booth requests
+  standaloneBooth: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Booth", // points to Booth when type='booth' (for standalone booths)
   },
   // Denormalized event info for easy rendering without populate
   eventName: { type: String },
   eventType: { type: String, enum: ['bazaar', 'booth', 'platform-booth'] },
+  eventType: { type: String, enum: ['bazaar', 'booth', 'standaloneBooth'] },
   attendees: [
     {
       name: { type: String, required: true },

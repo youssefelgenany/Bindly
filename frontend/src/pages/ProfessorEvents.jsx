@@ -413,14 +413,69 @@ const ProfessorEvents = () => {
       <div className="container">
         <div className="card">
           <div className="card-header">
-            <h1 className="card-title" style={{ color: 'var(--guc-red)' }}>My Events</h1>
-            <p className="card-subtitle">Create and manage your events. Submit new events for approval.</p>
+            <h1 className="card-title" style={{ color: 'var(--guc-red)' }}>My Workshops & Events</h1>
+            <p className="card-subtitle">View all workshops and events you've created. Create new workshops and manage existing ones.</p>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div style={{ color: 'var(--text-light)' }}>Logged in as: {user?.firstName} {user?.lastName}</div>
             <button className="btn btn-primary" onClick={openCreate}>+ Create Workshop</button>
           </div>
+
+          {/* Workshop Summary */}
+          {!loading && events.length > 0 && (
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '1rem', 
+              marginBottom: '1rem' 
+            }}>
+              <div style={{ 
+                backgroundColor: 'var(--light-gray)', 
+                padding: '1rem', 
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--guc-red)' }}>
+                  {events.length}
+                </div>
+                <div style={{ fontSize: '14px', color: 'var(--text-light)' }}>Total Workshops</div>
+              </div>
+              <div style={{ 
+                backgroundColor: 'var(--light-gray)', 
+                padding: '1rem', 
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--success-green)' }}>
+                  {events.filter(e => e.status === 'approved').length}
+                </div>
+                <div style={{ fontSize: '14px', color: 'var(--text-light)' }}>Approved</div>
+              </div>
+              <div style={{ 
+                backgroundColor: 'var(--light-gray)', 
+                padding: '1rem', 
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--warning-yellow)' }}>
+                  {events.filter(e => e.status === 'pending').length}
+                </div>
+                <div style={{ fontSize: '14px', color: 'var(--text-light)' }}>Pending</div>
+              </div>
+              <div style={{ 
+                backgroundColor: 'var(--light-gray)', 
+                padding: '1rem', 
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--error-red)' }}>
+                  {events.filter(e => e.status === 'rejected').length}
+                </div>
+                <div style={{ fontSize: '14px', color: 'var(--text-light)' }}>Rejected</div>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="alert alert-error" style={{ marginBottom: '1rem' }}>

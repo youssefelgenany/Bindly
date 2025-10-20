@@ -21,7 +21,7 @@ const CreateConference = () => {
           type: 'success', 
           text: 'Conference created successfully! Redirecting...' 
         });
-        setTimeout(() => navigate('/events'), 2000);
+        setTimeout(() => navigate('/student/events'), 2000);
       } else {
         setMessage({ 
           type: 'error', 

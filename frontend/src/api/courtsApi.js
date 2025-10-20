@@ -47,7 +47,7 @@ const courtsApiService = {
   getCourts: async (queryParams = {}) => {
     try {
       console.log('🏀 API: Getting courts with params:', queryParams);
-      const response = await courtsApi.get('/student', { params: queryParams });
+      const response = await courtsApi.get('/', { params: queryParams });
       console.log('🏀 API: Response:', response.data);
       return { success: true, data: response.data };
     } catch (error) {
@@ -55,6 +55,59 @@ const courtsApiService = {
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to fetch courts',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
+  // Get all courts (for staff and general use)
+  getAllCourts: async (queryParams = {}) => {
+    try {
+      console.log('🏀 API: Getting all courts with params:', queryParams);
+      const response = await courtsApi.get('/', { params: queryParams });
+      console.log('🏀 API: Response:', response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error fetching all courts:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch courts',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
+  // Get court availability for a specific date
+  getCourtAvailability: async (courtId, date) => {
+    try {
+      console.log('🏀 API: Getting court availability for:', courtId, 'on:', date);
+      const response = await courtsApi.get(`/${courtId}/availability`, { 
+        params: { date } 
+      });
+      console.log('🏀 API: Availability response:', response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error fetching court availability:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch court availability',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
+  // Book a court
+  bookCourt: async (bookingData) => {
+    try {
+      console.log('🏀 API: Booking court with data:', bookingData);
+      const response = await courtsApi.post('/book', bookingData);
+      console.log('🏀 API: Booking response:', response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error booking court:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to book court',
         error: error.response?.data || error.message,
       };
     }

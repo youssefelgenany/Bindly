@@ -248,19 +248,6 @@ const Dashboard = () => {
                 )}
                 
 
-                {user.userType === 'Professor' && (
-                  <>
-                    <Link to="/professor/events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
-                      Create Workshop
-                    </Link>
-                    <Link to="/professor/all-events" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
-                      All Events & Bazaars
-                    </Link>
-                    <Link to="/professor/profile" className="btn btn-outline" style={{ width: '100%', textDecoration: 'none', display: 'inline-block' }}>
-                      Profile & Account Settings
-                    </Link>
-                  </>
-                )}
 
                 {user.userType === 'Vendor' && (
                   <>

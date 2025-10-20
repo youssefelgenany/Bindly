@@ -28,6 +28,35 @@
   font-size: 1.1rem;
 }
 
+.user-info {
+  margin-top: 15px;
+  padding: 15px;
+  background: #e9ecef;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+}
+
+.user-info p {
+  margin: 0;
+  color: #495057;
+  font-size: 0.95rem;
+}
+
+.loading-message {
+  text-align: center;
+  padding: 30px;
+  background: white;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.loading-message p {
+  color: #6c757d;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
 .search-section {
   background: white;
   padding: 25px;

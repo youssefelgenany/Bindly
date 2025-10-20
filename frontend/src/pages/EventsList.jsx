@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { eventsApiService } from '../api/eventsApi';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,6 +6,7 @@ import '../styles/EventsList.css';
 import BazaarForm from '../components/BazaarForm';
 import ConferenceForm from '../components/ConferenceForm';
 import TripForm from '../components/TripForm';
+import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
 
 const EventsList = () => {
   const { user } = useAuth();
@@ -24,6 +25,9 @@ const EventsList = () => {
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState(null);
   const [tripSaving, setTripSaving] = useState(false);
+  const [isWorkshopModalOpen, setIsWorkshopModalOpen] = useState(false);
+  const [editingWorkshop, setEditingWorkshop] = useState(null);
+  const [workshopSaving, setWorkshopSaving] = useState(false);
   const [processingIds, setProcessingIds] = useState({}); // For tracking processing states
   const [actionMessages, setActionMessages] = useState({}); // For showing action feedback
 
@@ -53,7 +57,7 @@ const EventsList = () => {
           id: ev._id || ev.id,
           name: ev.title || ev.name,
           title: ev.title || ev.name,
-          type: ev.type,
+          type: ev.type || 'event', // Default to 'event' if no type
           status: ev.status || 'approved', // Default to approved if no status
           location: ev.location,
           startDate: ev.startDate,
@@ -130,8 +134,11 @@ const EventsList = () => {
   };
 
   const filteredEvents = events.filter(event => {
+    // Exclude 'other' type events
+    if (event.type === 'other') return false;
+    
     // Type filter
-    const typeMatch = filter === 'all' || event.type === filter;
+    const typeMatch = filter === 'all' || (event.type && event.type === filter);
     
     // Status filter (only for event office users)
     const statusMatch = statusFilter === 'all' || event.status === statusFilter;
@@ -320,9 +327,11 @@ const EventsList = () => {
           </div>
           
           <div className="events-actions">
-          <button className="btn btn-outline" onClick={handleViewAll}>
-            View All Events
-          </button>
+          {!(user?.role === 'admin' || user?.userType === 'Admin' || user?.userType === 'admin') && (
+            <button className="btn btn-outline" onClick={handleViewAll}>
+              View All Events
+            </button>
+          )}
           {!(user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office') && (
             <Link to="/create-bazaar" className="btn btn-primary">
               Create New Bazaar
@@ -365,6 +374,12 @@ const EventsList = () => {
             onClick={() => setFilter('workshop')}
           >
             Workshops
+          </button>
+          <button 
+            className={`filter-btn ${filter === 'booth' ? 'active' : ''}`}
+            onClick={() => setFilter('booth')}
+          >
+            Booths
           </button>
         </div>
 
@@ -426,7 +441,7 @@ const EventsList = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                 <h3>{event.name}</h3>
                   {/* Status Badge - Only show for workshops and other non-trip/bazaar/conference events */}
-                  {event.type !== 'trip' && event.type !== 'bazaar' && event.type !== 'conference' && (
+                  {event.type && event.type !== 'trip' && event.type !== 'bazaar' && event.type !== 'conference' && (
                     <span style={{
                       padding: '6px 12px',
                       borderRadius: '6px',
@@ -447,7 +462,7 @@ const EventsList = () => {
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <p className="event-type">{event.type.toUpperCase()}</p>
+                <p className="event-type">{(event.type || 'EVENT').toUpperCase()}</p>
                 </div>
                 <p className="event-location">📍 {event.location}</p>
                 <p className="event-date">
@@ -476,6 +491,28 @@ const EventsList = () => {
                     <p>⏰ Registration Deadline: {new Date(event.registrationDeadline).toLocaleDateString()}</p>
                   </div>
                 )}
+                
+                {event.type === 'booth' && event.extraResources && (
+                  <div className="booth-details">
+                    {(() => {
+                      try {
+                        const boothData = JSON.parse(event.extraResources);
+                        return (
+                          <>
+                            {boothData.boothSize && <p>📏 Booth Size: {boothData.boothSize}</p>}
+                            {boothData.durationWeeks && <p>⏱️ Duration: {boothData.durationWeeks} weeks</p>}
+                            {boothData.boothLocation && <p>📍 Booth Location: {boothData.boothLocation}</p>}
+                            {boothData.attendees && boothData.attendees.length > 0 && (
+                              <p>👥 Attendees: {boothData.attendees.length} registered</p>
+                            )}
+                          </>
+                        );
+                      } catch (e) {
+                        return null;
+                      }
+                    })()}
+                  </div>
+                )}
               </div>
               
               <div className="event-actions">
@@ -490,7 +527,7 @@ const EventsList = () => {
                     {/* Debug logging */}
                     {console.log('🔍 Event status for buttons:', event.id, event.status)}
                     {/* Status Management Buttons - Show Accept/Reject only for workshops and other non-trip/bazaar/conference events */}
-                    {event.type !== 'trip' && event.type !== 'bazaar' && event.type !== 'conference' && (
+                    {event.type && event.type !== 'trip' && event.type !== 'bazaar' && event.type !== 'conference' && (
                       <>
                         <button
                           className="btn btn-primary"
@@ -555,7 +592,18 @@ const EventsList = () => {
                           Trip has started
                         </span>
                       )
-                    ) : null}
+                    ) : event.type === 'workshop' && (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          console.log('Edit button clicked, event:', event);
+                          setEditingWorkshop(event);
+                          setIsWorkshopModalOpen(true);
+                        }}
+                      >
+                        Edit
+                      </button>
+                    )}
 
                     {/* Delete Button */}
                     <button 
@@ -725,6 +773,20 @@ const EventsList = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {isWorkshopModalOpen && editingWorkshop && (
+        <WorkshopEditRequestModal
+          open={isWorkshopModalOpen}
+          workshop={editingWorkshop}
+          onClose={() => { setIsWorkshopModalOpen(false); setEditingWorkshop(null); }}
+          onSubmitted={async (data) => {
+            // refresh list and close modal
+            setIsWorkshopModalOpen(false);
+            setEditingWorkshop(null);
+            await loadEvents();
+          }}
+        />
       )}
     </div>
   );

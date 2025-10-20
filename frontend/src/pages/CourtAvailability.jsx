@@ -36,7 +36,16 @@ const CourtAvailability = () => {
       setLoading(true);
       setError('');
       const params = typeFilter !== 'all' ? { type: typeFilter } : {};
-      const result = await courtApiService.getAllCourts(params);
+      
+      // Use different API method based on user type
+      let result;
+      if (user?.userType === 'Staff') {
+        // Staff users get all courts from the main courts collection
+        result = await courtApiService.getAllCourts(params);
+      } else {
+        // Students and other users use the student-specific endpoint
+        result = await courtApiService.getCourts(params);
+      }
       
       if (result.success) {
         setCourts(result.data.courts || []);

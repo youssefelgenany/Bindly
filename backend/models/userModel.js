@@ -32,13 +32,13 @@ const userSchema = new mongoose.Schema({
    name: {
     type: String,
     required: function() {
-      return ['admin', 'event_office'].includes(this.userType);
+      return ['Admin', 'event_office'].includes(this.userType);
     }
   },
   userType: {
     type: String,
     required: true,
-    enum: ['Student', 'Staff', 'TA', 'Professor', 'Vendor','event_office','admin']
+    enum: ['Student', 'Staff', 'TA', 'Professor', 'Vendor','event_office','Admin']
   },
   // For GUC users (Student, Staff, TA, Professor)
   gucId: {
@@ -131,6 +131,30 @@ userSchema.pre('save', function(next) {
     }
   }
   next();
+});
+
+// Auto-set verification/activation for newly created accounts by type
+userSchema.pre('save', function(next) {
+  try {
+    if (this.isNew) {
+      if (this.userType === 'Student') {
+        // Students: verified and active
+        this.isVerified = true;
+        this.status = 'active';
+      } else if (['TA', 'Staff', 'Professor'].includes(this.userType)) {
+        // TA/Staff/Professor: unverified but active
+        this.isVerified = false;
+        this.status = 'active';
+      } else if (this.userType === 'Vendor') {
+        // Keep previous behavior for vendors: verified and active
+        this.isVerified = true;
+        this.status = 'active';
+      }
+    }
+    next();
+  } catch (e) {
+    next(e);
+  }
 });
 
 module.exports = mongoose.model('User', userSchema);

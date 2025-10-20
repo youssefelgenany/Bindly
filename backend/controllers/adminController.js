@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const User = require("../models/userModel");
-const { sendVerificationEmail } = require("../Utils/mailer");
+const { sendVerificationEmail } = require("../utils/mailer");
 
 // Admin assigns correct role (staff/TA/professor) and sends email
 
@@ -64,11 +64,12 @@ exports.updateUserRole = async (req, res) => {
       });
     }
 
-    const allowedRoles = ['Student', 'Staff', 'TA', 'Professor', 'Vendor', 'Event Office', 'Admin'];
-    if (!allowedRoles.includes(role)) {
+    // Only allow updating into TA/Staff/Professor
+    const allowedAssignableRoles = ['Staff', 'TA', 'Professor'];
+    if (!allowedAssignableRoles.includes(role)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid role'
+        message: 'Invalid role. Admin can only assign roles: TA, Staff, Professor.'
       });
     }
 
@@ -80,7 +81,16 @@ exports.updateUserRole = async (req, res) => {
       });
     }
 
-    // Update user type (role)
+    // Only allow updating users who originally signed as TA/Staff/Professor
+    const updatableOriginRoles = ['Staff', 'TA', 'Professor'];
+    if (!updatableOriginRoles.includes(user.userType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'This user is not eligible for role update (only TA/Staff/Professor accounts can be updated)'
+      });
+    }
+
+    // Update user type (role) within the allowed set
     user.userType = role;
     await user.save();
 
@@ -470,74 +480,13 @@ exports.updateVendorStatus = async (req, res) => {
   }
 };
 
-// Update user verification status
+// Note: Direct user verification is disabled - users must verify via email
+// This endpoint is kept for backward compatibility but should not be used
 exports.updateUserVerification = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { isVerified, confirmationPassword } = req.body;
-    
-    console.log('🔍 Updating user verification:', userId);
-    console.log('🔍 Is Verified:', isVerified);
-
-    if (typeof isVerified !== 'boolean') {
-      console.log('❌ Invalid isVerified type:', typeof isVerified);
-      return res.status(400).json({
+  return res.status(403).json({
         success: false,
-        message: "isVerified must be a boolean value",
-      });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      console.log('❌ User not found:', userId);
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // Require password confirmation when modifying Admin/Event Office verification
-    if (user.userType === 'Admin' || user.userType === 'Event Office') {
-      if (!confirmationPassword || typeof confirmationPassword !== 'string') {
-        return res.status(400).json({
-          success: false,
-          message: 'confirmationPassword is required to modify admin accounts'
-        });
-      }
-      if (confirmationPassword !== '123456') {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid confirmation password'
-        });
-      }
-    }
-
-    console.log('📊 Current verification status:', user.isVerified);
-    user.isVerified = isVerified;
-    await user.save();
-    console.log('✅ User verification updated successfully');
-
-    res.status(200).json({
-      success: true,
-      message: `User ${isVerified ? 'verified' : 'unverified'} successfully`,
-      user: {
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        userType: user.userType,
-        isVerified: user.isVerified,
-        status: user.status,
-      },
-    });
-  } catch (error) {
-    console.error("❌ Error updating user verification:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update user verification",
-      error: error.message,
-    });
-  }
+    message: "Direct user verification is disabled. Users must verify via email verification link.",
+  });
 };
 
 // Send verification email to user
@@ -556,13 +505,8 @@ exports.sendVerificationEmail = async (req, res) => {
       });
     }
 
-    // Check if user is verified and active
-    if (!user.isVerified) {
-      return res.status(400).json({
-        success: false,
-        message: 'User must be verified before sending verification email'
-      });
-    }
+    // Allow sending verification emails to both verified and unverified users
+    // This allows admins to resend verification emails if needed
 
     if (user.status !== 'active') {
       return res.status(400).json({
@@ -587,7 +531,7 @@ exports.sendVerificationEmail = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Verification email sent successfully',
+      message: 'Verification email sent successfully. User must click the link in the email to verify their account.',
       user: {
         _id: user._id,
         firstName: user.firstName,

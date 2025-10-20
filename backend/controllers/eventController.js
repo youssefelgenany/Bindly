@@ -82,8 +82,10 @@ exports.getAllEvents = async (req, res) => {
     const { q, name, type, status } = req.query;
     const search = (q || name || '').toString().trim();
 
-    // Base match (type/status)
-    const baseMatch = {};
+    // Base match (type/status) - exclude 'other' type events
+    const baseMatch = {
+      type: { $ne: 'other' } // Exclude 'other' type events
+    };
     if (type) {
       const typeMap = {
         workshops: 'workshop',
@@ -179,6 +181,30 @@ exports.getAllEvents = async (req, res) => {
             status: 'accepted'
           }).populate('vendor', 'firstName lastName companyName email').lean();
 
+          // For booth events, include full vendor request details
+          if (e.type === 'booth') {
+            baseEvent.vendorRequests = vendorRequests.map(vr => ({
+              _id: vr._id,
+              vendor: {
+                _id: vr.vendor._id,
+                name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+                companyName: vr.vendor.companyName,
+                contactName: `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+                email: vr.vendor.email,
+              },
+              boothSize: vr.boothSize,
+              durationWeeks: vr.durationWeeks,
+              boothLocation: vr.boothLocation,
+              attendees: vr.attendees || [],
+              message: vr.message || '',
+              status: vr.status,
+              createdAt: vr.createdAt,
+              eventName: vr.eventName,
+              eventType: vr.eventType
+            }));
+          }
+
+          // Keep the original vendors array for backward compatibility
           baseEvent.vendors = vendorRequests.map(vr => ({
             _id: vr.vendor._id,
             name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
@@ -234,14 +260,35 @@ exports.getAllEventsForStudents = async (req, res) => {
     const { q, type, status } = req.query;
     
     console.log('🔍 Student search query:', q);
+    console.log('🔍 User type:', req.user.userType);
+    console.log('🔍 User role:', req.user.role);
+    console.log('🔍 User ID:', req.user._id);
+    console.log('🔍 Event type filter:', type);
+    console.log('🔍 Status filter:', status);
     
-    // Build filter for approved events that haven't started yet
+    // Build filter - Event Office users can see all events, others only see approved
     const filter = { 
-      status: 'approved',
       startDate: { $gt: new Date() } // Only events that start in the future
     };
     
+    // Only filter by status for non-Event Office users
+    const isEventOffice = req.user.userType === 'Event Office' || 
+                         req.user.userType === 'Events Office' || 
+                         req.user.userType === 'event_office' || 
+                         req.user.role === 'event_office' || 
+                         req.user.role === 'Event Office' ||
+                         req.user.userType === 'event office' ||
+                         req.user.role === 'event office';
+    
+    if (!isEventOffice) {
+      filter.status = 'approved';
+      console.log('🔍 Non-Event Office user - filtering to approved only');
+    } else {
+      console.log('🔍 Event Office user - showing all statuses');
+    }
+    
     if (type && type !== 'all') filter.type = type;
+    console.log('🔍 Final filter:', filter);
 
     // Get events with creator information
     const pipeline = [
@@ -327,6 +374,16 @@ exports.getAllEventsForStudents = async (req, res) => {
       })));
     }
     
+    console.log('🔍 Found events:', events.length);
+    console.log('🔍 Events by type:', events.reduce((acc, ev) => {
+      acc[ev.type] = (acc[ev.type] || 0) + 1;
+      return acc;
+    }, {}));
+    console.log('🔍 Events by status:', events.reduce((acc, ev) => {
+      acc[ev.status] = (acc[ev.status] || 0) + 1;
+      return acc;
+    }, {}));
+    
     // For each event, get vendor details if it's a bazaar
     const eventsWithVendors = await Promise.all(
       events.map(async (event) => {
@@ -385,7 +442,9 @@ exports.getAllEventsForAdmin = async (req, res) => {
     const { q, type, status } = req.query;
     console.log('🔍 Admin requesting events with query:', { q, type, status });
     
-    const filter = {};
+    const filter = {
+      type: { $ne: 'other' } // Exclude 'other' type events
+    };
 
     if (q) {
       filter.$or = [
@@ -394,7 +453,7 @@ exports.getAllEventsForAdmin = async (req, res) => {
         { location: new RegExp(q, "i") },
       ];
     }
-    if (type) filter.type = type;
+    if (type && type !== 'all') filter.type = type;
     if (status && status !== 'all') filter.status = status;
 
     console.log('🔍 Filter applied:', filter);
@@ -406,10 +465,72 @@ exports.getAllEventsForAdmin = async (req, res) => {
     console.log('📊 Found events:', events.length);
     console.log('📊 Events data:', events);
 
+    // Add vendor information for workshops and booths
+    const eventsWithVendors = await Promise.all(events.map(async (event) => {
+      const baseEvent = event.toObject();
+      
+      // Add vendor information for workshops, booths, and bazaars
+      if (event.type === 'workshop' || event.type === 'booth' || event.type === 'bazaar') {
+        try {
+          const VendorRequest = require('../models/vendorRequest');
+          const vendorRequests = await VendorRequest.find({
+            [event.type]: event._id,
+            status: 'accepted'
+          }).populate('vendor', 'firstName lastName companyName email phone userType').lean();
+
+          // For booth events, include full vendor request details
+          if (event.type === 'booth') {
+            baseEvent.vendorRequests = vendorRequests.map(vr => ({
+              _id: vr._id,
+              vendor: {
+                _id: vr.vendor._id,
+                name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+                companyName: vr.vendor.companyName,
+                contactName: `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+                email: vr.vendor.email,
+              },
+              boothSize: vr.boothSize,
+              durationWeeks: vr.durationWeeks,
+              boothLocation: vr.boothLocation,
+              attendees: vr.attendees || [],
+              message: vr.message || '',
+              status: vr.status,
+              createdAt: vr.createdAt,
+              eventName: vr.eventName,
+              eventType: vr.eventType
+            }));
+          }
+
+          // Keep the original vendors array for backward compatibility
+          baseEvent.vendors = vendorRequests.map(vr => ({
+            id: vr._id,
+            companyName: vr.vendor?.companyName || `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+            contactName: `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+            email: vr.vendor?.email || '',
+            phone: vr.vendor?.phone || '',
+            userType: vr.vendor?.userType || '',
+            boothSize: vr.boothSize || null,
+            durationWeeks: vr.durationWeeks || null,
+            boothLocation: vr.boothLocation || null,
+            attendees: vr.attendees || [],
+            message: vr.message || '',
+            status: vr.status,
+            joinedAt: vr.createdAt
+          }));
+        } catch (vendorError) {
+          console.error('Error fetching vendor information:', vendorError);
+          baseEvent.vendors = [];
+          baseEvent.vendorRequests = [];
+        }
+      }
+
+      return baseEvent;
+    }));
+
     res.status(200).json({
       success: true,
       message: 'Events fetched successfully',
-      events
+      events: eventsWithVendors
     });
   } catch (err) {
     console.error("❌ Error fetching events for admin:", err);
@@ -447,6 +568,10 @@ exports.updateEvent = async (req, res) => {
       return res.status(404).json({ msg: "Event not found" });
     }
 
+    console.log('🔍 Event type:', event.type);
+    console.log('🔍 Title field:', updates.title);
+    console.log('🔍 Name field:', updates.name);
+
     // Check if professor is trying to edit someone else's event
     if (req.user.userType === "Professor" && event.createdBy.toString() !== req.user._id.toString()) {
       return res.status(403).json({ msg: "You can only edit your own events" });
@@ -469,20 +594,38 @@ exports.updateEvent = async (req, res) => {
 // ❌ Delete an event
 exports.deleteEvent = async (req, res) => {
   try {
+    console.log('🗑️ Delete event request:', { eventId: req.params.id, user: req.user });
+    
     const event = await Event.findById(req.params.id);
-    if (!event) return res.status(404).json({ msg: "Event not found" });
+    if (!event) {
+      console.log('❌ Event not found:', req.params.id);
+      return res.status(404).json({ msg: "Event not found" });
+    }
+
+    console.log('📊 Event found:', { 
+      id: event._id, 
+      title: event.title, 
+      registeredCount: event.registeredCount,
+      createdBy: event.createdBy,
+      userType: req.user.userType,
+      userId: req.user._id
+    });
 
     // Professors may only delete events they created
     if (req.user && req.user.userType === "Professor" && event.createdBy?.toString() !== req.user._id.toString()) {
+      console.log('❌ Professor trying to delete event they did not create');
       return res.status(403).json({ msg: "You can only delete your own events" });
     }
 
     // Do not allow delete if people already registered
     if (event.registeredCount && event.registeredCount > 0) {
+      console.log('❌ Cannot delete event: users already registered:', event.registeredCount);
       return res.status(400).json({ msg: "Cannot delete event: users already registered." });
     }
 
+    console.log('✅ Proceeding with event deletion');
     await event.deleteOne();
+    console.log('✅ Event deleted successfully');
     res.json({ msg: "Event deleted successfully" });
   } catch (err) {
     console.error("❌ Error deleting event:", err);

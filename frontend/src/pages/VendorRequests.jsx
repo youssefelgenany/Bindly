@@ -10,7 +10,7 @@ const VendorRequests = () => {
     const [error, setError] = useState('');
     const [events, setEvents] = useState([]);
     const [statusFilter, setStatusFilter] = useState('pending'); // pending | rejected
-    // Removed type filter (all/bazaar/booth)
+    const [typeFilter, setTypeFilter] = useState('all'); // all | bazaar | booth
     const [q, setQ] = useState('');
     const [processingIds, setProcessingIds] = useState({});
     const [actionMessages, setActionMessages] = useState({});
@@ -32,7 +32,7 @@ const VendorRequests = () => {
                   user.role === 'Event Office'
                 );
 
-                if (isEventsOffice || (user && (user.role === 'admin' || user.userType === 'Admin'))) {
+                if (isEventsOffice || (user && (user.role === 'admin' || user.role === 'Admin' || user.userType === 'Admin' || user.userType === 'admin'))) {
                     // Fetch all vendor requests (event office view)
                     const token = localStorage.getItem('token');
                     const res = await axios.get('http://localhost:5000/api/vendor-requests', {
@@ -143,7 +143,7 @@ const VendorRequests = () => {
         };
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [statusFilter, user]);
+    }, [statusFilter, typeFilter, user]);
 
     const isEventsOffice = user && (
       user.userType === 'Event Office' ||
@@ -151,7 +151,7 @@ const VendorRequests = () => {
       user.userType === 'event_office' ||
       user.role === 'event_office' ||
       user.role === 'Event Office' ||
-      user.role === 'admin' || user.userType === 'Admin'
+      user.role === 'admin' || user.role === 'Admin' || user.userType === 'Admin' || user.userType === 'admin'
     );
 
     const handleUpdateStatus = async (requestId, newStatus) => {
@@ -205,12 +205,13 @@ const VendorRequests = () => {
     const filtered = useMemo(() => {
         let list = Array.isArray(events) ? events : [];
         if (statusFilter !== 'all') list = list.filter(e => (e.status || 'pending') === (statusFilter === 'approved' ? 'accepted' : statusFilter));
+        if (typeFilter !== 'all') list = list.filter(e => (e.type || '') === typeFilter);
         if (q.trim()) {
             const s = q.trim().toLowerCase();
             list = list.filter(e => (e.name || '').toLowerCase().includes(s));
         }
         return list;
-    }, [events, statusFilter, q]);
+    }, [events, statusFilter, typeFilter, q]);
 
     return (
         <div style={{ padding: '2rem' }}>
@@ -245,7 +246,23 @@ const VendorRequests = () => {
                                 onClick={() => setStatusFilter('all')}
                               >All</button>
                             </div>
-                            {/* Type filter removed */}
+                            {/* Event Type Filter */}
+                            {isEventsOffice && (
+                              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <button
+                                  className={`filter-btn ${typeFilter === 'all' ? 'active' : ''}`}
+                                  onClick={() => setTypeFilter('all')}
+                                >All Types</button>
+                                <button
+                                  className={`filter-btn ${typeFilter === 'bazaar' ? 'active' : ''}`}
+                                  onClick={() => setTypeFilter('bazaar')}
+                                >🏪 Bazaar</button>
+                                <button
+                                  className={`filter-btn ${typeFilter === 'booth' ? 'active' : ''}`}
+                                  onClick={() => setTypeFilter('booth')}
+                                >🏪 Booth</button>
+                              </div>
+                            )}
                         </div>
                     </div>
 
@@ -263,9 +280,28 @@ const VendorRequests = () => {
                             {filtered.map(ev => (
                                 <div key={ev._id} className="event-card">
                                     <div className="event-info">
-                                        {/* Event name and status */}
+                                        {/* Event name, type, and status */}
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-                                          <h3 style={{ margin: 0 }}>{ev.name}</h3>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                            <h3 style={{ margin: 0 }}>{ev.name}</h3>
+                                            {/* Event Type Badge */}
+                                            {ev.type && (
+                                              <span style={{
+                                                padding: '4px 8px',
+                                                borderRadius: 6,
+                                                fontSize: 11,
+                                                fontWeight: 600,
+                                                backgroundColor: ev.type === 'bazaar' ? '#e3f2fd' : '#f3e5f5',
+                                                color: ev.type === 'bazaar' ? '#1976d2' : '#7b1fa2',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: 0.5,
+                                                border: `1px solid ${ev.type === 'bazaar' ? '#1976d2' : '#7b1fa2'}`,
+                                                alignSelf: 'flex-start'
+                                              }}>
+                                                🏪 {ev.type}
+                                              </span>
+                                            )}
+                                          </div>
                                           {ev.status && (
                                             <span style={{
                                               padding: '4px 8px',
