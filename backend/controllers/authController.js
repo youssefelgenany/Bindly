@@ -25,11 +25,39 @@ async function sendVerificationEmail(toEmail, token) {
   const apiBase = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
   const verifyUrl = `${apiBase}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
   const html = `
-    <p>Welcome to Bindly!</p>
-    <p>Please verify your email to activate your account:</p>
-    <p><a href="${verifyUrl}" style="background:#007bff;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">Verify my email</a></p>
-    <p>If the button does not work, copy and paste this link into your browser:</p>
-    <p>${verifyUrl}</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #d32f2f; margin: 0;">Bindly</h1>
+        <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
+      </div>
+      
+      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <h2 style="color: #333; margin-top: 0;">Welcome to Bindly!</h2>
+        <p>Please verify your email to activate your account:</p>
+      </div>
+      
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${verifyUrl}" style="background: #d32f2f; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+          Verify My Email
+        </a>
+      </div>
+      
+      <div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
+        <p style="margin: 0; color: #856404;">
+          <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
+          <a href="${verifyUrl}" style="color: #d32f2f; word-break: break-all;">${verifyUrl}</a>
+        </p>
+      </div>
+      
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+        <p>After verification, you'll be able to access all features of the Bindly platform.</p>
+        <p>This verification link will expire in 24 hours.</p>
+        <p style="margin-top: 20px;">
+          Best regards,<br>
+          <strong>The Bindly Team</strong>
+        </p>
+      </div>
+    </div>
   `;
 
   console.log('[Bindly] Verification link for', toEmail, '=>', verifyUrl);
@@ -41,7 +69,7 @@ async function sendVerificationEmail(toEmail, token) {
 
   try {
     const mailOptions = {
-      from: process.env.MAIL_FROM || 'no-reply@bindly.app',
+      from: "Bindly <salmaahmed1504@gmail.com>",
       to: toEmail,
       subject: 'Verify your Bindly account',
       html
