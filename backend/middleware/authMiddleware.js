@@ -31,13 +31,7 @@ const protect = async (req, res, next) => {
   }
 };
 
-exports.permit = (...allowed) => (req, res, next) => {
-  const role = req.user?.userType;       // single source of truth
-  if (!role || !allowed.includes(role)) {
-    return res.status(403).json({ msg: 'Forbidden' });
-  }
-  next();
-};
+// Removed duplicate permit function
 
 // Normalize role strings for comparison (case-insensitive, unify spacing/underscores)
 function normalizeRole(role) {
