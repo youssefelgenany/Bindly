@@ -162,27 +162,19 @@ const PlatformBoothReservation = () => {
             };
 
             // Submit to backend API for approval
-            console.log('Submitting platform booth reservation:', submissionData);
-            const token = localStorage.getItem('token');
-            console.log('Token present:', !!token);
-            
-            const response = await fetch('http://localhost:5000/api/vendor-requests', {
+            const response = await fetch('/api/vendor-requests', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: JSON.stringify(submissionData)
             });
-            
-            console.log('Response status:', response.status);
-            console.log('Response ok:', response.ok);
 
             if (response.ok) {
                 setMessage('Platform booth reservation submitted successfully! Your request is pending approval from the admin and events office.');
             } else {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `Server error: ${response.status}`);
+                throw new Error('Failed to submit reservation');
             }
             
             // Reset form

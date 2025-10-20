@@ -149,10 +149,6 @@ const signup = async (req, res) => {
     if (userType !== 'Vendor' && (!firstName || !lastName)) {
       return res.status(400).json({ 
         success: false, 
-        message: 'First name and last name are required for non-vendor users' 
-      });
-    }
-    
         message: 'First name and last name are required for non-vendor users' })};
     // Basic validation - firstName and lastName not required for vendors
     if (!email || !password || !userType) {
