@@ -86,7 +86,7 @@ const CreateBooth = () => {
       setMessage('Booth created successfully! Redirecting...');
       setTimeout(() => {
         setForm({
-          title: '', location: '', startDate: '', endDate: '', boothSize: '', durationWeeks: '', boothLocation: '', attendees: [{ name: '', email: '' }], description: ''
+          title: '', startDate: '', endDate: '', boothSize: '', durationWeeks: '', boothLocation: '', attendees: [{ name: '', email: '' }], description: ''
         });
         // Redirect to student events view
         window.location.href = '/student/events';
