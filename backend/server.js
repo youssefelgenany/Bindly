@@ -33,6 +33,7 @@ const studentRegistrationRoutes = require("./routes/studentRegistrationRoutes");
 const courtRoutes = require("./routes/courtRoutes");
 const boothRoutes = require("./routes/boothRoutes");
 const gymSessionRoutes = require("./routes/gymSessionRoutes");
+const devEmailRoutes = require("./routes/devEmailRoutes");
 const { verifyByToken } = require("./controllers/authVerifyController");
 
 // Mount routes
@@ -52,6 +53,11 @@ app.use("/api/student-registrations", studentRegistrationRoutes);
 app.use("/api/courts", courtRoutes);
 app.use("/api/booths", boothRoutes);
 app.use("/api/gym-sessions", gymSessionRoutes);
+
+// Development email routes (only in development)
+if (process.env.NODE_ENV !== 'production') {
+  app.use("/api/dev", devEmailRoutes);
+}
 
 // Email verification link route
 app.get("/api/verify", verifyByToken);

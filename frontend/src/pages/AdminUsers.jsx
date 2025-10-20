@@ -123,7 +123,7 @@ const AdminUsers = () => {
     try {
       const result = await adminApiService.updateUserRole(userId, selectedRole);
       if (result.success) {
-        setMessageById(prev => ({ ...prev, [userId]: 'Role updated successfully.' }));
+        setMessageById(prev => ({ ...prev, [userId]: 'Role updated and verification email sent successfully.' }));
         // Update the user in the local state
         setUsers(prev => prev.map(u => 
           u._id === userId ? { ...u, userType: selectedRole } : u
@@ -195,38 +195,29 @@ const AdminUsers = () => {
     console.log('🔍 User type:', user?.userType);
     console.log('🔍 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
     
-    const newVerificationStatus = !verificationStatusById[userId];
-    console.log('🔍 New verification status:', newVerificationStatus);
-    
     setVerifyingIds(prev => ({ ...prev, [userId]: true }));
     setVerifyMsgById(prev => ({ ...prev, [userId]: '' }));
     
     try {
-      console.log('🔍 Calling updateUserVerification API...');
-      let confirmationPassword = '';
-      if (newVerificationStatus !== undefined) {
-        // For admin/event office targets, backend will require password
-        confirmationPassword = '123456';
-      }
-      const result = await adminApiService.updateUserVerification(userId, newVerificationStatus, confirmationPassword);
+      console.log('🔍 Calling sendVerificationEmail API...');
+      const result = await adminApiService.sendVerificationEmail(userId);
       console.log('🔍 API result:', result);
       
       if (result.success) {
-        console.log('✅ Verification update successful');
-        setVerificationStatusById(prev => ({ ...prev, [userId]: newVerificationStatus }));
-        setVerifyMsgById(prev => ({ ...prev, [userId]: 'Verification updated.' }));
-        // Update the user in the local state
-        setUsers(prev => prev.map(u => 
-          u._id === userId ? { ...u, isVerified: newVerificationStatus } : u
-        ));
+        console.log('✅ Verification email sent successfully');
+        setVerifyMsgById(prev => ({ ...prev, [userId]: 'Verification email sent successfully!' }));
+        // Clear message after 3 seconds
+        setTimeout(() => {
+          setVerifyMsgById(prev => ({ ...prev, [userId]: '' }));
+        }, 3000);
       } else {
-        console.log('❌ Verification update failed:', result.message);
-        setVerifyMsgById(prev => ({ ...prev, [userId]: result.message || 'Failed to update verification.' }));
+        console.log('❌ Verification email failed:', result.message);
+        setVerifyMsgById(prev => ({ ...prev, [userId]: result.message || 'Failed to send verification email.' }));
       }
     } catch (e) {
-      console.log('❌ Verification update error:', e);
+      console.log('❌ Verification email error:', e);
       const serverMessage = e?.response?.data?.message;
-      setVerifyMsgById(prev => ({ ...prev, [userId]: serverMessage || 'Failed to update verification.' }));
+      setVerifyMsgById(prev => ({ ...prev, [userId]: serverMessage || 'Failed to send verification email.' }));
     } finally {
       setVerifyingIds(prev => ({ ...prev, [userId]: false }));
     }
@@ -415,23 +406,19 @@ const AdminUsers = () => {
                         </div>
                         )}
 
-                        {/* Verification controls (only for TA/Staff/Professor) */}
-                        {(['TA', 'Staff', 'Professor'].includes(u.userType)) && (
+                        {/* Verification controls (only for unverified TA/Staff/Professor) */}
+                        {(['TA', 'Staff', 'Professor'].includes(u.userType)) && !verificationStatusById[userId] && (
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                           <button
-                            className={verificationStatusById[userId] ? 'btn btn-outline' : 'btn btn-primary'}
+                            className="btn btn-primary"
                             onClick={() => handleToggleVerification(userId)}
                             disabled={!!verifyingIds[userId]}
-                            style={{ backgroundColor: verificationStatusById[userId] ? 'var(--success-green)' : 'var(--warning-yellow)', color: 'white' }}
+                            style={{ backgroundColor: 'var(--warning-yellow)', color: 'white' }}
                           >
-                            {verifyingIds[userId]
-                              ? 'Updating...'
-                              : verificationStatusById[userId]
-                                ? 'Unverify User'
-                                : 'Verify User'}
+                            {verifyingIds[userId] ? 'Sending Email...' : 'Send Verification Email'}
                           </button>
-                          <span style={{ fontSize: '12px', color: verificationStatusById[userId] ? 'var(--success-green)' : 'var(--warning-yellow)' }}>
-                            {verificationStatusById[userId] ? 'Verified' : 'Pending'}
+                          <span style={{ fontSize: '12px', color: 'var(--warning-yellow)' }}>
+                            Pending Email Verification
                           </span>
                           {verifyMsgById[userId] && (
                             <span style={{ marginLeft: '0.5rem', fontSize: '12px', color: 'var(--text-light)' }}>
@@ -440,6 +427,23 @@ const AdminUsers = () => {
                           )}
                         </div>
                         )}
+
+                        {/* Verification status display (only for verified TA/Staff/Professor) */}
+                        {(['TA', 'Staff', 'Professor'].includes(u.userType)) && verificationStatusById[userId] && (
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ 
+                            fontSize: '12px', 
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: 'var(--success-green)', 
+                            color: 'white',
+                            fontWeight: '500'
+                          }}>
+                            ✅ Verified
+                          </span>
+                        </div>
+                        )}
+
 
                         {/* Activation controls removed as requested */}
 
