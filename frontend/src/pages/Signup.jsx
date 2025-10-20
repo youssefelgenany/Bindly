@@ -14,10 +14,6 @@ const Signup = () => {
     gucId: '',
     companyName: ''
   });
-  const [files, setFiles] = useState({
-    vendorLogo: null,
-    vendorTaxCard: null
-  });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -111,20 +107,6 @@ const Signup = () => {
     }
   };
 
-  const handleFileChange = (e) => {
-    const { name, files: fileList } = e.target;
-    setFiles(prev => ({
-      ...prev,
-      [name]: fileList[0] || null
-    }));
-    // Clear error when user selects file
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -167,6 +149,12 @@ const Signup = () => {
       if (!formData.lastName.trim()) {
         newErrors.lastName = 'Last name is required';
       }
+    if (!formData.firstName.trim() && formData.userType !== 'Vendor') {
+      newErrors.firstName = 'First name is required';
+    }
+
+    if (!formData.lastName.trim() && formData.userType !== 'Vendor') {
+      newErrors.lastName = 'Last name is required';
     }
 
     // Employee type validation
@@ -192,13 +180,6 @@ const Signup = () => {
         newErrors.companyName = 'Company name is required';
       }
 
-      if (!files.vendorLogo) {
-        newErrors.vendorLogo = 'Company logo is required';
-      }
-
-      if (!files.vendorTaxCard) {
-        newErrors.vendorTaxCard = 'Tax card is required';
-      }
     }
 
     setErrors(newErrors);
@@ -226,6 +207,7 @@ const Signup = () => {
       submitData.append('password', formData.password);
       
       // Only add first and last name for non-vendors
+      // Only add firstName and lastName for non-vendor users
       if (actualUserType !== 'Vendor') {
         submitData.append('firstName', formData.firstName);
         submitData.append('lastName', formData.lastName);
@@ -241,41 +223,32 @@ const Signup = () => {
         submitData.append('companyName', formData.companyName);
       }
 
-      // Add files for vendors
-      if (actualUserType === 'Vendor') {
-        if (files.vendorLogo) {
-          submitData.append('vendorLogo', files.vendorLogo);
-        }
-        if (files.vendorTaxCard) {
-          submitData.append('vendorTaxCard', files.vendorTaxCard);
-        }
-      }
 
       // Debug: Log the form data being sent
       console.log('Form data being sent:', {
         userType: actualUserType,
         email: formData.email,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        firstName: actualUserType !== 'Vendor' ? formData.firstName : 'Not sent for vendors',
+        lastName: actualUserType !== 'Vendor' ? formData.lastName : 'Not sent for vendors',
         gucId: formData.gucId,
-        companyName: formData.companyName,
-        hasLogo: !!files.vendorLogo,
-        hasTaxCard: !!files.vendorTaxCard
+        companyName: formData.companyName
       });
 
       const result = await signup(submitData);
       
       if (result.success) {
         if (result.requiresVerification) {
-          setMessage('Account created successfully! Redirecting to verification page...');
-          setTimeout(() => {
-            navigate('/pending-verification');
-          }, 1000);
-        } else {
-          setMessage('Account created successfully! Redirecting to login...');
+          // Students/Vendors should not require verification per backend rules,
+          // but keep fallback just in case server says requiresVerification.
+          setMessage('Account created successfully! Redirecting...');
           setTimeout(() => {
             navigate('/login');
-          }, 1000);
+          }, 800);
+        } else {
+          setMessage('Account created successfully! Redirecting...');
+          setTimeout(() => {
+            navigate('/login');
+          }, 800);
         }
       } else {
         setMessage(result.message);
@@ -385,6 +358,11 @@ const Signup = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
                 <label htmlFor="firstName" className="form-label">First Name <span style={{ color: 'red' }}>*</span></label>
+          {/* Personal Information - Hidden for Vendors */}
+          {formData.userType !== 'Vendor' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-group">
+                <label htmlFor="firstName" className="form-label">First Name</label>
                 <input
                   type="text"
                   id="firstName"
@@ -400,6 +378,7 @@ const Signup = () => {
 
               <div className="form-group">
                 <label htmlFor="lastName" className="form-label">Last Name <span style={{ color: 'red' }}>*</span></label>
+                <label htmlFor="lastName" className="form-label">Last Name</label>
                 <input
                   type="text"
                   id="lastName"

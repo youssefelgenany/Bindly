@@ -486,19 +486,19 @@ const AdminManagement = () => {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                                 <span style={{ 
                                   fontSize: '12px', 
-                                  color: account.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)' 
+                                  color: (account.userType === 'Admin' || account.userType === 'event_office') ? 'var(--success-green)' : (account.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)')
                                 }}>
-                                  {account.isVerified ? 'Verified' : 'Pending'}
+                                  {(account.userType === 'Admin' || account.userType === 'event_office') ? 'Verified (Auto)' : (account.isVerified ? 'Verified' : 'Pending')}
                                 </span>
                                 <span style={{ 
                                   fontSize: '12px', 
-                                  color: account.status === 'active' ? 'var(--success-green)' : 'var(--guc-red)' 
+                                  color: (account.userType === 'Admin' || account.userType === 'event_office') ? 'var(--success-green)' : (account.status === 'active' ? 'var(--success-green)' : 'var(--guc-red)')
                                 }}>
-                                  {account.status === 'active' ? 'Active' : 'Blocked'}
+                                  {(account.userType === 'Admin' || account.userType === 'event_office') ? 'Active (Auto)' : (account.status === 'active' ? 'Active' : 'Blocked')}
                                 </span>
                                 
-                                {/* Activation/Deactivation Button */}
-                                {true && (
+                                {/* Activation/Deactivation Button - Hidden for Admin and Event Office accounts */}
+                                {account.userType !== 'Admin' && account.userType !== 'event_office' && (
                                   <button
                                     className={account.status === 'active' ? 'btn btn-outline' : 'btn btn-primary'}
                                     onClick={() => openActivationPasswordModal(accountId, account.status)}
@@ -525,22 +525,24 @@ const AdminManagement = () => {
                                   </button>
                                 )}
 
-                                {/* Verify/Unverify Button */}
-                                <button
-                                  className={account.isVerified ? 'btn btn-outline' : 'btn btn-primary'}
-                                  onClick={() => openVerificationPasswordModal(accountId, !!account.isVerified)}
-                                  disabled={activatingIds[accountId]}
-                                  style={{ 
-                                    padding: '4px 8px', 
-                                    fontSize: '12px',
-                                    backgroundColor: account.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)',
-                                    color: 'white',
-                                    border: 'none'
-                                  }}
-                                  title={account.isVerified ? 'Unverify Account' : 'Verify Account'}
-                                >
-                                  {account.isVerified ? 'Unverify' : 'Verify'}
-                                </button>
+                                {/* Verify/Unverify Button - Hidden for Admin and Event Office accounts */}
+                                {account.userType !== 'Admin' && account.userType !== 'event_office' && (
+                                  <button
+                                    className={account.isVerified ? 'btn btn-outline' : 'btn btn-primary'}
+                                    onClick={() => openVerificationPasswordModal(accountId, !!account.isVerified)}
+                                    disabled={activatingIds[accountId]}
+                                    style={{ 
+                                      padding: '4px 8px', 
+                                      fontSize: '12px',
+                                      backgroundColor: account.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)',
+                                      color: 'white',
+                                      border: 'none'
+                                    }}
+                                    title={account.isVerified ? 'Unverify Account' : 'Verify Account'}
+                                  >
+                                    {account.isVerified ? 'Unverify' : 'Verify'}
+                                  </button>
+                                )}
                                 
                                 <button
                                   className="btn btn-outline"

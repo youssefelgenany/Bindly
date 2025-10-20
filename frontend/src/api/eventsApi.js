@@ -86,6 +86,18 @@ export const eventsApiService = {
       };
     }
   },
+  updateEvent: async (id, eventData) => {
+    try {
+      const response = await eventsApi.put(`/${id}`, eventData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to update event',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
   updateEventStatus: async (id, statusData) => {
     try {
       const response = await eventsApi.put(`/${id}`, statusData);

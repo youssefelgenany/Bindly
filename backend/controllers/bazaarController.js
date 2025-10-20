@@ -1,5 +1,25 @@
 const Event = require('../models/eventModel');
 
+// Get a single bazaar by ID
+exports.getBazaarById = async (req, res) => {
+  try {
+    const bazaar = await Event.findById(req.params.id);
+    
+    if (!bazaar) {
+      return res.status(404).json({ message: 'Bazaar not found' });
+    }
+
+    // Check if it's actually a bazaar
+    if (bazaar.type !== 'bazaar') {
+      return res.status(400).json({ message: 'This is not a bazaar event' });
+    }
+
+    res.json(bazaar);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching bazaar', error: error.message });
+  }
+};
+
 // Get all bazaars (for users to browse)
 exports.getAllBazaars = async (req, res) => {
   try {

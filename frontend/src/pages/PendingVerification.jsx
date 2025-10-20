@@ -1,15 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const PendingVerification = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [isChecking, setIsChecking] = useState(false);
+  const hasChecked = useRef(false);
 
-  // Check verification status periodically
+  // Check verification status manually
   const checkVerificationStatus = async () => {
     if (!user) return;
     
+    setIsChecking(true);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('http://localhost:5000/api/auth/me', {
@@ -35,14 +38,30 @@ const PendingVerification = () => {
       }
     } catch (error) {
       console.error('Error checking verification status:', error);
+    } finally {
+      setIsChecking(false);
     }
   };
 
-  // Check status every 30 seconds
+  // Check status only once on mount
   useEffect(() => {
-    const interval = setInterval(checkVerificationStatus, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
+    // Prevent multiple calls
+    if (hasChecked.current) return;
+    hasChecked.current = true;
+
+    // Immediate redirect if already verified and active in current context
+    if (user && user.isVerified && (user.status === 'active' || !user.status)) {
+      if (user.userType === 'Vendor') {
+        navigate('/vendor');
+      } else {
+        navigate('/dashboard');
+      }
+      return;
+    }
+
+    // Check once on mount
+    checkVerificationStatus();
+  }, [user, navigate]);
 
   return (
     <div style={{ 
@@ -51,7 +70,13 @@ const PendingVerification = () => {
       alignItems: 'center', 
       justifyContent: 'center',
       background: 'linear-gradient(135deg, var(--light-gray) 0%, #E9ECEF 100%)',
-      padding: '2rem'
+      padding: '2rem',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      overflow: 'auto'
     }}>
       <div className="card" style={{
         maxWidth: '500px',
@@ -75,10 +100,30 @@ const PendingVerification = () => {
           </p>
         </div>
 
-        {/* Login Link */}
+        {/* Check Status Button */}
         <div style={{
           textAlign: 'center',
           marginTop: '2rem'
+        }}>
+          <button
+            onClick={checkVerificationStatus}
+            disabled={isChecking}
+            className="btn btn-primary"
+            style={{
+              marginRight: '1rem',
+              padding: '12px 24px',
+              fontSize: '1rem',
+              fontWeight: '500'
+            }}
+          >
+            {isChecking ? 'Checking...' : 'Check Verification Status'}
+          </button>
+        </div>
+
+        {/* Login Link */}
+        <div style={{
+          textAlign: 'center',
+          marginTop: '1rem'
         }}>
           <a 
             href="/login" 
@@ -104,14 +149,14 @@ const PendingVerification = () => {
           </a>
         </div>
 
-        {/* Auto-refresh notice */}
+        {/* Manual check notice */}
         <p style={{
           color: 'var(--text-light)',
           fontSize: '0.9rem',
           marginTop: '2rem',
           fontStyle: 'italic'
         }}>
-          This page automatically checks for updates every 30 seconds
+          Click "Check Verification Status" to see if your account has been verified
         </p>
       </div>
     </div>

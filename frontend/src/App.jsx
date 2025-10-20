@@ -24,12 +24,18 @@ import EventsList from './pages/EventsList';
 import CreateBazaar from "./pages/CreateBazaar";
 import CreateTrip from './pages/CreateTrip';
 import CreateBooth from './pages/CreateBooth';
+import CreateGymSession from './pages/CreateGymSession';
 import EditBazaar from './pages/EditBazaar';
 import EditTrip from './pages/EditTrip';
 import VendorBazaars from './pages/VendorBazaars';
 import Confrences from './pages/Confrences';
 import VendorAccepted from './pages/VendorAccepted';
 import VendorRequests from './pages/VendorRequests';
+import StudentEventsView from './pages/StudentEventsView';
+import StudentMyRegistrations from './pages/StudentMyRegistrations';
+import StudentCourtsView from './pages/StudentCourtsView';
+import StaffEventsView from './pages/StaffEventsView';
+import StaffMyRegistrations from './pages/StaffMyRegistrations';
 import CourtAvailability from './pages/CourtAvailability';
 import PlatformBoothReservation from './pages/PlatformBoothReservation';
 
@@ -54,13 +60,12 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" />;
   }
 
-  // Check if user is verified (except for admin users, students, and vendors who are always verified)
-  const isAutoVerified = user.userType === 'admin' || 
-                        user.userType === 'Admin' || 
-                        user.userType === 'Student' || 
-                        user.userType === 'Vendor';
-  
-  if (!user.isVerified && !isAutoVerified) {
+  // If user is not verified and not auto-verified by type, redirect to pending
+  const autoVerifiedTypes = ['Student', 'Vendor'];
+  const isAdminType = user.userType === 'admin' || user.userType === 'Admin' || user.role === 'admin' || user.role === 'Admin';
+  const isAutoVerified = isAdminType || autoVerifiedTypes.includes(user.userType);
+
+  if (user.isVerified === false && !isAutoVerified) {
     return <Navigate to="/pending-verification" />;
   }
 
@@ -108,6 +113,7 @@ const AdminOnly = ({ children }) => {
 
   const isAdmin = user && (
     user.role === 'admin' || 
+    user.role === 'Admin' ||
     user.userType === 'Admin' || 
     user.userType === 'admin'
   );
@@ -138,7 +144,7 @@ const EventsOfficeOnly = ({ children }) => {
     user.role === 'event_office' ||
     user.role === 'Event Office'
   );
-  const isAdmin = user && (user.role === 'admin' || user.userType === 'Admin');
+  const isAdmin = user && (user.role === 'admin' || user.role === 'Admin' || user.userType === 'Admin' || user.userType === 'admin');
 
   return (isEventsOffice || isAdmin) ? children : <Navigate to="/dashboard" />;
 };
@@ -160,8 +166,15 @@ const StudentOnly = ({ children }) => {
     );
   }
 
-  const isStudent = user && user.userType === 'Student';
-  return isStudent ? children : <Navigate to="/dashboard" />;
+  const isStudentOrEventOffice = user && (
+    user.userType === 'Student' || 
+    user.userType === 'Event Office' || 
+    user.userType === 'Events Office' || 
+    user.userType === 'event_office' || 
+    user.role === 'event_office' || 
+    user.role === 'Event Office'
+  );
+  return isStudentOrEventOffice ? children : <Navigate to="/dashboard" />;
 };
 
 // Staff-only guard
@@ -183,6 +196,27 @@ const StaffOnly = ({ children }) => {
 
   const isStaff = user && user.userType === 'Staff';
   return isStaff ? children : <Navigate to="/dashboard" />;
+};
+
+// Staff and TA guard
+const StaffAndTAOnly = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
+      }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  const isStaffOrTAOrProfessor = user && (user.userType === 'Staff' || user.userType === 'TA' || user.userType === 'Professor');
+  return isStaffOrTAOrProfessor ? children : <Navigate to="/dashboard" />;
 };
 
 function App() {
@@ -276,6 +310,56 @@ function App() {
               element={
                 <ProtectedRoute>
                   <EventsList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/events"
+              element={
+                <ProtectedRoute>
+                  <StudentOnly>
+                    <StudentEventsView />
+                  </StudentOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/my-registrations"
+              element={
+                <ProtectedRoute>
+                  <StudentOnly>
+                    <StudentMyRegistrations />
+                  </StudentOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/courts"
+              element={
+                <ProtectedRoute>
+                  <StudentOnly>
+                    <StudentCourtsView />
+                  </StudentOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/events"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <StaffEventsView />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/my-registrations"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <StaffMyRegistrations />
+                  </StaffAndTAOnly>
                 </ProtectedRoute>
               }
             />
@@ -428,6 +512,16 @@ function App() {
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <CreateBooth />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/create-gym-session"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <CreateGymSession />
                   </EventsOfficeOnly>
                 </ProtectedRoute>
               }

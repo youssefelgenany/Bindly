@@ -26,6 +26,14 @@ const StudentCourtsView = () => {
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
+  // Auto-filter when filterType changes
+  useEffect(() => {
+    if (filterType !== 'all') {
+      setLoading(true);
+      loadCourts();
+    }
+  }, [filterType]);
+
   const loadCourts = async () => {
     try {
       setError('');
@@ -308,7 +316,11 @@ const StudentCourtsView = () => {
         <div className="filter-buttons">
           <button 
             className={filterType === 'all' ? 'active' : ''} 
-            onClick={() => setFilterType('all')}
+            onClick={() => {
+              setFilterType('all');
+              setLoading(true);
+              loadCourts();
+            }}
           >
             All Courts
           </button>

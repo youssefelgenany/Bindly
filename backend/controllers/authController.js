@@ -25,11 +25,39 @@ async function sendVerificationEmail(toEmail, token) {
   const apiBase = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
   const verifyUrl = `${apiBase}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
   const html = `
-    <p>Welcome to Bindly!</p>
-    <p>Please verify your email to activate your account:</p>
-    <p><a href="${verifyUrl}" style="background:#007bff;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">Verify my email</a></p>
-    <p>If the button does not work, copy and paste this link into your browser:</p>
-    <p>${verifyUrl}</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #d32f2f; margin: 0;">Bindly</h1>
+        <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
+      </div>
+      
+      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <h2 style="color: #333; margin-top: 0;">Welcome to Bindly!</h2>
+        <p>Please verify your email to activate your account:</p>
+      </div>
+      
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${verifyUrl}" style="background: #d32f2f; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+          Verify My Email
+        </a>
+      </div>
+      
+      <div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
+        <p style="margin: 0; color: #856404;">
+          <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
+          <a href="${verifyUrl}" style="color: #d32f2f; word-break: break-all;">${verifyUrl}</a>
+        </p>
+      </div>
+      
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+        <p>After verification, you'll be able to access all features of the Bindly platform.</p>
+        <p>This verification link will expire in 24 hours.</p>
+        <p style="margin-top: 20px;">
+          Best regards,<br>
+          <strong>The Bindly Team</strong>
+        </p>
+      </div>
+    </div>
   `;
 
   console.log('[Bindly] Verification link for', toEmail, '=>', verifyUrl);
@@ -41,7 +69,7 @@ async function sendVerificationEmail(toEmail, token) {
 
   try {
     const mailOptions = {
-      from: process.env.MAIL_FROM || 'no-reply@bindly.app',
+      from: "Bindly <salmaahmed1504@gmail.com>",
       to: toEmail,
       subject: 'Verify your Bindly account',
       html
@@ -122,6 +150,19 @@ const signup = async (req, res) => {
       return res.status(400).json({ 
         success: false, 
         message: 'First name and last name are required for non-vendor users' 
+    // Basic validation - firstName and lastName not required for vendors
+    if (!email || !password || !userType) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields: email, password, userType' 
+      });
+    }
+
+    // Additional validation for non-vendor users
+    if (userType !== 'Vendor' && (!firstName || !lastName)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields: firstName, lastName' 
       });
     }
 
@@ -150,6 +191,7 @@ const signup = async (req, res) => {
     };
 
     // Add first and last name only for non-vendors
+    // Add firstName and lastName for non-vendor users
     if (userType !== 'Vendor') {
       userData.firstName = firstName;
       userData.lastName = lastName;
@@ -207,12 +249,14 @@ const signup = async (req, res) => {
     };
 
     // Only include first and last name for non-vendors
+    // Add firstName and lastName for non-vendor users
     if (newUser.userType !== 'Vendor') {
       userResponse.firstName = newUser.firstName;
       userResponse.lastName = newUser.lastName;
     }
 
     // Generate JWT token for immediate login
+    // Generate JWT token (will be returned only if user is verified and active)
     const token = jwt.sign(
       { 
         userId: newUser._id, 
@@ -224,14 +268,17 @@ const signup = async (req, res) => {
     );
 
     // Determine response message based on user type
-    let responseMessage = 'Account created successfully. Your account is pending admin verification. You will receive an email once verified.';
-    
+    const isReady = Boolean(newUser.isVerified && String(newUser.status) === 'active');
+    let responseMessage = isReady
+      ? 'Account created successfully.'
+      : 'Account created successfully. Your account is pending admin verification. You will receive an email once verified.';
+
     const responseBody = {
       success: true,
       message: responseMessage,
       user: userResponse,
-      token: null, // No token for unverified accounts
-      requiresVerification: true // All accounts require verification
+      token: isReady ? token : null,
+      requiresVerification: !isReady
     };
 
     res.status(201).json(responseBody);
@@ -289,6 +336,7 @@ const login = async (req, res) => {
         lastName: user.lastName,
         name: user.name, // For admin accounts
         userType: user.userType,
+        role: user.role || user.userType, // Include role for Admin model users, or userType for User model users
         gucId: user.gucId,
         companyName: user.companyName,
         isVerified: user.isVerified,
@@ -313,6 +361,7 @@ const login = async (req, res) => {
         lastName: user.lastName,
         name: user.name, // For admin accounts
         userType: user.userType,
+        role: user.role || user.userType, // Include role for Admin model users, or userType for User model users
         gucId: user.gucId,
         companyName: user.companyName,
         isVerified: user.isVerified,
@@ -339,7 +388,9 @@ const login = async (req, res) => {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      name: user.name, // For admin accounts
       userType: user.userType,
+      role: user.role || user.userType, // Include role for Admin model users, or userType for User model users
       gucId: user.gucId,
       department: user.department,
       profilePicturePath: user.profilePicturePath,

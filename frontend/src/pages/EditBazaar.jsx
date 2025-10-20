@@ -14,22 +14,40 @@ const EditBazaar = () => {
 
   // Load existing bazaar data when page loads
   useEffect(() => {
-    // In a real app, you'd fetch the bazaar data by ID
-    // For now, we'll simulate loading existing data
-    setLoadingData(true);
+    const fetchBazaarData = async () => {
+      setLoadingData(true);
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/bazaars/${id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setBazaarData({
+            name: data.title || data.name,
+            location: data.location || '',
+            description: data.description || '',
+            startDate: data.startDate ? new Date(data.startDate).toISOString().slice(0, 16) : '',
+            endDate: data.endDate ? new Date(data.endDate).toISOString().slice(0, 16) : '',
+            registrationDeadline: data.registrationDeadline ? new Date(data.registrationDeadline).toISOString().slice(0, 16) : ''
+          });
+        } else {
+          setMessage({ type: 'error', text: 'Failed to load bazaar data' });
+        }
+      } catch (error) {
+        setMessage({ type: 'error', text: 'Network error loading bazaar data' });
+      } finally {
+        setLoadingData(false);
+      }
+    };
 
-    // Simulate API call to get bazaar data
-    setTimeout(() => {
-      setBazaarData({
-        name: "Sample Bazaar",
-        location: "Sample Location",
-        description: "Sample description",
-        startDate: "2024-12-01T10:00",
-        endDate: "2024-12-01T18:00",
-        registrationDeadline: "2024-11-25T23:59"
-      });
-      setLoadingData(false);
-    }, 500);
+    if (id) {
+      fetchBazaarData();
+    }
   }, [id]);
 
   const handleUpdateBazaar = async (updatedData) => {
@@ -44,7 +62,7 @@ const EditBazaar = () => {
           type: 'success',
           text: 'Bazaar updated successfully! Redirecting...'
         });
-        setTimeout(() => navigate('/events'), 2000);
+        setTimeout(() => navigate('/student/events'), 2000);
       } else {
         setMessage({
           type: 'error',

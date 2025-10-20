@@ -85,10 +85,14 @@ const CreateBooth = () => {
         setMessage(data?.message || data?.msg || 'Failed to create booth');
         return;
       }
-      setMessage('Booth created successfully!');
-      setForm({
-        title: '', location: '', startDate: '', endDate: '', boothSize: '', durationWeeks: '', boothLocation: '', attendees: [{ name: '', email: '' }], description: ''
-      });
+      setMessage('Booth created successfully! Redirecting...');
+      setTimeout(() => {
+        setForm({
+          title: '', location: '', startDate: '', endDate: '', boothSize: '', durationWeeks: '', boothLocation: '', attendees: [{ name: '', email: '' }], description: ''
+        });
+        // Redirect to student events view
+        window.location.href = '/student/events';
+      }, 2000);
     } catch (err) {
       setMessage('Network error.');
     } finally {

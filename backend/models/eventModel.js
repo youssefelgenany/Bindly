@@ -8,7 +8,7 @@ const eventSchema = new mongoose.Schema({
   description: String,
   type: {
     type: String,
-    enum: ['bazaar', 'trip', 'sports', 'seminar', 'workshop', 'conference', 'booth', 'other'],
+    enum: ['bazaar', 'trip', 'sports', 'seminar', 'workshop', 'conference', 'booth', 'standaloneBooth', 'other'],
     default: 'other',
   },
   startDate: {
@@ -70,6 +70,37 @@ const eventSchema = new mongoose.Schema({
   bannerFile: {
     type: String,
     required: false, // Path to uploaded banner/flyer
+  },
+  // Standalone booth specific fields
+  boothNumber: {
+    type: Number,
+    required: function() { return this.type === 'standaloneBooth'; },
+    min: 1,
+    max: 12
+  },
+  boothSize: {
+    type: String,
+    enum: ['2x2', '4x4'],
+    required: function() { return this.type === 'standaloneBooth'; }
+  },
+  amenities: [{
+    type: String,
+    enum: ['power-outlet', 'wifi', 'storage', 'display-screen', 'refrigeration', 'lighting']
+  }],
+  boothStatus: {
+    type: String,
+    enum: ['free', 'taken'],
+    default: 'free',
+    required: function() { return this.type === 'standaloneBooth'; }
+  },
+  currentOwner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: function() { return this.type === 'standaloneBooth' && this.boothStatus === 'taken'; }
+  },
+  occupancyEndDate: {
+    type: Date,
+    required: function() { return this.type === 'standaloneBooth' && this.boothStatus === 'taken'; }
   }
 }, { timestamps: true });
 

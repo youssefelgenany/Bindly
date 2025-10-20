@@ -1,10 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { createBazaar, editBazaar, getAllBazaars, registerForBazaar } = require('../controllers/bazaarController');
+const { createBazaar, editBazaar, getAllBazaars, registerForBazaar, getBazaarById } = require('../controllers/bazaarController');
 const { protect, permit } = require('../middleware/authMiddleware');
 
 // Get all bazaars (for users to browse)
 router.get('/', protect, getAllBazaars);
+
+// Get a single bazaar by ID
+router.get('/:id', protect, getBazaarById);
 
 // Register for a bazaar
 router.post('/:id/register', protect, registerForBazaar);
