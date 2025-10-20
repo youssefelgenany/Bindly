@@ -57,6 +57,9 @@ const AdminEvents = () => {
   const filteredEvents = useMemo(() => {
     let filtered = events;
 
+    // Exclude 'other' type events
+    filtered = filtered.filter(event => event.type !== 'other');
+
     // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();

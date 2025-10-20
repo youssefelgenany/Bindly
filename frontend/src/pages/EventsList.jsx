@@ -134,6 +134,9 @@ const EventsList = () => {
   };
 
   const filteredEvents = events.filter(event => {
+    // Exclude 'other' type events
+    if (event.type === 'other') return false;
+    
     // Type filter
     const typeMatch = filter === 'all' || (event.type && event.type === filter);
     

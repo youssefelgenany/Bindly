@@ -82,8 +82,10 @@ exports.getAllEvents = async (req, res) => {
     const { q, name, type, status } = req.query;
     const search = (q || name || '').toString().trim();
 
-    // Base match (type/status)
-    const baseMatch = {};
+    // Base match (type/status) - exclude 'other' type events
+    const baseMatch = {
+      type: { $ne: 'other' } // Exclude 'other' type events
+    };
     if (type) {
       const typeMap = {
         workshops: 'workshop',
@@ -440,7 +442,9 @@ exports.getAllEventsForAdmin = async (req, res) => {
     const { q, type, status } = req.query;
     console.log('🔍 Admin requesting events with query:', { q, type, status });
     
-    const filter = {};
+    const filter = {
+      type: { $ne: 'other' } // Exclude 'other' type events
+    };
 
     if (q) {
       filter.$or = [
