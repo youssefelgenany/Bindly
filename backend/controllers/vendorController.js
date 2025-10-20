@@ -188,8 +188,8 @@ module.exports.applyToEvent = async (req, res) => {
     }
     
     if (!event) return res.status(404).json({ message: 'Invalid event or booth' });
-    if (event.type !== 'bazaar' && event.type !== 'booth' && event.type !== 'standaloneBooth') {
-      return res.status(400).json({ message: 'Event type must be bazaar, booth, or standaloneBooth' });
+    if (event.type !== 'bazaar' && event.type !== 'booth') {
+      return res.status(400).json({ message: 'Event type must be bazaar or booth' });
     }
 
     // Validate specific requirements based on event type
@@ -197,9 +197,8 @@ module.exports.applyToEvent = async (req, res) => {
       return res.status(400).json({ message: 'Booth size required for bazaar' });
     }
     if (event.type === 'booth') {
-      // Check if this is a standalone booth event
-      // Can be determined by either isStandalone parameter or eventType
-      const isStandaloneBooth = isStandalone === true || eventType === 'standaloneBooth';
+      // Check if this is a standalone booth event based on eventType parameter
+      const isStandaloneBooth = eventType === 'standaloneBooth';
       
       if (isStandaloneBooth) {
         // For standalone booth events, only duration is required
@@ -224,16 +223,6 @@ module.exports.applyToEvent = async (req, res) => {
         }
       }
     }
-    if (event.type === 'standaloneBooth') {
-      if (!durationWeeks || durationWeeks < 1 || durationWeeks > 4) {
-        return res.status(400).json({ message: 'Valid duration (1-4 weeks) required for standalone booth' });
-      }
-      
-      // Check if booth is actually available
-      if (event.boothStatus !== 'free') {
-        return res.status(400).json({ message: 'This booth is not available for application' });
-      }
-    }
 
     const existingRequest = await VendorRequest.findOne({ 
       vendor: vendorId, 
@@ -247,9 +236,11 @@ module.exports.applyToEvent = async (req, res) => {
       // Update existing application instead of rejecting duplicates
       existingRequest.attendees = attendees;
       existingRequest.boothSize = boothSize;
-      if (eventType === 'booth') {
+      if (eventType === 'booth' || eventType === 'standaloneBooth') {
         existingRequest.durationWeeks = durationWeeks;
-        existingRequest.boothLocation = (boothLocation && boothLocation.trim() !== '') ? boothLocation : undefined;
+        if (eventType === 'booth') {
+          existingRequest.boothLocation = (boothLocation && boothLocation.trim() !== '') ? boothLocation : undefined;
+        }
       }
       if (typeof message === 'string') existingRequest.message = message;
       await existingRequest.save();
@@ -260,32 +251,26 @@ module.exports.applyToEvent = async (req, res) => {
       vendor: vendorId,
       attendees,
       boothSize: event.type === 'bazaar' ? boothSize : undefined,
-      durationWeeks: (event.type === 'booth' || event.type === 'standaloneBooth') ? durationWeeks : undefined,
-      boothLocation: (event.type === 'booth' && boothLocation && boothLocation.trim() !== '') ? boothLocation : undefined,
+      durationWeeks: event.type === 'booth' ? durationWeeks : undefined,
+      boothLocation: (event.type === 'booth' && eventType === 'booth' && boothLocation && boothLocation.trim() !== '') ? boothLocation : undefined,
       message,
       // denormalized fields for quick access
       eventName: event.title || event.name,
-      eventType: event.type,
+      eventType: eventType, // Use the eventType from the request, not the event's type
     };
 
     // Set the correct reference field based on event type and source
     if (event.type === 'bazaar') {
       requestData.bazaar = eventId;
     } else if (event.type === 'booth') {
-      // Check if this is a standalone booth event
-      const isStandaloneBooth = isStandalone === true || eventType === 'standaloneBooth';
-      
-      if (isStandaloneBooth) {
-        requestData.standaloneBooth = eventId;
-      } else {
-        requestData.booth = eventId;
-      }
-    } else if (event.type === 'standaloneBooth') {
-      requestData.booth = eventId; // Use booth field for standaloneBooth events
+      // All booth events (regular and standalone) use the booth field
+      requestData.booth = eventId;
     }
 
+    console.log('🔍 Creating new VendorRequest with data:', requestData);
     const request = new VendorRequest(requestData);
     await request.save();
+    console.log('🔍 Saved VendorRequest with ID:', request._id);
     res.status(201).json({ message: 'Application submitted' });
   } catch (error) {
     console.error('Server error in applyToEvent:', error);
@@ -434,7 +419,7 @@ module.exports.getMyRequests = async (req, res) => {
             startDate: r.booth.startDate,
             endDate: r.booth.endDate,
             location: r.booth.location,
-            type: 'booth',
+            type: r.eventType || 'booth',
             requestId: r._id,
             status: r.status,
             attendees: r.attendees || [],
@@ -445,8 +430,10 @@ module.exports.getMyRequests = async (req, res) => {
       return [];
     };
 
-    if (type === 'bazaar' || type === 'booth') {
-      const list = await fetchForType(type);
+    if (type === 'bazaar' || type === 'booth' || type === 'standaloneBooth') {
+      // Treat standaloneBooth the same as booth since they're both stored in Event collection
+      const actualType = type === 'standaloneBooth' ? 'booth' : type;
+      const list = await fetchForType(actualType);
       return res.json({ success: true, events: list, status });
     }
 
