@@ -92,8 +92,16 @@ async function sendVerificationEmail(toEmail, token) {
 const signupValidation = [
   body('email').isEmail().withMessage('Please provide a valid email address'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
-  body('firstName').trim().isLength({ min: 1 }).withMessage('First name is required'),
-  body('lastName').trim().isLength({ min: 1 }).withMessage('Last name is required'),
+  body('firstName')
+    .if(body('userType').not().equals('Vendor'))
+    .trim()
+    .isLength({ min: 1 })
+    .withMessage('First name is required for non-vendor users'),
+  body('lastName')
+    .if(body('userType').not().equals('Vendor'))
+    .trim()
+    .isLength({ min: 1 })
+    .withMessage('Last name is required for non-vendor users'),
   body('userType').isIn(['Student', 'Staff', 'TA', 'Professor', 'Vendor'])
     .withMessage('User type must be one of: Student, Staff, TA, Professor, Vendor'),
   body('gucId')
@@ -129,6 +137,19 @@ const signup = async (req, res) => {
 
     const { email, password, firstName, lastName, userType, gucId, companyName } = req.body;
 
+    // Basic validation
+    if (!email || !password || !userType) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields: email, password, userType' 
+      });
+    }
+
+    // First name and last name are only required for non-vendors
+    if (userType !== 'Vendor' && (!firstName || !lastName)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'First name and last name are required for non-vendor users' 
     // Basic validation - firstName and lastName not required for vendors
     if (!email || !password || !userType) {
       return res.status(400).json({ 
@@ -169,6 +190,7 @@ const signup = async (req, res) => {
       status: 'blocked' // All users start as blocked until verified
     };
 
+    // Add first and last name only for non-vendors
     // Add firstName and lastName for non-vendor users
     if (userType !== 'Vendor') {
       userData.firstName = firstName;
@@ -226,12 +248,14 @@ const signup = async (req, res) => {
       createdAt: newUser.createdAt
     };
 
+    // Only include first and last name for non-vendors
     // Add firstName and lastName for non-vendor users
     if (newUser.userType !== 'Vendor') {
       userResponse.firstName = newUser.firstName;
       userResponse.lastName = newUser.lastName;
     }
 
+    // Generate JWT token for immediate login
     // Generate JWT token (will be returned only if user is verified and active)
     const token = jwt.sign(
       { 

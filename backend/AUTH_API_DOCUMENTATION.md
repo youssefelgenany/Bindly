@@ -31,7 +31,8 @@ This authentication system supports signup for different user types with appropr
 Multipart form-data fields and files:
 
 - Fields:
-  - `email`, `password`, `firstName`, `lastName`, `userType` = `Vendor`, `companyName`
+  - `email`, `password`, `userType` = `Vendor`, `companyName`
+  - Note: `firstName` and `lastName` are not required for vendors
 - Files (required):
   - `vendorLogo` (image)
   - `vendorTaxCard` (image or PDF)
@@ -42,8 +43,6 @@ curl -X POST http://localhost:5000/api/auth/signup \
   -H "Content-Type: multipart/form-data" \
   -F email=vendor@company.com \
   -F password=password123 \
-  -F firstName=Jane \
-  -F lastName=Smith \
   -F userType=Vendor \
   -F companyName="Tech Solutions Inc" \
   -F vendorLogo=@/path/to/logo.png \

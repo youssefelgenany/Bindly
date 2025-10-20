@@ -29,6 +29,19 @@ const Navbar = () => {
     return types[userType] || userType;
   };
 
+  const getDashboardPath = (userType) => {
+    const dashboardPaths = {
+      'Student': '/dashboard',
+      'Staff': '/dashboard',
+      'TA': '/dashboard',
+      'Professor': '/dashboard',
+      'Vendor': '/vendor',
+      'Admin': '/admin',
+      'Event Office': '/event-office'
+    };
+    return dashboardPaths[userType] || '/dashboard';
+  };
+
   return (
     <nav style={{
       backgroundColor: 'var(--white)',
@@ -54,7 +67,7 @@ const Navbar = () => {
             </button>
           )}
           <Link 
-            to={user ? '/dashboard' : '/'} 
+            to={user ? getDashboardPath(user.userType) : '/'} 
             style={{ 
               textDecoration: 'none',
               display: 'flex',

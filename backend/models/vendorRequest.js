@@ -22,6 +22,7 @@ const vendorRequestSchema = new mongoose.Schema({
   },
   // Denormalized event info for easy rendering without populate
   eventName: { type: String },
+  eventType: { type: String, enum: ['bazaar', 'booth', 'platform-booth'] },
   eventType: { type: String, enum: ['bazaar', 'booth', 'standaloneBooth'] },
   attendees: [
     {
@@ -51,6 +52,15 @@ const vendorRequestSchema = new mongoose.Schema({
       'library-area', 'gym-entrance', 'parking-lot', 'garden-section',
       'auditorium-hall', 'cafeteria-area'
     ]
+  },
+  // Platform booth specific fields
+  boothId: {
+    type: String,
+    required: false,
+  },
+  startDate: {
+    type: Date,
+    required: false,
   },
   // Optional message or notes from the vendor
   message: {

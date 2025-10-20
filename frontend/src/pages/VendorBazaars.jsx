@@ -177,6 +177,19 @@ const VendorBazaars = () => {
 
             {/* Error Messages */}
             {error && <div className="alert alert-error">{error}</div>}
+            {/* Demo mode removed */}
+            {/* my accepted section removed; see /vendor/accepted */}
+
+            {loading ? (
+                <div className="events-loading">
+                    <div className="loading-spinner"></div>
+                    <p>Loading events...</p>
+                </div>
+            ) : (
+                <div className="events-list" style={{ display: 'grid', gap: '2rem' }}>
+                    {/* Bazaars */}
+                    <div>
+                        <h2 style={{ marginBottom: '0.5rem' }}>Bazaars {bazaars.length ? `(${bazaars.length})` : ''}</h2>
             {boothsError && <div className="alert alert-error">{boothsError}</div>}
 
             {/* Tab Content */}

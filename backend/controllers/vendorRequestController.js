@@ -96,6 +96,51 @@ const getVendorRequestById = async (req, res) => {
   }
 };
 
+// @desc Create a new vendor request
+// @route POST /api/vendor-requests
+// @access Vendor
+const createVendorRequest = async (req, res) => {
+  try {
+    const {
+      eventType,
+      attendees,
+      boothSize,
+      durationWeeks,
+      boothLocation,
+      boothId,
+      startDate,
+      message
+    } = req.body;
+
+    // Get vendor ID from authenticated user
+    const vendorId = req.user.id;
+
+    // Create the vendor request
+    const vendorRequest = new VendorRequest({
+      vendor: vendorId,
+      eventType,
+      attendees,
+      boothSize,
+      durationWeeks,
+      boothLocation,
+      boothId,
+      startDate: startDate ? new Date(startDate) : undefined,
+      message,
+      status: 'pending'
+    });
+
+    await vendorRequest.save();
+
+    res.status(201).json({
+      message: 'Vendor request created successfully',
+      request: vendorRequest
+    });
+  } catch (error) {
+    console.error('Error creating vendor request:', error);
+    res.status(500).json({ message: 'Error creating vendor request', error: error.message });
+  }
+};
+
 // @desc Accept or reject a vendor participation request
 // @route PATCH /api/vendor-requests/:id/status
 // @access Events Office / Admin
@@ -130,5 +175,6 @@ const updateVendorRequestStatus = async (req, res) => {
 module.exports = {
   getAllVendorRequests,
   getVendorRequestById,
+  createVendorRequest,
   updateVendorRequestStatus,
 };

@@ -37,6 +37,7 @@ import StudentCourtsView from './pages/StudentCourtsView';
 import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
 import CourtAvailability from './pages/CourtAvailability';
+import PlatformBoothReservation from './pages/PlatformBoothReservation';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -283,6 +284,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <VendorRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vendor/platform-booth"
+              element={
+                <ProtectedRoute>
+                  <PlatformBoothReservation />
                 </ProtectedRoute>
               }
             />

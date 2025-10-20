@@ -3,9 +3,13 @@ const router = express.Router();
 const {
   getAllVendorRequests,
   getVendorRequestById,
+  createVendorRequest,
   updateVendorRequestStatus
 } = require('../controllers/vendorRequestController');
 const { protect, permit } = require('../middleware/authMiddleware');
+
+// Route to create a new vendor request - Vendor
+router.post('/', protect, permit('vendor'), createVendorRequest);
 
 // Route to get all vendor requests - Events Office / Admin
 router.get('/', protect, permit('event_office', 'admin'), getAllVendorRequests);

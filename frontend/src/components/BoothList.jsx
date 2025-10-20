@@ -56,6 +56,7 @@ const BoothList = ({ booths, bazaarId, onApplyToBooth }) => {
 
     return (
         <div style={{ marginTop: '1rem' }}>
+            <div style={{ display: 'grid', gap: '0.5rem' }}>
             <div style={{
                 display: 'flex',
                 alignItems: 'center',
