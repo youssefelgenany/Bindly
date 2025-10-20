@@ -12,9 +12,7 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {} }) => {
     fundingSource: initialData.fundingSource || 'GUC',
     extraResources: initialData.extraResources || '',
     startDate: initialData.startDate || '',
-    endDate: initialData.endDate || '',
-    location: initialData.location || '',
-    capacity: initialData.capacity || ''
+    endDate: initialData.endDate || ''
   });
 
   console.log('🔹 ConferenceForm: Initialized formData:', formData);
