@@ -62,6 +62,11 @@ const StaffEventsView = () => {
         searchQueryProcessed = ''; // Clear the search query since we're filtering by type
         setFilter('conference'); // Update the filter state to reflect the active filter
         setSearchQuery(''); // Clear the search input to show the filter is applied
+      } else if (queryLower === 'booth' || queryLower === 'booths') {
+        searchType = 'booth';
+        searchQueryProcessed = ''; // Clear the search query since we're filtering by type
+        setFilter('booth'); // Update the filter state to reflect the active filter
+        setSearchQuery(''); // Clear the search input to show the filter is applied
       }
       
       const result = await eventsApiService.getStudentEvents({
@@ -97,15 +102,7 @@ const StaffEventsView = () => {
           vendors: ev.vendors || []
         }));
 
-        // Filter events for TA users to only show workshops and trips
-        if (user?.userType === 'TA') {
-          mapped = mapped.filter(ev => ev.type === 'workshop' || ev.type === 'trip');
-        }
-
-        // Filter events for Professor users to only show workshops and trips
-        if (user?.userType === 'Professor') {
-          mapped = mapped.filter(ev => ev.type === 'workshop' || ev.type === 'trip');
-        }
+        // All users can see all event types now
 
         setEvents(mapped);
       } else {
@@ -423,7 +420,7 @@ const StaffEventsView = () => {
         <div className="search-bar">
           <input
             type="text"
-            placeholder="Search by event name, professor name, location, description, or type (trip, workshop, bazaar, conference)..."
+            placeholder="Search by event name, professor name, location, description, or type (trip, workshop, bazaar, conference, booth)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -450,14 +447,12 @@ const StaffEventsView = () => {
           >
             All Events
           </button>
-          {user?.userType !== 'TA' && user?.userType !== 'Professor' && (
-            <button 
-              className={filter === 'bazaar' ? 'active' : ''} 
-              onClick={() => setFilter('bazaar')}
-            >
-              Bazaars
-            </button>
-          )}
+          <button 
+            className={filter === 'bazaar' ? 'active' : ''} 
+            onClick={() => setFilter('bazaar')}
+          >
+            Bazaars
+          </button>
           <button 
             className={filter === 'trip' ? 'active' : ''} 
             onClick={() => setFilter('trip')}
@@ -470,14 +465,18 @@ const StaffEventsView = () => {
           >
             Workshops
           </button>
-          {user?.userType !== 'TA' && user?.userType !== 'Professor' && (
-            <button 
-              className={filter === 'conference' ? 'active' : ''} 
-              onClick={() => setFilter('conference')}
-            >
-              Conferences
-            </button>
-          )}
+          <button 
+            className={filter === 'conference' ? 'active' : ''} 
+            onClick={() => setFilter('conference')}
+          >
+            Conferences
+          </button>
+          <button 
+            className={filter === 'booth' ? 'active' : ''} 
+            onClick={() => setFilter('booth')}
+          >
+            Booths
+          </button>
         </div>
       </div>
 
