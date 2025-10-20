@@ -107,6 +107,16 @@ const Signup = () => {
     }
   };
 
+  const handleFileChange = (e) => {
+    const { name, files } = e.target;
+    if (files && files[0]) {
+      setFormData(prev => ({
+        ...prev,
+        [name]: files[0]
+      }));
+    }
+  };
+
 
   const validateForm = () => {
     const newErrors = {};
@@ -149,12 +159,6 @@ const Signup = () => {
       if (!formData.lastName.trim()) {
         newErrors.lastName = 'Last name is required';
       }
-    if (!formData.firstName.trim() && formData.userType !== 'Vendor') {
-      newErrors.firstName = 'First name is required';
-    }
-
-    if (!formData.lastName.trim() && formData.userType !== 'Vendor') {
-      newErrors.lastName = 'Last name is required';
     }
 
     // Employee type validation
@@ -179,7 +183,6 @@ const Signup = () => {
       if (!formData.companyName.trim()) {
         newErrors.companyName = 'Company name is required';
       }
-
     }
 
     setErrors(newErrors);
@@ -277,13 +280,14 @@ const Signup = () => {
           <p className="card-subtitle">Create your account to get started</p>
         </div>
 
-        {message && (
-          <div className={`alert ${message.includes('successfully') ? 'alert-success' : 'alert-error'}`}>
-            {message}
-          </div>
-        )}
+        <div className="card-body">
+          {message && (
+            <div className={`alert ${message.includes('successfully') ? 'alert-success' : 'alert-error'}`}>
+              {message}
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit}>
           {/* Main User Type Selection */}
           <div className="form-group">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
@@ -358,11 +362,6 @@ const Signup = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
                 <label htmlFor="firstName" className="form-label">First Name <span style={{ color: 'red' }}>*</span></label>
-          {/* Personal Information - Hidden for Vendors */}
-          {formData.userType !== 'Vendor' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="form-group">
-                <label htmlFor="firstName" className="form-label">First Name</label>
                 <input
                   type="text"
                   id="firstName"
@@ -378,7 +377,6 @@ const Signup = () => {
 
               <div className="form-group">
                 <label htmlFor="lastName" className="form-label">Last Name <span style={{ color: 'red' }}>*</span></label>
-                <label htmlFor="lastName" className="form-label">Last Name</label>
                 <input
                   type="text"
                   id="lastName"
@@ -618,22 +616,23 @@ const Signup = () => {
               'Create Account'
             )}
           </button>
-        </form>
+          </form>
 
-        <div className="text-center">
-          <p style={{ color: 'var(--text-light)' }}>
-            Already have an account?{' '}
-            <Link 
-              to="/login" 
-              style={{ 
-                color: 'var(--guc-red)', 
-                textDecoration: 'none', 
-                fontWeight: '600' 
-              }}
-            >
-              Sign in here
-            </Link>
-          </p>
+          <div className="text-center">
+            <p style={{ color: 'var(--text-light)' }}>
+              Already have an account?{' '}
+              <Link 
+                to="/login" 
+                style={{ 
+                  color: 'var(--guc-red)', 
+                  textDecoration: 'none', 
+                  fontWeight: '600' 
+                }}
+              >
+                Sign in here
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

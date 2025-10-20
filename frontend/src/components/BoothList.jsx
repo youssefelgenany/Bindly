@@ -317,6 +317,7 @@ const BoothList = ({ booths, bazaarId, onApplyToBooth }) => {
                     </div>
                 ))}
             </div>
+            </div>
         </div>
     );
 };
