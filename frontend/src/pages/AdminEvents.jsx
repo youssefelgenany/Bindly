@@ -326,6 +326,90 @@ const AdminEvents = () => {
                             <div style={{ color: 'var(--text-light)', fontSize: '12px' }}>
                               📍 {event.location} • 👥 {event.registeredCount || 0}/{event.capacity} attendees
                             </div>
+                            
+                            {/* Participating Vendors for Workshops, Booths, and Bazaars */}
+                            {(event.type === 'workshop' || event.type === 'booth' || event.type === 'bazaar') && event.vendors && event.vendors.length > 0 && (
+                              <div style={{ marginTop: '0.5rem' }}>
+                                <div style={{ 
+                                  fontSize: '12px', 
+                                  color: 'var(--guc-blue)', 
+                                  fontWeight: '600',
+                                  marginBottom: '0.5rem'
+                                }}>
+                                  🏪 Participating Vendors ({event.vendors.length})
+                                </div>
+                                <div style={{ 
+                                  display: 'grid', 
+                                  gap: '0.5rem',
+                                  maxHeight: '200px',
+                                  overflowY: 'auto',
+                                  backgroundColor: 'rgba(0, 123, 255, 0.05)',
+                                  padding: '0.5rem',
+                                  borderRadius: '8px',
+                                  border: '1px solid var(--light-blue)'
+                                }}>
+                                  {event.vendors.map((vendor, index) => (
+                                    <div key={vendor.id || index} style={{
+                                      backgroundColor: 'white',
+                                      padding: '0.5rem',
+                                      borderRadius: '6px',
+                                      border: '1px solid var(--light-blue)',
+                                      fontSize: '11px'
+                                    }}>
+                                      <div style={{ fontWeight: '600', color: 'var(--charcoal-black)', marginBottom: '0.25rem' }}>
+                                        {vendor.companyName || vendor.contactName}
+                                      </div>
+                                      <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                        📧 {vendor.email}
+                                      </div>
+                                      {vendor.phone && (
+                                        <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                          📞 {vendor.phone}
+                                        </div>
+                                      )}
+                                      {vendor.contactName && vendor.contactName !== vendor.companyName && (
+                                        <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                          👤 Contact: {vendor.contactName}
+                                        </div>
+                                      )}
+                                      {vendor.boothSize && (
+                                        <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                          📏 {event.type === 'bazaar' ? 'Booth Size' : 'Booth Size'}: {vendor.boothSize}
+                                        </div>
+                                      )}
+                                      {vendor.durationWeeks && (
+                                        <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                          ⏱️ Duration: {vendor.durationWeeks} week{vendor.durationWeeks !== 1 ? 's' : ''}
+                                        </div>
+                                      )}
+                                      {vendor.boothLocation && (
+                                        <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                          📍 {event.type === 'bazaar' ? 'Booth Location' : 'Location'}: {vendor.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                        </div>
+                                      )}
+                                      {vendor.attendees && vendor.attendees.length > 0 && (
+                                        <div style={{ color: 'var(--text-light)', marginBottom: '0.25rem' }}>
+                                          👥 Attendees: {vendor.attendees.length}
+                                          <div style={{ marginLeft: '0.5rem', fontSize: '10px' }}>
+                                            {vendor.attendees.map((attendee, idx) => (
+                                              <div key={idx}>• {attendee.name} ({attendee.email})</div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {vendor.message && (
+                                        <div style={{ color: 'var(--text-light)', fontStyle: 'italic', fontSize: '10px' }}>
+                                          💬 "{vendor.message}"
+                                        </div>
+                                      )}
+                                      <div style={{ color: 'var(--text-light)', fontSize: '10px', marginTop: '0.25rem' }}>
+                                        📅 Applied: {new Date(vendor.joinedAt).toLocaleDateString()}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         <div style={{ textAlign: 'right', display: 'grid', gap: '0.25rem' }}>
                           <div style={{ 
