@@ -39,6 +39,7 @@ const protect = async (req, res, next) => {
   }
 };
 
+// Removed duplicate permit function
 // Normalize role strings for comparison (case-insensitive, unify spacing/underscores)
 function normalizeRole(role) {
   return String(role || '')
