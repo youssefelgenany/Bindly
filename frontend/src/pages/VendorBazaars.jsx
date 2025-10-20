@@ -266,6 +266,9 @@ const VendorBazaars = () => {
                     onSubmit={handleBoothApplicationSubmit}
                 />
             )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
