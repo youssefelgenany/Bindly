@@ -42,19 +42,6 @@ const TripForm = ({ onSubmit, loading = false, initialData = {} }) => {
       </div>
 
       <div className="form-group">
-        <label className="form-label">Location *</label>
-        <input
-          type="text"
-          name="location"
-          className="form-input"
-          value={formData.location}
-          onChange={handleChange}
-          required
-          placeholder="Enter location"
-        />
-      </div>
-
-      <div className="form-group">
         <label className="form-label">Price (EGP) *</label>
         <input
           type="number"
@@ -66,20 +53,6 @@ const TripForm = ({ onSubmit, loading = false, initialData = {} }) => {
           min="0"
           step="0.01"
           placeholder="Enter price"
-        />
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">Capacity (Number of people) *</label>
-        <input
-          type="number"
-          name="capacity"
-          className="form-input"
-          value={formData.capacity}
-          onChange={handleChange}
-          required
-          min="1"
-          placeholder="Enter capacity"
         />
       </div>
 

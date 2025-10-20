@@ -4,7 +4,6 @@ import '../styles/CreateBazaar.css';
 const CreateBooth = () => {
   const [form, setForm] = useState({
     title: '',
-    location: '',
     startDate: '',
     endDate: '',
     boothSize: '',
@@ -40,7 +39,7 @@ const CreateBooth = () => {
     e.preventDefault();
     setMessage('');
 
-    if (!form.title || !form.location || !form.startDate || !form.endDate || !form.boothSize || !form.durationWeeks || !form.boothLocation) {
+    if (!form.title || !form.startDate || !form.endDate || !form.boothSize || !form.durationWeeks || !form.boothLocation) {
       setMessage('Please fill all required fields.');
       return;
     }
@@ -66,7 +65,6 @@ const CreateBooth = () => {
           type: 'booth',
           title: form.title,
           description: form.description,
-          location: form.location,
           startDate: new Date(form.startDate).toISOString(),
           endDate: new Date(form.endDate).toISOString(),
           capacity: 100,
@@ -120,10 +118,6 @@ const CreateBooth = () => {
             <input name="title" className="form-input" value={form.title} onChange={handleChange} required />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Location *</label>
-            <input name="location" className="form-input" value={form.location} onChange={handleChange} required />
-          </div>
 
           <div className="form-row">
             <div className="form-group">

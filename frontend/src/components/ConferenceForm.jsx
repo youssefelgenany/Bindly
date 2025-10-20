@@ -72,31 +72,17 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {} }) => {
         />
       </div>
 
-      <div className="form-row">
-        <div className="form-group">
-          <label className="form-label">Website Link *</label>
-          <input
-            type="url"
-            name="website"
-            className="form-input"
-            value={formData.website}
-            onChange={handleChange}
-            required
-            placeholder="https://example.com"
-          />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Location *</label>
-          <input
-            type="text"
-            name="location"
-            className="form-input"
-            value={formData.location}
-            onChange={handleChange}
-            required
-            placeholder="Conference venue"
-          />
-        </div>
+      <div className="form-group">
+        <label className="form-label">Website Link *</label>
+        <input
+          type="url"
+          name="website"
+          className="form-input"
+          value={formData.website}
+          onChange={handleChange}
+          required
+          placeholder="https://example.com"
+        />
       </div>
 
       <div className="form-row">
@@ -154,18 +140,6 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {} }) => {
         </div>
       </div>
 
-      <div className="form-group">
-        <label className="form-label">Capacity</label>
-        <input
-          type="number"
-          name="capacity"
-          className="form-input"
-          value={formData.capacity}
-          onChange={handleChange}
-          min="0"
-          placeholder="Maximum number of attendees"
-        />
-      </div>
 
       <div className="form-group">
         <label className="form-label">Extra Resources</label>
