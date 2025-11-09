@@ -7,7 +7,9 @@
     "dev": "supervisor server.js",
     "start": "nodemon server.js",
     "lint": "eslint . --ext .js",
-    "lint:fix": "eslint . --ext .js --fix"
+    "lint:fix": "eslint . --ext .js --fix",
+    "create-test-users": "node scripts/create-test-users.js",
+    "create-test-events": "node scripts/create-test-events.js"
   },
   "keywords": [],
   "author": "",
@@ -21,7 +23,7 @@
     "express-validator": "^7.0.1",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.20.0",
-    "mongoose": "^8.19.1",
+    "mongoose": "^7.8.7",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.13"
   },

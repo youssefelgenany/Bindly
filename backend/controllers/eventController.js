@@ -109,16 +109,36 @@ exports.getAllEvents = async (req, res) => {
 
     if (search) {
       const nameRegex = new RegExp(search, 'i');
+      // Build type-specific search conditions
+      const searchConditions = [
+        { title: nameRegex },
+        { name: nameRegex },
+        { description: nameRegex },
+        { location: nameRegex },
+        { 'creator.firstName': nameRegex },
+        { 'creator.lastName': nameRegex },
+      ];
+
+      // For workshops: add professor name search
+      if (!type || type === 'workshop' || type === 'workshops') {
+        searchConditions.push({ professors: nameRegex });
+        searchConditions.push({ faculty: nameRegex });
+      }
+
+      // For conferences: add website and agenda search
+      if (!type || type === 'conference' || type === 'confrence') {
+        searchConditions.push({ website: nameRegex });
+        searchConditions.push({ agenda: nameRegex });
+      }
+
+      // For trips: add price search (as string)
+      if (!type || type === 'trip' || type === 'trips') {
+        searchConditions.push({ price: { $exists: true } }); // Will be filtered later if needed
+      }
+
       pipeline.push({
         $match: {
-          $or: [
-            { title: nameRegex },
-            { name: nameRegex },
-            { description: nameRegex },
-            { location: nameRegex },
-            { 'creator.firstName': nameRegex },
-            { 'creator.lastName': nameRegex },
-          ]
+          $or: searchConditions
         }
       });
     }
@@ -247,7 +267,38 @@ exports.getAllEvents = async (req, res) => {
       return baseEvent;
     }));
 
-    res.json(eventsWithVendors);
+    // Filter bazaars and booths by vendor names if search term is provided
+    let filteredEvents = eventsWithVendors;
+    if (search && (!type || type === 'bazaar' || type === 'bazaars' || type === 'booth' || type === 'booths')) {
+      const searchLower = search.toLowerCase();
+      filteredEvents = eventsWithVendors.filter(e => {
+        // If it's not a bazaar or booth, keep it (already filtered by basic search)
+        if (e.type !== 'bazaar' && e.type !== 'booth') return true;
+        
+        // For bazaars and booths, check if any vendor matches the search
+        const vendorMatches = e.vendors && e.vendors.some(vendor => {
+          const vendorName = (vendor.companyName || vendor.name || vendor.contactName || '').toLowerCase();
+          return vendorName.includes(searchLower);
+        });
+        
+        // Also check basic event fields (already matched in pipeline, but keep for consistency)
+        const eventMatches = 
+          (e.title && e.title.toLowerCase().includes(searchLower)) ||
+          (e.description && e.description.toLowerCase().includes(searchLower)) ||
+          (e.location && e.location.toLowerCase().includes(searchLower));
+        
+        return vendorMatches || eventMatches;
+      });
+    }
+
+    // Ensure events are sorted by startDate (nearest first) after filtering
+    filteredEvents.sort((a, b) => {
+      const dateA = new Date(a.startDate);
+      const dateB = new Date(b.startDate);
+      return dateA - dateB; // Ascending order (nearest date first)
+    });
+
+    res.json(filteredEvents);
   } catch (err) {
     console.error("❌ Error fetching events:", err);
     res.status(500).json({ msg: "Server error" });
@@ -323,7 +374,12 @@ exports.getAllEventsForStudents = async (req, res) => {
             { location: new RegExp(q, "i") },
             { faculty: new RegExp(q, "i") },
             { professors: new RegExp(q, "i") },
-            { creatorFullName: new RegExp(q, "i") }
+            { creatorFullName: new RegExp(q, "i") },
+            // For conferences: search in website and agenda
+            ...(type === 'conference' || !type ? [
+              { website: new RegExp(q, "i") },
+              { agenda: new RegExp(q, "i") }
+            ] : [])
           ]
         }
       }] : []),
@@ -423,9 +479,40 @@ exports.getAllEventsForStudents = async (req, res) => {
       })
     );
 
+    // Filter bazaars and booths by vendor names if search term is provided
+    let filteredEvents = eventsWithVendors;
+    if (q && (type === 'bazaar' || type === 'booth' || !type)) {
+      const searchLower = q.toLowerCase();
+      filteredEvents = eventsWithVendors.filter(e => {
+        // If it's not a bazaar or booth, keep it (already filtered by basic search)
+        if (e.type !== 'bazaar' && e.type !== 'booth') return true;
+        
+        // For bazaars and booths, check if any vendor matches the search
+        const vendorMatches = e.vendors && e.vendors.some(vendor => {
+          const vendorName = (vendor.companyName || '').toLowerCase();
+          return vendorName.includes(searchLower);
+        });
+        
+        // Also check basic event fields (already matched in pipeline, but keep for consistency)
+        const eventMatches = 
+          (e.title && e.title.toLowerCase().includes(searchLower)) ||
+          (e.description && e.description.toLowerCase().includes(searchLower)) ||
+          (e.location && e.location.toLowerCase().includes(searchLower));
+        
+        return vendorMatches || eventMatches;
+      });
+    }
+
+    // Ensure events are sorted by startDate (nearest first) after filtering
+    filteredEvents.sort((a, b) => {
+      const dateA = new Date(a.startDate);
+      const dateB = new Date(b.startDate);
+      return dateA - dateB; // Ascending order (nearest date first)
+    });
+
     res.json({
       success: true,
-      events: eventsWithVendors
+      events: filteredEvents
     });
   } catch (err) {
     console.error("❌ Error fetching events for students:", err);
@@ -447,20 +534,44 @@ exports.getAllEventsForAdmin = async (req, res) => {
     };
 
     if (q) {
-      filter.$or = [
+      const searchConditions = [
         { title: new RegExp(q, "i") },
         { description: new RegExp(q, "i") },
         { location: new RegExp(q, "i") },
       ];
+
+      // For workshops: add professor name and faculty search
+      if (!type || type === 'workshop' || type === 'workshops') {
+        searchConditions.push({ professors: new RegExp(q, "i") });
+        searchConditions.push({ faculty: new RegExp(q, "i") });
+      }
+
+      // For conferences: add website and agenda search
+      if (!type || type === 'conference' || type === 'confrence') {
+        searchConditions.push({ website: new RegExp(q, "i") });
+        searchConditions.push({ agenda: new RegExp(q, "i") });
+      }
+
+      filter.$or = searchConditions;
     }
-    if (type && type !== 'all') filter.type = type;
+    if (type && type !== 'all') {
+      const typeMap = {
+        workshops: 'workshop',
+        trips: 'trip',
+        bazaars: 'bazaar',
+        booths: 'booth',
+        confrence: 'conference',
+        conference: 'conference'
+      };
+      filter.type = typeMap[type] || type;
+    }
     if (status && status !== 'all') filter.status = status;
 
     console.log('🔍 Filter applied:', filter);
 
     const events = await Event.find(filter)
       .populate('createdBy', 'firstName lastName email')
-      .sort({ createdAt: -1 });
+      .sort({ startDate: 1 }); // Sort by startDate ascending (nearest date first)
 
     console.log('📊 Found events:', events.length);
     console.log('📊 Events data:', events);
@@ -527,10 +638,41 @@ exports.getAllEventsForAdmin = async (req, res) => {
       return baseEvent;
     }));
 
+    // Filter bazaars and booths by vendor names if search term is provided
+    let filteredEvents = eventsWithVendors;
+    if (q && (type === 'bazaar' || type === 'bazaars' || type === 'booth' || type === 'booths' || !type)) {
+      const searchLower = q.toLowerCase();
+      filteredEvents = eventsWithVendors.filter(e => {
+        // If it's not a bazaar or booth, keep it (already filtered by basic search)
+        if (e.type !== 'bazaar' && e.type !== 'booth') return true;
+        
+        // For bazaars and booths, check if any vendor matches the search
+        const vendorMatches = e.vendors && e.vendors.some(vendor => {
+          const vendorName = (vendor.companyName || vendor.contactName || '').toLowerCase();
+          return vendorName.includes(searchLower);
+        });
+        
+        // Also check basic event fields (already matched in filter, but keep for consistency)
+        const eventMatches = 
+          (e.title && e.title.toLowerCase().includes(searchLower)) ||
+          (e.description && e.description.toLowerCase().includes(searchLower)) ||
+          (e.location && e.location.toLowerCase().includes(searchLower));
+        
+        return vendorMatches || eventMatches;
+      });
+    }
+
+    // Ensure events are sorted by startDate (nearest first) after filtering
+    filteredEvents.sort((a, b) => {
+      const dateA = new Date(a.startDate);
+      const dateB = new Date(b.startDate);
+      return dateA - dateB; // Ascending order (nearest date first)
+    });
+
     res.status(200).json({
       success: true,
       message: 'Events fetched successfully',
-      events: eventsWithVendors
+      events: filteredEvents
     });
   } catch (err) {
     console.error("❌ Error fetching events for admin:", err);
@@ -722,7 +864,7 @@ exports.getMyEvents = async (req, res) => {
     
     const events = await Event.find({ createdBy: req.user._id })
       .populate('createdBy', 'firstName lastName email')
-      .sort({ createdAt: -1 });
+      .sort({ startDate: 1 }); // Sort by startDate ascending (nearest date first)
 
     console.log('📊 Found professor events:', events.length);
 
