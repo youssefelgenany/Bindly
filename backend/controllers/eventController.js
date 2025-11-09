@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Event = require("../models/eventModel");
 const Registration = require("../models/registrationModel");
 const Trip = require("../models/tripModel");
@@ -170,6 +171,8 @@ exports.getAllEvents = async (req, res) => {
         faculty: 1,
         professors: 1,
         bannerFile: 1,
+        ratings: 1,
+        comments: 1,
         createdBy: {
           _id: '$creator._id',
           firstName: '$creator.firstName',
@@ -184,12 +187,24 @@ exports.getAllEvents = async (req, res) => {
     
     // For bazaars and booths, get vendor information
     const eventsWithVendors = await Promise.all(events.map(async (e) => {
+      // Calculate rating statistics
+      const ratingCount = e.ratings ? e.ratings.length : 0;
+      const averageRating = ratingCount > 0
+        ? parseFloat((e.ratings.reduce((sum, r) => sum + r.rating, 0) / ratingCount).toFixed(2))
+        : 0;
+
+      // Calculate comment count
+      const commentCount = e.comments ? e.comments.length : 0;
+
       const baseEvent = {
         ...e,
         creatorName: e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null,
         creatorRole: e.createdBy ? (e.createdBy.userType || null) : null,
         creatorFirstName: e.createdBy?.firstName || null,
         creatorLastName: e.createdBy?.lastName || null,
+        averageRating,
+        ratingCount,
+        commentCount
       };
 
       // Add vendor information for bazaars and booths
@@ -408,6 +423,8 @@ exports.getAllEventsForStudents = async (req, res) => {
           faculty: 1,
           professors: 1,
           bannerFile: 1,
+          ratings: 1,
+          comments: 1,
           createdBy: {
             _id: '$creator._id',
             firstName: '$creator.firstName',
@@ -468,6 +485,15 @@ exports.getAllEventsForStudents = async (req, res) => {
           }
         }
         
+        // Calculate rating statistics
+        const ratingCount = event.ratings ? event.ratings.length : 0;
+        const averageRating = ratingCount > 0
+          ? parseFloat((event.ratings.reduce((sum, r) => sum + r.rating, 0) / ratingCount).toFixed(2))
+          : 0;
+
+        // Calculate comment count
+        const commentCount = event.comments ? event.comments.length : 0;
+
         return {
           ...event,
           vendors,
@@ -475,6 +501,9 @@ exports.getAllEventsForStudents = async (req, res) => {
           creatorRole: event.createdBy ? (event.createdBy.userType || null) : null,
           creatorFirstName: event.createdBy?.firstName || null,
           creatorLastName: event.createdBy?.lastName || null,
+          averageRating,
+          ratingCount,
+          commentCount
         };
       })
     );
@@ -579,6 +608,18 @@ exports.getAllEventsForAdmin = async (req, res) => {
     // Add vendor information for workshops and booths
     const eventsWithVendors = await Promise.all(events.map(async (event) => {
       const baseEvent = event.toObject();
+      
+      // Calculate rating statistics
+      const ratingCount = baseEvent.ratings ? baseEvent.ratings.length : 0;
+      const averageRating = ratingCount > 0
+        ? parseFloat((baseEvent.ratings.reduce((sum, r) => sum + r.rating, 0) / ratingCount).toFixed(2))
+        : 0;
+      baseEvent.averageRating = averageRating;
+      baseEvent.ratingCount = ratingCount;
+      
+      // Calculate comment count
+      const commentCount = baseEvent.comments ? baseEvent.comments.length : 0;
+      baseEvent.commentCount = commentCount;
       
       // Add vendor information for workshops, booths, and bazaars
       if (event.type === 'workshop' || event.type === 'booth' || event.type === 'bazaar') {
@@ -686,9 +727,41 @@ exports.getAllEventsForAdmin = async (req, res) => {
 // 🔍 Get a single event by ID
 exports.getEventById = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id);
+    const event = await Event.findById(req.params.id)
+      .populate('ratings.user', 'firstName lastName email userType')
+      .populate('comments.user', 'firstName lastName email userType');
+    
     if (!event) return res.status(404).json({ msg: "Event not found" });
-    res.json(event);
+    
+    // Calculate rating statistics
+    const ratingCount = event.ratings ? event.ratings.length : 0;
+    const averageRating = ratingCount > 0
+      ? parseFloat((event.ratings.reduce((sum, r) => sum + r.rating, 0) / ratingCount).toFixed(2))
+      : 0;
+    
+    // Calculate comment count
+    const commentCount = event.comments ? event.comments.length : 0;
+    
+    // Format comments with user info
+    const formattedComments = event.comments ? event.comments.map(comment => ({
+      _id: comment._id,
+      user: {
+        _id: comment.user._id,
+        name: `${comment.user.firstName || ''} ${comment.user.lastName || ''}`.trim(),
+        email: comment.user.email,
+        userType: comment.user.userType
+      },
+      text: comment.text,
+      createdAt: comment.createdAt
+    })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) : [];
+    
+    const eventObj = event.toObject();
+    eventObj.averageRating = averageRating;
+    eventObj.ratingCount = ratingCount;
+    eventObj.commentCount = commentCount;
+    eventObj.comments = formattedComments;
+    
+    res.json(eventObj);
   } catch (err) {
     console.error("❌ Error fetching event:", err);
     res.status(500).json({ msg: "Server error" });
@@ -927,6 +1000,448 @@ exports.getEventRegistrations = async (req, res) => {
     res.status(500).json({ 
       success: false,
       message: "Server error" 
+    });
+  }
+};
+
+// ⭐ Submit or update a rating for an event
+exports.submitRating = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rating } = req.body;
+    const userId = req.user._id;
+
+    console.log('⭐ Submit rating request:', {
+      eventId: id,
+      userId: userId,
+      body: req.body,
+      rating: rating,
+      ratingType: typeof rating
+    });
+
+    // Validate rating
+    if (rating === undefined || rating === null) {
+      console.log('❌ Rating is missing');
+      return res.status(400).json({ 
+        success: false,
+        msg: "Rating is required. Please provide 'rating' field in request body (1-5)." 
+      });
+    }
+
+    // Convert to number if it's a string
+    const ratingNum = typeof rating === 'string' ? parseInt(rating, 10) : Number(rating);
+
+    if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+      console.log('❌ Invalid rating value:', rating);
+      return res.status(400).json({ 
+        success: false,
+        msg: "Rating must be a number between 1 and 5" 
+      });
+    }
+
+    // Validate event ID format
+    if (!id || typeof id !== 'string') {
+      console.log('❌ Event ID is missing or not a string:', id);
+      return res.status(400).json({ 
+        success: false,
+        msg: "Event ID is required and must be a string" 
+      });
+    }
+
+    if (id.length !== 24) {
+      console.log('❌ Invalid event ID length:', id.length, 'Expected: 24');
+      return res.status(400).json({ 
+        success: false,
+        msg: `Invalid event ID format. Expected 24 characters, got ${id.length}. Please use a valid MongoDB ObjectId.` 
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      console.log('❌ Invalid event ID format:', id);
+      return res.status(400).json({ 
+        success: false,
+        msg: "Invalid event ID format. Please use a valid MongoDB ObjectId (24 hexadecimal characters)." 
+      });
+    }
+
+    // Check if event exists
+    let event;
+    try {
+      event = await Event.findById(id);
+    } catch (findError) {
+      console.error('❌ Error finding event:', findError);
+      return res.status(400).json({ 
+        success: false,
+        msg: "Invalid event ID format",
+        error: findError.message 
+      });
+    }
+
+    if (!event) {
+      console.log('❌ Event not found:', id);
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Initialize ratings array if it doesn't exist
+    if (!event.ratings) {
+      event.ratings = [];
+    }
+
+    // Check if user has already rated this event
+    const existingRatingIndex = event.ratings.findIndex(
+      r => r.user && r.user.toString() === userId.toString()
+    );
+
+    if (existingRatingIndex !== -1) {
+      // Update existing rating
+      event.ratings[existingRatingIndex].rating = ratingNum;
+      event.ratings[existingRatingIndex].createdAt = new Date();
+      console.log('✅ Updating existing rating');
+    } else {
+      // Add new rating
+      event.ratings.push({
+        user: userId,
+        rating: ratingNum,
+        createdAt: new Date()
+      });
+      console.log('✅ Adding new rating');
+    }
+
+    await event.save();
+
+    // Calculate average rating
+    const averageRating = event.ratings.length > 0
+      ? (event.ratings.reduce((sum, r) => sum + (r.rating || 0), 0) / event.ratings.length).toFixed(2)
+      : 0;
+
+    const savedRating = event.ratings[existingRatingIndex !== -1 ? existingRatingIndex : event.ratings.length - 1];
+
+    console.log('✅ Rating submitted successfully');
+
+    res.status(200).json({
+      success: true,
+      msg: existingRatingIndex !== -1 ? "Rating updated successfully" : "Rating submitted successfully",
+      rating: {
+        user: userId,
+        rating: ratingNum,
+        createdAt: savedRating.createdAt
+      },
+      averageRating: parseFloat(averageRating),
+      totalRatings: event.ratings.length
+    });
+  } catch (err) {
+    console.error("❌ Error submitting rating:", err);
+    console.error("❌ Error stack:", err.stack);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message 
+    });
+  }
+};
+
+// ⭐ Get all ratings for an event
+exports.getEventRatings = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const event = await Event.findById(id)
+      .populate('ratings.user', 'firstName lastName email userType')
+      .select('ratings');
+
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Calculate average rating
+    const averageRating = event.ratings.length > 0
+      ? (event.ratings.reduce((sum, r) => sum + r.rating, 0) / event.ratings.length).toFixed(2)
+      : 0;
+
+    // Format ratings with user info
+    const formattedRatings = event.ratings.map(r => ({
+      _id: r._id,
+      user: {
+        _id: r.user._id,
+        name: `${r.user.firstName || ''} ${r.user.lastName || ''}`.trim(),
+        email: r.user.email,
+        userType: r.user.userType
+      },
+      rating: r.rating,
+      createdAt: r.createdAt
+    }));
+
+    res.status(200).json({
+      success: true,
+      ratings: formattedRatings,
+      averageRating: parseFloat(averageRating),
+      totalRatings: event.ratings.length
+    });
+  } catch (err) {
+    console.error("❌ Error fetching event ratings:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error" 
+    });
+  }
+};
+
+// ⭐ Get current user's rating for an event
+exports.getUserRating = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const event = await Event.findById(id).select('ratings');
+
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    const userRating = event.ratings.find(
+      r => r.user.toString() === userId.toString()
+    );
+
+    if (!userRating) {
+      return res.status(200).json({
+        success: true,
+        hasRated: false,
+        rating: null
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      hasRated: true,
+      rating: {
+        _id: userRating._id,
+        rating: userRating.rating,
+        createdAt: userRating.createdAt
+      }
+    });
+  } catch (err) {
+    console.error("❌ Error fetching user rating:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error" 
+    });
+  }
+};
+
+// 💬 Submit a comment on an event
+exports.submitComment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { text } = req.body;
+    const userId = req.user._id;
+
+    console.log('💬 Submit comment request:', {
+      eventId: id,
+      userId: userId,
+      body: req.body,
+      text: text,
+      textType: typeof text
+    });
+
+    // Validate comment text
+    if (text === undefined || text === null) {
+      console.log('❌ Comment text is missing');
+      return res.status(400).json({ 
+        success: false,
+        msg: "Comment text is required. Please provide 'text' field in request body." 
+      });
+    }
+
+    if (typeof text !== 'string') {
+      console.log('❌ Comment text is not a string:', typeof text);
+      return res.status(400).json({ 
+        success: false,
+        msg: "Comment text must be a string" 
+      });
+    }
+
+    if (text.trim().length === 0) {
+      console.log('❌ Comment text is empty');
+      return res.status(400).json({ 
+        success: false,
+        msg: "Comment text cannot be empty" 
+      });
+    }
+
+    if (text.trim().length > 1000) {
+      console.log('❌ Comment text is too long:', text.trim().length);
+      return res.status(400).json({ 
+        success: false,
+        msg: "Comment must be 1000 characters or less" 
+      });
+    }
+
+    // Check if event exists
+    const event = await Event.findById(id);
+    if (!event) {
+      console.log('❌ Event not found:', id);
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Initialize comments array if it doesn't exist
+    if (!event.comments) {
+      event.comments = [];
+    }
+
+    // Add new comment
+    const newComment = {
+      user: userId,
+      text: text.trim(),
+      createdAt: new Date()
+    };
+
+    event.comments.push(newComment);
+    await event.save();
+
+    // Populate user info for the response
+    await event.populate('comments.user', 'firstName lastName email userType');
+
+    const addedComment = event.comments[event.comments.length - 1];
+
+    console.log('✅ Comment submitted successfully');
+
+    res.status(201).json({
+      success: true,
+      msg: "Comment submitted successfully",
+      comment: {
+        _id: addedComment._id,
+        user: {
+          _id: addedComment.user._id,
+          name: `${addedComment.user.firstName || ''} ${addedComment.user.lastName || ''}`.trim(),
+          email: addedComment.user.email,
+          userType: addedComment.user.userType
+        },
+        text: addedComment.text,
+        createdAt: addedComment.createdAt
+      },
+      totalComments: event.comments.length
+    });
+  } catch (err) {
+    console.error("❌ Error submitting comment:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message 
+    });
+  }
+};
+
+// 💬 Get all comments for an event
+exports.getEventComments = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const event = await Event.findById(id)
+      .populate('comments.user', 'firstName lastName email userType')
+      .select('comments');
+
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Format comments with user info
+    const formattedComments = event.comments.map(comment => ({
+      _id: comment._id,
+      user: {
+        _id: comment.user._id,
+        name: `${comment.user.firstName || ''} ${comment.user.lastName || ''}`.trim(),
+        email: comment.user.email,
+        userType: comment.user.userType
+      },
+      text: comment.text,
+      createdAt: comment.createdAt
+    }));
+
+    // Sort comments by creation date (newest first)
+    formattedComments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.status(200).json({
+      success: true,
+      comments: formattedComments,
+      totalComments: event.comments.length
+    });
+  } catch (err) {
+    console.error("❌ Error fetching event comments:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error" 
+    });
+  }
+};
+
+// 💬 Delete a comment
+exports.deleteComment = async (req, res) => {
+  try {
+    const { id, commentId } = req.params;
+    const userId = req.user._id;
+
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Find the comment
+    const commentIndex = event.comments.findIndex(
+      c => c._id.toString() === commentId
+    );
+
+    if (commentIndex === -1) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Comment not found" 
+      });
+    }
+
+    const comment = event.comments[commentIndex];
+
+    // Check if user owns the comment or is admin/event office
+    const isOwner = comment.user.toString() === userId.toString();
+    const isAdmin = req.user.userType === 'Admin' || req.user.userType === 'event_office' || req.user.userType === 'Event Office';
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ 
+        success: false,
+        msg: "You can only delete your own comments" 
+      });
+    }
+
+    // Remove the comment
+    event.comments.splice(commentIndex, 1);
+    await event.save();
+
+    res.status(200).json({
+      success: true,
+      msg: "Comment deleted successfully",
+      totalComments: event.comments.length
+    });
+  } catch (err) {
+    console.error("❌ Error deleting comment:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error" 
     });
   }
 };
