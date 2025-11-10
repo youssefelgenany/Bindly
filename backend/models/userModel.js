@@ -138,9 +138,14 @@ userSchema.pre('save', function(next) {
   try {
     if (this.isNew) {
       if (this.userType === 'Student') {
-        // Students: verified and active
-        this.isVerified = true;
-        this.status = 'active';
+        // Students: unverified and blocked until email verification
+        // Only set if not already explicitly set (to allow manual override)
+        if (this.isVerified === undefined) {
+          this.isVerified = false;
+        }
+        if (this.status === undefined || this.status === 'blocked') {
+          this.status = 'blocked';
+        }
       } else if (['TA', 'Staff', 'Professor'].includes(this.userType)) {
         // TA/Staff/Professor: unverified but active
         this.isVerified = false;

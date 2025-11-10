@@ -11,14 +11,9 @@ const {
   registerForEvent,
   getMyRegistrations,
   getMyEvents,
+  getMyWorkshops,
   getEventRegistrations,
-  createConference,
-  submitRating,
-  getEventRatings,
-  getUserRating,
-  submitComment,
-  getEventComments,
-  deleteComment
+  createConference
 } = require("../controllers/eventController");
 
 const { protect, permit } = require("../middleware/authMiddleware");
@@ -48,16 +43,11 @@ router.get("/my/registrations", protect, getMyRegistrations);
 // 🎓 Get events created by the logged-in professor
 router.get("/my/events", protect, permit("Professor"), getMyEvents);
 
+// 🎓 Get workshops created by the logged-in professor
+router.get("/my/workshops", protect, permit("Professor"), getMyWorkshops);
+
 // 👥 Get registrations for a specific event (for event creators)
 router.get("/:id/registrations", protect, getEventRegistrations);
-
-// 💬 Comment routes (must come before /:id route)
-// Get all comments for an event
-router.get(
-  "/:id/comments",
-  protect,
-  getEventComments
-);
 
 // 🔍 Get a specific event by its ID
 router.get("/:id", protect, getEventById);
@@ -92,46 +82,6 @@ router.post(
   protect,
   permit("event_office", "admin"),
   createConference
-);
-
-// ⭐ Rating routes
-// Submit or update a rating for an event (Student, Staff, TA, Professor)
-router.post(
-  "/:id/rating",
-  protect,
-  permit("Student", "Staff", "TA", "Professor"),
-  submitRating
-);
-
-// Get all ratings for an event
-router.get(
-  "/:id/ratings",
-  protect,
-  getEventRatings
-);
-
-// Get current user's rating for an event
-router.get(
-  "/:id/my-rating",
-  protect,
-  permit("Student", "Staff", "TA", "Professor"),
-  getUserRating
-);
-
-// 💬 Comment routes
-// Submit a comment on an event (Student, Staff, TA, Professor)
-router.post(
-  "/:id/comments",
-  protect,
-  permit("Student", "Staff", "TA", "Professor"),
-  submitComment
-);
-
-// Delete a comment (owner or admin)
-router.delete(
-  "/:id/comments/:commentId",
-  protect,
-  deleteComment
 );
 
 module.exports = router;
