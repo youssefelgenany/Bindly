@@ -105,6 +105,31 @@ const userSchema = new mongoose.Schema({
   favoriteEvents: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Event'
+  }],
+  // Wallet balance for payments
+  walletBalance: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  // Wallet transaction history
+  walletTransactions: [{
+    amount: {
+      type: Number,
+      required: true
+    },
+    type: {
+      type: String,
+      enum: ['topup', 'payment', 'refund'],
+      required: true
+    },
+    description: String,
+    balanceAfter: Number,
+    reference: String, // Payment ID or registration ID
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
   }]
 });
 

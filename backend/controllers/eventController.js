@@ -1,9 +1,24 @@
 const Event = require("../models/eventModel");
 const Registration = require("../models/registrationModel");
+const StudentRegistration = require("../models/studentRegistrationModel");
 const Trip = require("../models/tripModel");
 const VendorRequest = require("../models/vendorRequest");
 const User = require("../models/userModel");
-const StudentRegistration = require("../models/studentRegistrationModel");
+const Payment = require("../models/paymentModel");
+const { sendReceiptEmail } = require("../utils/sendReceiptEmail");
+const { sendRefundEmail } = require("../utils/sendRefundEmail");
+
+// Initialize Stripe if secret key is available
+let stripe = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  try {
+    stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  } catch (error) {
+    console.warn('⚠️ Stripe package not installed. Run: npm install stripe');
+  }
+} else {
+  console.warn('⚠️ STRIPE_SECRET_KEY not configured. Card payments will be disabled.');
+}
 // 🎯 Create a new event (Admin or Event Office)
 exports.createEvent = async (req, res) => {
   try {
@@ -1076,6 +1091,518 @@ exports.getFavoriteEvents = async (req, res) => {
     res.status(500).json({ 
       success: false,
       msg: "Server error" 
+    });
+  }
+};
+
+// Helper function to deduct from wallet
+async function deductWallet(userId, amount, description, reference) {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  
+  if (user.walletBalance < amount) {
+    throw new Error('Insufficient wallet balance');
+  }
+  
+  user.walletBalance -= amount;
+  
+  // Add transaction record
+  const walletTransaction = {
+    amount: -amount, // Negative for payment
+    type: 'payment',
+    description: description || 'Payment for event registration',
+    balanceAfter: user.walletBalance,
+    reference: reference || '',
+    createdAt: new Date()
+  };
+  user.walletTransactions.push(walletTransaction);
+  
+  await user.save();
+  return user.walletBalance;
+}
+
+// Helper function to create Stripe session
+async function createStripeSession(event, user) {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
+  
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+  const amountInCents = Math.round(event.price * 100); // Convert to cents
+  
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price_data: {
+          currency: 'egp',
+          product_data: {
+            name: event.title || event.name,
+            description: event.description || `Payment for ${event.type}`,
+          },
+          unit_amount: amountInCents,
+        },
+        quantity: 1,
+      },
+    ],
+    mode: 'payment',
+    success_url: `${clientUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${clientUrl}/payment-cancelled`,
+    customer_email: user.email,
+    metadata: {
+      userId: user._id.toString(),
+      eventId: event._id.toString(),
+      eventTitle: event.title || event.name,
+    },
+  });
+  
+  return session;
+}
+
+// 💳 Pay for an event
+exports.payForEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paymentMethod } = req.body;
+    const userId = req.user._id;
+
+    if (!paymentMethod || !['wallet', 'card'].includes(paymentMethod)) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Payment method must be 'wallet' or 'card'" 
+      });
+    }
+
+    // Find the event
+    let event = await Event.findById(id);
+    let isTrip = false;
+    
+    // If not found, try Trip
+    if (!event) {
+      const trip = await Trip.findById(id);
+      if (trip) {
+        event = trip;
+        isTrip = true;
+      }
+    }
+
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Check if event has a price
+    const amount = event.price || 0;
+    if (amount <= 0) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "This event is free. No payment required." 
+      });
+    }
+
+    // Check if user is registered for this event
+    // Try Registration model first
+    let registration = await Registration.findOne({ 
+      event: id, 
+      user: userId 
+    });
+
+    // If not found, try StudentRegistration
+    if (!registration) {
+      const userDoc = await User.findById(userId);
+      if (userDoc && userDoc.email) {
+        registration = await StudentRegistration.findOne({
+          event: id,
+          studentEmail: userDoc.email.toLowerCase()
+        });
+      }
+    }
+
+    if (!registration) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "You are not registered for this event" 
+      });
+    }
+
+    // Check if already paid
+    if (registration.paid) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Payment already completed for this registration" 
+      });
+    }
+
+    // Get user details
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "User not found" 
+      });
+    }
+
+    // Handle wallet payment
+    if (paymentMethod === 'wallet') {
+      try {
+        const eventTitle = event.title || event.name || 'Event';
+        const paymentDescription = `Payment for ${eventTitle}`;
+        
+        // Create payment record first to get payment ID
+        const payment = await Payment.create({
+          user: userId,
+          event: id,
+          amount: amount,
+          paymentMethod: 'wallet',
+          status: 'success'
+        });
+
+        // Deduct from wallet with transaction record
+        const newBalance = await deductWallet(
+          userId, 
+          amount, 
+          paymentDescription,
+          payment._id.toString()
+        );
+        
+        // Mark registration as paid
+        registration.paid = true;
+        await registration.save();
+
+        // Send receipt email
+        const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
+        await sendReceiptEmail(
+          user.email,
+          userName,
+          eventTitle,
+          amount,
+          'wallet',
+          new Date()
+        );
+
+        return res.status(200).json({
+          success: true,
+          msg: "Payment completed successfully using wallet",
+          payment: {
+            id: payment._id,
+            amount: amount,
+            method: 'wallet',
+            status: 'success'
+          },
+          walletBalance: newBalance
+        });
+      } catch (error) {
+        if (error.message === 'Insufficient wallet balance') {
+          return res.status(400).json({ 
+            success: false,
+            msg: "Insufficient wallet balance" 
+          });
+        }
+        throw error;
+      }
+    }
+
+    // Handle card payment with Stripe
+    if (paymentMethod === 'card') {
+      if (!stripe) {
+        return res.status(500).json({ 
+          success: false,
+          msg: "Card payments are not available. Stripe is not configured." 
+        });
+      }
+
+      try {
+        const session = await createStripeSession(event, user);
+        
+        // Create pending payment record
+        const payment = await Payment.create({
+          user: userId,
+          event: id,
+          amount: amount,
+          paymentMethod: 'card',
+          status: 'pending',
+          stripeSessionId: session.id
+        });
+
+        return res.status(200).json({
+          success: true,
+          msg: "Stripe checkout session created",
+          sessionId: session.id,
+          sessionUrl: session.url,
+          payment: {
+            id: payment._id,
+            amount: amount,
+            method: 'card',
+            status: 'pending'
+          }
+        });
+      } catch (error) {
+        console.error('❌ Stripe session creation error:', error);
+        return res.status(500).json({ 
+          success: false,
+          msg: "Failed to create payment session",
+          error: error.message 
+        });
+      }
+    }
+
+  } catch (err) {
+    console.error("❌ Error processing payment:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message 
+    });
+  }
+};
+
+// 🚫 Cancel event registration and process refund
+exports.cancelRegistration = async (req, res) => {
+  try {
+    const { id } = req.params; // event ID
+    const userId = req.user._id;
+
+    console.log('🚫 Cancellation request for event:', id, 'by user:', userId);
+
+    // Find the event
+    let event = await Event.findById(id);
+    let isTrip = false;
+    
+    if (!event) {
+      const trip = await Trip.findById(id);
+      if (trip) {
+        event = trip;
+        isTrip = true;
+      }
+    }
+
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Check if cancellation is allowed (at least 2 weeks before event)
+    const eventStartDate = event.startDate;
+    if (!eventStartDate) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Event start date is not set" 
+      });
+    }
+
+    const now = new Date();
+    const startDate = new Date(eventStartDate);
+    const daysUntilEvent = Math.ceil((startDate - now) / (1000 * 60 * 60 * 24)); // Convert to days
+
+    // Check if event has already started
+    if (daysUntilEvent < 0) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Cannot cancel registration for an event that has already started or passed.",
+        daysUntilEvent: daysUntilEvent,
+        eventStartDate: startDate
+      });
+    }
+
+    // Check if at least 2 weeks (14 days) remain
+    if (daysUntilEvent < 14) {
+      return res.status(400).json({ 
+        success: false,
+        msg: `Cancellation is only allowed if there are at least 2 weeks remaining until the event. The event starts in ${daysUntilEvent} day(s).`,
+        daysUntilEvent: daysUntilEvent,
+        eventStartDate: startDate,
+        minimumDaysRequired: 14
+      });
+    }
+
+    console.log(`✅ Cancellation allowed. Event starts in ${daysUntilEvent} days.`);
+
+    // Find registration - try Registration model first
+    let registration = await Registration.findOne({ 
+      event: id, 
+      user: userId 
+    });
+    let registrationType = 'registration';
+
+    // If not found, try StudentRegistration
+    if (!registration) {
+      const userDoc = await User.findById(userId);
+      if (userDoc && userDoc.email) {
+        registration = await StudentRegistration.findOne({
+          event: id,
+          studentEmail: userDoc.email.toLowerCase()
+        });
+        registrationType = 'student';
+      }
+    }
+
+    if (!registration) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "You are not registered for this event" 
+      });
+    }
+
+    // Check if already cancelled
+    if (registration.status === 'cancelled') {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Registration is already cancelled" 
+      });
+    }
+
+    // Get user details
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "User not found" 
+      });
+    }
+
+    // Process refund if payment was made
+    let refundAmount = 0;
+    let refundProcessed = false;
+
+    if (registration.paid) {
+      // Find the payment record
+      const payment = await Payment.findOne({
+        user: userId,
+        event: id,
+        status: 'success'
+      }).sort({ createdAt: -1 }); // Get the most recent successful payment
+
+      if (payment) {
+        refundAmount = payment.amount;
+        
+        // Refund to wallet
+        console.log('💰 Processing refund of', refundAmount, 'EGP to wallet...');
+        user.walletBalance += refundAmount;
+        
+        // Add transaction record
+        const walletTransaction = {
+          amount: refundAmount,
+          type: 'refund',
+          description: `Refund for cancelled registration: ${event.title || event.name || 'Event'}`,
+          balanceAfter: user.walletBalance,
+          reference: payment._id.toString(),
+          createdAt: new Date()
+        };
+        user.walletTransactions.push(walletTransaction);
+        await user.save();
+        
+        // Update payment status to refunded
+        payment.status = 'refunded';
+        await payment.save();
+        
+        refundProcessed = true;
+        console.log('✅ Refund processed. New wallet balance:', user.walletBalance);
+      } else {
+        console.warn('⚠️ Payment record not found, but registration marked as paid');
+        // Still process cancellation even if payment record not found
+      }
+    }
+
+    // Update registration status to cancelled
+    registration.status = 'cancelled';
+    registration.paid = false; // Reset paid status
+    await registration.save();
+
+    // Send refund email if refund was processed
+    if (refundProcessed && refundAmount > 0) {
+      const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
+      const eventTitle = event.title || event.name || 'Event';
+      
+      try {
+        const emailResult = await sendRefundEmail(
+          user.email,
+          userName,
+          eventTitle,
+          refundAmount,
+          new Date()
+        );
+        if (emailResult.sent) {
+          console.log('✅ Refund email sent successfully');
+        } else {
+          console.error('❌ Refund email not sent:', emailResult.reason || emailResult.error);
+        }
+      } catch (emailError) {
+        console.error('❌ Exception while sending refund email:', emailError);
+        // Don't fail the cancellation if email fails
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      msg: "Registration cancelled successfully",
+      refundProcessed: refundProcessed,
+      refundAmount: refundAmount,
+      walletBalance: user.walletBalance,
+      registration: {
+        id: registration._id,
+        status: registration.status,
+        eventTitle: event.title || event.name
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Error cancelling registration:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message 
+    });
+  }
+};
+
+// 💰 Get wallet transactions for the logged-in user
+exports.getWalletTransactions = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const user = await User.findById(userId).select('walletBalance walletTransactions');
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "User not found" 
+      });
+    }
+
+    // Sort transactions by date (newest first)
+    const transactions = (user.walletTransactions || []).sort((a, b) => {
+      const dateA = a.createdAt || new Date(0);
+      const dateB = b.createdAt || new Date(0);
+      return dateB - dateA;
+    });
+
+    return res.status(200).json({
+      success: true,
+      walletBalance: user.walletBalance || 0,
+      transactions: transactions.map(tx => ({
+        id: tx._id,
+        amount: tx.amount,
+        type: tx.type,
+        description: tx.description,
+        balanceAfter: tx.balanceAfter,
+        reference: tx.reference,
+        createdAt: tx.createdAt
+      })),
+      count: transactions.length
+    });
+
+  } catch (err) {
+    console.error("❌ Error fetching wallet transactions:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message 
     });
   }
 };

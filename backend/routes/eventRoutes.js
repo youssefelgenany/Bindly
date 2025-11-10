@@ -17,8 +17,12 @@ const {
   createConference,
   addToFavorites,
   removeFromFavorites,
-  getFavoriteEvents
+  getFavoriteEvents,
+  payForEvent,
+  cancelRegistration,
+  getWalletTransactions
 } = require("../controllers/eventController");
+const { verifyPayment } = require("../controllers/paymentVerificationController");
 
 const { protect, permit } = require("../middleware/authMiddleware");
 
@@ -89,6 +93,44 @@ router.post(
   protect,
   permit("Student", "Staff", "TA", "Professor"),
   registerForEvent
+);
+
+// 💳 Pay for an event (Student, Staff, TA, or Professor)
+router.post(
+  "/:id/pay",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  payForEvent
+);
+
+// ✅ Confirm Stripe payment success (callback after redirect - public route)
+router.get(
+  "/payment-success",
+  require("../controllers/stripeSuccessController")
+);
+
+// 🔍 Manual payment verification endpoint (for testing/debugging)
+router.get(
+  "/verify-payment",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  verifyPayment
+);
+
+// 🚫 Cancel event registration and get refund
+router.post(
+  "/:id/cancel",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  cancelRegistration
+);
+
+// 💰 Get wallet transactions
+router.get(
+  "/wallet/transactions",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  getWalletTransactions
 );
 
 // Route to create a conference (protected, e.g. admin/event office only)
