@@ -20,6 +20,10 @@ const registrationSchema = new mongoose.Schema({
     enum: ['pending', 'approved', 'rejected', 'cancelled'],
     default: 'approved',
   },
+  paid: {
+    type: Boolean,
+    default: false
+  },
   registeredAt: {
     type: Date,
     default: Date.now,
