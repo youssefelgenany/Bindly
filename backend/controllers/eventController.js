@@ -3,6 +3,7 @@ const Registration = require("../models/registrationModel");
 const Trip = require("../models/tripModel");
 const VendorRequest = require("../models/vendorRequest");
 const User = require("../models/userModel");
+const StudentRegistration = require("../models/studentRegistrationModel");
 // 🎯 Create a new event (Admin or Event Office)
 exports.createEvent = async (req, res) => {
   try {
@@ -813,6 +814,86 @@ exports.getEventRegistrations = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error fetching event registrations:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error" 
+    });
+  }
+};
+
+// 🎓 Get workshop participants (for professors who created the workshop)
+exports.getWorkshopParticipants = async (req, res) => {
+  try {
+    const { workshopId } = req.params;
+    console.log('🎓 Professor requesting participants for workshop:', workshopId);
+    console.log('🎓 Professor ID:', req.user._id);
+    
+    // Verify the workshop exists and is a workshop
+    const workshop = await Event.findById(workshopId);
+    if (!workshop) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Workshop not found' 
+      });
+    }
+    
+    // Verify it's a workshop
+    if (workshop.type !== 'workshop') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'This endpoint is only for workshops' 
+      });
+    }
+    
+    // Verify the professor created this workshop
+    if (workshop.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'You can only view participants for workshops you created' 
+      });
+    }
+    
+    // Get all student registrations for this workshop
+    const participants = await StudentRegistration.find({ 
+      event: workshopId,
+      eventType: 'workshop'
+    })
+      .sort({ registeredAt: -1 })
+      .lean();
+    
+    console.log('📊 Found participants:', participants.length);
+    
+    // Calculate remaining spots
+    const totalCapacity = workshop.capacity || 0;
+    const currentRegistrations = participants.length;
+    const remainingSpots = Math.max(0, totalCapacity - currentRegistrations);
+    
+    // Format participants data
+    const formattedParticipants = participants.map(participant => ({
+      id: participant._id,
+      studentName: participant.studentName,
+      studentId: participant.studentId,
+      studentEmail: participant.studentEmail,
+      status: participant.status,
+      registeredAt: participant.registeredAt,
+      createdAt: participant.createdAt
+    }));
+    
+    res.status(200).json({
+      success: true,
+      message: 'Workshop participants fetched successfully',
+      workshop: {
+        id: workshop._id,
+        title: workshop.title,
+        capacity: totalCapacity,
+        currentRegistrations: currentRegistrations,
+        remainingSpots: remainingSpots
+      },
+      participants: formattedParticipants,
+      count: formattedParticipants.length
+    });
+  } catch (err) {
+    console.error("❌ Error fetching workshop participants:", err);
     res.status(500).json({ 
       success: false,
       message: "Server error" 

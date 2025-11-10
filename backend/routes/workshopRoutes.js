@@ -9,8 +9,13 @@ const {
   deleteWorkshop,
   approveWorkshop,
   rejectWorkshop,
-  requestEdits
+  requestEdits,
+  getWorkshopParticipants
 } = require('../controllers/workshopController');
+
+
+// Professor view participants
+router.get('/:id/participants', protect, permit('Professor'), getWorkshopParticipants);
 
 // Professor routes (require professor-id header)
 router.get('/my-workshops', getMyWorkshops);

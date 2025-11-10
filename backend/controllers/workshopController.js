@@ -126,6 +126,60 @@ const requestEdits = async (req, res) => {
     res.status(400).json({ error: 'Failed to request edits' });
   }
 };
+const StudentRegistration = require('../models/studentRegistrationModel');
+
+const mongoose = require('mongoose');
+// Professor: view participants for their own workshop
+const getWorkshopParticipants = async (req, res) => {
+  try {
+    if (req.user.userType !== 'Professor') {
+      return res.status(403).json({ error: 'Only professors can view participants' });
+    }
+
+    const workshopId = req.params.id;
+    const professorId = req.user._id;
+    
+    console.log('Professor ID from JWT:', professorId);
+    console.log('Requested Workshop ID:', workshopId);
+    // Verify the workshop belongs to this professor
+    const workshop = await Workshop.findOne({
+      _id: new mongoose.Types.ObjectId(workshopId),
+      professorId: new mongoose.Types.ObjectId(req.user._id)
+    });
+
+    if (!workshop) {
+      console.log('Workshop not found or professor mismatch');
+      return res.status(404).json({ error: 'Workshop not found or not authorized' });
+    }
+
+    // Get participants
+    const participants = await StudentRegistration.find({ workshopId: workshop._id  });
+
+    // Calculate remaining spots
+    const remainingSpots = workshop.capacity - participants.length;
+
+    // Format response
+    res.json({
+      workshopSummary: {
+        title: workshop.title,
+        capacity: workshop.capacity,
+        currentRegistrations: participants.length,
+        remainingSpots: remainingSpots < 0 ? 0 : remainingSpots
+      },
+      participants: participants.map(p => ({
+        name: p.studentName,
+        studentId: p.studentId,
+        email: p.studentEmail,
+        status: p.status,
+        registrationDate: p.createdAt
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching participants:', err.message);
+    res.status(500).json({ error: 'Failed to fetch participants', details: err.message });
+  }
+};
+
 
 module.exports = {
   getAllWorkshops,
@@ -135,5 +189,6 @@ module.exports = {
   deleteWorkshop,
   approveWorkshop,
   rejectWorkshop,
-  requestEdits
+  requestEdits,
+  getWorkshopParticipants
 };

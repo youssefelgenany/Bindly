@@ -13,6 +13,7 @@ const {
   getMyEvents,
   getMyWorkshops,
   getEventRegistrations,
+  getWorkshopParticipants,
   createConference,
   addToFavorites,
   removeFromFavorites,
@@ -48,6 +49,9 @@ router.get("/my/events", protect, permit("Professor"), getMyEvents);
 
 // 🎓 Get workshops created by the logged-in professor
 router.get("/my/workshops", protect, permit("Professor"), getMyWorkshops);
+
+// 🎓 Get participants for a specific workshop (for professors who created it)
+router.get("/workshops/:workshopId/participants", protect, permit("Professor"), getWorkshopParticipants);
 
 // ⭐ Get user's favorite events (must be before /:id routes)
 router.get(
