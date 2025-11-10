@@ -327,8 +327,8 @@ const login = async (req, res) => {
         gucId: user.gucId,
         companyName: user.companyName,
         isVerified: user.isVerified,
-        status: user.status,
-        createdAt: user.createdAt
+      status: user.status,
+      createdAt: user.createdAt,
       };
       
       // Different message for students (email verification) vs other users (admin verification)
@@ -357,8 +357,8 @@ const login = async (req, res) => {
         gucId: user.gucId,
         companyName: user.companyName,
         isVerified: user.isVerified,
-        status: user.status,
-        createdAt: user.createdAt
+      status: user.status,
+      createdAt: user.createdAt,
       };
       
       return res.status(403).json({
@@ -388,7 +388,7 @@ const login = async (req, res) => {
       profilePicturePath: user.profilePicturePath,
       companyName: user.companyName,
       isVerified: user.isVerified,
-      createdAt: user.createdAt
+      createdAt: user.createdAt,
     };
 
     res.json({ success: true, message: 'Login successful', user: userResponse, token });
@@ -660,7 +660,7 @@ const getCurrentUser = async (req, res) => {
         isActive: user.isActive,
         profilePicturePath: user.profilePicturePath,
         createdAt: user.createdAt,
-        updatedAt: user.updatedAt
+        updatedAt: user.updatedAt,
       }
     });
   } catch (err) {

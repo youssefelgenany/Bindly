@@ -2,6 +2,7 @@ const Event = require("../models/eventModel");
 const Registration = require("../models/registrationModel");
 const Trip = require("../models/tripModel");
 const VendorRequest = require("../models/vendorRequest");
+const User = require("../models/userModel");
 // 🎯 Create a new event (Admin or Event Office)
 exports.createEvent = async (req, res) => {
   try {
@@ -815,6 +816,185 @@ exports.getEventRegistrations = async (req, res) => {
     res.status(500).json({ 
       success: false,
       message: "Server error" 
+    });
+  }
+};
+
+// ⭐ Add event to favorites
+exports.addToFavorites = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    // Verify event exists
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Get user and check if event is already in favorites
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "User not found" 
+      });
+    }
+
+    // Check if already in favorites (compare as strings)
+    if (user.favoriteEvents && user.favoriteEvents.some(eventId => eventId.toString() === id)) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Event is already in your favorites" 
+      });
+    }
+
+    // Add to favorites
+    if (!user.favoriteEvents) {
+      user.favoriteEvents = [];
+    }
+    user.favoriteEvents.push(id);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      msg: "Event added to favorites",
+      favoriteEvents: user.favoriteEvents
+    });
+  } catch (err) {
+    console.error("❌ Error adding event to favorites:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error" 
+    });
+  }
+};
+
+// ⭐ Remove event from favorites
+exports.removeFromFavorites = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    // Get user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "User not found" 
+      });
+    }
+
+    // Check if event is in favorites (compare as strings)
+    if (!user.favoriteEvents || !user.favoriteEvents.some(eventId => eventId.toString() === id)) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Event is not in your favorites" 
+      });
+    }
+
+    // Remove from favorites
+    user.favoriteEvents = user.favoriteEvents.filter(
+      eventId => eventId.toString() !== id
+    );
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      msg: "Event removed from favorites",
+      favoriteEvents: user.favoriteEvents
+    });
+  } catch (err) {
+    console.error("❌ Error removing event from favorites:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error" 
+    });
+  }
+};
+
+// ⭐ Get user's favorite events
+exports.getFavoriteEvents = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Get user with favorite events populated
+    const user = await User.findById(userId)
+      .populate({
+        path: 'favoriteEvents',
+        populate: {
+          path: 'createdBy',
+          select: 'firstName lastName email userType'
+        }
+      });
+
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "User not found" 
+      });
+    }
+
+    // Format the events similar to getAllEventsForStudents
+    const favoriteEvents = await Promise.all(
+      (user.favoriteEvents || []).map(async (event) => {
+        if (!event) return null; // Handle deleted events
+
+        const baseEvent = event.toObject ? event.toObject() : event;
+        
+        // Add vendor information for bazaars
+        let vendors = [];
+        if (event.type === 'bazaar') {
+          try {
+            const vendorRequests = await VendorRequest.find({
+              bazaar: event._id,
+              status: 'accepted'
+            })
+            .populate('vendor', 'companyName firstName lastName email')
+            .select('vendor attendees boothSize createdAt');
+            
+            vendors = vendorRequests.map(req => ({
+              id: req._id,
+              companyName: req.vendor?.companyName || `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim(),
+              email: req.vendor?.email || '',
+              attendees: req.attendees || [],
+              boothSize: req.boothSize || null,
+              joinedAt: req.createdAt
+            }));
+          } catch (vendorErr) {
+            console.error('Error fetching vendors for bazaar:', vendorErr);
+            vendors = [];
+          }
+        }
+
+        return {
+          ...baseEvent,
+          vendors,
+          creatorName: event.createdBy ? `${event.createdBy.firstName || ''} ${event.createdBy.lastName || ''}`.trim() : null,
+          creatorRole: event.createdBy ? (event.createdBy.userType || null) : null,
+          creatorFirstName: event.createdBy?.firstName || null,
+          creatorLastName: event.createdBy?.lastName || null,
+        };
+      })
+    );
+
+    // Filter out null events (deleted events)
+    const validFavoriteEvents = favoriteEvents.filter(event => event !== null);
+
+    res.status(200).json({
+      success: true,
+      msg: "Favorite events retrieved successfully",
+      events: validFavoriteEvents,
+      count: validFavoriteEvents.length
+    });
+  } catch (err) {
+    console.error("❌ Error fetching favorite events:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error" 
     });
   }
 };

@@ -100,7 +100,12 @@ const userSchema = new mongoose.Schema({
       console.log('🔍 User Model - Setting default status to BLOCKED for userType:', this.userType);
       return 'blocked';
     }
-  }
+  },
+  // Favorite events list for students/TA/professor/staff
+  favoriteEvents: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Event'
+  }]
 });
 
 // Hash password before saving

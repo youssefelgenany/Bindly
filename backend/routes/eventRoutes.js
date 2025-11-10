@@ -13,7 +13,10 @@ const {
   getMyEvents,
   getMyWorkshops,
   getEventRegistrations,
-  createConference
+  createConference,
+  addToFavorites,
+  removeFromFavorites,
+  getFavoriteEvents
 } = require("../controllers/eventController");
 
 const { protect, permit } = require("../middleware/authMiddleware");
@@ -45,6 +48,14 @@ router.get("/my/events", protect, permit("Professor"), getMyEvents);
 
 // 🎓 Get workshops created by the logged-in professor
 router.get("/my/workshops", protect, permit("Professor"), getMyWorkshops);
+
+// ⭐ Get user's favorite events (must be before /:id routes)
+router.get(
+  "/favorites",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  getFavoriteEvents
+);
 
 // 👥 Get registrations for a specific event (for event creators)
 router.get("/:id/registrations", protect, getEventRegistrations);
@@ -82,6 +93,22 @@ router.post(
   protect,
   permit("event_office", "admin"),
   createConference
+);
+
+// ⭐ Add event to favorites
+router.post(
+  "/:id/favorite",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  addToFavorites
+);
+
+// Remove event from favorites
+router.delete(
+  "/:id/favorite",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  removeFromFavorites
 );
 
 module.exports = router;

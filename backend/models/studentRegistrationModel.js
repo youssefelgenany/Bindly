@@ -42,7 +42,7 @@ const studentRegistrationSchema = new mongoose.Schema({
     phone: String,
   },
   dietaryRequirements: String,
-  medicalConditions: String,
+  medicalConditions: String
 }, { timestamps: true });
 
 // Add index to prevent duplicate registrations for the same event
