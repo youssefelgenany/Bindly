@@ -11,6 +11,14 @@ const courtBookingSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  studentName: {
+    type: String,
+    trim: true
+  },
+  studentGucId: {
+    type: String,
+    trim: true
+  },
   bookingDate: {
     type: Date,
     required: true
@@ -37,7 +45,7 @@ const courtBookingSchema = new mongoose.Schema({
   },
   duration: {
     type: Number,
-    required: true,
+    required: false, // Auto-calculated from startTime and endTime
     min: 30, // Minimum 30 minutes
     max: 240 // Maximum 4 hours
   },
