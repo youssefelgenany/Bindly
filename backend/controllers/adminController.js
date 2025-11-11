@@ -591,18 +591,67 @@ exports.getAttendeesReport = async (req, res) => {
   try {
     console.log('📊 Generating attendees report...');
 
-    // Get all events
-    const allEvents = await Event.find({}).lean();
+    // Extract filter parameters from query string
+    const { eventName, eventType, startDate, endDate } = req.query;
     
-    // Get all student registrations (for workshops and trips)
-    const studentRegistrations = await StudentRegistration.find({
-      status: { $in: ['approved', 'pending'] } // Only count approved/pending registrations
-    }).lean();
+    console.log('🔍 Filters applied:', { eventName, eventType, startDate, endDate });
+
+    // Build event filter object
+    const eventFilter = {};
     
-    // Get all regular registrations (for other event types)
-    const regularRegistrations = await Registration.find({
-      status: { $in: ['approved', 'pending'] } // Only count approved/pending registrations
-    }).lean();
+    // Filter by event name (case-insensitive partial match)
+    if (eventName) {
+      eventFilter.title = { $regex: eventName, $options: 'i' };
+    }
+    
+    // Filter by event type
+    if (eventType) {
+      eventFilter.type = eventType;
+    }
+    
+    // Filter by date range
+    if (startDate || endDate) {
+      // Match events that overlap with the date range
+      if (startDate && endDate) {
+        // Event overlaps with the date range: starts before endDate AND ends after startDate
+        eventFilter.$and = [
+          { startDate: { $lte: new Date(endDate) } },
+          { endDate: { $gte: new Date(startDate) } }
+        ];
+      } else if (startDate) {
+        // Event ends on or after startDate
+        eventFilter.endDate = { $gte: new Date(startDate) };
+      } else if (endDate) {
+        // Event starts on or before endDate
+        eventFilter.startDate = { $lte: new Date(endDate) };
+      }
+    }
+
+    // Get filtered events
+    const allEvents = await Event.find(eventFilter).lean();
+    console.log(`📅 Found ${allEvents.length} events matching filters`);
+    
+    // Get event IDs for filtering registrations
+    const eventIds = allEvents.map(e => e._id);
+    
+    // Initialize empty arrays for registrations
+    let studentRegistrations = [];
+    let regularRegistrations = [];
+    
+    // Only query registrations if there are events matching the filter
+    if (eventIds.length > 0) {
+      // Get student registrations for filtered events (for workshops and trips)
+      studentRegistrations = await StudentRegistration.find({
+        event: { $in: eventIds },
+        status: { $in: ['approved', 'pending'] } // Only count approved/pending registrations
+      }).lean();
+      
+      // Get regular registrations for filtered events (for other event types)
+      regularRegistrations = await Registration.find({
+        event: { $in: eventIds },
+        status: { $in: ['approved', 'pending'] } // Only count approved/pending registrations
+      }).lean();
+    }
 
     // Initialize report structure
     const report = {
@@ -693,6 +742,12 @@ exports.getAttendeesReport = async (req, res) => {
       success: true,
       message: 'Attendees report fetched successfully',
       report: report,
+      filters: {
+        eventName: eventName || null,
+        eventType: eventType || null,
+        startDate: startDate || null,
+        endDate: endDate || null
+      },
       generatedAt: new Date()
     });
 
