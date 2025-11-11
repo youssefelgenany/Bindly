@@ -4,7 +4,10 @@ const {
   getAllVendorRequests,
   getVendorRequestById,
   createVendorRequest,
-  updateVendorRequestStatus
+  updateVendorRequestStatus,
+  voteForVendorRequest,
+  removeVote,
+  getVendorRequestVotes
 } = require('../controllers/vendorRequestController');
 const { protect, permit } = require('../middleware/authMiddleware');
 
@@ -19,6 +22,15 @@ router.get('/:id', protect, permit('event_office', 'admin'), getVendorRequestByI
 
 // Route to update vendor request status (accept/reject) - Events Office / Admin
 router.patch('/:id/status', protect, permit('event_office', 'admin'), updateVendorRequestStatus);
+
+// Route to vote for a vendor request - Student, Staff, TA, Professor
+router.post('/:id/vote', protect, permit('Student', 'Staff', 'TA', 'Professor'), voteForVendorRequest);
+
+// Route to remove vote from a vendor request - Student, Staff, TA, Professor
+router.delete('/:id/vote', protect, permit('Student', 'Staff', 'TA', 'Professor'), removeVote);
+
+// Route to get vote count and user's vote status - All authenticated users
+router.get('/:id/votes', protect, getVendorRequestVotes);
 
 module.exports = router;
 

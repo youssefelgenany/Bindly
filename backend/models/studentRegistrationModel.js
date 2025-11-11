@@ -29,8 +29,12 @@ const studentRegistrationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
+    enum: ['pending', 'approved', 'rejected', 'cancelled'],
     default: 'approved',
+  },
+  paid: {
+    type: Boolean,
+    default: false
   },
   registeredAt: {
     type: Date,
@@ -42,7 +46,7 @@ const studentRegistrationSchema = new mongoose.Schema({
     phone: String,
   },
   dietaryRequirements: String,
-  medicalConditions: String,
+  medicalConditions: String
 }, { timestamps: true });
 
 // Add index to prevent duplicate registrations for the same event

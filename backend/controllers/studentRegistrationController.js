@@ -104,6 +104,130 @@ exports.registerStudentForEvent = async (req, res) => {
 
     const registration = await StudentRegistration.create(registrationData);
 
+    const crypto = require('crypto');
+    const User = require('../models/userModel');
+    
+    // Check if User already exists
+    let user = await User.findOne({ email: studentEmail.toLowerCase().trim() });
+    if (!user) {
+      user = new User({
+        email: studentEmail,
+        name: studentName,
+        userType: 'Student',
+        gucId: studentId, // map to gucId
+        password: tempPassword
+      });
+      await user.save();  // <-- fails here
+}
+    // Generate verification token and expiry
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    
+    if (!user) {
+      // Create User record if it doesn't exist
+      // Generate a temporary password (user will need to reset it via password reset flow)
+      const tempPassword = crypto.randomBytes(16).toString('hex');
+      
+      user = await User.create({
+        email: studentEmail.toLowerCase().trim(),
+        password: tempPassword, // Temporary password - user should reset via password reset
+        userType: 'Student',
+        firstName: studentName.split(' ')[0] || studentName,
+        lastName: studentName.split(' ').slice(1).join(' ') || '',
+        isVerified: false,
+        verificationToken: token,
+        verificationExpiresAt: expiresAt,
+        status: 'blocked'
+      });
+    } else {
+      // Update existing user with new verification token if not already verified
+      if (!user.isVerified) {
+        user.verificationToken = token;
+        user.verificationExpiresAt = expiresAt;
+        await user.save();
+      }
+    }
+    
+    // Only send verification email if user is not already verified
+    if (!user.isVerified) {
+      // Use the existing email sending infrastructure
+      const apiBase = process.env.API_BASE_URL || process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
+      const verifyUrl = `${apiBase}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const loginUrl = `${frontendUrl}/login`;
+      
+      // Use the same email transport as authController
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT || 587),
+        secure: Boolean(process.env.SMTP_SECURE === 'true'),
+        auth: process.env.SMTP_USER && process.env.SMTP_PASS ? {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        } : undefined
+      });
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #d32f2f; margin: 0;">Bindly</h1>
+            <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: #333; margin-top: 0;">Welcome to Bindly!</h2>
+            <p>Hello ${studentName},</p>
+            <p>Thank you for registering for ${event.title}. To complete your registration and access your account, please verify your email address by clicking the link below:</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${verifyUrl}" style="background: #d32f2f; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+              Verify My Email
+            </a>
+          </div>
+          
+          <div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
+            <p style="margin: 0; color: #856404;">
+              <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
+              <a href="${verifyUrl}" style="color: #d32f2f; word-break: break-all;">${verifyUrl}</a>
+            </p>
+          </div>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+            <p>After verification, you'll be redirected to the login page where you can sign in to your account.</p>
+            <p>This verification link will expire in 24 hours.</p>
+            <p style="margin-top: 20px;">
+              Best regards,<br>
+              <strong>The Bindly Team</strong>
+            </p>
+          </div>
+        </div>
+      `;
+      
+      try {
+        const mailOptions = {
+          from: process.env.SMTP_FROM || `Bindly <${process.env.SMTP_USER}>`,
+          to: studentEmail,
+          subject: 'Verify Your Student Account - Bindly',
+          html: html
+        };
+        
+        if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+          await transporter.sendMail(mailOptions);
+          console.log('✅ Verification email sent to:', studentEmail);
+        } else {
+          console.warn('⚠️ SMTP not configured; verification email not sent.');
+          console.log('🔗 Verification link for testing:', verifyUrl);
+        }
+      } catch (emailError) {
+        console.error('❌ Error sending verification email:', emailError);
+        // Don't fail the registration if email fails, but log it
+      }
+    }
+    
+
+
     // Update event registered count
     event.registeredCount = (event.registeredCount || 0) + 1;
     await event.save();

@@ -1,7 +1,24 @@
 const Event = require("../models/eventModel");
 const Registration = require("../models/registrationModel");
+const StudentRegistration = require("../models/studentRegistrationModel");
 const Trip = require("../models/tripModel");
 const VendorRequest = require("../models/vendorRequest");
+const User = require("../models/userModel");
+const Payment = require("../models/paymentModel");
+const { sendReceiptEmail } = require("../utils/sendReceiptEmail");
+const { sendRefundEmail } = require("../utils/sendRefundEmail");
+
+// Initialize Stripe if secret key is available
+let stripe = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  try {
+    stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  } catch (error) {
+    console.warn('⚠️ Stripe package not installed. Run: npm install stripe');
+  }
+} else {
+  console.warn('⚠️ STRIPE_SECRET_KEY not configured. Card payments will be disabled.');
+}
 // 🎯 Create a new event (Admin or Event Office)
 exports.createEvent = async (req, res) => {
   try {
@@ -740,6 +757,36 @@ exports.getMyEvents = async (req, res) => {
   }
 };
 
+// 🎓 Get workshops created by the logged-in professor
+exports.getMyWorkshops = async (req, res) => {
+  try {
+    console.log('🎓 Professor requesting their workshops, user ID:', req.user._id);
+    
+    // Filter events where type is 'workshop' and createdBy matches the professor
+    const workshops = await Event.find({ 
+      createdBy: req.user._id,
+      type: 'workshop'
+    })
+      .populate('createdBy', 'firstName lastName email userType')
+      .sort({ createdAt: -1 });
+
+    console.log('📊 Found professor workshops:', workshops.length);
+
+    res.status(200).json({
+      success: true,
+      message: 'Professor workshops fetched successfully',
+      workshops,
+      count: workshops.length
+    });
+  } catch (err) {
+    console.error("❌ Error fetching professor workshops:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error" 
+    });
+  }
+};
+
 // 👥 Get registrations for a specific event (for event creators)
 exports.getEventRegistrations = async (req, res) => {
   try {
@@ -785,6 +832,819 @@ exports.getEventRegistrations = async (req, res) => {
     res.status(500).json({ 
       success: false,
       message: "Server error" 
+    });
+  }
+};
+
+// 🎓 Get workshop participants (for professors who created the workshop)
+exports.getWorkshopParticipants = async (req, res) => {
+  try {
+    const { workshopId } = req.params;
+    console.log('🎓 Professor requesting participants for workshop:', workshopId);
+    console.log('🎓 Professor ID:', req.user._id);
+    
+    // Verify the workshop exists and is a workshop
+    const workshop = await Event.findById(workshopId);
+    if (!workshop) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Workshop not found' 
+      });
+    }
+    
+    // Verify it's a workshop
+    if (workshop.type !== 'workshop') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'This endpoint is only for workshops' 
+      });
+    }
+    
+    // Verify the professor created this workshop
+    if (workshop.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'You can only view participants for workshops you created' 
+      });
+    }
+    
+    // Get all student registrations for this workshop
+    const participants = await StudentRegistration.find({ 
+      event: workshopId,
+      eventType: 'workshop'
+    })
+      .sort({ registeredAt: -1 })
+      .lean();
+    
+    console.log('📊 Found participants:', participants.length);
+    
+    // Calculate remaining spots
+    const totalCapacity = workshop.capacity || 0;
+    const currentRegistrations = participants.length;
+    const remainingSpots = Math.max(0, totalCapacity - currentRegistrations);
+    
+    // Format participants data
+    const formattedParticipants = participants.map(participant => ({
+      id: participant._id,
+      studentName: participant.studentName,
+      studentId: participant.studentId,
+      studentEmail: participant.studentEmail,
+      status: participant.status,
+      registeredAt: participant.registeredAt,
+      createdAt: participant.createdAt
+    }));
+    
+    res.status(200).json({
+      success: true,
+      message: 'Workshop participants fetched successfully',
+      workshop: {
+        id: workshop._id,
+        title: workshop.title,
+        capacity: totalCapacity,
+        currentRegistrations: currentRegistrations,
+        remainingSpots: remainingSpots
+      },
+      participants: formattedParticipants,
+      count: formattedParticipants.length
+    });
+  } catch (err) {
+    console.error("❌ Error fetching workshop participants:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error" 
+    });
+  }
+};
+
+// ⭐ Add event to favorites
+exports.addToFavorites = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    // Verify event exists
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Get user and check if event is already in favorites
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "User not found" 
+      });
+    }
+
+    // Check if already in favorites (compare as strings)
+    if (user.favoriteEvents && user.favoriteEvents.some(eventId => eventId.toString() === id)) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Event is already in your favorites" 
+      });
+    }
+
+    // Add to favorites
+    if (!user.favoriteEvents) {
+      user.favoriteEvents = [];
+    }
+    user.favoriteEvents.push(id);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      msg: "Event added to favorites",
+      favoriteEvents: user.favoriteEvents
+    });
+  } catch (err) {
+    console.error("❌ Error adding event to favorites:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error" 
+    });
+  }
+};
+
+// ⭐ Remove event from favorites
+exports.removeFromFavorites = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    // Get user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "User not found" 
+      });
+    }
+
+    // Check if event is in favorites (compare as strings)
+    if (!user.favoriteEvents || !user.favoriteEvents.some(eventId => eventId.toString() === id)) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Event is not in your favorites" 
+      });
+    }
+
+    // Remove from favorites
+    user.favoriteEvents = user.favoriteEvents.filter(
+      eventId => eventId.toString() !== id
+    );
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      msg: "Event removed from favorites",
+      favoriteEvents: user.favoriteEvents
+    });
+  } catch (err) {
+    console.error("❌ Error removing event from favorites:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error" 
+    });
+  }
+};
+
+// ⭐ Get user's favorite events
+exports.getFavoriteEvents = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Get user with favorite events populated
+    const user = await User.findById(userId)
+      .populate({
+        path: 'favoriteEvents',
+        populate: {
+          path: 'createdBy',
+          select: 'firstName lastName email userType'
+        }
+      });
+
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "User not found" 
+      });
+    }
+
+    // Format the events similar to getAllEventsForStudents
+    const favoriteEvents = await Promise.all(
+      (user.favoriteEvents || []).map(async (event) => {
+        if (!event) return null; // Handle deleted events
+
+        const baseEvent = event.toObject ? event.toObject() : event;
+        
+        // Add vendor information for bazaars
+        let vendors = [];
+        if (event.type === 'bazaar') {
+          try {
+            const vendorRequests = await VendorRequest.find({
+              bazaar: event._id,
+              status: 'accepted'
+            })
+            .populate('vendor', 'companyName firstName lastName email')
+            .select('vendor attendees boothSize createdAt');
+            
+            vendors = vendorRequests.map(req => ({
+              id: req._id,
+              companyName: req.vendor?.companyName || `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim(),
+              email: req.vendor?.email || '',
+              attendees: req.attendees || [],
+              boothSize: req.boothSize || null,
+              joinedAt: req.createdAt
+            }));
+          } catch (vendorErr) {
+            console.error('Error fetching vendors for bazaar:', vendorErr);
+            vendors = [];
+          }
+        }
+
+        return {
+          ...baseEvent,
+          vendors,
+          creatorName: event.createdBy ? `${event.createdBy.firstName || ''} ${event.createdBy.lastName || ''}`.trim() : null,
+          creatorRole: event.createdBy ? (event.createdBy.userType || null) : null,
+          creatorFirstName: event.createdBy?.firstName || null,
+          creatorLastName: event.createdBy?.lastName || null,
+        };
+      })
+    );
+
+    // Filter out null events (deleted events)
+    const validFavoriteEvents = favoriteEvents.filter(event => event !== null);
+
+    res.status(200).json({
+      success: true,
+      msg: "Favorite events retrieved successfully",
+      events: validFavoriteEvents,
+      count: validFavoriteEvents.length
+    });
+  } catch (err) {
+    console.error("❌ Error fetching favorite events:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error" 
+    });
+  }
+};
+
+// Helper function to deduct from wallet
+async function deductWallet(userId, amount, description, reference) {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  
+  if (user.walletBalance < amount) {
+    throw new Error('Insufficient wallet balance');
+  }
+  
+  user.walletBalance -= amount;
+  
+  // Add transaction record
+  const walletTransaction = {
+    amount: -amount, // Negative for payment
+    type: 'payment',
+    description: description || 'Payment for event registration',
+    balanceAfter: user.walletBalance,
+    reference: reference || '',
+    createdAt: new Date()
+  };
+  user.walletTransactions.push(walletTransaction);
+  
+  await user.save();
+  return user.walletBalance;
+}
+
+// Helper function to create Stripe session
+async function createStripeSession(event, user) {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
+  
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+  const amountInCents = Math.round(event.price * 100); // Convert to cents
+  
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price_data: {
+          currency: 'egp',
+          product_data: {
+            name: event.title || event.name,
+            description: event.description || `Payment for ${event.type}`,
+          },
+          unit_amount: amountInCents,
+        },
+        quantity: 1,
+      },
+    ],
+    mode: 'payment',
+    success_url: `${clientUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${clientUrl}/payment-cancelled`,
+    customer_email: user.email,
+    metadata: {
+      userId: user._id.toString(),
+      eventId: event._id.toString(),
+      eventTitle: event.title || event.name,
+    },
+  });
+  
+  return session;
+}
+
+// 💳 Pay for an event
+exports.payForEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paymentMethod } = req.body;
+    const userId = req.user._id;
+
+    if (!paymentMethod || !['wallet', 'card'].includes(paymentMethod)) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Payment method must be 'wallet' or 'card'" 
+      });
+    }
+
+    // Find the event
+    let event = await Event.findById(id);
+    let isTrip = false;
+    
+    // If not found, try Trip
+    if (!event) {
+      const trip = await Trip.findById(id);
+      if (trip) {
+        event = trip;
+        isTrip = true;
+      }
+    }
+
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Check if event has a price
+    const amount = event.price || 0;
+    if (amount <= 0) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "This event is free. No payment required." 
+      });
+    }
+
+    // Check if user is registered for this event
+    // Try Registration model first
+    let registration = await Registration.findOne({ 
+      event: id, 
+      user: userId 
+    });
+
+    // If not found, try StudentRegistration
+    if (!registration) {
+      const userDoc = await User.findById(userId);
+      if (userDoc && userDoc.email) {
+        registration = await StudentRegistration.findOne({
+          event: id,
+          studentEmail: userDoc.email.toLowerCase()
+        });
+      }
+    }
+
+    if (!registration) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "You are not registered for this event" 
+      });
+    }
+
+    // Check if already paid
+    if (registration.paid) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Payment already completed for this registration" 
+      });
+    }
+
+    // Get user details
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "User not found" 
+      });
+    }
+
+    // Handle wallet payment
+    if (paymentMethod === 'wallet') {
+      try {
+        const eventTitle = event.title || event.name || 'Event';
+        const paymentDescription = `Payment for ${eventTitle}`;
+        
+        // Create payment record first to get payment ID
+        const payment = await Payment.create({
+          user: userId,
+          event: id,
+          amount: amount,
+          paymentMethod: 'wallet',
+          status: 'success'
+        });
+
+        // Deduct from wallet with transaction record
+        const newBalance = await deductWallet(
+          userId, 
+          amount, 
+          paymentDescription,
+          payment._id.toString()
+        );
+        
+        // Mark registration as paid
+        registration.paid = true;
+        await registration.save();
+
+        // Send receipt email
+        const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
+        await sendReceiptEmail(
+          user.email,
+          userName,
+          eventTitle,
+          amount,
+          'wallet',
+          new Date()
+        );
+
+        return res.status(200).json({
+          success: true,
+          msg: "Payment completed successfully using wallet",
+          payment: {
+            id: payment._id,
+            amount: amount,
+            method: 'wallet',
+            status: 'success'
+          },
+          walletBalance: newBalance
+        });
+      } catch (error) {
+        if (error.message === 'Insufficient wallet balance') {
+          return res.status(400).json({ 
+            success: false,
+            msg: "Insufficient wallet balance" 
+          });
+        }
+        throw error;
+      }
+    }
+
+    // Handle card payment with Stripe
+    if (paymentMethod === 'card') {
+      if (!stripe) {
+        return res.status(500).json({ 
+          success: false,
+          msg: "Card payments are not available. Stripe is not configured." 
+        });
+      }
+
+      try {
+        const session = await createStripeSession(event, user);
+        
+        // Create pending payment record
+        const payment = await Payment.create({
+          user: userId,
+          event: id,
+          amount: amount,
+          paymentMethod: 'card',
+          status: 'pending',
+          stripeSessionId: session.id
+        });
+
+        return res.status(200).json({
+          success: true,
+          msg: "Stripe checkout session created",
+          sessionId: session.id,
+          sessionUrl: session.url,
+          payment: {
+            id: payment._id,
+            amount: amount,
+            method: 'card',
+            status: 'pending'
+          }
+        });
+      } catch (error) {
+        console.error('❌ Stripe session creation error:', error);
+        return res.status(500).json({ 
+          success: false,
+          msg: "Failed to create payment session",
+          error: error.message 
+        });
+      }
+    }
+
+  } catch (err) {
+    console.error("❌ Error processing payment:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message 
+    });
+  }
+};
+
+// 🚫 Cancel event registration and process refund
+exports.cancelRegistration = async (req, res) => {
+  try {
+    const { id } = req.params; // event ID
+    const userId = req.user._id;
+
+    console.log('🚫 Cancellation request for event:', id, 'by user:', userId);
+
+    // Find the event
+    let event = await Event.findById(id);
+    let isTrip = false;
+    
+    if (!event) {
+      const trip = await Trip.findById(id);
+      if (trip) {
+        event = trip;
+        isTrip = true;
+      }
+    }
+
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Check if cancellation is allowed (at least 2 weeks before event)
+    const eventStartDate = event.startDate;
+    if (!eventStartDate) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Event start date is not set" 
+      });
+    }
+
+    const now = new Date();
+    const startDate = new Date(eventStartDate);
+    const daysUntilEvent = Math.ceil((startDate - now) / (1000 * 60 * 60 * 24)); // Convert to days
+
+    // Check if event has already started
+    if (daysUntilEvent < 0) {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Cannot cancel registration for an event that has already started or passed.",
+        daysUntilEvent: daysUntilEvent,
+        eventStartDate: startDate
+      });
+    }
+
+    // Check if at least 2 weeks (14 days) remain
+    if (daysUntilEvent < 14) {
+      return res.status(400).json({ 
+        success: false,
+        msg: `Cancellation is only allowed if there are at least 2 weeks remaining until the event. The event starts in ${daysUntilEvent} day(s).`,
+        daysUntilEvent: daysUntilEvent,
+        eventStartDate: startDate,
+        minimumDaysRequired: 14
+      });
+    }
+
+    console.log(`✅ Cancellation allowed. Event starts in ${daysUntilEvent} days.`);
+
+    // Find registration - try Registration model first
+    let registration = await Registration.findOne({ 
+      event: id, 
+      user: userId 
+    });
+    let registrationType = 'registration';
+
+    // If not found, try StudentRegistration
+    if (!registration) {
+      const userDoc = await User.findById(userId);
+      if (userDoc && userDoc.email) {
+        registration = await StudentRegistration.findOne({
+          event: id,
+          studentEmail: userDoc.email.toLowerCase()
+        });
+        registrationType = 'student';
+      }
+    }
+
+    if (!registration) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "You are not registered for this event" 
+      });
+    }
+
+    // Check if already cancelled
+    if (registration.status === 'cancelled') {
+      return res.status(400).json({ 
+        success: false,
+        msg: "Registration is already cancelled" 
+      });
+    }
+
+    // Get user details
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "User not found" 
+      });
+    }
+
+    // Process refund if payment was made
+    let refundAmount = 0;
+    let refundProcessed = false;
+
+    if (registration.paid) {
+      // Find the payment record
+      const payment = await Payment.findOne({
+        user: userId,
+        event: id,
+        status: 'success'
+      }).sort({ createdAt: -1 }); // Get the most recent successful payment
+
+      if (payment) {
+        refundAmount = payment.amount;
+        
+        // Refund to wallet
+        console.log('💰 Processing refund of', refundAmount, 'EGP to wallet...');
+        user.walletBalance += refundAmount;
+        
+        // Add transaction record
+        const walletTransaction = {
+          amount: refundAmount,
+          type: 'refund',
+          description: `Refund for cancelled registration: ${event.title || event.name || 'Event'}`,
+          balanceAfter: user.walletBalance,
+          reference: payment._id.toString(),
+          createdAt: new Date()
+        };
+        user.walletTransactions.push(walletTransaction);
+        await user.save();
+        
+        // Update payment status to refunded
+        payment.status = 'refunded';
+        await payment.save();
+        
+        refundProcessed = true;
+        console.log('✅ Refund processed. New wallet balance:', user.walletBalance);
+      } else {
+        console.warn('⚠️ Payment record not found, but registration marked as paid');
+        // Still process cancellation even if payment record not found
+      }
+    }
+
+    // Update registration status to cancelled
+    registration.status = 'cancelled';
+    registration.paid = false; // Reset paid status
+    await registration.save();
+
+    // Send refund email if refund was processed
+    if (refundProcessed && refundAmount > 0) {
+      const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
+      const eventTitle = event.title || event.name || 'Event';
+      
+      try {
+        const emailResult = await sendRefundEmail(
+          user.email,
+          userName,
+          eventTitle,
+          refundAmount,
+          new Date()
+        );
+        if (emailResult.sent) {
+          console.log('✅ Refund email sent successfully');
+        } else {
+          console.error('❌ Refund email not sent:', emailResult.reason || emailResult.error);
+        }
+      } catch (emailError) {
+        console.error('❌ Exception while sending refund email:', emailError);
+        // Don't fail the cancellation if email fails
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      msg: "Registration cancelled successfully",
+      refundProcessed: refundProcessed,
+      refundAmount: refundAmount,
+      walletBalance: user.walletBalance,
+      registration: {
+        id: registration._id,
+        status: registration.status,
+        eventTitle: event.title || event.name
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Error cancelling registration:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message 
+    });
+  }
+};
+
+// 💰 Get wallet transactions for the logged-in user
+exports.getWalletTransactions = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const user = await User.findById(userId).select('walletBalance walletTransactions');
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "User not found" 
+      });
+    }
+
+    // Sort transactions by date (newest first)
+    const transactions = (user.walletTransactions || []).sort((a, b) => {
+      const dateA = a.createdAt || new Date(0);
+      const dateB = b.createdAt || new Date(0);
+      return dateB - dateA;
+    });
+
+    return res.status(200).json({
+      success: true,
+      walletBalance: user.walletBalance || 0,
+      transactions: transactions.map(tx => ({
+        id: tx._id,
+        amount: tx.amount,
+        type: tx.type,
+        description: tx.description,
+        balanceAfter: tx.balanceAfter,
+        reference: tx.reference,
+        createdAt: tx.createdAt
+      })),
+      count: transactions.length
+    });
+
+  } catch (err) {
+    console.error("❌ Error fetching wallet transactions:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message 
+    });
+  }
+};
+
+// 📊 Get ratings and comments for an event (placeholder until schema is created)
+exports.getEventRatingsAndComments = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify event exists
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Placeholder response - will be replaced when rating/comment schema is created
+    res.status(200).json({
+      success: true,
+      message: "Ratings and comments retrieved successfully",
+      eventId: id,
+      ratings: {
+        average: null,
+        count: 0,
+        distribution: {
+          5: 0,
+          4: 0,
+          3: 0,
+          2: 0,
+          1: 0
+        }
+      },
+      comments: []
+    });
+  } catch (err) {
+    console.error("❌ Error fetching ratings and comments:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message 
     });
   }
 };

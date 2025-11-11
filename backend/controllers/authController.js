@@ -69,7 +69,7 @@ async function sendVerificationEmail(toEmail, token) {
 
   try {
     const mailOptions = {
-      from: "Bindly <salmaahmed1504@gmail.com>",
+      from: process.env.SMTP_FROM || `Bindly <${process.env.SMTP_USER}>`,
       to: toEmail,
       subject: 'Verify your Bindly account',
       html
@@ -327,14 +327,19 @@ const login = async (req, res) => {
         gucId: user.gucId,
         companyName: user.companyName,
         isVerified: user.isVerified,
-        status: user.status,
-        createdAt: user.createdAt
+      status: user.status,
+      createdAt: user.createdAt,
       };
+      
+      // Different message for students (email verification) vs other users (admin verification)
+      const message = user.userType === 'Student' 
+        ? 'Please verify your email address to login. Check your inbox for the verification link.'
+        : 'Your account is pending admin verification. You will receive an email once verified.';
       
       return res.status(403).json({ 
         success: false, 
         code: 'AWAITING_VERIFICATION',
-        message: 'Your account is pending admin verification. You will receive an email once verified.',
+        message: message,
         user: userResponse
       });
     }
@@ -352,8 +357,8 @@ const login = async (req, res) => {
         gucId: user.gucId,
         companyName: user.companyName,
         isVerified: user.isVerified,
-        status: user.status,
-        createdAt: user.createdAt
+      status: user.status,
+      createdAt: user.createdAt,
       };
       
       return res.status(403).json({
@@ -383,7 +388,7 @@ const login = async (req, res) => {
       profilePicturePath: user.profilePicturePath,
       companyName: user.companyName,
       isVerified: user.isVerified,
-      createdAt: user.createdAt
+      createdAt: user.createdAt,
     };
 
     res.json({ success: true, message: 'Login successful', user: userResponse, token });
@@ -405,6 +410,14 @@ async function verifyEmail(req, res) {
     user.isVerified = true;
     user.verificationToken = null;
     user.verificationExpiresAt = null;
+    
+    // Set status to active after verification for students and Staff/TA/Professor
+    if (user.status === 'blocked') {
+      if (user.userType === 'Student' || ['Staff', 'TA', 'Professor'].includes(user.userType)) {
+        user.status = 'active';
+      }
+    }
+    
     await user.save();
 
     const loginUrl = (process.env.FRONTEND_URL || 'http://localhost:3000') + '/login';
@@ -647,7 +660,7 @@ const getCurrentUser = async (req, res) => {
         isActive: user.isActive,
         profilePicturePath: user.profilePicturePath,
         createdAt: user.createdAt,
-        updatedAt: user.updatedAt
+        updatedAt: user.updatedAt,
       }
     });
   } catch (err) {

@@ -15,44 +15,8 @@ async function sendVerificationEmail(to, token, name) {
   console.log('📧 sendVerificationEmail called with:', { to, token, name });
   
   const verifyUrl = `${process.env.BACKEND_URL || "http://localhost:5000"}/api/auth/verify-email?token=${token}`;
-  
-  // Check if SMTP is configured
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.log('📧 Development Mode: Storing email in database instead of sending');
-    
-    // Store email in database for development
-    try {
-      const emailRecord = new Email({
-        to: to,
-        subject: "GUC Events — Verify your account",
-        html: html,
-        verificationToken: token,
-        verificationUrl: verifyUrl,
-        userInfo: {
-          name: name,
-          userType: 'Staff/TA/Professor', // This will be updated based on actual user type
-          email: to
-        }
-      });
-      
-      await emailRecord.save();
-      console.log('✅ Email stored in database for development');
-      console.log('🔗 Verification URL:', verifyUrl);
-      console.log('📧 View emails at: http://localhost:5000/api/dev/emails');
-      
-      return; // Success - email stored in database
-    } catch (error) {
-      console.error('❌ Error storing email in database:', error);
-      // Fallback to console logging
-      console.log('🔗 VERIFICATION LINK (Fallback):');
-      console.log('   User:', name);
-      console.log('   Email:', to);
-      console.log('   Verification URL:', verifyUrl);
-      console.log('   Token:', token);
-      return;
-    }
-  }
   const loginRedirect = process.env.APP_LOGIN_URL || "http://localhost:3000/login";
+  
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="text-align: center; margin-bottom: 30px;">
@@ -90,6 +54,43 @@ async function sendVerificationEmail(to, token, name) {
     </div>
   `;
   
+  // Check if SMTP is configured
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log('📧 Development Mode: Storing email in database instead of sending');
+    
+    // Store email in database for development
+    try {
+      const emailRecord = new Email({
+        to: to,
+        subject: "GUC Events — Verify your account",
+        html: html,
+        verificationToken: token,
+        verificationUrl: verifyUrl,
+        userInfo: {
+          name: name,
+          userType: 'Staff/TA/Professor', // This will be updated based on actual user type
+          email: to
+        }
+      });
+      
+      await emailRecord.save();
+      console.log('✅ Email stored in database for development');
+      console.log('🔗 Verification URL:', verifyUrl);
+      console.log('📧 View emails at: http://localhost:5000/api/dev/emails');
+      
+      return; // Success - email stored in database
+    } catch (error) {
+      console.error('❌ Error storing email in database:', error);
+      // Fallback to console logging
+      console.log('🔗 VERIFICATION LINK (Fallback):');
+      console.log('   User:', name);
+      console.log('   Email:', to);
+      console.log('   Verification URL:', verifyUrl);
+      console.log('   Token:', token);
+      return;
+    }
+  }
+  
   console.log('📧 Sending email with config:', {
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT,
@@ -101,7 +102,7 @@ async function sendVerificationEmail(to, token, name) {
 
   try {
     await transporter.sendMail({
-      from: "Bindly <salmaahmed1504@gmail.com>",
+      from: process.env.SMTP_FROM || `Bindly <${process.env.SMTP_USER}>`,
       to,
       subject: "GUC Events — Verify your account",
       html,
