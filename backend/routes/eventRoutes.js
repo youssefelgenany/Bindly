@@ -20,7 +20,8 @@ const {
   getFavoriteEvents,
   payForEvent,
   cancelRegistration,
-  getWalletTransactions
+  getWalletTransactions,
+  getEventRatingsAndComments
 } = require("../controllers/eventController");
 const { verifyPayment } = require("../controllers/paymentVerificationController");
 
@@ -67,6 +68,11 @@ router.get(
 
 // 👥 Get registrations for a specific event (for event creators)
 router.get("/:id/registrations", protect, getEventRegistrations);
+
+// 📊 Get ratings and comments for an event (all authenticated users can view)
+router.get("/:id/ratings", protect, getEventRatingsAndComments);
+router.get("/:id/comments", protect, getEventRatingsAndComments);
+router.get("/:id/feedback", protect, getEventRatingsAndComments);
 
 // 🔍 Get a specific event by its ID
 router.get("/:id", protect, getEventById);
