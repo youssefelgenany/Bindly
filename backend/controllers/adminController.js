@@ -1,5 +1,8 @@
 const crypto = require("crypto");
 const User = require("../models/userModel");
+const Event = require("../models/eventModel");
+const StudentRegistration = require("../models/studentRegistrationModel");
+const Registration = require("../models/registrationModel");
 const { sendVerificationEmail } = require("../utils/mailer");
 
 // Admin assigns correct role (staff/TA/professor) and sends email
@@ -579,6 +582,126 @@ exports.sendVerificationEmail = async (req, res) => {
       success: false,
       message: "Failed to send verification email",
       error: error.message,
+    });
+  }
+};
+
+// Get attendees report for Events Office/Admin
+exports.getAttendeesReport = async (req, res) => {
+  try {
+    console.log('📊 Generating attendees report...');
+
+    // Get all events
+    const allEvents = await Event.find({}).lean();
+    
+    // Get all student registrations (for workshops and trips)
+    const studentRegistrations = await StudentRegistration.find({
+      status: { $in: ['approved', 'pending'] } // Only count approved/pending registrations
+    }).lean();
+    
+    // Get all regular registrations (for other event types)
+    const regularRegistrations = await Registration.find({
+      status: { $in: ['approved', 'pending'] } // Only count approved/pending registrations
+    }).lean();
+
+    // Initialize report structure
+    const report = {
+      summary: {
+        totalEvents: allEvents.length,
+        totalAttendees: 0,
+        totalStudentRegistrations: studentRegistrations.length,
+        totalRegularRegistrations: regularRegistrations.length,
+      },
+      byEventType: {},
+      byEvent: []
+    };
+
+    // Process student registrations (workshops and trips)
+    const studentRegByEvent = {};
+    studentRegistrations.forEach(reg => {
+      const eventId = reg.event.toString();
+      if (!studentRegByEvent[eventId]) {
+        studentRegByEvent[eventId] = 0;
+      }
+      studentRegByEvent[eventId]++;
+    });
+
+    // Process regular registrations
+    const regularRegByEvent = {};
+    regularRegistrations.forEach(reg => {
+      const eventId = reg.event.toString();
+      if (!regularRegByEvent[eventId]) {
+        regularRegByEvent[eventId] = 0;
+      }
+      regularRegByEvent[eventId]++;
+    });
+
+    // Aggregate by event type and build per-event details
+    allEvents.forEach(event => {
+      const eventId = event._id.toString();
+      const eventType = event.type || 'other';
+      
+      // Count attendees for this event
+      const studentRegCount = studentRegByEvent[eventId] || 0;
+      const regularRegCount = regularRegByEvent[eventId] || 0;
+      const totalAttendees = studentRegCount + regularRegCount;
+
+      // Initialize event type in report if not exists
+      if (!report.byEventType[eventType]) {
+        report.byEventType[eventType] = {
+          eventCount: 0,
+          totalAttendees: 0,
+          studentRegistrations: 0,
+          regularRegistrations: 0
+        };
+      }
+
+      // Update event type totals
+      report.byEventType[eventType].eventCount++;
+      report.byEventType[eventType].totalAttendees += totalAttendees;
+      report.byEventType[eventType].studentRegistrations += studentRegCount;
+      report.byEventType[eventType].regularRegistrations += regularRegCount;
+
+      // Add per-event details
+      report.byEvent.push({
+        eventId: eventId,
+        title: event.title,
+        type: eventType,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        location: event.location,
+        capacity: event.capacity,
+        registeredCount: event.registeredCount || 0,
+        actualAttendees: totalAttendees,
+        studentRegistrations: studentRegCount,
+        regularRegistrations: regularRegCount,
+        status: event.status
+      });
+    });
+
+    // Calculate total attendees
+    report.summary.totalAttendees = report.summary.totalStudentRegistrations + report.summary.totalRegularRegistrations;
+
+    // Sort events by start date (most recent first)
+    report.byEvent.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+
+    console.log('✅ Attendees report generated successfully');
+    console.log(`   Total Events: ${report.summary.totalEvents}`);
+    console.log(`   Total Attendees: ${report.summary.totalAttendees}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Attendees report fetched successfully',
+      report: report,
+      generatedAt: new Date()
+    });
+
+  } catch (error) {
+    console.error('❌ Error generating attendees report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate attendees report',
+      error: error.message
     });
   }
 };

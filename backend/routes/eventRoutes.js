@@ -24,6 +24,7 @@ const {
   getEventRatingsAndComments
 } = require("../controllers/eventController");
 const { verifyPayment } = require("../controllers/paymentVerificationController");
+const { sendWorkshopCompletionEmails } = require("../controllers/workshopCompletionController");
 
 const { protect, permit } = require("../middleware/authMiddleware");
 
@@ -45,6 +46,14 @@ router.get("/student", protect, permit("Student", "Staff", "TA", "Professor", "E
 
 // 📅 Get all events for admin management (including pending)
 router.get("/admin/all", protect, permit("admin"), getAllEventsForAdmin);
+
+// 📧 Send completion emails for workshops that ended today (Admin, Event Office)
+router.post(
+  "/workshops/send-completion-emails",
+  protect,
+  permit("admin", "event_office"),
+  sendWorkshopCompletionEmails
+);
 
 // 👤 Get logged-in user's event registrations
 router.get("/my/registrations", protect, getMyRegistrations);

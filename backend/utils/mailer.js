@@ -102,7 +102,7 @@ async function sendVerificationEmail(to, token, name) {
 
   try {
     await transporter.sendMail({
-      from: "Bindly <salmaahmed1504@gmail.com>",
+      from: process.env.SMTP_FROM || `Bindly <${process.env.SMTP_USER}>`,
       to,
       subject: "GUC Events — Verify your account",
       html,

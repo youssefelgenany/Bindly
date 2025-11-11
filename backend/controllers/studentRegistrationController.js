@@ -207,7 +207,7 @@ exports.registerStudentForEvent = async (req, res) => {
       
       try {
         const mailOptions = {
-          from: "Bindly <salmaahmed1504@gmail.com>",
+          from: process.env.SMTP_FROM || `Bindly <${process.env.SMTP_USER}>`,
           to: studentEmail,
           subject: 'Verify Your Student Account - Bindly',
           html: html
