@@ -101,7 +101,69 @@ const eventSchema = new mongoose.Schema({
   occupancyEndDate: {
     type: Date,
     required: function() { return this.type === 'standaloneBooth' && this.boothStatus === 'taken'; }
-  }
+  },
+  // Ratings system
+  ratings: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    rating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  // Comments system
+  comments: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    text: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 1000
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, { timestamps: true });
+
+// Virtual for average rating
+eventSchema.virtual('averageRating').get(function() {
+  if (!this.ratings || this.ratings.length === 0) {
+    return 0;
+  }
+  const sum = this.ratings.reduce((acc, r) => acc + r.rating, 0);
+  return (sum / this.ratings.length).toFixed(2);
+});
+
+// Virtual for rating count
+eventSchema.virtual('ratingCount').get(function() {
+  return this.ratings ? this.ratings.length : 0;
+});
+
+// Virtual for comment count
+eventSchema.virtual('commentCount').get(function() {
+  return this.comments ? this.comments.length : 0;
+});
+
+// Ensure virtuals are included in JSON
+eventSchema.set('toJSON', { virtuals: true });
+eventSchema.set('toObject', { virtuals: true });
+
+// Index to prevent duplicate ratings from same user
+eventSchema.index({ 'ratings.user': 1 });
 
 module.exports = mongoose.model('Event', eventSchema);
