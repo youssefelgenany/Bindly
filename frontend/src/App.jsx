@@ -1,6 +1,7 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Navbar from './components/Navbar';
 import AdminUsers from './pages/AdminUsers';
 import AdminVendors from './pages/AdminVendors';
 import AdminEvents from './pages/AdminEvents';
@@ -9,6 +10,7 @@ import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
+import EventsOfficeDashboard from './pages/EventsOfficeDashboard';
 import PendingVerification from './pages/PendingVerification';
 import ProfessorEvents from './pages/ProfessorEvents';
 import ProfessorAllEvents from './pages/ProfessorAllEvents';
@@ -16,7 +18,6 @@ import GymSchedule from './pages/GymSchedule';
 import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
 import ProfessorGymSchedule from './pages/ProfessorGymSchedule';
-import Navbar from './components/Navbar';
 import VendorDashboard from './pages/VendorDashboard';
 import CreateConference from './pages/CreateConfrence';
 import EditConfrences from './pages/EditConfrences';
@@ -219,13 +220,19 @@ const StaffAndTAOnly = ({ children }) => {
   return isStaffOrTAOrProfessor ? children : <Navigate to="/dashboard" />;
 };
 
-function App() {
+// Component to conditionally show Navbar
+const AppContent = () => {
+  const location = useLocation();
+  const hideNavbarPaths = ['/login', '/signup'];
+  const hideNavbarForPaths = ['/event-office', '/create-bazaar', '/create-trip', '/create-conference', '/create-gym-session'];
+  const isExactMatch = hideNavbarPaths.includes(location.pathname);
+  const isPathStart = hideNavbarForPaths.some(path => location.pathname.startsWith(path));
+  const showNavbar = !isExactMatch && !isPathStart;
+
   return (
-    <AuthProvider>
-      <Router>
-        <div className="App">
-          <Navbar />
-          <Routes>
+    <div className="App">
+      {showNavbar && <Navbar />}
+      <Routes>
             <Route path="/" element={<Navigate to="/login" />} />
             <Route
               path="/login"
@@ -252,6 +259,16 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/event-office"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <EventsOfficeDashboard />
+                  </EventsOfficeOnly>
                 </ProtectedRoute>
               }
             />
@@ -556,6 +573,14 @@ function App() {
             />
           </Routes>
         </div>
+  );
+};
+
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <AppContent />
       </Router>
     </AuthProvider>
   );
