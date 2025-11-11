@@ -10,6 +10,7 @@ const Login = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -18,9 +19,8 @@ const Login = () => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: name === 'email' ? value.toLowerCase() : value
     }));
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -71,12 +71,32 @@ const Login = () => {
           }
         }, 1000);
       } else {
-        setMessage(result.message);
-        if (result.redirect) {
-          setTimeout(() => navigate(result.redirect), 1000);
+        let errorMessage = result.message;
+        
+        switch (result.code) {
+          case 'MISSING_FIELDS':
+            errorMessage = 'Please enter both email and password.';
+            break;
+          case 'USER_NOT_FOUND':
+            errorMessage = 'No account found with this email. Please check your email or sign up for a new account.';
+            break;
+          case 'INVALID_PASSWORD':
+            errorMessage = 'Incorrect password. Please check your password and try again.';
+            break;
+          case 'AWAITING_VERIFICATION':
+            errorMessage = 'Your account is pending admin verification. Please wait for an administrator to verify your account.';
+            break;
+          case 'ACCOUNT_BLOCKED':
+            errorMessage = `Your account is currently ${result.user?.status || 'blocked'}. Please contact an administrator for assistance.`;
+            break;
+          default:
+            errorMessage = result.message || 'Login failed. Please try again.';
         }
+        
+        setMessage(errorMessage);
       }
     } catch (error) {
+      console.error('Login error:', error);
       setMessage('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -85,93 +105,373 @@ const Login = () => {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      position: 'relative',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, var(--light-gray) 0%, #E9ECEF 100%)',
-      padding: '20px'
+      minHeight: '100vh',
+      width: '100%',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      backgroundColor: '#F1FAEE',
+      fontFamily: 'Inter, sans-serif'
     }}>
-      <div className="card" style={{ maxWidth: '400px', width: '100%' }}>
-        <div className="card-header">
-          <h1 className="card-title">Welcome Back</h1>
-          <p className="card-subtitle">Sign in to your Bindly account</p>
+      <div className="login-container" style={{
+        display: 'flex',
+        height: '100%',
+        minHeight: '100vh',
+        width: '100%',
+        flexDirection: 'column'
+      }}>
+        {/* Left Panel - Login Form */}
+        <div style={{
+          display: 'flex',
+          width: '100%',
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#FFFFFF',
+          padding: '1.5rem'
+        }}>
+          <div style={{
+            display: 'flex',
+            width: '100%',
+            maxWidth: '28rem',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '2rem'
+          }}>
+            {/* Logo and Title */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '1rem',
+              textAlign: 'center'
+            }}>
+              <svg 
+                style={{ height: '3rem', width: '3rem', color: '#1D3557' }}
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="1.5" 
+                viewBox="0 0 24 24" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path 
+                  d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <p style={{
+                fontFamily: 'sans-serif',
+                fontSize: '1.875rem',
+                fontWeight: '700',
+                letterSpacing: '-0.025em',
+                color: '#1D3557',
+                margin: 0
+              }}>
+                Bindly
+              </p>
+            </div>
+
+            {/* Welcome Message */}
+            <div style={{ width: '100%', textAlign: 'center' }}>
+              <p style={{
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                letterSpacing: '-0.025em',
+                color: '#111827',
+                margin: 0
+              }}>
+                Welcome Back!
+              </p>
+              <p style={{
+                fontSize: '1rem',
+                color: '#6B7280',
+                paddingTop: '0.5rem',
+                margin: 0
+              }}>
+                Login to your account to continue.
+              </p>
+            </div>
+
+            {/* Error/Success Message */}
+            {message && (
+              <div className={`alert ${message.includes('successful') ? 'alert-success' : 'alert-error'}`} style={{ 
+                width: '100%',
+                marginBottom: '0',
+                marginTop: '-1rem'
+              }}>
+                {message}
+              </div>
+            )}
+
+            {/* Login Form */}
+            <div style={{ width: '100%' }}>
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Email Input */}
+                  <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                    <p style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      paddingBottom: '0.5rem',
+                      color: '#374151',
+                      margin: 0
+                    }}>
+                      Email Address
+                    </p>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      placeholder="you@example.com"
+                      disabled={loading}
+                      style={{
+                        display: 'flex',
+                        width: '100%',
+                        minWidth: 0,
+                        flex: 1,
+                        resize: 'none',
+                        overflow: 'hidden',
+                        borderRadius: '0.375rem',
+                        border: '1px solid #D1D5DB',
+                        backgroundColor: '#FFFFFF',
+                        padding: '0.75rem 1rem',
+                        fontSize: '1rem',
+                        color: '#111827',
+                        fontFamily: 'inherit'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#457B9D';
+                        e.target.style.outline = 'none';
+                        e.target.style.boxShadow = '0 0 0 2px rgba(69, 123, 157, 0.3)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = errors.email ? '#DC3545' : '#D1D5DB';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    />
+                    {errors.email && (
+                      <div style={{ color: '#DC3545', fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                        {errors.email}
+                      </div>
+                    )}
+                  </label>
+
+                  {/* Password Input */}
+                  <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                    <p style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      paddingBottom: '0.5rem',
+                      color: '#374151',
+                      margin: 0
+                    }}>
+                      Password
+                    </p>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        placeholder="Enter your password"
+                        disabled={loading}
+                        style={{
+                          display: 'flex',
+                          width: '100%',
+                          minWidth: 0,
+                          flex: 1,
+                          resize: 'none',
+                          overflow: 'hidden',
+                          borderRadius: '0.375rem',
+                          border: '1px solid #D1D5DB',
+                          backgroundColor: '#FFFFFF',
+                          padding: '0.75rem 2.5rem 0.75rem 1rem',
+                          fontSize: '1rem',
+                          color: '#111827',
+                          fontFamily: 'inherit'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#457B9D';
+                          e.target.style.outline = 'none';
+                          e.target.style.boxShadow = '0 0 0 2px rgba(69, 123, 157, 0.3)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = errors.password ? '#DC3545' : '#D1D5DB';
+                          e.target.style.boxShadow = 'none';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          inset: '0 0 0 auto',
+                          display: 'flex',
+                          alignItems: 'center',
+                          paddingRight: '0.75rem',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#9CA3AF'
+                        }}
+                        onMouseEnter={(e) => e.target.style.color = '#4B5563'}
+                        onMouseLeave={(e) => e.target.style.color = '#9CA3AF'}
+                        disabled={loading}
+                      >
+                        {showPassword ? (
+                          <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        ) : (
+                          <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                    {errors.password && (
+                      <div style={{ color: '#DC3545', fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                        {errors.password}
+                      </div>
+                    )}
+                  </label>
+                </div>
+
+                {/* Login Button */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    display: 'flex',
+                    height: '3rem',
+                    width: '100%',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '0.375rem',
+                    backgroundColor: '#1D3557',
+                    padding: '0 1.5rem',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#FFFFFF',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    border: 'none',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.6 : 1,
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) e.target.style.backgroundColor = 'rgba(29, 53, 87, 0.9)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!loading) e.target.style.backgroundColor = '#1D3557';
+                  }}
+                >
+                  {loading ? (
+                    <>
+                      <span className="spinner"></span>
+                      <span style={{ marginLeft: '8px' }}>Signing In...</span>
+                    </>
+                  ) : (
+                    'Login'
+                  )}
+                </button>
+              </form>
+            </div>
+
+            {/* Sign Up Link */}
+            <div style={{ textAlign: 'center', fontSize: '0.875rem', color: '#6B7280' }}>
+              Don't have an account?{' '}
+              <Link
+                to="/signup"
+                style={{
+                  fontWeight: '600',
+                  color: '#457B9D',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.color = '#1D3557';
+                  e.target.style.textDecoration = 'underline';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.color = '#457B9D';
+                  e.target.style.textDecoration = 'none';
+                }}
+              >
+                Sign up
+              </Link>
+            </div>
+          </div>
         </div>
 
-        {message && (
-          <div className={`alert ${message.includes('successful') ? 'alert-success' : 'alert-error'}`}>
-            {message}
+        {/* Right Panel - Background Image */}
+        <div className="login-right-panel" style={{
+          position: 'relative',
+          display: 'none',
+          width: '100%',
+          flex: 1
+        }}>
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            height: '100%',
+            width: '100%',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            backgroundSize: 'cover',
+            backgroundImage: 'url(/assets/images/login-background.jpg)'
+          }}>
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.7)'
+            }}></div>
+            <div style={{
+              position: 'relative',
+              display: 'flex',
+              height: '100%',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              justifyContent: 'flex-end',
+              padding: '3rem',
+              color: '#FFFFFF'
+            }}>
+              <p style={{
+                fontSize: '1.875rem',
+                fontWeight: '700',
+                lineHeight: '1.375',
+                margin: 0
+              }}>
+                "Connecting our campus, one event at a time."
+              </p>
+              <p style={{
+                marginTop: '1rem',
+                fontSize: '1.125rem',
+                color: '#A8DADC',
+                marginBottom: 0
+              }}>
+                Explore, engage, and excel with Bindly.
+              </p>
+            </div>
           </div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="email" className="form-label">
-              Email Address
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              className={`form-input ${errors.email ? 'error' : ''}`}
-              placeholder="Enter your email"
-              disabled={loading}
-            />
-            {errors.email && <div className="form-error">{errors.email}</div>}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password" className="form-label">
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              className={`form-input ${errors.password ? 'error' : ''}`}
-              placeholder="Enter your password"
-              disabled={loading}
-            />
-            {errors.password && <div className="form-error">{errors.password}</div>}
-          </div>
-
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loading}
-            style={{ width: '100%', marginBottom: '1rem' }}
-          >
-            {loading ? (
-              <>
-                <span className="spinner"></span>
-                <span style={{ marginLeft: '8px' }}>Signing In...</span>
-              </>
-            ) : (
-              'Sign In'
-            )}
-          </button>
-        </form>
-
-        <div className="text-center">
-          <p style={{ color: 'var(--text-light)', marginBottom: '1rem' }}>
-            Don't have an account?{' '}
-            <Link
-              to="/signup"
-              style={{
-                color: 'var(--guc-red)',
-                textDecoration: 'none',
-                fontWeight: '600'
-              }}
-            >
-              Sign up here
-            </Link>
-          </p>
         </div>
       </div>
+
+      {/* Responsive: Show right panel on large screens */}
+      <style>{`
+        @media (min-width: 1024px) {
+          .login-container {
+            flex-direction: row !important;
+          }
+          .login-right-panel {
+            display: flex !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };

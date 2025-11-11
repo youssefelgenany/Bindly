@@ -7,6 +7,9 @@ const path = require('path');
 
 const app = express();
 
+// Stripe webhook endpoint (must be before JSON middleware, uses raw body)
+app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), require('./controllers/stripeWebhookController'));
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

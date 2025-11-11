@@ -100,7 +100,37 @@ const userSchema = new mongoose.Schema({
       console.log('🔍 User Model - Setting default status to BLOCKED for userType:', this.userType);
       return 'blocked';
     }
-  }
+  },
+  // Favorite events list for students/TA/professor/staff
+  favoriteEvents: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Event'
+  }],
+  // Wallet balance for payments
+  walletBalance: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  // Wallet transaction history
+  walletTransactions: [{
+    amount: {
+      type: Number,
+      required: true
+    },
+    type: {
+      type: String,
+      enum: ['topup', 'payment', 'refund'],
+      required: true
+    },
+    description: String,
+    balanceAfter: Number,
+    reference: String, // Payment ID or registration ID
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 });
 
 // Hash password before saving
@@ -138,9 +168,14 @@ userSchema.pre('save', function(next) {
   try {
     if (this.isNew) {
       if (this.userType === 'Student') {
-        // Students: verified and active
-        this.isVerified = true;
-        this.status = 'active';
+        // Students: unverified and blocked until email verification
+        // Only set if not already explicitly set (to allow manual override)
+        if (this.isVerified === undefined) {
+          this.isVerified = false;
+        }
+        if (this.status === undefined || this.status === 'blocked') {
+          this.status = 'blocked';
+        }
       } else if (['TA', 'Staff', 'Professor'].includes(this.userType)) {
         // TA/Staff/Professor: unverified but active
         this.isVerified = false;

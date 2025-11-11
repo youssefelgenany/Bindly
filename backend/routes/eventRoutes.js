@@ -11,9 +11,18 @@ const {
   registerForEvent,
   getMyRegistrations,
   getMyEvents,
+  getMyWorkshops,
   getEventRegistrations,
-  createConference
+  getWorkshopParticipants,
+  createConference,
+  addToFavorites,
+  removeFromFavorites,
+  getFavoriteEvents,
+  payForEvent,
+  cancelRegistration,
+  getWalletTransactions
 } = require("../controllers/eventController");
+const { verifyPayment } = require("../controllers/paymentVerificationController");
 
 const { protect, permit } = require("../middleware/authMiddleware");
 
@@ -41,6 +50,20 @@ router.get("/my/registrations", protect, getMyRegistrations);
 
 // 🎓 Get events created by the logged-in professor
 router.get("/my/events", protect, permit("Professor"), getMyEvents);
+
+// 🎓 Get workshops created by the logged-in professor
+router.get("/my/workshops", protect, permit("Professor"), getMyWorkshops);
+
+// 🎓 Get participants for a specific workshop (for professors who created it)
+router.get("/workshops/:workshopId/participants", protect, permit("Professor"), getWorkshopParticipants);
+
+// ⭐ Get user's favorite events (must be before /:id routes)
+router.get(
+  "/favorites",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  getFavoriteEvents
+);
 
 // 👥 Get registrations for a specific event (for event creators)
 router.get("/:id/registrations", protect, getEventRegistrations);
@@ -72,12 +95,66 @@ router.post(
   registerForEvent
 );
 
+// 💳 Pay for an event (Student, Staff, TA, or Professor)
+router.post(
+  "/:id/pay",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  payForEvent
+);
+
+// ✅ Confirm Stripe payment success (callback after redirect - public route)
+router.get(
+  "/payment-success",
+  require("../controllers/stripeSuccessController")
+);
+
+// 🔍 Manual payment verification endpoint (for testing/debugging)
+router.get(
+  "/verify-payment",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  verifyPayment
+);
+
+// 🚫 Cancel event registration and get refund
+router.post(
+  "/:id/cancel",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  cancelRegistration
+);
+
+// 💰 Get wallet transactions
+router.get(
+  "/wallet/transactions",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  getWalletTransactions
+);
+
 // Route to create a conference (protected, e.g. admin/event office only)
 router.post(
   "/conference",
   protect,
   permit("event_office", "admin"),
   createConference
+);
+
+// ⭐ Add event to favorites
+router.post(
+  "/:id/favorite",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  addToFavorites
+);
+
+// Remove event from favorites
+router.delete(
+  "/:id/favorite",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  removeFromFavorites
 );
 
 module.exports = router;

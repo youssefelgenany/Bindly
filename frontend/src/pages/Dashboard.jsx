@@ -1,11 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import ProfessorDashboardOverview from '../components/ProfessorDashboardOverview';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect Event Office users to their dedicated dashboard
+  useEffect(() => {
+    const isEventsOffice = user && (
+      user.userType === 'Event Office' ||
+      user.userType === 'Events Office' ||
+      user.userType === 'event_office' ||
+      user.role === 'event_office' ||
+      user.role === 'Event Office'
+    );
+    if (isEventsOffice) {
+      navigate('/event-office');
+    }
+  }, [user, navigate]);
 
   const getUserTypeDisplay = (userType) => {
     const types = {

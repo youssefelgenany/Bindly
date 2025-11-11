@@ -20,8 +20,16 @@ exports.assignRoleAndSendVerification = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ msg: "User not found" });
 
+    // Ensure name exists
+if (!user.name || user.name.trim() === '') {
+  user.name = user.firstName
+    ? `${user.firstName} ${user.lastName || ''}`.trim()
+    : user.email.split('@')[0]; // fallback to email prefix
+}
+
     // Update userType + generate verification token
     user.userType = role;
+    user.isVerified = false;
     user.verificationToken = crypto.randomBytes(24).toString("hex");
     user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await user.save();
@@ -92,11 +100,29 @@ exports.updateUserRole = async (req, res) => {
 
     // Update user type (role) within the allowed set
     user.userType = role;
+    
+    // Generate verification token and set user as unverified
+    // User must click verification link in email to verify their account
+    user.verificationToken = crypto.randomBytes(32).toString('hex');
+    user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    user.isVerified = false; // Keep user unverified until they click the email link
+    
     await user.save();
+
+    // Send verification email
+    try {
+      const name = user.firstName ? `${user.firstName} ${user.lastName}` : user.name || 'User';
+      await sendVerificationEmail(user.email, user.verificationToken, name);
+      console.log('✅ Verification email sent to:', user.email);
+    } catch (emailError) {
+      console.error('❌ Error sending verification email:', emailError);
+      // Don't fail the role update if email fails, but log it
+      // The admin can manually resend the email if needed
+    }
 
     res.status(200).json({
       success: true,
-      message: 'User role updated successfully',
+      message: 'User role updated successfully. Verification email has been sent. User must click the verification link to activate their account.',
       user: {
         id: user._id,
         firstName: user.firstName,
@@ -519,6 +545,11 @@ exports.sendVerificationEmail = async (req, res) => {
     const verificationToken = crypto.randomBytes(24).toString('hex');
     user.verificationToken = verificationToken;
     user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    if (!user.name || user.name.trim() === '') {
+      user.name = user.firstName
+        ? `${user.firstName} ${user.lastName || ''}`.trim()
+        : user.email.split('@')[0];
+    }
     await user.save();
 
     // Send verification email
