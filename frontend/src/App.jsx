@@ -224,7 +224,7 @@ const StaffAndTAOnly = ({ children }) => {
 const AppContent = () => {
   const location = useLocation();
   const hideNavbarPaths = ['/login', '/signup'];
-  const hideNavbarForPaths = ['/event-office', '/create-bazaar', '/create-trip', '/create-conference', '/create-gym-session'];
+  const hideNavbarForPaths = ['/event-office', '/vendor', '/create-bazaar', '/create-trip', '/create-conference', '/create-gym-session'];
   const isExactMatch = hideNavbarPaths.includes(location.pathname);
   const isPathStart = hideNavbarForPaths.some(path => location.pathname.startsWith(path));
   const showNavbar = !isExactMatch && !isPathStart;
