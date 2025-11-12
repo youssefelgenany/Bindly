@@ -3,6 +3,38 @@ const Bazaar = require('../models/bazaarModel.js'); // legacy (unused for upcomi
 const Booth = require('../models/boothModel.js');   // legacy (unused for upcoming)
 const VendorRequest = require('../models/vendorRequest.js');
 const Event = require('../models/eventModel.js');
+const { sampleVendors } = require('../scripts/test-vendor-loyalty-program.js');
+
+module.exports.getLoyaltyProgramVendors = async (req, res) => {
+  try {
+    const vendors = (sampleVendors || []).map((vendor) => ({
+      id: vendor.id || vendor.vendorName,
+      vendorName: vendor.vendorName,
+      category: vendor.category || null,
+      description: vendor.description || null,
+      discountRate: vendor.discountRate,
+      discountType: vendor.discountType || 'percentage',
+      promoCode: vendor.promoCode,
+      termsAndConditions: vendor.termsAndConditions,
+      validFrom: vendor.validFrom || null,
+      validUntil: vendor.validUntil || null,
+      logoUrl: vendor.logoUrl || null,
+      updatedAt: vendor.updatedAt || null
+    }));
+
+    return res.status(200).json({
+      success: true,
+      count: vendors.length,
+      vendors
+    });
+  } catch (error) {
+    console.error('Server error in getLoyaltyProgramVendors:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to fetch loyalty program vendors'
+    });
+  }
+};
 // View upcoming bazaars/booths
 module.exports.viewUpcomingEvents = async (req, res) => {
   try {
