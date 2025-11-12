@@ -1,13 +1,26 @@
 import React, { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
 import { useAuth } from '../contexts/AuthContext';
-import '../styles/StudentMyRegistrations.css';
 
 const StudentMyRegistrations = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedRegistration, setSelectedRegistration] = useState(null);
+
+  const isActiveRoute = (path) => {
+    return location.pathname === path;
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   useEffect(() => {
     if (user && user.email) {
@@ -26,22 +39,18 @@ const StudentMyRegistrations = () => {
     setError('');
 
     try {
-      console.log('🔍 Loading registrations for user:', user.email);
       const result = await studentRegistrationApi.getMyRegistrations(user.email);
-      console.log('🔍 API result:', result);
       
       if (result.success) {
         setRegistrations(result.data.registrations || []);
-        console.log('🔍 Set registrations:', result.data.registrations);
       } else {
         setError(result.message || 'Failed to fetch registrations');
         setRegistrations([]);
-        console.log('🔍 Error:', result.message);
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      console.error('Error loading registrations:', err);
+      setError(err.message || 'An unexpected error occurred. Please try again.');
       setRegistrations([]);
-      console.error('🔍 Unexpected error:', err);
     } finally {
       setLoading(false);
     }
@@ -61,164 +70,1048 @@ const StudentMyRegistrations = () => {
 
   const getEventTypeColor = (type) => {
     const colors = {
-      workshop: '#607D8B',
+      bazaar: '#F48FB1', // Light pink
       trip: '#2196F3',
-      bazaar: '#4CAF50',
+      workshop: '#607D8B',
+      conference: '#795548',
+      booth: '#3F51B5',
+      sports: '#FF9800',
       other: '#757575'
     };
-    return colors[type] || colors.other;
+    return colors[type?.toLowerCase()] || colors.other;
   };
 
   const getStatusColor = (status) => {
     const colors = {
-      approved: '#27ae60',
-      pending: '#f39c12',
-      rejected: '#e74c3c'
+      approved: '#059669',
+      pending: '#f59e0b',
+      rejected: '#dc2626'
     };
-    return colors[status] || '#757575';
+    return colors[status?.toLowerCase()] || '#6b7280';
   };
 
-  const RegistrationCard = ({ registration }) => (
-    <div className="registration-card">
-      <div className="registration-header">
-        <div className="event-type-badge" style={{ backgroundColor: getEventTypeColor(registration.eventType) }}>
-          {registration.eventType.toUpperCase()}
-        </div>
-        <div className="status-badge" style={{ backgroundColor: getStatusColor(registration.status) }}>
-          {registration.status.toUpperCase()}
-        </div>
-      </div>
+  const getDaysUntilEvent = (dateString) => {
+    if (!dateString) return null;
+    const eventDate = new Date(dateString);
+    const today = new Date();
+    const diffTime = eventDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return 'Past';
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    return `In ${diffDays} days`;
+  };
 
-      <h3 className="event-title">{registration.eventTitle}</h3>
-
-      <div className="event-details">
-        <div className="detail-item">
-          <span className="detail-label">📅 Event Date:</span>
-          <span>{formatDate(registration.eventDate)}</span>
-        </div>
-        <div className="detail-item">
-          <span className="detail-label">📍 Location:</span>
-          <span>{registration.eventLocation}</span>
-        </div>
-        {registration.capacity && (
-          <div className="detail-item">
-            <span className="detail-label">👥 Capacity:</span>
-            <span>{registration.registeredCount || 0}/{registration.capacity}</span>
-          </div>
-        )}
-        <div className="detail-item">
-          <span className="detail-label">📝 Registered:</span>
-          <span>{formatDate(registration.registeredAt)}</span>
-        </div>
-      </div>
-
-      {registration.eventDescription && (
-        <p className="event-description">{registration.eventDescription}</p>
-      )}
-
-      <div className="student-info">
-        <div className="info-section">
-          <h4>Your Registration Details</h4>
-          <div className="detail-item">
-            <span className="detail-label">Name:</span>
-            <span>{registration.studentName}</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Student ID:</span>
-            <span>{registration.studentId}</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Email:</span>
-            <span>{registration.studentEmail}</span>
-          </div>
-        </div>
-
-        {registration.eventType === 'trip' && (
-          <div className="info-section">
-            <h4>Trip Information</h4>
-            {registration.emergencyContact && (
-              <>
-                <div className="detail-item">
-                  <span className="detail-label">Emergency Contact:</span>
-                  <span>{registration.emergencyContact.name}</span>
-                </div>
-                {registration.emergencyContact.phone && (
-                  <div className="detail-item">
-                    <span className="detail-label">Contact Phone:</span>
-                    <span>{registration.emergencyContact.phone}</span>
-                  </div>
-                )}
-              </>
-            )}
-            {registration.dietaryRequirements && (
-              <div className="detail-item">
-                <span className="detail-label">Dietary Requirements:</span>
-                <span>{registration.dietaryRequirements}</span>
-              </div>
-            )}
-            {registration.medicalConditions && (
-              <div className="detail-item">
-                <span className="detail-label">Medical Conditions:</span>
-                <span>{registration.medicalConditions}</span>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const displayName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`
+    : user?.name || 'Student';
 
   if (loading) {
     return (
-      <div className="my-registrations-container">
-        <div className="loading">Loading registrations...</div>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#f8f6f6'
+      }}>
+        <div style={{
+          width: '2.5rem',
+          height: '2.5rem',
+          border: '3px solid #e5e7eb',
+          borderTop: '3px solid #1e40af',
+          borderRadius: '50%',
+          display: 'inline-block'
+        }} className="spinner"></div>
       </div>
     );
   }
 
   return (
-    <div className="my-registrations-container">
-      <div className="page-header">
-        <h1>📋 My Event Registrations</h1>
-        <p>View all your registered workshops and trips</p>
-        {user?.email && (
-          <div className="user-info">
-            <p><strong>Logged in as:</strong> {user.email}</p>
+    <div style={{
+      display: 'flex',
+      height: '100vh',
+      fontFamily: 'Inter, sans-serif',
+      backgroundColor: '#f8f6f6'
+    }}>
+      {/* Left Sidebar */}
+      <aside style={{
+        width: sidebarOpen ? '16rem' : '0',
+        flexShrink: 0,
+        backgroundColor: '#1D3557',
+        padding: sidebarOpen ? '1.5rem' : '0',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        overflow: 'hidden',
+        transition: 'width 0.3s ease, padding 0.3s ease'
+      }}>
+        {/* Top Section - Logo and Navigation */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {/* Logo and Branding */}
+          {sidebarOpen && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                borderRadius: '50%',
+                backgroundColor: '#457B9D',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF'
+              }}>
+                <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
+                </svg>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <h1 style={{
+                  color: '#FFFFFF',
+                  fontSize: '1rem',
+                  fontWeight: '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Student Events
+                </h1>
+                <p style={{
+                  color: 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: '400',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  University Portal
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation */}
+          {sidebarOpen && (
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <Link
+                to="/dashboard"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/dashboard')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/dashboard')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{
+                  color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '1.25rem'
+                }}>
+                  dashboard
+                </span>
+                <p style={{
+                  color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/dashboard') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Dashboard
+                </p>
+              </Link>
+
+              <Link
+                to="/student/events"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/student/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/student/events')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/student/events')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{
+                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '1.25rem'
+                }}>
+                  explore
+                </span>
+                <p style={{
+                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/student/events') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Discover Events
+                </p>
+              </Link>
+
+              <Link
+                to="/student/my-registrations"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/student/my-registrations') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/student/my-registrations')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/student/my-registrations')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{
+                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '1.25rem'
+                }}>
+                  event
+                </span>
+                <p style={{
+                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/student/my-registrations') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  My Events
+                </p>
+              </Link>
+
+              <Link
+                to="/student/courts"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/student/courts') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/student/courts')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/student/courts')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{
+                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '1.25rem'
+                }}>
+                  sports_tennis
+                </span>
+                <p style={{
+                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/student/courts') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Campus Courts
+                </p>
+              </Link>
+
+              <Link
+                to="/gym"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/gym') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/gym')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/gym')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{
+                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '1.25rem'
+                }}>
+                  fitness_center
+                </span>
+                <p style={{
+                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/gym') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Gym Sessions
+                </p>
+              </Link>
+            </nav>
+          )}
+        </div>
+
+        {/* Logout Button - Fixed at bottom */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textAlign: 'left',
+              width: '100%'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ color: 'rgba(241, 250, 238, 0.7)', fontSize: '1.25rem' }}>
+              logout
+            </span>
+            {sidebarOpen && (
+              <p style={{
+                color: 'rgba(241, 250, 238, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                lineHeight: 'normal',
+                margin: 0
+              }}>
+                Logout
+              </p>
+            )}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
+        {/* Header */}
+        <header style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '1rem 2.5rem',
+          backgroundColor: '#FFFFFF'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#1D3557'
+              }}
+              aria-label="Toggle sidebar"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                menu
+              </span>
+            </button>
+            <h2 style={{
+              color: '#1D3557',
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              lineHeight: '1.25',
+              margin: 0
+            }}>
+              My Events
+            </h2>
           </div>
-        )}
-      </div>
-
-      {loading && (
-        <div className="loading-message">
-          <p>Loading your registrations...</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="error-message">
-          ❌ {error}
-        </div>
-      )}
-
-      {!loading && user?.email && (
-        <div className="results-header">
-          <h2>Your Registrations</h2>
-          <p>Found {registrations.length} registration{registrations.length !== 1 ? 's' : ''}</p>
-        </div>
-      )}
-
-      <div className="registrations-grid">
-        {!loading && registrations.length === 0 && user?.email ? (
-          <div className="no-registrations">
-            <p>No registrations found for your account.</p>
-            <p>Make sure you've registered for workshops or trips using your email.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#1D3557',
+                margin: 0
+              }}>
+                {displayName}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                margin: 0
+              }}>
+                Student
+              </p>
+            </div>
+            {user?.profilePicturePath ? (
+              <img
+                src={`http://localhost:5000${user.profilePicturePath}`}
+                alt="User profile"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                borderRadius: '50%',
+                backgroundColor: '#1D3557',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF',
+                fontWeight: '600'
+              }}>
+                {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
+              </div>
+            )}
           </div>
-        ) : (
-          registrations.map(registration => (
-            <RegistrationCard key={registration.id} registration={registration} />
-          ))
-        )}
-      </div>
+        </header>
+
+        {/* Content */}
+        <div style={{
+          flex: 1,
+          padding: '2rem',
+          overflowY: 'auto',
+          backgroundColor: '#f8f6f6'
+        }}>
+          {error && (
+            <div style={{
+              padding: '0.75rem 1rem',
+              marginBottom: '1.5rem',
+              borderRadius: '0.375rem',
+              backgroundColor: '#fee2e2',
+              color: '#991b1b',
+              fontSize: '0.875rem'
+            }}>
+              {error}
+            </div>
+          )}
+
+          {!loading && registrations.length === 0 ? (
+            <div style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              padding: '4rem 2rem',
+              textAlign: 'center',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+            }}>
+              <div style={{
+                fontSize: '3rem',
+                marginBottom: '1rem',
+                opacity: 0.5
+              }}>📋</div>
+              <p style={{
+                color: '#374151',
+                fontSize: '1.125rem',
+                fontWeight: '500',
+                marginBottom: '0.5rem',
+                marginTop: 0
+              }}>
+                No registrations found
+              </p>
+              <p style={{
+                color: '#6b7280',
+                fontSize: '0.875rem',
+                marginBottom: '1.5rem',
+                marginTop: 0
+              }}>
+                You haven't registered for any events yet. Browse events to get started!
+              </p>
+              <button
+                onClick={() => navigate('/student/events')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#1e40af',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#1e3a8a';
+                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#1e40af';
+                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                }}
+              >
+                Browse Events
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{
+                marginBottom: '1.5rem',
+                color: '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}>
+                Found {registrations.length} registration{registrations.length !== 1 ? 's' : ''}
+              </div>
+              
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                {registrations.map(registration => (
+                  <div
+                    key={registration.id}
+                    onClick={() => setSelectedRegistration(registration)}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '0.75rem',
+                      padding: '1.5rem',
+                      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      border: '1px solid #e5e7eb',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.borderColor = '#1e40af';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div style={{
+                        padding: '0.375rem 0.875rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: getEventTypeColor(registration.eventType),
+                        color: '#FFFFFF',
+                        fontSize: '0.6875rem',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        {registration.eventType}
+                      </div>
+                      <div style={{
+                        padding: '0.375rem 0.875rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: getStatusColor(registration.status),
+                        color: '#FFFFFF',
+                        fontSize: '0.6875rem',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        {registration.status}
+                      </div>
+                    </div>
+                    
+                    <h3 style={{
+                      color: '#1D3557',
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      marginBottom: '1rem',
+                      marginTop: 0,
+                      lineHeight: '1.4'
+                    }}>
+                      {registration.eventTitle}
+                    </h3>
+                    
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.625rem',
+                      marginBottom: '1rem',
+                      flex: 1
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.625rem',
+                        fontSize: '0.8125rem',
+                        color: '#6b7280'
+                      }}>
+                        <span className="material-symbols-outlined" style={{
+                          fontSize: '1.125rem',
+                          color: '#9ca3af'
+                        }}>
+                          calendar_today
+                        </span>
+                        <span>{formatDate(registration.eventDate)}</span>
+                        {getDaysUntilEvent(registration.eventDate) && (
+                          <span style={{
+                            fontSize: '0.75rem',
+                            color: '#1e40af',
+                            fontWeight: '600',
+                            backgroundColor: '#eff6ff',
+                            padding: '0.25rem 0.625rem',
+                            borderRadius: '0.375rem',
+                            marginLeft: 'auto'
+                          }}>
+                            {getDaysUntilEvent(registration.eventDate)}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.625rem',
+                        fontSize: '0.8125rem',
+                        color: '#6b7280'
+                      }}>
+                        <span className="material-symbols-outlined" style={{
+                          fontSize: '1.125rem',
+                          color: '#9ca3af'
+                        }}>
+                          location_on
+                        </span>
+                        <span>{registration.eventLocation}</span>
+                      </div>
+                      {registration.capacity && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            people
+                          </span>
+                          <span>{registration.registeredCount || 0}/{registration.capacity} registered</span>
+                        </div>
+                      )}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.625rem',
+                        fontSize: '0.8125rem',
+                        color: '#6b7280'
+                      }}>
+                        <span className="material-symbols-outlined" style={{
+                          fontSize: '1.125rem',
+                          color: '#9ca3af'
+                        }}>
+                          schedule
+                        </span>
+                        <span>Registered: {formatDate(registration.registeredAt)}</span>
+                      </div>
+                    </div>
+
+                    {registration.eventDescription && (
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.8125rem',
+                        marginBottom: '1rem',
+                        marginTop: 0,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        lineHeight: '1.5'
+                      }}>
+                        {registration.eventDescription}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </main>
+
+      {/* Registration Detail Modal */}
+      {selectedRegistration && (
+        <div
+          onClick={() => setSelectedRegistration(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem',
+            backdropFilter: 'blur(4px)'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '600px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                margin: 0
+              }}>
+                {selectedRegistration.eventTitle}
+              </h2>
+              <button
+                onClick={() => setSelectedRegistration(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.25rem',
+                  transition: 'background-color 0.2s',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2rem',
+                  height: '2rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{
+                  padding: '0.375rem 0.875rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: getEventTypeColor(selectedRegistration.eventType),
+                  color: '#FFFFFF',
+                  fontSize: '0.6875rem',
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  {selectedRegistration.eventType}
+                </div>
+                <div style={{
+                  padding: '0.375rem 0.875rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: getStatusColor(selectedRegistration.status),
+                  color: '#FFFFFF',
+                  fontSize: '0.6875rem',
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  {selectedRegistration.status}
+                </div>
+              </div>
+              
+              <div style={{
+                display: 'grid',
+                gap: '1rem',
+                marginBottom: '1.5rem',
+                padding: '1rem',
+                backgroundColor: '#f9fafb',
+                borderRadius: '0.5rem'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem'
+                }}>
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.25rem',
+                    color: '#9ca3af'
+                  }}>
+                    calendar_today
+                  </span>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Event Date</div>
+                    <div style={{ color: '#374151', fontWeight: '500' }}>{formatDate(selectedRegistration.eventDate)}</div>
+                  </div>
+                </div>
+                {selectedRegistration.eventEndDate && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      event
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>End Date</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>{formatDate(selectedRegistration.eventEndDate)}</div>
+                    </div>
+                  </div>
+                )}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem'
+                }}>
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.25rem',
+                    color: '#9ca3af'
+                  }}>
+                    location_on
+                  </span>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Location</div>
+                    <div style={{ color: '#374151', fontWeight: '500' }}>{selectedRegistration.eventLocation}</div>
+                  </div>
+                </div>
+                {selectedRegistration.capacity && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      people
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Capacity</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>{selectedRegistration.registeredCount || 0}/{selectedRegistration.capacity} registered</div>
+                    </div>
+                  </div>
+                )}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem'
+                }}>
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.25rem',
+                    color: '#9ca3af'
+                  }}>
+                    schedule
+                  </span>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Registered At</div>
+                    <div style={{ color: '#374151', fontWeight: '500' }}>{formatDate(selectedRegistration.registeredAt)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {selectedRegistration.eventDescription && (
+                <div style={{
+                  marginBottom: '1.5rem',
+                  padding: '1rem',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '0.5rem'
+                }}>
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#9ca3af',
+                    marginBottom: '0.5rem',
+                    fontWeight: '500',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    Description
+                  </div>
+                  <p style={{
+                    color: '#374151',
+                    lineHeight: '1.6',
+                    margin: 0,
+                    fontSize: '0.875rem'
+                  }}>
+                    {selectedRegistration.eventDescription}
+                  </p>
+                </div>
+              )}
+
+              <div style={{
+                marginBottom: '1.5rem',
+                padding: '1rem',
+                backgroundColor: '#f9fafb',
+                borderRadius: '0.5rem'
+              }}>
+                <div style={{
+                  fontSize: '0.75rem',
+                  color: '#9ca3af',
+                  marginBottom: '0.75rem',
+                  fontWeight: '500',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                    person
+                  </span>
+                  Your Registration Details
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gap: '0.75rem'
+                }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Name</div>
+                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentName}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Student ID</div>
+                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentId}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Email</div>
+                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentEmail}</div>
+                  </div>
+                </div>
+              </div>
+
+              {selectedRegistration.eventType === 'trip' && (
+                <div style={{
+                  marginBottom: '1.5rem',
+                  padding: '1rem',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '0.5rem'
+                }}>
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#9ca3af',
+                    marginBottom: '0.75rem',
+                    fontWeight: '500',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                      flight_takeoff
+                    </span>
+                    Trip Information
+                  </div>
+                  {selectedRegistration.emergencyContact && (
+                    <div style={{
+                      display: 'grid',
+                      gap: '0.75rem',
+                      marginBottom: '0.75rem'
+                    }}>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Emergency Contact</div>
+                        <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.emergencyContact.name}</div>
+                      </div>
+                      {selectedRegistration.emergencyContact.phone && (
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Contact Phone</div>
+                          <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.emergencyContact.phone}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {selectedRegistration.dietaryRequirements && (
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Dietary Requirements</div>
+                      <div style={{ color: '#374151', fontSize: '0.875rem' }}>{selectedRegistration.dietaryRequirements}</div>
+                    </div>
+                  )}
+                  {selectedRegistration.medicalConditions && (
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Medical Conditions</div>
+                      <div style={{ color: '#374151', fontSize: '0.875rem' }}>{selectedRegistration.medicalConditions}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
