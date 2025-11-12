@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { eventsApiService } from '../api/eventsApi';
 import { useAuth } from '../contexts/AuthContext';
 import StudentRegistrationForm from '../components/StudentRegistrationForm';
-import '../styles/StudentEventsView.css';
 
 const StaffEventsView = () => {
   const { user } = useAuth();
@@ -166,7 +165,7 @@ const StaffEventsView = () => {
 
   const getEventTypeColor = (type) => {
     const colors = {
-      bazaar: '#4CAF50',
+      bazaar: '#F48FB1', // Light pink
       trip: '#2196F3',
       sports: '#FF9800',
       seminar: '#9C27B0',

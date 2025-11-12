@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import ProfessorDashboardOverview from '../components/ProfessorDashboardOverview';
+import StudentDashboard from '../components/StudentDashboard';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -85,6 +86,12 @@ const Dashboard = () => {
   }, [user]);
 
   const isAdmin = user?.role === 'admin' || user?.userType === 'admin' || user?.userType === 'Admin';
+  const isStudent = user?.userType === 'Student' || user?.userType === 'student';
+
+  // Show Student Dashboard for students
+  if (isStudent) {
+    return <StudentDashboard />;
+  }
 
   return (
     <div style={{ padding: '2rem' }}>

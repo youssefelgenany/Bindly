@@ -1,7 +1,6 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Navbar from './components/Navbar';
 import AdminUsers from './pages/AdminUsers';
 import AdminVendors from './pages/AdminVendors';
 import AdminEvents from './pages/AdminEvents';
@@ -39,6 +38,7 @@ import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
 import CourtAvailability from './pages/CourtAvailability';
 import PlatformBoothReservation from './pages/PlatformBoothReservation';
+import EventsOfficeEventsView from './pages/EventsOfficeEventsView';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -220,18 +220,9 @@ const StaffAndTAOnly = ({ children }) => {
   return isStaffOrTAOrProfessor ? children : <Navigate to="/dashboard" />;
 };
 
-// Component to conditionally show Navbar
 const AppContent = () => {
-  const location = useLocation();
-  const hideNavbarPaths = ['/login', '/signup'];
-  const hideNavbarForPaths = ['/event-office', '/vendor', '/create-bazaar', '/create-trip', '/create-conference', '/create-gym-session'];
-  const isExactMatch = hideNavbarPaths.includes(location.pathname);
-  const isPathStart = hideNavbarForPaths.some(path => location.pathname.startsWith(path));
-  const showNavbar = !isExactMatch && !isPathStart;
-
   return (
     <div className="App">
-      {showNavbar && <Navbar />}
       <Routes>
             <Route path="/" element={<Navigate to="/login" />} />
             <Route
@@ -318,6 +309,16 @@ const AppContent = () => {
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <VendorRequests />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/event-office/events"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <EventsOfficeEventsView />
                   </EventsOfficeOnly>
                 </ProtectedRoute>
               }
@@ -537,9 +538,7 @@ const AppContent = () => {
               path="/create-gym-session"
               element={
                 <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <CreateGymSession />
-                  </EventsOfficeOnly>
+                  <CreateGymSession />
                 </ProtectedRoute>
               }
             />

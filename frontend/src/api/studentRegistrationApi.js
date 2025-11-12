@@ -25,9 +25,10 @@ export const studentRegistrationApi = {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error fetching my registrations:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch registrations';
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to fetch registrations',
+        message: errorMessage,
         error: error.response?.data || error.message,
       };
     }

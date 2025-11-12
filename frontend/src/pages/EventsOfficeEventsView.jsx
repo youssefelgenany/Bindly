@@ -2,26 +2,20 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { eventsApiService } from '../api/eventsApi';
-import { studentRegistrationApi } from '../api/studentRegistrationApi';
-import StudentRegistrationForm from '../components/StudentRegistrationForm';
-import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
 
-const StudentEventsView = () => {
+const EventsOfficeEventsView = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [showRegistrationForm, setShowRegistrationForm] = useState(false);
-  const [registrationEvent, setRegistrationEvent] = useState(null);
-  const [showWorkshopEditModal, setShowWorkshopEditModal] = useState(false);
-  const [selectedWorkshop, setSelectedWorkshop] = useState(null);
-  const [registeredEventIds, setRegisteredEventIds] = useState(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [deletingEventId, setDeletingEventId] = useState(null);
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -89,72 +83,34 @@ const StudentEventsView = () => {
     loadEvents();
   }, [filter, loadEvents]);
 
-  // Load user's registrations to check which events they're registered for
-  useEffect(() => {
-    const loadUserRegistrations = async () => {
-      if (!user?.email) return;
-      
-      try {
-        const result = await studentRegistrationApi.getMyRegistrations(user.email);
-        if (result.success && result.data.registrations) {
-          // Extract event IDs from registrations
-          const registeredIds = new Set();
-          result.data.registrations.forEach(reg => {
-            // Check for eventId in the formatted response
-            if (reg.eventId) {
-              registeredIds.add(String(reg.eventId));
-            }
-            // Fallback: check if event object exists with _id
-            else if (reg.event && typeof reg.event === 'object' && reg.event._id) {
-              registeredIds.add(String(reg.event._id));
-            } 
-            // Fallback: check if event is a string ID
-            else if (reg.event && typeof reg.event === 'string') {
-              registeredIds.add(reg.event);
-            }
-          });
-          setRegisteredEventIds(registeredIds);
-        }
-      } catch (error) {
-        console.error('Error loading user registrations:', error);
-      }
-    };
-
-    loadUserRegistrations();
-  }, [user]);
-
   const handleSearch = () => {
     loadEvents();
   };
 
-  const handleRegisterClick = (event) => {
-    setRegistrationEvent(event);
-    setShowRegistrationForm(true);
-  };
+  const handleDeleteEvent = async (event) => {
+    if (!event) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${event.title}"?\n\nThis action cannot be undone.`
+    );
+    if (!confirmed) return;
 
-  const handleRegistrationSuccess = (registrationData) => {
-    setShowRegistrationForm(false);
-    // Add the event ID to registered set
-    if (registrationEvent?.id) {
-      setRegisteredEventIds(prev => new Set([...prev, String(registrationEvent.id)]));
+    setDeletingEventId(event.id);
+    setDeleting(true);
+    try {
+      const result = await eventsApiService.deleteEvent(event.id);
+      
+      if (result.success) {
+        alert(`${event.type.charAt(0).toUpperCase() + event.type.slice(1)} deleted successfully!`);
+        await loadEvents();
+      } else {
+        alert(`Error deleting ${event.type}: ${result.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      alert(`Error deleting ${event.type}: ${error.message}`);
+    } finally {
+      setDeleting(false);
+      setDeletingEventId(null);
     }
-    setRegistrationEvent(null);
-    loadEvents();
-  };
-
-  const handleCloseRegistrationForm = () => {
-    setShowRegistrationForm(false);
-    setRegistrationEvent(null);
-  };
-
-  const handleCloseWorkshopEditModal = () => {
-    setShowWorkshopEditModal(false);
-    setSelectedWorkshop(null);
-  };
-
-  const handleWorkshopEditRequest = (event) => {
-    setSelectedWorkshop(event);
-    setShowWorkshopEditModal(true);
   };
 
   const formatDate = (dateString) => {
@@ -191,14 +147,15 @@ const StudentEventsView = () => {
       workshop: '#607D8B',
       conference: '#795548',
       booth: '#3F51B5',
+      standalonebooth: '#3F51B5',
       other: '#757575'
     };
-    return colors[type] || colors.other;
+    return colors[type?.toLowerCase()] || colors.other;
   };
 
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
-    : user?.name || 'Student';
+    : user?.name || 'Events Office';
 
   return (
     <div style={{
@@ -246,7 +203,7 @@ const StudentEventsView = () => {
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  Student Events
+                  Events Office
                 </h1>
                 <p style={{
                   color: 'rgba(241, 250, 238, 0.7)',
@@ -265,24 +222,24 @@ const StudentEventsView = () => {
           {sidebarOpen && (
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <Link
-                to="/dashboard"
+                to="/event-office"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                  backgroundColor: isActiveRoute('/event-office') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
                   textDecoration: 'none',
                   color: '#FFFFFF'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
+                  if (!isActiveRoute('/event-office')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
+                  if (!isActiveRoute('/event-office')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
@@ -302,37 +259,37 @@ const StudentEventsView = () => {
               </Link>
 
               <Link
-                to="/student/events"
+                to="/event-office/events"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/event-office/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/events')) {
+                  if (!isActiveRoute('/event-office/events')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/events')) {
+                  if (!isActiveRoute('/event-office/events')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
                   fontSize: '1.25rem' 
                 }}>
                   explore
                 </span>
                 <p style={{
-                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/events') ? '700' : '500',
+                  fontWeight: isActiveRoute('/event-office/events') ? '700' : '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
@@ -341,115 +298,154 @@ const StudentEventsView = () => {
               </Link>
 
               <Link
-                to="/student/my-registrations"
+                to="/create-bazaar"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/my-registrations') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/create-bazaar') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/my-registrations')) {
+                  if (!isActiveRoute('/create-bazaar')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/my-registrations')) {
+                  if (!isActiveRoute('/create-bazaar')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  color: isActiveRoute('/create-bazaar') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
                   fontSize: '1.25rem' 
                 }}>
-                  event
+                  storefront
                 </span>
                 <p style={{
-                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/create-bazaar') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/my-registrations') ? '700' : '500',
+                  fontWeight: isActiveRoute('/create-bazaar') ? '700' : '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  My Events
+                  Bazaars
                 </p>
               </Link>
 
               <Link
-                to="/student/courts"
+                to="/create-trip"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/courts') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/create-trip') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/courts')) {
+                  if (!isActiveRoute('/create-trip')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/courts')) {
+                  if (!isActiveRoute('/create-trip')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  color: isActiveRoute('/create-trip') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
                   fontSize: '1.25rem' 
                 }}>
-                  sports_tennis
+                  flight_takeoff
                 </span>
                 <p style={{
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/create-trip') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/courts') ? '700' : '500',
+                  fontWeight: isActiveRoute('/create-trip') ? '700' : '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  Campus Courts
+                  Trips
                 </p>
               </Link>
 
               <Link
-                to="/gym"
+                to="/create-conference"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/gym') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/create-conference') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/gym')) {
+                  if (!isActiveRoute('/create-conference')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/gym')) {
+                  if (!isActiveRoute('/create-conference')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  color: isActiveRoute('/create-conference') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
                   fontSize: '1.25rem' 
                 }}>
-                  sports_gymnastics
+                  groups
                 </span>
                 <p style={{
-                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/create-conference') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/gym') ? '700' : '500',
+                  fontWeight: isActiveRoute('/create-conference') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Conferences
+                </p>
+              </Link>
+
+              <Link
+                to="/create-gym-session"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/create-gym-session') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/create-gym-session')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/create-gym-session')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  fitness_center
+                </span>
+                <p style={{
+                  color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/create-gym-session') ? '700' : '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
@@ -459,7 +455,7 @@ const StudentEventsView = () => {
             </nav>
           )}
         </div>
-        
+
         {/* Logout Button - Fixed at bottom */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <button
@@ -561,7 +557,7 @@ const StudentEventsView = () => {
                 color: '#6b7280',
                 margin: 0
               }}>
-                Student
+                Events Office
               </p>
             </div>
             {user?.profilePicturePath ? (
@@ -587,7 +583,7 @@ const StudentEventsView = () => {
                 color: '#FFFFFF',
                 fontWeight: '600'
               }}>
-                {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
+                {(user?.firstName?.[0] || user?.name?.[0] || 'E').toUpperCase()}
               </div>
             )}
           </div>
@@ -1022,64 +1018,48 @@ const StudentEventsView = () => {
                       </p>
                     )}
 
-                    {(event.type === 'workshop' || event.type === 'trip') && (
-                      registeredEventIds.has(String(event.id)) ? (
-                        <button
-                          disabled
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem 1rem',
-                            borderRadius: '0.5rem',
-                            backgroundColor: '#10b981',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            cursor: 'not-allowed',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            marginTop: 'auto',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                          }}
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
-                          Registered
-                        </button>
-                      ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRegisterClick(event);
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem 1rem',
-                            borderRadius: '0.5rem',
-                            backgroundColor: '#1e40af',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            transition: 'all 0.2s',
-                            marginTop: 'auto',
-                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = '#1e3a8a';
-                            e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = '#1e40af';
-                            e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                          }}
-                        >
-                          Register for {event.type === 'workshop' ? 'Workshop' : 'Trip'}
-                        </button>
-                      )
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteEvent(event);
+                      }}
+                      disabled={deleting && deletingEventId === event.id}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: deleting && deletingEventId === event.id ? '#9ca3af' : '#dc2626',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        cursor: deleting && deletingEventId === event.id ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        transition: 'all 0.2s',
+                        marginTop: 'auto',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!(deleting && deletingEventId === event.id)) {
+                          e.target.style.backgroundColor = '#b91c1c';
+                          e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!(deleting && deletingEventId === event.id)) {
+                          e.target.style.backgroundColor = '#dc2626';
+                          e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                        }
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                        {deleting && deletingEventId === event.id ? 'hourglass_empty' : 'delete'}
+                      </span>
+                      {deleting && deletingEventId === event.id ? 'Deleting...' : 'Delete Event'}
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1418,115 +1398,55 @@ const StudentEventsView = () => {
                 </div>
               )}
 
-              {(selectedEvent.type === 'workshop' || selectedEvent.type === 'trip') && (
-                registeredEventIds.has(String(selectedEvent.id)) ? (
-                  <button
-                    disabled
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem 1rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: '#10b981',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      cursor: 'not-allowed',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.5rem',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                    }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>check_circle</span>
-                    Registered
-                  </button>
-                ) : (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRegisterClick(selectedEvent);
-                      setSelectedEvent(null);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem 1rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: '#1e40af',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      transition: 'all 0.2s',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#1e3a8a';
-                      e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#1e40af';
-                      e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                    }}
-                  >
-                    Register for {selectedEvent.type === 'workshop' ? 'Workshop' : 'Trip'}
-                  </button>
-                )
-              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteEvent(selectedEvent);
+                  setSelectedEvent(null);
+                }}
+                disabled={deleting && deletingEventId === selectedEvent.id}
+                style={{
+                  width: '100%',
+                  padding: '0.875rem 1rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: deleting && deletingEventId === selectedEvent.id ? '#9ca3af' : '#dc2626',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: deleting && deletingEventId === selectedEvent.id ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  if (!(deleting && deletingEventId === selectedEvent.id)) {
+                    e.target.style.backgroundColor = '#b91c1c';
+                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!(deleting && deletingEventId === selectedEvent.id)) {
+                    e.target.style.backgroundColor = '#dc2626';
+                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                  {deleting && deletingEventId === selectedEvent.id ? 'hourglass_empty' : 'delete'}
+                </span>
+                {deleting && deletingEventId === selectedEvent.id ? 'Deleting...' : 'Delete Event'}
+              </button>
             </div>
           </div>
         </div>
-      )}
-
-      {/* Registration Form Modal */}
-      {showRegistrationForm && registrationEvent && (
-        <div
-          onClick={handleCloseRegistrationForm}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem'
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '0.5rem',
-              maxWidth: '600px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-            }}
-          >
-            <StudentRegistrationForm
-              event={registrationEvent}
-              onClose={handleCloseRegistrationForm}
-              onSuccess={handleRegistrationSuccess}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Workshop Edit Request Modal */}
-      {showWorkshopEditModal && selectedWorkshop && (
-        <WorkshopEditRequestModal
-          open={showWorkshopEditModal}
-          onClose={handleCloseWorkshopEditModal}
-          workshop={selectedWorkshop}
-          onSubmitted={handleCloseWorkshopEditModal}
-        />
       )}
     </div>
   );
 };
 
-export default StudentEventsView;
+export default EventsOfficeEventsView;
+

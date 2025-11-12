@@ -139,7 +139,7 @@ const Events = () => {
 
   const getEventTypeColor = (type) => {
     const colors = {
-      'bazaar': '#28a745',
+      'bazaar': '#F48FB1', // Light pink
       'booth': '#dc3545',
       'trip': '#007bff',
       'workshop': '#6f42c1',
