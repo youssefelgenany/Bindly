@@ -97,9 +97,42 @@ exports.createConference = async (req, res) => {
 // 📈 Get sales report for events (admin and event office only)
 exports.getSalesReport = async (req, res) => {
   try {
+    const { startDate, endDate, type } = req.query || {};
+
     const entries = Array.isArray(salesReport) ? [...salesReport] : [];
 
-    const sortedReport = entries
+    const normalizeType = (value) =>
+      String(value || '')
+        .trim()
+        .toLowerCase();
+
+    const requestedType = type ? normalizeType(type) : null;
+
+    const filteredEntries = entries.filter((entry) => {
+      const entryType = normalizeType(entry.type || entry.category);
+
+      if (requestedType && entryType !== requestedType) {
+        return false;
+      }
+
+      if (startDate) {
+        const entryStart = new Date(entry.startDate);
+        if (Number.isNaN(entryStart.getTime()) || entryStart < new Date(startDate)) {
+          return false;
+        }
+      }
+
+      if (endDate) {
+        const entryEnd = new Date(entry.endDate || entry.startDate);
+        if (Number.isNaN(entryEnd.getTime()) || entryEnd > new Date(endDate)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    const sortedReport = filteredEntries
       .map((entry) => {
         const ticketsSold = Number(entry.ticketsSold) || 0;
         const totalRevenue = Number(entry.totalRevenue) || 0;
