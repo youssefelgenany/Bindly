@@ -263,3 +263,45 @@ exports.getUserNotifications = async (userId, options = {}) => {
   
   return { notifications, total, unreadCount, limit, skip };
 };
+
+// Notify all eligible users when a new event is created
+exports.notifyNewEventCreated = async (event) => {
+  try {
+    // Find all users (Students, Staff, TAs, Professors, Events Office)
+    const allUsers = await User.find({
+      userType: { $in: ['Student', 'Staff', 'TA', 'Professor', 'Events Office'] }
+    });
+    
+    for (const user of allUsers) {
+      // Check if notification already exists for this user and event
+      const existingNotification = await Notification.findOne({
+        recipient: user._id,
+        type: 'event_announcement',
+        'metadata.eventId': event._id.toString()
+      });
+      
+      if (!existingNotification) {
+        await Notification.create({
+          recipient: user._id,
+          type: 'event_announcement',
+          title: `New Event: ${event.title}`,
+          message: `A new event "${event.title}" has been added on ${new Date(event.startDate).toLocaleDateString()} at ${event.location}`,
+          relatedEvent: event._id,
+          priority: 'medium',
+          metadata: {
+            eventTitle: event.title,
+            eventDate: event.startDate,
+            eventType: event.type,
+            location: event.location,
+            description: event.description,
+            eventId: event._id.toString(),
+            createdBy: event.createdBy?.toString(),
+            createdAt: new Date()
+          }
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error notifying new event created:', error);
+  }
+};
