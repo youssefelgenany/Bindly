@@ -33,7 +33,19 @@ const StudentCourtsView = () => {
       const result = await courtsApiService.getCourts();
       
       if (result.success) {
-        setCourts(result.data.courts || []);
+        // Filter out courts with empty or missing essential data
+        const allCourts = result.data.courts || [];
+        const filteredCourts = allCourts.filter(court => {
+          // Keep only courts with name, type, and location
+          return court && 
+                 court.name && 
+                 court.name.trim() !== '' && 
+                 court.type && 
+                 court.type.trim() !== '' &&
+                 court.location && 
+                 court.location.trim() !== '';
+        });
+        setCourts(filteredCourts);
       } else {
         setCourts([]);
         setError(result.message || 'Failed to fetch courts');
@@ -659,26 +671,30 @@ const StudentCourtsView = () => {
                     flexDirection: 'column',
                     gap: '0.5rem'
                   }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem',
-                      color: '#6b7280'
-                    }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>location_on</span>
-                      {court.location}
-                    </div>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem',
-                      color: '#6b7280'
-                    }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>groups</span>
-                      Capacity: {court.capacity} people
-                    </div>
+                    {court.location && court.location.trim() !== '' && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem',
+                        color: '#6b7280'
+                      }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>location_on</span>
+                        {court.location}
+                      </div>
+                    )}
+                    {court.capacity && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem',
+                        color: '#6b7280'
+                      }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>groups</span>
+                        Capacity: {court.capacity} people
+                      </div>
+                    )}
                     {court.facilities && court.facilities.length > 0 && (
                       <div style={{
                         display: 'flex',
@@ -992,7 +1008,9 @@ const StudentCourtsView = () => {
                       gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
                       gap: '0.75rem'
                     }}>
-                      {availabilityData.availableSlots.map((slot, index) => (
+                      {availabilityData.availableSlots
+                        .filter(slot => slot && slot.startTime && slot.endTime && slot.startTime.trim() !== '' && slot.endTime.trim() !== '')
+                        .map((slot, index) => (
                         <div
                           key={index}
                           style={{
@@ -1047,7 +1065,9 @@ const StudentCourtsView = () => {
                         flexDirection: 'column',
                         gap: '0.5rem'
                       }}>
-                        {availabilityData.bookings.map((booking, index) => (
+                        {availabilityData.bookings
+                          .filter(booking => booking && booking.startTime && booking.endTime && booking.startTime.trim() !== '' && booking.endTime.trim() !== '')
+                          .map((booking, index) => (
                           <div
                             key={index}
                             style={{

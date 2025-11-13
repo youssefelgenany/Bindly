@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { eventsApiService } from '../api/eventsApi';
+import professorApiService from '../api/professorApi';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
 import StudentRegistrationForm from '../components/StudentRegistrationForm';
 import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
 
-const StudentEventsView = () => {
+const ProfessorEventsView = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -36,13 +36,14 @@ const StudentEventsView = () => {
     try {
       setError('');
       setLoading(true);
-      const result = await eventsApiService.getStudentEvents({
+      const result = await professorApiService.getAllEvents({
         q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
         type: filter !== 'all' ? filter : undefined
       });
       
       if (result.success) {
-        const mapped = (result.data || []).map(ev => ({
+        const eventsList = Array.isArray(result.data) ? result.data : (result.data.events || []);
+        const mapped = eventsList.map(ev => ({
           id: ev._id || ev.id,
           title: ev.title,
           type: ev.type,
@@ -99,6 +100,8 @@ const StudentEventsView = () => {
       if (!user?.email) return;
       
       try {
+        // Professors register through StudentRegistrationForm which uses studentRegistrationApi
+        // So we need to check the student registration API, not the professor registration API
         const result = await studentRegistrationApi.getMyRegistrations(user.email);
         if (result.success && result.data.registrations) {
           // Extract event IDs from registrations
@@ -117,6 +120,7 @@ const StudentEventsView = () => {
               registeredIds.add(reg.event);
             }
           });
+          console.log('✅ Professor registered event IDs:', Array.from(registeredIds));
           setRegisteredEventIds(registeredIds);
         }
       } catch (error) {
@@ -201,7 +205,7 @@ const StudentEventsView = () => {
 
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
-    : user?.name || 'Student';
+    : user?.name || 'Professor';
 
   return (
     <div style={{
@@ -237,9 +241,7 @@ const StudentEventsView = () => {
                 justifyContent: 'center',
                 color: '#FFFFFF'
               }}>
-                <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
-                </svg>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <h1 style={{
@@ -249,7 +251,7 @@ const StudentEventsView = () => {
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  Student Events
+                  Professor Portal
                 </h1>
                 <p style={{
                   color: 'rgba(241, 250, 238, 0.7)',
@@ -305,37 +307,37 @@ const StudentEventsView = () => {
               </Link>
 
               <Link
-                to="/student/events"
+                to="/professor/all-events"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/professor/all-events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/events')) {
+                  if (!isActiveRoute('/professor/all-events')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/events')) {
+                  if (!isActiveRoute('/professor/all-events')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
                   fontSize: '1.25rem' 
                 }}>
                   explore
                 </span>
                 <p style={{
-                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/events') ? '700' : '500',
+                  fontWeight: isActiveRoute('/professor/all-events') ? '700' : '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
@@ -343,123 +345,166 @@ const StudentEventsView = () => {
                 </p>
               </Link>
 
-              <Link
-                to="/student/my-registrations"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/my-registrations') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/my-registrations')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/my-registrations')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  event
-                </span>
-                <p style={{
-                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/my-registrations') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  My Events
-                </p>
-              </Link>
+                            <Link
+                                to="/professor/events"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    padding: '0.5rem 0.75rem',
+                                    borderRadius: '0.5rem',
+                                    backgroundColor: isActiveRoute('/professor/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                                    textDecoration: 'none'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isActiveRoute('/professor/events')) {
+                                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isActiveRoute('/professor/events')) {
+                                        e.target.style.backgroundColor = 'transparent';
+                                    }
+                                }}
+                            >
+                                <span className="material-symbols-outlined" style={{ 
+                                    color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                                    fontSize: '1.25rem' 
+                                }}>
+                                    event_note
+                                </span>
+                                <p style={{
+                                    color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                                    fontSize: '0.875rem',
+                                    fontWeight: isActiveRoute('/professor/events') ? '700' : '500',
+                                    lineHeight: 'normal',
+                                    margin: 0
+                                }}>
+                                    My Events
+                                </p>
+                            </Link>
 
-              <Link
-                to="/student/courts"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/courts') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/courts')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/courts')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  sports_tennis
-                </span>
-                <p style={{
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/courts') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Campus Courts
-                </p>
-              </Link>
+                            <Link
+                                to="/professor/my-workshops"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    padding: '0.5rem 0.75rem',
+                                    borderRadius: '0.5rem',
+                                    backgroundColor: isActiveRoute('/professor/my-workshops') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                                    textDecoration: 'none'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isActiveRoute('/professor/my-workshops')) {
+                                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isActiveRoute('/professor/my-workshops')) {
+                                        e.target.style.backgroundColor = 'transparent';
+                                    }
+                                }}
+                            >
+                                <span className="material-symbols-outlined" style={{ 
+                                    color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                                    fontSize: '1.25rem' 
+                                }}>
+                                    work
+                                </span>
+                                <p style={{
+                                    color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                                    fontSize: '0.875rem',
+                                    fontWeight: isActiveRoute('/professor/my-workshops') ? '700' : '500',
+                                    lineHeight: 'normal',
+                                    margin: 0
+                                }}>
+                                    My Workshops
+                                </p>
+                            </Link>
 
-              <Link
-                to="/gym"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/gym') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/gym')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/gym')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  sports_gymnastics
-                </span>
-                <p style={{
-                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/gym') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Gym Sessions
-                </p>
-              </Link>
-            </nav>
+                            <Link
+                                to="/gym-schedule"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    padding: '0.5rem 0.75rem',
+                                    borderRadius: '0.5rem',
+                                    backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                                    textDecoration: 'none'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isActiveRoute('/gym-schedule')) {
+                                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isActiveRoute('/gym-schedule')) {
+                                        e.target.style.backgroundColor = 'transparent';
+                                    }
+                                }}
+                            >
+                                <span className="material-symbols-outlined" style={{ 
+                                    color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                                    fontSize: '1.25rem' 
+                                }}>
+                                    calendar_month
+                                </span>
+                                {sidebarOpen && (
+                                    <p style={{
+                                        color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                                        fontSize: '0.875rem',
+                                        fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
+                                        lineHeight: 'normal',
+                                        margin: 0
+                                    }}>
+                                        View Gym Sessions
+                                    </p>
+                                )}
+                            </Link>
+
+                            <Link
+                                to="/professor/create-workshop"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    padding: '0.5rem 0.75rem',
+                                    borderRadius: '0.5rem',
+                                    backgroundColor: isActiveRoute('/professor/create-workshop') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                                    textDecoration: 'none'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isActiveRoute('/professor/create-workshop')) {
+                                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isActiveRoute('/professor/create-workshop')) {
+                                        e.target.style.backgroundColor = 'transparent';
+                                    }
+                                }}
+                            >
+                                <span className="material-symbols-outlined" style={{ 
+                                    color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                                    fontSize: '1.25rem' 
+                                }}>
+                                    add_circle
+                                </span>
+                                {sidebarOpen && (
+                                    <p style={{
+                                        color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                                        fontSize: '0.875rem',
+                                        fontWeight: isActiveRoute('/professor/create-workshop') ? '700' : '500',
+                                        lineHeight: 'normal',
+                                        margin: 0
+                                    }}>
+                                        Create Workshop
+                                    </p>
+                                )}
+                            </Link>
+                        </nav>
           )}
         </div>
         
@@ -564,7 +609,7 @@ const StudentEventsView = () => {
                 color: '#6b7280',
                 margin: 0
               }}>
-                Student
+                Professor
               </p>
             </div>
             {user?.profilePicturePath ? (
@@ -590,7 +635,7 @@ const StudentEventsView = () => {
                 color: '#FFFFFF',
                 fontWeight: '600'
               }}>
-                {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
+                {(user?.firstName?.[0] || user?.name?.[0] || 'P').toUpperCase()}
               </div>
             )}
           </div>
@@ -1091,7 +1136,7 @@ const StudentEventsView = () => {
         </div>
       </main>
 
-      {/* Event Modal */}
+      {/* Event Modal - Same as StudentEventsView */}
       {selectedEvent && (
         <div
           onClick={() => setSelectedEvent(null)}
@@ -1532,4 +1577,5 @@ const StudentEventsView = () => {
   );
 };
 
-export default StudentEventsView;
+export default ProfessorEventsView;
+

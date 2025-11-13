@@ -438,6 +438,82 @@ export const professorApiService = {
       };
     }
   },
+
+  // Create a new workshop (for professors)
+  createWorkshop: async (workshopData) => {
+    try {
+      console.log('🎯 Creating workshop:', workshopData);
+      // Workshop routes are at /api/workshops, not /api/professor/workshops
+      const response = await axios.post('http://localhost:5000/api/workshops', workshopData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      console.log('✅ Workshop created successfully:', response.data);
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('❌ Error creating workshop:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.error || 'Failed to create workshop',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
+  // Get my workshops (for professors)
+  getMyWorkshops: async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/workshops/my-workshops', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('❌ Error fetching workshops:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.error || 'Failed to fetch workshops',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
+  // Update a workshop (for professors)
+  updateWorkshop: async (workshopId, workshopData) => {
+    try {
+      console.log('✏️ Updating workshop:', workshopId, workshopData);
+      const response = await axios.put(`http://localhost:5000/api/workshops/${workshopId}`, workshopData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      console.log('✅ Workshop updated successfully:', response.data);
+      // Backend returns the workshop directly, not wrapped in success object
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('❌ Error updating workshop:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      return {
+        success: false,
+        message: error.response?.data?.error || error.response?.data?.message || 'Failed to update workshop',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
 };
 
 export default professorApiService;

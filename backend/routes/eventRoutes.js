@@ -21,7 +21,8 @@ const {
   payForEvent,
   cancelRegistration,
   getWalletTransactions,
-  getEventRatingsAndComments
+  getEventRatingsAndComments,
+  cleanupInvalidEvents
 } = require("../controllers/eventController");
 const { verifyPayment } = require("../controllers/paymentVerificationController");
 const { sendWorkshopCompletionEmails } = require("../controllers/workshopCompletionController");
@@ -154,6 +155,14 @@ router.post(
   protect,
   permit("event_office", "admin"),
   createConference
+);
+
+// 🗑️ Cleanup invalid/empty events (Admin only)
+router.delete(
+  "/cleanup",
+  protect,
+  permit("admin", "event_office"),
+  cleanupInvalidEvents
 );
 
 // ⭐ Add event to favorites

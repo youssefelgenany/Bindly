@@ -41,6 +41,17 @@ exports.createEvent = async (req, res) => {
       return res.status(400).json({ msg: "Missing required fields" });
     }
 
+    // Validate event type
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({ msg: `Invalid event type. Allowed types: ${validTypes.join(', ')}` });
+    }
+
+    // Validate that title and location are not empty
+    if (!title.trim() || !location.trim()) {
+      return res.status(400).json({ msg: "Title and location cannot be empty" });
+    }
+
     const newEvent = new Event({
       title,
       description,
@@ -99,9 +110,18 @@ exports.getAllEvents = async (req, res) => {
     const { q, name, type, status } = req.query;
     const search = (q || name || '').toString().trim();
 
-    // Base match (type/status) - exclude 'other' type events
+    // Base match (type/status) - only allow valid event types
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     const baseMatch = {
-      type: { $ne: 'other' } // Exclude 'other' type events
+      type: { $in: validTypes }, // Only include valid event types
+      $and: [
+        { title: { $exists: true } },
+        { title: { $ne: null } },
+        { title: { $ne: '' } },
+        { location: { $exists: true } },
+        { location: { $ne: null } },
+        { location: { $ne: '' } }
+      ]
     };
     if (type) {
       const typeMap = {
@@ -284,8 +304,18 @@ exports.getAllEventsForStudents = async (req, res) => {
     console.log('🔍 Status filter:', status);
     
     // Build filter - Event Office users can see all events, others only see approved
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     const filter = { 
-      startDate: { $gt: new Date() } // Only events that start in the future
+      startDate: { $gt: new Date() }, // Only events that start in the future
+      type: { $in: validTypes }, // Only valid event types
+      $and: [
+        { title: { $exists: true } },
+        { title: { $ne: null } },
+        { title: { $ne: '' } },
+        { location: { $exists: true } },
+        { location: { $ne: null } },
+        { location: { $ne: '' } }
+      ]
     };
     
     // Only filter by status for non-Event Office users
@@ -304,7 +334,20 @@ exports.getAllEventsForStudents = async (req, res) => {
       console.log('🔍 Event Office user - showing all statuses');
     }
     
-    if (type && type !== 'all') filter.type = type;
+    if (type && type !== 'all') {
+      const typeMap = {
+        workshops: 'workshop',
+        trips: 'trip',
+        bazaars: 'bazaar',
+        booths: 'booth',
+        confrence: 'conference',
+        conference: 'conference'
+      };
+      const mappedType = typeMap[type] || type;
+      if (validTypes.includes(mappedType)) {
+        filter.type = mappedType;
+      }
+    }
     console.log('🔍 Final filter:', filter);
 
     // Get events with creator information
@@ -459,8 +502,17 @@ exports.getAllEventsForAdmin = async (req, res) => {
     const { q, type, status } = req.query;
     console.log('🔍 Admin requesting events with query:', { q, type, status });
     
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     const filter = {
-      type: { $ne: 'other' } // Exclude 'other' type events
+      type: { $in: validTypes }, // Only valid event types
+      $and: [
+        { title: { $exists: true } },
+        { title: { $ne: null } },
+        { title: { $ne: '' } },
+        { location: { $exists: true } },
+        { location: { $ne: null } },
+        { location: { $ne: '' } }
+      ]
     };
 
     if (q) {
@@ -1644,6 +1696,53 @@ exports.getEventRatingsAndComments = async (req, res) => {
     res.status(500).json({ 
       success: false,
       msg: "Server error",
+      error: err.message 
+    });
+  }
+};
+
+// 🗑️ Cleanup endpoint to delete invalid/empty events
+exports.cleanupInvalidEvents = async (req, res) => {
+  try {
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+    
+    // Find events that should be deleted:
+    // 1. Events with invalid types
+    // 2. Events with empty/null title
+    // 3. Events with empty/null location
+    const invalidEvents = await Event.find({
+      $or: [
+        { type: { $nin: validTypes } },
+        { title: { $in: [null, ''] } },
+        { location: { $in: [null, ''] } },
+        { $or: [
+          { title: { $exists: false } },
+          { location: { $exists: false } }
+        ]}
+      ]
+    });
+
+    const deletedCount = invalidEvents.length;
+    
+    // Delete invalid events
+    if (invalidEvents.length > 0) {
+      const eventIds = invalidEvents.map(e => e._id);
+      await Event.deleteMany({ _id: { $in: eventIds } });
+      
+      // Also clean up related registrations
+      await StudentRegistration.deleteMany({ event: { $in: eventIds } });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Cleanup completed. Deleted ${deletedCount} invalid events.`,
+      deletedCount
+    });
+  } catch (err) {
+    console.error("❌ Error cleaning up invalid events:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error during cleanup",
       error: err.message 
     });
   }
