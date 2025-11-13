@@ -22,7 +22,8 @@ const {
   cancelRegistration,
   getWalletTransactions,
   getEventRatingsAndComments,
-  cleanupInvalidEvents
+  cleanupInvalidEvents,
+  getSalesReport
 } = require("../controllers/eventController");
 const { verifyPayment } = require("../controllers/paymentVerificationController");
 const { sendWorkshopCompletionEmails } = require("../controllers/workshopCompletionController");

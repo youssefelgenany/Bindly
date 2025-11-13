@@ -30,9 +30,12 @@ if (!user.name || user.name.trim() === '') {
     : user.email.split('@')[0]; // fallback to email prefix
 }
 
-    // Update userType + generate verification token
+    // Update userType + activate and verify account
+    // When admin assigns a role, it's considered approval, so verify immediately
     user.userType = role;
-    user.isVerified = false;
+    user.isVerified = true; // Verify immediately when admin assigns role
+    user.status = 'active'; // Activate the account when admin assigns role
+    // Still generate token for email confirmation (optional)
     user.verificationToken = crypto.randomBytes(24).toString("hex");
     user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await user.save();

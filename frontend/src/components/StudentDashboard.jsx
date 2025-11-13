@@ -7,7 +7,7 @@ const StudentDashboard = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [stats, setStats] = useState({
         enrolledEvents: 0,
         upcomingEvents: 0,
@@ -27,29 +27,61 @@ const StudentDashboard = () => {
             
             // Fetch student registrations
             if (user?.email) {
+                console.log('Loading dashboard data for user:', user.email);
                 const registrationsRes = await studentRegistrationApi.getMyRegistrations(user.email);
-                const registrations = registrationsRes.success 
-                    ? (registrationsRes.data?.registrations || [])
-                    : [];
+                console.log('Registrations API response:', registrationsRes);
+                
+                // Handle different response formats
+                let registrations = [];
+                if (registrationsRes.success) {
+                    // The API returns { success: true, data: response.data }
+                    // where response.data is { success: true, registrations: [...] }
+                    // So we need to check registrationsRes.data.registrations
+                    registrations = registrationsRes.data?.registrations || 
+                                   registrationsRes.data?.data?.registrations ||
+                                   (Array.isArray(registrationsRes.data) ? registrationsRes.data : []) ||
+                                   [];
+                    console.log('Extracted registrations:', registrations.length, registrations);
+                } else {
+                    console.error('Failed to fetch registrations:', registrationsRes.message);
+                }
 
                 const now = new Date();
+                console.log('Total registrations found:', registrations.length);
+                
+                // Filter upcoming events - check both eventDate and event.startDate
                 const upcoming = registrations.filter(reg => {
-                    const eventDate = new Date(reg.eventDate || reg.event?.startDate);
-                    return eventDate > now;
+                    const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
+                    if (!eventDate) return false;
+                    const date = new Date(eventDate);
+                    return !isNaN(date.getTime()) && date > now;
                 });
+                console.log('Upcoming events:', upcoming.length);
 
                 // Calculate stats
+                const enrolledCount = registrations.length;
+                const upcomingCount = upcoming.length;
+                const actionRequiredCount = registrations.filter(reg => {
+                    const status = (reg.status || '').toLowerCase();
+                    return status === 'pending' || status === 'payment_required' || status === 'payment_pending';
+                }).length;
+                
+                console.log('Calculated stats:', { enrolledCount, upcomingCount, actionRequiredCount });
+                
                 setStats({
-                    enrolledEvents: registrations.length,
-                    upcomingEvents: upcoming.length,
-                    eventsRequiringAction: registrations.filter(reg => 
-                        reg.status === 'pending' || reg.status === 'payment_required'
-                    ).length
+                    enrolledEvents: enrolledCount,
+                    upcomingEvents: upcomingCount,
+                    eventsRequiringAction: actionRequiredCount
                 });
 
                 // Generate recent activity from registrations
                 const activities = registrations
-                    .sort((a, b) => new Date(b.registeredAt || 0) - new Date(a.registeredAt || 0))
+                    .filter(reg => reg.registeredAt) // Only include registrations with a date
+                    .sort((a, b) => {
+                        const dateA = new Date(a.registeredAt || 0);
+                        const dateB = new Date(b.registeredAt || 0);
+                        return dateB - dateA;
+                    })
                     .slice(0, 3)
                     .map(reg => ({
                         id: reg.id || reg._id,
@@ -62,9 +94,10 @@ const StudentDashboard = () => {
                     }));
 
                 // Add action required activity if any
-                const actionRequired = registrations.find(reg => 
-                    reg.status === 'pending' || reg.status === 'payment_required'
-                );
+                const actionRequired = registrations.find(reg => {
+                    const status = (reg.status || '').toLowerCase();
+                    return status === 'pending' || status === 'payment_required' || status === 'payment_pending';
+                });
                 if (actionRequired) {
                     activities.unshift({
                         id: 'action-required',
@@ -77,34 +110,63 @@ const StudentDashboard = () => {
                     });
                 }
 
+                console.log('Recent activities:', activities);
                 setRecentActivity(activities.slice(0, 3));
 
-                // Generate upcoming deadlines
+                // Generate upcoming deadlines from upcoming events
                 const deadlines = upcoming
                     .map(reg => {
-                        const eventDate = new Date(reg.eventDate || reg.event?.startDate);
+                        const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
+                        if (!eventDate) return null;
+                        const date = new Date(eventDate);
+                        if (isNaN(date.getTime())) return null;
+                        
+                        const timeDiff = date.getTime() - now.getTime();
+                        const isUrgent = timeDiff < 7 * 24 * 60 * 60 * 1000;
+                        
                         return {
                             id: reg.id || reg._id,
-                            month: eventDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
-                            day: eventDate.getDate(),
+                            month: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+                            day: date.getDate(),
                             title: reg.eventTitle || reg.event?.title || 'Event',
-                            description: 'Registration deadline',
-                            color: eventDate.getTime() - now.getTime() < 7 * 24 * 60 * 60 * 1000 
+                            description: 'Event date',
+                            color: isUrgent 
                                 ? 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300'
                                 : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300'
                         };
                     })
+                    .filter(d => d !== null) // Remove invalid dates
                     .sort((a, b) => {
-                        const dateA = new Date(`${a.month} ${a.day}`);
-                        const dateB = new Date(`${b.month} ${b.day}`);
+                        // Sort by actual date
+                        const year = new Date().getFullYear();
+                        const dateA = new Date(`${a.month} ${a.day}, ${year}`);
+                        const dateB = new Date(`${b.month} ${b.day}, ${year}`);
                         return dateA - dateB;
                     })
                     .slice(0, 3);
 
+                console.log('Upcoming deadlines:', deadlines);
                 setUpcomingDeadlines(deadlines);
+            } else {
+                // Reset stats if no user email
+                setStats({
+                    enrolledEvents: 0,
+                    upcomingEvents: 0,
+                    eventsRequiringAction: 0
+                });
+                setRecentActivity([]);
+                setUpcomingDeadlines([]);
             }
         } catch (error) {
             console.error('Error loading dashboard data:', error);
+            // Set empty data on error
+            setStats({
+                enrolledEvents: 0,
+                upcomingEvents: 0,
+                eventsRequiringAction: 0
+            });
+            setRecentActivity([]);
+            setUpcomingDeadlines([]);
         } finally {
             setLoading(false);
         }
@@ -143,7 +205,7 @@ const StudentDashboard = () => {
             display: 'flex',
             height: '100vh',
             fontFamily: 'Inter, sans-serif',
-            backgroundColor: '#f8f6f6'
+            backgroundColor: '#f6f7f8'
         }}>
             {/* Left Sidebar */}
             <aside style={{
@@ -172,9 +234,7 @@ const StudentDashboard = () => {
                                 justifyContent: 'center',
                                 color: '#FFFFFF'
                             }}>
-                                <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
-                                </svg>
+                                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                                 <h1 style={{
@@ -184,7 +244,7 @@ const StudentDashboard = () => {
                                     lineHeight: 'normal',
                                     margin: 0
                                 }}>
-                                    Student Events
+                                    Student Portal
                                 </h1>
                                 <p style={{
                                     color: 'rgba(241, 250, 238, 0.7)',
@@ -345,15 +405,17 @@ const StudentDashboard = () => {
                                 }}>
                                     sports_tennis
                                 </span>
-                                <p style={{
-                                    color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                                    fontSize: '0.875rem',
-                                    fontWeight: isActiveRoute('/student/courts') ? '700' : '500',
-                                    lineHeight: 'normal',
-                                    margin: 0
-                                }}>
-                                    Campus Courts
-                                </p>
+                                {sidebarOpen && (
+                                    <p style={{
+                                        color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                                        fontSize: '0.875rem',
+                                        fontWeight: isActiveRoute('/student/courts') ? '700' : '500',
+                                        lineHeight: 'normal',
+                                        margin: 0
+                                    }}>
+                                        Campus Courts
+                                    </p>
+                                )}
                             </Link>
 
                             <Link
@@ -384,15 +446,17 @@ const StudentDashboard = () => {
                                 }}>
                                     sports_gymnastics
                                 </span>
-                                <p style={{
-                                    color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                                    fontSize: '0.875rem',
-                                    fontWeight: isActiveRoute('/gym') ? '700' : '500',
-                                    lineHeight: 'normal',
-                                    margin: 0
-                                }}>
-                                    Gym Sessions
-                                </p>
+                                {sidebarOpen && (
+                                    <p style={{
+                                        color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                                        fontSize: '0.875rem',
+                                        fontWeight: isActiveRoute('/gym') ? '700' : '500',
+                                        lineHeight: 'normal',
+                                        margin: 0
+                                    }}>
+                                        Gym Sessions
+                                    </p>
+                                )}
                             </Link>
                         </nav>
                     )}
@@ -481,7 +545,7 @@ const StudentDashboard = () => {
                             lineHeight: '1.25',
                             margin: 0
                         }}>
-                            Dashboard
+                            Bindly
                         </h2>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -536,100 +600,350 @@ const StudentDashboard = () => {
                     flex: 1,
                     padding: '2rem',
                     overflowY: 'auto',
-                    backgroundColor: '#f8f6f6'
+                    backgroundColor: '#f6f7f8'
                 }}>
-                    <div>
-                        <h2 className="text-xl font-semibold mb-4 text-text-light-primary dark:text-text-dark-primary">Quick Stats</h2>
+                    {/* Page Title Box */}
+                    <div style={{
+                        backgroundColor: '#FFFFFF',
+                        padding: '1rem 1.5rem',
+                        borderRadius: '0.5rem',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        marginBottom: '1.5rem',
+                        borderLeft: '4px solid #1D3557'
+                    }}>
+                        <h3 style={{
+                            color: '#1D3557',
+                            fontSize: '1.25rem',
+                            fontWeight: '600',
+                            margin: 0
+                        }}>
+                            Dashboard
+                        </h3>
+                        <p style={{
+                            color: '#6b7280',
+                            fontSize: '1rem',
+                            fontWeight: '400',
+                            margin: '0.25rem 0 0 0'
+                        }}>
+                            Overview of your events, registrations, and upcoming deadlines.
+                        </p>
+                    </div>
+
+                    {/* Quick Stats */}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <h3 style={{
+                            color: '#1D3557',
+                            fontSize: '1.125rem',
+                            fontWeight: '600',
+                            marginBottom: '1rem',
+                            marginTop: 0
+                        }}>
+                            Quick Stats
+                        </h3>
                         {loading ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div className="bg-card-light dark:bg-card-dark p-6 rounded-lg">Loading...</div>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                gap: '1rem'
+                            }}>
+                                <div style={{
+                                    backgroundColor: '#FFFFFF',
+                                    padding: '1.5rem',
+                                    borderRadius: '0.75rem',
+                                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                }}>
+                                    Loading...
+                                </div>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div className="bg-card-light dark:bg-card-dark p-6 rounded-lg flex items-center gap-6 shadow-sm">
-                                    <div className="p-4 bg-blue-100 dark:bg-blue-900/50 rounded-full">
-                                        <span className="material-symbols-outlined text-blue-500 text-3xl">event_available</span>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                gap: '1rem'
+                            }}>
+                                <div style={{
+                                    backgroundColor: '#FFFFFF',
+                                    padding: '1.5rem',
+                                    borderRadius: '0.75rem',
+                                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '1rem'
+                                }}>
+                                    <div style={{
+                                        padding: '1rem',
+                                        backgroundColor: '#dbeafe',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '2rem', color: '#2563eb' }}>
+                                            event_available
+                                        </span>
                                     </div>
                                     <div>
-                                        <p className="text-text-light-secondary dark:text-text-dark-secondary">Enrolled Events</p>
-                                        <p className="text-3xl font-bold text-text-light-primary dark:text-text-dark-primary">{stats.enrolledEvents}</p>
+                                        <p style={{
+                                            color: '#6b7280',
+                                            fontSize: '0.875rem',
+                                            margin: 0,
+                                            marginBottom: '0.25rem'
+                                        }}>
+                                            Enrolled Events
+                                        </p>
+                                        <p style={{
+                                            color: '#111827',
+                                            fontSize: '1.875rem',
+                                            fontWeight: '700',
+                                            margin: 0
+                                        }}>
+                                            {stats.enrolledEvents}
+                                        </p>
                                     </div>
                                 </div>
-                                <div className="bg-card-light dark:bg-card-dark p-6 rounded-lg flex items-center gap-6 shadow-sm">
-                                    <div className="p-4 bg-green-100 dark:bg-green-900/50 rounded-full">
-                                        <span className="material-symbols-outlined text-green-500 text-3xl">event_upcoming</span>
+                                <div style={{
+                                    backgroundColor: '#FFFFFF',
+                                    padding: '1.5rem',
+                                    borderRadius: '0.75rem',
+                                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '1rem'
+                                }}>
+                                    <div style={{
+                                        padding: '1rem',
+                                        backgroundColor: '#d1fae5',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '2rem', color: '#059669' }}>
+                                            event_upcoming
+                                        </span>
                                     </div>
                                     <div>
-                                        <p className="text-text-light-secondary dark:text-text-dark-secondary">Upcoming Events</p>
-                                        <p className="text-3xl font-bold text-text-light-primary dark:text-text-dark-primary">{stats.upcomingEvents}</p>
+                                        <p style={{
+                                            color: '#6b7280',
+                                            fontSize: '0.875rem',
+                                            margin: 0,
+                                            marginBottom: '0.25rem'
+                                        }}>
+                                            Upcoming Events
+                                        </p>
+                                        <p style={{
+                                            color: '#111827',
+                                            fontSize: '1.875rem',
+                                            fontWeight: '700',
+                                            margin: 0
+                                        }}>
+                                            {stats.upcomingEvents}
+                                        </p>
                                     </div>
                                 </div>
-                                <div className="bg-card-light dark:bg-card-dark p-6 rounded-lg flex items-center gap-6 shadow-sm">
-                                    <div className="p-4 bg-orange-100 dark:bg-orange-900/50 rounded-full">
-                                        <span className="material-symbols-outlined text-orange-500 text-3xl">pending_actions</span>
+                                <div style={{
+                                    backgroundColor: '#FFFFFF',
+                                    padding: '1.5rem',
+                                    borderRadius: '0.75rem',
+                                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '1rem'
+                                }}>
+                                    <div style={{
+                                        padding: '1rem',
+                                        backgroundColor: '#fed7aa',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '2rem', color: '#ea580c' }}>
+                                            pending_actions
+                                        </span>
                                     </div>
                                     <div>
-                                        <p className="text-text-light-secondary dark:text-text-dark-secondary">Events Requiring Action</p>
-                                        <p className="text-3xl font-bold text-text-light-primary dark:text-text-dark-primary">{stats.eventsRequiringAction}</p>
+                                        <p style={{
+                                            color: '#6b7280',
+                                            fontSize: '0.875rem',
+                                            margin: 0,
+                                            marginBottom: '0.25rem'
+                                        }}>
+                                            Events Requiring Action
+                                        </p>
+                                        <p style={{
+                                            color: '#111827',
+                                            fontSize: '1.875rem',
+                                            fontWeight: '700',
+                                            margin: 0
+                                        }}>
+                                            {stats.eventsRequiringAction}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-2 bg-card-light dark:bg-card-dark p-6 rounded-lg shadow-sm">
-                            <h3 className="text-lg font-semibold mb-4 text-text-light-primary dark:text-text-dark-primary">Recent Activity</h3>
+                    {/* Recent Activity and Upcoming Deadlines */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                        gap: '1.5rem'
+                    }}>
+                        {/* Recent Activity */}
+                        <div style={{
+                            backgroundColor: '#FFFFFF',
+                            padding: '1.5rem',
+                            borderRadius: '0.75rem',
+                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                        }}>
+                            <h3 style={{
+                                color: '#1D3557',
+                                fontSize: '1.125rem',
+                                fontWeight: '600',
+                                marginBottom: '1rem',
+                                marginTop: 0
+                            }}>
+                                Recent Activity
+                            </h3>
                             {loading ? (
-                                <div className="text-center py-4">Loading...</div>
+                                <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                    Loading...
+                                </div>
                             ) : recentActivity.length === 0 ? (
-                                <div className="text-center py-4 text-text-light-secondary dark:text-text-dark-secondary">
+                                <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                                     No recent activity. Start exploring events!
                                 </div>
                             ) : (
-                                <ul className="space-y-4">
-                                    {recentActivity.map((activity) => (
-                                        <li key={activity.id} className="flex items-start gap-4">
-                                            <div className={`${activity.iconBg} p-2 rounded-full`}>
-                                                <span className={`material-symbols-outlined ${activity.iconColor}`}>
-                                                    {activity.icon}
-                                                </span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    {recentActivity.map((activity) => {
+                                        const iconBgColors = {
+                                            'bg-green-100 dark:bg-green-900/50': '#d1fae5',
+                                            'bg-orange-100 dark:bg-orange-900/50': '#fed7aa',
+                                            'bg-blue-100 dark:bg-blue-900/50': '#dbeafe'
+                                        };
+                                        const iconTextColors = {
+                                            'text-green-600 dark:text-green-400': '#059669',
+                                            'text-orange-600 dark:text-orange-400': '#ea580c',
+                                            'text-blue-600 dark:text-blue-400': '#2563eb'
+                                        };
+                                        const bgColor = iconBgColors[activity.iconBg] || '#dbeafe';
+                                        const textColor = iconTextColors[activity.iconColor] || '#2563eb';
+                                        
+                                        return (
+                                            <div key={activity.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+                                                <div style={{
+                                                    padding: '0.5rem',
+                                                    backgroundColor: bgColor,
+                                                    borderRadius: '50%',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem', color: textColor }}>
+                                                        {activity.icon}
+                                                    </span>
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <p style={{
+                                                        color: '#111827',
+                                                        fontSize: '0.875rem',
+                                                        margin: 0,
+                                                        marginBottom: '0.25rem'
+                                                    }}>
+                                                        {activity.message}
+                                                    </p>
+                                                    <p style={{
+                                                        color: '#6b7280',
+                                                        fontSize: '0.75rem',
+                                                        margin: 0
+                                                    }}>
+                                                        {activity.time}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-text-light-primary dark:text-text-dark-primary">
-                                                    {activity.message}
-                                                </p>
-                                                <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">{activity.time}</p>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
+                                        );
+                                    })}
+                                </div>
                             )}
                         </div>
 
-                        <div className="bg-card-light dark:bg-card-dark p-6 rounded-lg shadow-sm">
-                            <h3 className="text-lg font-semibold mb-4 text-text-light-primary dark:text-text-dark-primary">Upcoming Deadlines</h3>
+                        {/* Upcoming Deadlines */}
+                        <div style={{
+                            backgroundColor: '#FFFFFF',
+                            padding: '1.5rem',
+                            borderRadius: '0.75rem',
+                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                        }}>
+                            <h3 style={{
+                                color: '#1D3557',
+                                fontSize: '1.125rem',
+                                fontWeight: '600',
+                                marginBottom: '1rem',
+                                marginTop: 0
+                            }}>
+                                Upcoming Deadlines
+                            </h3>
                             {loading ? (
-                                <div className="text-center py-4">Loading...</div>
+                                <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                    Loading...
+                                </div>
                             ) : upcomingDeadlines.length === 0 ? (
-                                <div className="text-center py-4 text-text-light-secondary dark:text-text-dark-secondary">
+                                <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                                     No upcoming deadlines.
                                 </div>
                             ) : (
-                                <ul className="space-y-5">
-                                    {upcomingDeadlines.map((deadline) => (
-                                        <li key={deadline.id} className="flex items-start gap-4">
-                                            <div className={`flex-shrink-0 w-12 h-12 flex flex-col items-center justify-center ${deadline.color} rounded-md`}>
-                                                <span className="text-xs font-bold uppercase">{deadline.month}</span>
-                                                <span className="text-xl font-bold">{deadline.day}</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                    {upcomingDeadlines.map((deadline) => {
+                                        const isUrgent = deadline.color.includes('red');
+                                        const bgColor = isUrgent ? '#fee2e2' : '#dbeafe';
+                                        const textColor = isUrgent ? '#991b1b' : '#1e40af';
+                                        
+                                        return (
+                                            <div key={deadline.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+                                                <div style={{
+                                                    flexShrink: 0,
+                                                    width: '3rem',
+                                                    height: '3rem',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    backgroundColor: bgColor,
+                                                    color: textColor,
+                                                    borderRadius: '0.375rem',
+                                                    padding: '0.5rem'
+                                                }}>
+                                                    <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase' }}>
+                                                        {deadline.month}
+                                                    </span>
+                                                    <span style={{ fontSize: '1.25rem', fontWeight: '700' }}>
+                                                        {deadline.day}
+                                                    </span>
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <p style={{
+                                                        color: '#111827',
+                                                        fontSize: '0.875rem',
+                                                        fontWeight: '500',
+                                                        margin: 0,
+                                                        marginBottom: '0.25rem'
+                                                    }}>
+                                                        {deadline.title}
+                                                    </p>
+                                                    <p style={{
+                                                        color: '#6b7280',
+                                                        fontSize: '0.75rem',
+                                                        margin: 0
+                                                    }}>
+                                                        {deadline.description}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="font-medium text-text-light-primary dark:text-text-dark-primary">{deadline.title}</p>
-                                                <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">{deadline.description}</p>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
+                                        );
+                                    })}
+                                </div>
                             )}
                         </div>
                     </div>

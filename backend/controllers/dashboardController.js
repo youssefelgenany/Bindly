@@ -1,5 +1,7 @@
 const Event = require('../models/eventModel');
 const Announcement = require('../models/announcementModel');
+const Workshop = require('../models/Workshop');
+const Registration = require('../models/registrationModel');
 
 // Get professor dashboard statistics
 exports.getProfessorDashboardStats = async (req, res) => {
@@ -8,33 +10,34 @@ exports.getProfessorDashboardStats = async (req, res) => {
     
     console.log('📊 Fetching professor dashboard stats for user:', userId);
 
-    // Get total events created by this professor
-    const totalEventsCreated = await Event.countDocuments({ createdBy: userId });
+    // Get total workshops created by this professor
+    const totalWorkshopsCreated = await Workshop.countDocuments({ professorId: userId });
 
-    // Get upcoming events (events with startDate in the future)
-    const upcomingEvents = await Event.countDocuments({
-      createdBy: userId,
+    // Get upcoming events (events with startDate in the future that professor is registered for)
+    const registrations = await Registration.find({ user: userId, status: 'approved' }).select('event');
+    const registeredEventIds = registrations.map(reg => reg.event);
+    const upcomingEvents = registeredEventIds.length > 0 ? await Event.countDocuments({
+      _id: { $in: registeredEventIds },
       startDate: { $gte: new Date() }
-    });
+    }) : 0;
 
-    // Get events participating in (for now, we'll use total events as a placeholder)
-    // In a real system, this would be based on event registrations/participation
-    const eventsParticipatingIn = await Event.countDocuments({
-      createdBy: userId,
+    // Get events participating in (events professor is registered for)
+    const eventsParticipatingIn = registeredEventIds.length > 0 ? await Event.countDocuments({
+      _id: { $in: registeredEventIds },
       status: 'approved'
-    });
+    }) : 0;
 
-    // Get pending approvals (events with status 'pending')
-    const pendingApprovals = await Event.countDocuments({
-      createdBy: userId,
+    // Get workshops pending approval
+    const workshopsPendingApproval = await Workshop.countDocuments({
+      professorId: userId,
       status: 'pending'
     });
 
     const stats = {
-      totalEventsCreated,
+      totalWorkshopsCreated,
       upcomingEvents,
       eventsParticipatingIn,
-      pendingApprovals
+      workshopsPendingApproval
     };
 
     console.log('✅ Professor dashboard stats:', stats);

@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const Workshop = require('../models/Workshop');
 const Notification = require('../models/notificationModel');
+const Event = require('../models/eventModel');
 
 // Events Office: list all workshops
 const getAllWorkshops = async (req, res) => {
@@ -229,13 +230,72 @@ const approveWorkshop = async (req, res) => {
       });
     }
     
-    // Update the workshop
-    workshop.status = 'approved';
-    workshop.rejectionReason = '';
-    workshop.editRequests = '';
-    await workshop.save();
+    // Update the workshop status without re-validating other fields
+    await Workshop.findByIdAndUpdate(
+      workshopId,
+      {
+        status: 'approved',
+        rejectionReason: '',
+        editRequests: '',
+        updatedAt: new Date()
+      },
+      { runValidators: false, new: true }
+    );
+    
+    // Reload the workshop for response
+    workshop = await Workshop.findById(workshopId);
     
     console.log('✅ Workshop approved:', workshop._id, 'Title:', workshop.workshopName || workshop.title);
+    
+    // Create an Event in the Event model so it appears in the all events page
+    try {
+      // Check if event already exists for this workshop (by matching title and dates)
+      const existingEvent = await Event.findOne({ 
+        type: 'workshop',
+        title: workshop.workshopName,
+        startDate: workshop.startDate,
+        endDate: workshop.endDate
+      });
+      
+      if (!existingEvent) {
+        // Create new event from workshop
+        const newEvent = new Event({
+          title: workshop.workshopName,
+          description: workshop.shortDescription || '',
+          type: 'workshop',
+          startDate: workshop.startDate,
+          endDate: workshop.endDate,
+          registrationDeadline: workshop.registrationDeadline || workshop.endDate,
+          location: workshop.location,
+          capacity: workshop.capacity || 100,
+          status: 'approved',
+          createdBy: workshop.professorId,
+          // Workshop-specific fields
+          agenda: workshop.fullAgenda || '',
+          faculty: workshop.facultyResponsible || '',
+          professors: Array.isArray(workshop.professorsParticipating) 
+            ? workshop.professorsParticipating.join(', ')
+            : (workshop.professorsParticipating || ''),
+          extraResources: workshop.extraRequiredResources || '',
+          fundingSource: workshop.fundingSource || 'GUC'
+        });
+        
+        await newEvent.save();
+        console.log('✅ Event created from approved workshop:', newEvent._id);
+      } else {
+        // Update existing event status to approved
+        existingEvent.status = 'approved';
+        await existingEvent.save();
+        console.log('✅ Existing event updated to approved:', existingEvent._id);
+      }
+    } catch (eventError) {
+      console.error('❌ Error creating event from workshop:', eventError);
+      console.error('❌ Event error details:', {
+        message: eventError.message,
+        stack: eventError.stack
+      });
+      // Don't fail the approval if event creation fails
+    }
     
     // Create notification for the professor
     try {
@@ -299,12 +359,21 @@ const rejectWorkshop = async (req, res) => {
       });
     }
     
-    // Update the workshop
+    // Update the workshop status without re-validating other fields
     const rejectionReason = req.body.rejectionReason || '';
-    workshop.status = 'rejected';
-    workshop.rejectionReason = rejectionReason;
-    workshop.editRequests = '';
-    await workshop.save();
+    await Workshop.findByIdAndUpdate(
+      workshopId,
+      {
+        status: 'rejected',
+        rejectionReason: rejectionReason,
+        editRequests: '',
+        updatedAt: new Date()
+      },
+      { runValidators: false, new: true }
+    );
+    
+    // Reload the workshop for response
+    workshop = await Workshop.findById(workshopId);
     
     console.log('✅ Workshop rejected:', workshop._id, 'Title:', workshop.workshopName || workshop.title);
     
@@ -371,12 +440,21 @@ const requestEdits = async (req, res) => {
       });
     }
     
-    // Update the workshop
+    // Update the workshop status without re-validating other fields
     const editRequests = req.body.editRequests || '';
-    workshop.status = 'needs_edits';
-    workshop.editRequests = editRequests;
-    workshop.rejectionReason = '';
-    await workshop.save();
+    await Workshop.findByIdAndUpdate(
+      workshopId,
+      {
+        status: 'needs_edits',
+        editRequests: editRequests,
+        rejectionReason: '',
+        updatedAt: new Date()
+      },
+      { runValidators: false, new: true }
+    );
+    
+    // Reload the workshop for response
+    workshop = await Workshop.findById(workshopId);
     
     console.log('✅ Workshop edit requested:', workshop._id, 'Title:', workshop.workshopName || workshop.title);
     

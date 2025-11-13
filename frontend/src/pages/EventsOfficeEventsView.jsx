@@ -240,6 +240,11 @@ const EventsOfficeEventsView = () => {
     const startDate = new Date(event.startDate);
     if (isNaN(startDate.getTime())) return false;
     
+    // Filter out past events
+    const now = new Date();
+    const eventEndDate = event.endDate ? new Date(event.endDate) : startDate;
+    if (isNaN(eventEndDate.getTime()) || eventEndDate < now) return false;
+    
     if (event.type === 'other') return false;
     
     const typeMatch = filter === 'all' || (event.type && event.type === filter);
@@ -691,6 +696,45 @@ const EventsOfficeEventsView = () => {
               </Link>
 
               <Link
+                to="/event-office/workshops"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/workshops') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/workshops')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/workshops')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  school
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/workshops') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Professor Workshops
+                </p>
+              </Link>
+
+              <Link
                 to="/create-bazaar"
                 style={{
                   display: 'flex',
@@ -1104,108 +1148,117 @@ const EventsOfficeEventsView = () => {
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '0.75rem',
-            padding: '1rem',
+            padding: '1.5rem',
             marginBottom: '1.5rem',
             boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '1rem',
-              alignItems: 'center'
-            }}>
-              {/* Search */}
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                  <div style={{ display: 'flex', width: '100%', height: '3rem' }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      paddingLeft: '1rem',
-                      border: '1px solid #e5e7eb',
-                      borderRight: 'none',
-                      backgroundColor: '#f9fafb',
-                      borderTopLeftRadius: '0.5rem',
-                      borderBottomLeftRadius: '0.5rem'
-                    }}>
-                      <span className="material-symbols-outlined" style={{ 
-                        fontSize: '1.5rem',
-                        color: '#9ca3af'
-                      }}>
-                        search
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Search by Event Name/Professor"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { handleSearch(); } }}
-                      style={{
-                        flex: 1,
-                        padding: '0.75rem 1rem',
-                        border: '1px solid #e5e7eb',
-                        borderLeft: 'none',
-                        borderTopRightRadius: '0.5rem',
-                        borderBottomRightRadius: '0.5rem',
-                        fontSize: '1rem',
-                        outline: 'none',
-                        backgroundColor: '#FFFFFF'
-                      }}
-                    />
-                  </div>
-                </label>
+            {/* Search Bar */}
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', alignItems: 'center' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <span className="material-symbols-outlined" style={{
+                  position: 'absolute',
+                  left: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#9ca3af',
+                  fontSize: '1.25rem',
+                  pointerEvents: 'none'
+                }}>
+                  search
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search by event name, professor name, location, or description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e5e7eb',
+                    backgroundColor: '#FFFFFF',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1e40af';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
               </div>
-
-              {/* Type Filter */}
-              <div>
-                <label style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '3rem' }}>
-                  <select
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      padding: '0.75rem 1rem',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.5rem',
-                      fontSize: '1rem',
-                      outline: 'none',
-                      backgroundColor: '#FFFFFF',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value="all">All Types</option>
-                    <option value="workshop">Workshops</option>
-                    <option value="trip">Trips</option>
-                    <option value="bazaar">Bazaars</option>
-                    <option value="booth">Booths</option>
-                    <option value="conference">Conferences</option>
-                  </select>
-                </label>
-              </div>
-
-              {/* Apply Filters Button */}
               <button
                 onClick={handleSearch}
                 style={{
-                  height: '3rem',
-                  padding: '0 1.5rem',
-                  backgroundColor: '#137fec',
-                  color: '#FFFFFF',
+                  padding: '0.875rem 1.75rem',
                   borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
+                  backgroundColor: '#1e40af',
+                  color: '#FFFFFF',
                   border: 'none',
                   cursor: 'pointer',
-                  width: '100%'
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#0f6fd6'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#137fec'}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#1e3a8a';
+                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#1e40af';
+                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                }}
               >
-                Apply Filters
+                Search
               </button>
+            </div>
+            
+            {/* Filter Buttons */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => {
+                    setFilter(type);
+                    handleSearch();
+                  }}
+                  style={{
+                    padding: '0.625rem 1.25rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: filter === type ? '#1e40af' : '#f9fafb',
+                    color: filter === type ? '#FFFFFF' : '#6b7280',
+                    border: filter === type ? 'none' : '1px solid #e5e7eb',
+                    cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: filter === type ? '600' : '500',
+                    textTransform: 'capitalize',
+                    transition: 'all 0.2s',
+                    boxShadow: filter === type ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (filter !== type) {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                      e.target.style.borderColor = '#d1d5db';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (filter !== type) {
+                      e.target.style.backgroundColor = '#f9fafb';
+                      e.target.style.borderColor = '#e5e7eb';
+                    }
+                  }}
+                >
+                  {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
+                </button>
+              ))}
             </div>
           </div>
 

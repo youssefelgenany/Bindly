@@ -7,7 +7,8 @@ const StudentMyRegistrations = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedRows, setExpandedRows] = useState(new Set());
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -113,7 +114,7 @@ const StudentMyRegistrations = () => {
         justifyContent: 'center',
         alignItems: 'center',
         height: '100vh',
-        backgroundColor: '#f8f6f6'
+        backgroundColor: '#f6f7f8'
       }}>
         <div style={{
           width: '2.5rem',
@@ -127,12 +128,34 @@ const StudentMyRegistrations = () => {
     );
   }
 
+  const formatTableDate = (dateString) => {
+    if (!dateString) return 'TBD';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const toggleRowExpansion = (registrationId) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(registrationId)) {
+        newSet.delete(registrationId);
+      } else {
+        newSet.add(registrationId);
+      }
+      return newSet;
+    });
+  };
+
   return (
     <div style={{
       display: 'flex',
       height: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
+      backgroundColor: '#f6f7f8'
     }}>
       {/* Left Sidebar */}
       <aside style={{
@@ -161,9 +184,7 @@ const StudentMyRegistrations = () => {
                 justifyContent: 'center',
                 color: '#FFFFFF'
               }}>
-                <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
-                </svg>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <h1 style={{
@@ -173,7 +194,7 @@ const StudentMyRegistrations = () => {
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  Student Events
+                  Student Portal
                 </h1>
                 <p style={{
                   color: 'rgba(241, 250, 238, 0.7)',
@@ -199,8 +220,9 @@ const StudentMyRegistrations = () => {
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
+                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                  textDecoration: 'none',
+                  color: '#FFFFFF'
                 }}
                 onMouseEnter={(e) => {
                   if (!isActiveRoute('/dashboard')) {
@@ -213,16 +235,13 @@ const StudentMyRegistrations = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
-                }}>
+                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.25rem' }}>
                   dashboard
                 </span>
                 <p style={{
-                  color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: '#FFFFFF',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/dashboard') ? '700' : '500',
+                  fontWeight: '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
@@ -330,21 +349,23 @@ const StudentMyRegistrations = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
                   sports_tennis
                 </span>
-                <p style={{
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/courts') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Campus Courts
-                </p>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/courts') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    Campus Courts
+                  </p>
+                )}
               </Link>
 
               <Link
@@ -369,21 +390,23 @@ const StudentMyRegistrations = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
-                  fitness_center
+                  sports_gymnastics
                 </span>
-                <p style={{
-                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/gym') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Gym Sessions
-                </p>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/gym') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    Gym Sessions
+                  </p>
+                )}
               </Link>
             </nav>
           )}
@@ -472,7 +495,7 @@ const StudentMyRegistrations = () => {
               lineHeight: '1.25',
               margin: 0
             }}>
-              My Events
+              Bindly
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -527,8 +550,35 @@ const StudentMyRegistrations = () => {
           flex: 1,
           padding: '2rem',
           overflowY: 'auto',
-          backgroundColor: '#f8f6f6'
+          backgroundColor: '#f6f7f8'
         }}>
+          {/* Page Title Box */}
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            padding: '1rem 1.5rem',
+            borderRadius: '0.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            marginBottom: '1.5rem',
+            borderLeft: '4px solid #1D3557'
+          }}>
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              My Events
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '1rem',
+              fontWeight: '400',
+              margin: '0.25rem 0 0 0'
+            }}>
+              View and manage your event registrations.
+            </p>
+          </div>
+
           {error && (
             <div style={{
               padding: '0.75rem 1rem',
