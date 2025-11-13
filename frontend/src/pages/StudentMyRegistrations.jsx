@@ -653,7 +653,7 @@ const StudentMyRegistrations = () => {
                         letterSpacing: '0.05em'
                       }}>
                         {registration.eventType}
-                      </div>
+        </div>
                       <div style={{
                         padding: '0.375rem 0.875rem',
                         borderRadius: '0.5rem',
@@ -665,9 +665,9 @@ const StudentMyRegistrations = () => {
                         letterSpacing: '0.05em'
                       }}>
                         {registration.status}
-                      </div>
-                    </div>
-                    
+        </div>
+      </div>
+
                     <h3 style={{
                       color: '#1D3557',
                       fontSize: '1.125rem',
@@ -699,7 +699,7 @@ const StudentMyRegistrations = () => {
                         }}>
                           calendar_today
                         </span>
-                        <span>{formatDate(registration.eventDate)}</span>
+          <span>{formatDate(registration.eventDate)}</span>
                         {getDaysUntilEvent(registration.eventDate) && (
                           <span style={{
                             fontSize: '0.75rem',
@@ -713,7 +713,7 @@ const StudentMyRegistrations = () => {
                             {getDaysUntilEvent(registration.eventDate)}
                           </span>
                         )}
-                      </div>
+        </div>
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -727,9 +727,9 @@ const StudentMyRegistrations = () => {
                         }}>
                           location_on
                         </span>
-                        <span>{registration.eventLocation}</span>
-                      </div>
-                      {registration.capacity && (
+          <span>{registration.eventLocation}</span>
+        </div>
+        {registration.capacity && (
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -744,8 +744,8 @@ const StudentMyRegistrations = () => {
                             people
                           </span>
                           <span>{registration.registeredCount || 0}/{registration.capacity} registered</span>
-                        </div>
-                      )}
+          </div>
+        )}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -760,10 +760,10 @@ const StudentMyRegistrations = () => {
                           schedule
                         </span>
                         <span>Registered: {formatDate(registration.registeredAt)}</span>
-                      </div>
-                    </div>
+        </div>
+      </div>
 
-                    {registration.eventDescription && (
+      {registration.eventDescription && (
                       <p style={{
                         color: '#6b7280',
                         fontSize: '0.8125rem',
@@ -1045,13 +1045,13 @@ const StudentMyRegistrations = () => {
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Student ID</div>
                     <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentId}</div>
-                  </div>
+          </div>
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Email</div>
                     <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentEmail}</div>
-                  </div>
-                </div>
-              </div>
+          </div>
+          </div>
+        </div>
 
               {selectedRegistration.eventType === 'trip' && (
                 <div style={{
@@ -1085,33 +1085,33 @@ const StudentMyRegistrations = () => {
                       <div>
                         <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Emergency Contact</div>
                         <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.emergencyContact.name}</div>
-                      </div>
+                </div>
                       {selectedRegistration.emergencyContact.phone && (
                         <div>
                           <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Contact Phone</div>
                           <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.emergencyContact.phone}</div>
-                        </div>
-                      )}
+                  </div>
+                )}
                     </div>
                   )}
                   {selectedRegistration.dietaryRequirements && (
                     <div style={{ marginBottom: '0.75rem' }}>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Dietary Requirements</div>
                       <div style={{ color: '#374151', fontSize: '0.875rem' }}>{selectedRegistration.dietaryRequirements}</div>
-                    </div>
-                  )}
+              </div>
+            )}
                   {selectedRegistration.medicalConditions && (
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Medical Conditions</div>
                       <div style={{ color: '#374151', fontSize: '0.875rem' }}>{selectedRegistration.medicalConditions}</div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    </div>
+          </div>
+        )}
     </div>
   );
 };
