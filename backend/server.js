@@ -8,7 +8,17 @@ const path = require('path');
 const app = express();
 
 // Stripe webhook endpoint (must be before JSON middleware, uses raw body)
-app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), require('./controllers/stripeWebhookController'));
+// Only register if stripe is available
+try {
+  const stripeController = require('./controllers/stripeWebhookController');
+  app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeController);
+} catch (error) {
+  console.warn('⚠️ Stripe webhook controller not available. Stripe webhook endpoint disabled.');
+  // Register a placeholder endpoint to prevent 404 errors
+  app.post('/api/webhooks/stripe', (req, res) => {
+    res.status(503).json({ error: 'Stripe webhook functionality is not available. Please install stripe package.' });
+  });
+}
 
 // Middleware
 app.use(express.json());
