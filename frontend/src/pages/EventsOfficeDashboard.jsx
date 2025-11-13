@@ -392,6 +392,47 @@ const EventsOfficeDashboard = () => {
             </Link>
 
             <Link
+              to="/event-office/workshops"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.5rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: isActiveRoute('/event-office/workshops') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                textDecoration: 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActiveRoute('/event-office/workshops')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActiveRoute('/event-office/workshops')) {
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ 
+                color: isActiveRoute('/event-office/workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                fontSize: '1.25rem' 
+              }}>
+                school
+              </span>
+              {sidebarOpen && (
+                <p style={{
+                  color: isActiveRoute('/event-office/workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/workshops') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Professor Workshops
+                </p>
+              )}
+            </Link>
+
+            <Link
               to="/create-bazaar"
               style={{
                 display: 'flex',

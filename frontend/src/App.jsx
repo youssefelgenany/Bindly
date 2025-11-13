@@ -43,6 +43,7 @@ import CourtAvailability from './pages/CourtAvailability';
 import PlatformBoothReservation from './pages/PlatformBoothReservation';
 import PlatformBooths from './pages/PlatformBooths';
 import EventsOfficeEventsView from './pages/EventsOfficeEventsView';
+import EventsOfficeWorkshops from './pages/EventsOfficeWorkshops';
 import VendorAcceptedEvents from './pages/VendorAcceptedEvents';
 import VendorMyRequests from './pages/VendorMyRequests';
 import PlatformBoothRequests from './pages/PlatformBoothRequests';
@@ -350,6 +351,16 @@ const AppContent = () => {
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <EventsOfficeEventsView />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/event-office/workshops"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <EventsOfficeWorkshops />
                   </EventsOfficeOnly>
                 </ProtectedRoute>
               }
