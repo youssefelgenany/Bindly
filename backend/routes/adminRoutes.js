@@ -3,7 +3,7 @@ const router = express.Router();
 
 const { createGymSession, viewGymScheduleMonth } = require("../controllers/gymController");
 const { protect, permit } = require("../middleware/authMiddleware");
-const { getAllUsers, updateUserRole, updateUserStatus, changePassword, updateProfile, getAllVendors, updateVendorVerification, updateVendorStatus, updateUserVerification, sendVerificationEmail, getAttendeesReport } = require('../controllers/adminController');
+const { getAllUsers, updateUserRole, updateUserStatus, changePassword, updateProfile, getAllVendors, updateVendorVerification, updateVendorStatus, updateUserVerification, sendVerificationEmail, getAttendeesReport, assignRoleAndSendVerification } = require('../controllers/adminController');
 const { createAdminOrEventOffice, deleteAdminOrEventOffice } = require('../controllers/adminAccountsController');
 
 // Admin routes
@@ -15,6 +15,7 @@ router.put('/users/:userId/verification', protect, permit('admin'), (req, res, n
   next();
 }, updateUserVerification);
 router.post('/users/:userId/send-verification-email', protect, permit('admin'), sendVerificationEmail);
+router.post('/users/assign-role-and-verify', protect, permit('admin'), assignRoleAndSendVerification);
 
 // Admin account management routes
 router.post('/accounts', protect, permit('admin'), createAdminOrEventOffice);

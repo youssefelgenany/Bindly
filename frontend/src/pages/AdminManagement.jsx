@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { adminApiService } from '../api/adminApi';
 
 const AdminManagement = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('create'); // 'create' or 'view'
   
   // Create form state
@@ -27,22 +31,6 @@ const AdminManagement = () => {
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, account: null });
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Activation state management
-  const [activatingIds, setActivatingIds] = useState({}); // id -> boolean
-  const [activationMessages, setActivationMessages] = useState({}); // id -> message
-
-  // Password confirmation modal state (used for activation and verification)
-  const [passwordConfirm, setPasswordConfirm] = useState({
-    show: false,
-    mode: 'activation', // 'activation' | 'verification'
-    accountId: null,
-    currentStatus: '', // 'active' | 'blocked'
-    currentVerified: false,
-    value: '',
-    error: '',
-    submitting: false
-  });
-
   const roleOptions = ['Admin', 'Event Office'];
 
   // Helper function to format userType for display
@@ -56,6 +44,17 @@ const AdminManagement = () => {
         return userType;
     }
   };
+
+  const isActiveRoute = (path) => {
+    return location.pathname === path;
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const displayName = user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Admin';
 
   // Load admin accounts on component mount
   useEffect(() => {
@@ -111,17 +110,10 @@ const AdminManagement = () => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    console.log('🔍 handleCreateAccount called');
-    console.log('🔍 Current user:', user);
-    console.log('🔍 User type:', user?.userType);
-    console.log('🔍 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
-    console.log('🔍 Form data:', formData);
-
     setIsCreating(true);
     setCreateMessage('');
 
     try {
-      console.log('🔍 Calling createAdminAccount API...');
       const result = await adminApiService.createAdminAccount({
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -130,20 +122,19 @@ const AdminManagement = () => {
         role: formData.role
       });
       
-      console.log('🔍 API result:', result);
-      
       if (result.success) {
-        console.log('✅ Account creation successful');
         setCreateMessage('Account created successfully!');
         setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'Admin' });
         // Reload admin accounts to show the new one
         await loadAdminAccounts();
+        // Switch to view tab after creation
+        setTimeout(() => {
+          setActiveTab('view');
+        }, 1500);
       } else {
-        console.log('❌ Account creation failed:', result.message);
         setCreateMessage(result.message || 'Failed to create account. Please try again.');
       }
     } catch (error) {
-      console.log('❌ Account creation error:', error);
       setCreateMessage('Failed to create account. Please try again.');
     } finally {
       setIsCreating(false);
@@ -168,11 +159,10 @@ const AdminManagement = () => {
         ));
         setDeleteConfirm({ show: false, account: null });
       } else {
-        console.error('Delete failed:', result.message);
-        // You could show an error message to the user here
+        alert(result.message || 'Failed to delete account');
       }
     } catch (error) {
-      console.error('Delete failed:', error);
+      alert('Failed to delete account');
     } finally {
       setIsDeleting(false);
     }
@@ -180,85 +170,6 @@ const AdminManagement = () => {
 
   const handleDeleteCancel = () => {
     setDeleteConfirm({ show: false, account: null });
-  };
-
-  const openActivationPasswordModal = (accountId, currentStatus) => {
-    setPasswordConfirm({
-      show: true,
-      mode: 'activation',
-      accountId,
-      currentStatus,
-      currentVerified: false,
-      value: '',
-      error: '',
-      submitting: false
-    });
-  };
-
-  const closeActivationPasswordModal = () => {
-    setPasswordConfirm(prev => ({ ...prev, show: false, value: '', error: '', submitting: false }));
-  };
-
-  const openVerificationPasswordModal = (accountId, currentVerified) => {
-    setPasswordConfirm({
-      show: true,
-      mode: 'verification',
-      accountId,
-      currentStatus: '',
-      currentVerified,
-      value: '',
-      error: '',
-      submitting: false
-    });
-  };
-
-  const submitPasswordConfirm = async () => {
-    const { mode, accountId, currentStatus, currentVerified, value } = passwordConfirm;
-    if (!value) {
-      setPasswordConfirm(prev => ({ ...prev, error: 'Password is required' }));
-      return;
-    }
-    setPasswordConfirm(prev => ({ ...prev, submitting: true, error: '' }));
-    setActivatingIds(prev => ({ ...prev, [accountId]: true }));
-    setActivationMessages(prev => ({ ...prev, [accountId]: '' }));
-
-    try {
-      if (mode === 'activation') {
-        const newStatus = currentStatus === 'active' ? false : true; // isActive parameter
-        const result = await adminApiService.updateUserStatus(accountId, newStatus, value);
-        if (result.success) {
-          setActivationMessages(prev => ({ ...prev, [accountId]: 'Status updated successfully' }));
-          setAdminAccounts(prev => prev.map(acc =>
-            (acc._id || acc.id) === accountId
-              ? { ...acc, status: newStatus ? 'active' : 'blocked' }
-              : acc
-          ));
-          closeActivationPasswordModal();
-        } else {
-          setPasswordConfirm(prev => ({ ...prev, error: result.message || 'Invalid password' }));
-        }
-      } else {
-        // verification
-        const newVerified = !currentVerified;
-        const result = await adminApiService.updateUserVerification(accountId, newVerified, value);
-        if (result.success) {
-          setActivationMessages(prev => ({ ...prev, [accountId]: 'Verification updated successfully' }));
-          setAdminAccounts(prev => prev.map(acc =>
-            (acc._id || acc.id) === accountId
-              ? { ...acc, isVerified: newVerified }
-              : acc
-          ));
-          closeActivationPasswordModal();
-        } else {
-          setPasswordConfirm(prev => ({ ...prev, error: result.message || 'Invalid password' }));
-        }
-      }
-    } catch (error) {
-      setPasswordConfirm(prev => ({ ...prev, error: 'Failed to update status' }));
-    } finally {
-      setActivatingIds(prev => ({ ...prev, [accountId]: false }));
-      setPasswordConfirm(prev => ({ ...prev, submitting: false }));
-    }
   };
 
   // Basic guard (UI-level) to avoid rendering for non-admins
@@ -277,305 +188,1019 @@ const AdminManagement = () => {
     );
   }
 
-  if (loading) {
-    return (
-      <div style={{ padding: '2rem' }}>
-        <div className="container">
-          <div className="card">
-            <div className="card-header">
-              <h1 className="card-title" style={{ color: 'var(--guc-red)' }}>Admin Management</h1>
-              <p className="card-subtitle">Loading...</p>
-            </div>
-            <div style={{ padding: '2rem', textAlign: 'center' }}>
-              <div className="spinner" style={{ margin: '0 auto' }}></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ padding: '2rem' }}>
-      <div className="container">
-        <div className="card">
-          <div className="card-header">
-            <h1 className="card-title" style={{ color: 'var(--guc-red)' }}>Admin Management</h1>
-            <p className="card-subtitle">Create and manage admin accounts</p>
-          </div>
+    <div style={{
+      display: 'flex',
+      height: '100vh',
+      fontFamily: 'Inter, sans-serif',
+      backgroundColor: '#f8f6f6'
+    }}>
+      {/* Left Sidebar */}
+      <aside style={{
+        width: sidebarOpen ? '16rem' : '0',
+        flexShrink: 0,
+        backgroundColor: '#1D3557',
+        padding: sidebarOpen ? '1.5rem' : '0',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        overflow: 'hidden',
+        transition: 'width 0.3s ease, padding 0.3s ease'
+      }}>
+        {/* Top Section - Logo and Navigation */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {/* Logo and Branding */}
+          {sidebarOpen && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                borderRadius: '50%',
+                backgroundColor: '#457B9D',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF'
+              }}>
+                <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <h1 style={{
+                  color: '#FFFFFF',
+                  fontSize: '1rem',
+                  fontWeight: '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Admin Portal
+                </h1>
+                <p style={{
+                  color: 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: '400',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Platform Management
+                </p>
+              </div>
+            </div>
+          )}
 
-          <div style={{ padding: '1rem' }}>
-            {error && (
-              <div className="alert alert-error">
-                {error}
-                <button 
-                  onClick={loadAdminAccounts}
-                  className="btn btn-outline"
-                  style={{ marginLeft: '1rem', padding: '4px 8px' }}
-                >
-                  Retry
-                </button>
+          {/* Navigation */}
+          {sidebarOpen && (
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <Link
+                to="/dashboard"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/dashboard')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/dashboard')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  dashboard
+                </span>
+                <p style={{
+                  color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/dashboard') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Dashboard
+                </p>
+              </Link>
+
+              <Link
+                to="/admin/events-view"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/admin/events-view') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/admin/events-view')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/admin/events-view')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/admin/events-view') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  explore
+                </span>
+                <p style={{
+                  color: isActiveRoute('/admin/events-view') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/admin/events-view') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Discover Events
+                </p>
+              </Link>
+
+              <Link
+                to="/admin/users"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/admin/users') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/admin/users')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/admin/users')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/admin/users') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  people
+                </span>
+                <p style={{
+                  color: isActiveRoute('/admin/users') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/admin/users') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Users
+                </p>
+              </Link>
+
+              <Link
+                to="/admin/platform-booth-requests"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/admin/platform-booth-requests') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/admin/platform-booth-requests')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/admin/platform-booth-requests')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/admin/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  location_on
+                </span>
+                <p style={{
+                  color: isActiveRoute('/admin/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/admin/platform-booth-requests') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Platform Booths
+                </p>
+              </Link>
+
+              <Link
+                to="/admin/manage"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/admin/manage') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/admin/manage')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/admin/manage')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/admin/manage') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  settings
+                </span>
+                <p style={{
+                  color: isActiveRoute('/admin/manage') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/admin/manage') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Management
+                </p>
+              </Link>
+            </nav>
+          )}
+        </div>
+
+        {/* Logout Button - Fixed at bottom */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textAlign: 'left',
+              width: '100%'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ color: 'rgba(241, 250, 238, 0.7)', fontSize: '1.25rem' }}>
+              logout
+            </span>
+            {sidebarOpen && (
+              <p style={{
+                color: 'rgba(241, 250, 238, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                lineHeight: 'normal',
+                margin: 0
+              }}>
+                Logout
+              </p>
+            )}
+          </button>
+        </div>
+      </aside>
+
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
+        <header style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '1rem 2.5rem',
+          backgroundColor: '#FFFFFF'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#1D3557'
+              }}
+              aria-label="Toggle sidebar"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                menu
+              </span>
+            </button>
+            <h2 style={{
+              color: '#1D3557',
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              lineHeight: '1.25',
+              margin: 0
+            }}>
+              Bindly
+            </h2>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#1D3557',
+                margin: 0
+              }}>
+                {displayName}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                margin: 0
+              }}>
+                Admin
+              </p>
+            </div>
+            {user?.profilePicturePath ? (
+              <img
+                src={`http://localhost:5000${user.profilePicturePath}`}
+                alt="User profile"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                borderRadius: '50%',
+                backgroundColor: '#1D3557',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF',
+                fontWeight: '600'
+              }}>
+                {(user?.firstName?.[0] || user?.name?.[0] || 'A').toUpperCase()}
               </div>
             )}
+          </div>
+        </header>
 
-            {/* Tab Navigation */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
-              <button
-                className={activeTab === 'create' ? 'btn btn-primary' : 'btn btn-outline'}
-                onClick={() => setActiveTab('create')}
-              >
-                Create New Account
-              </button>
-              <button
-                className={activeTab === 'view' ? 'btn btn-primary' : 'btn btn-outline'}
-                onClick={() => setActiveTab('view')}
-              >
-                View All Accounts
-              </button>
+        {/* Content Area */}
+        <div style={{
+          flex: 1,
+          padding: '2.5rem',
+          overflowY: 'auto'
+        }}>
+          {loading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+              <div className="spinner"></div>
             </div>
+          ) : (
+            <>
+              {/* Page Name Box */}
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                padding: '1rem 1.5rem',
+                borderRadius: '0.5rem',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                marginBottom: '2rem',
+                borderLeft: '4px solid #1D3557'
+              }}>
+                <h3 style={{
+                  color: '#1D3557',
+                  fontSize: '1.25rem',
+                  fontWeight: '600',
+                  margin: 0
+                }}>
+                  Admin & Event Office Management
+                </h3>
+                <p style={{
+                  color: '#6b7280',
+                  fontSize: '0.875rem',
+                  margin: '0.25rem 0 0 0'
+                }}>
+                  Create and manage admin and Event Office accounts
+                </p>
+              </div>
 
-            {/* Create Account Form */}
-            {activeTab === 'create' && (
-              <div className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
-                <div style={{ padding: '1rem' }}>
-                  <h3 style={{ color: 'var(--charcoal-black)', marginBottom: '1rem' }}>
+              {error && (
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1.5rem',
+                  borderRadius: '0.375rem',
+                  backgroundColor: '#fee2e2',
+                  color: '#991b1b',
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <span>{error}</span>
+                  <button 
+                    onClick={loadAdminAccounts}
+                    style={{
+                      marginLeft: '1rem',
+                      padding: '0.25rem 0.75rem',
+                      backgroundColor: '#991b1b',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '0.25rem',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {/* Tab Navigation */}
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                padding: '0.5rem',
+                borderRadius: '0.75rem',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                marginBottom: '1.5rem',
+                display: 'flex',
+                gap: '0.5rem'
+              }}>
+                <button
+                  onClick={() => setActiveTab('create')}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    backgroundColor: activeTab === 'create' ? '#1D3557' : 'transparent',
+                    color: activeTab === 'create' ? '#FFFFFF' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeTab !== 'create') {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeTab !== 'create') {
+                      e.target.style.backgroundColor = 'transparent';
+                    }
+                  }}
+                >
+                  Create New Account
+                </button>
+                <button
+                  onClick={() => setActiveTab('view')}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    backgroundColor: activeTab === 'view' ? '#1D3557' : 'transparent',
+                    color: activeTab === 'view' ? '#FFFFFF' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeTab !== 'view') {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeTab !== 'view') {
+                      e.target.style.backgroundColor = 'transparent';
+                    }
+                  }}
+                >
+                  View All Accounts ({adminAccounts.length})
+                </button>
+              </div>
+
+              {/* Create Account Form */}
+              {activeTab === 'create' && (
+                <div style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '0.75rem',
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                  padding: '2rem',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  <h4 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: '600',
+                    color: '#111827',
+                    marginBottom: '1.5rem'
+                  }}>
                     Create New Admin/Event Office Account
-                  </h3>
+                  </h4>
                   
                   {createMessage && (
-                    <div className={`alert ${createMessage.includes('successfully') ? 'alert-success' : 'alert-error'}`}>
+                    <div style={{
+                      padding: '0.75rem 1rem',
+                      marginBottom: '1.5rem',
+                      borderRadius: '0.375rem',
+                      backgroundColor: createMessage.includes('successfully') ? '#d1fae5' : '#fee2e2',
+                      color: createMessage.includes('successfully') ? '#065f46' : '#991b1b',
+                      fontSize: '0.875rem'
+                    }}>
                       {createMessage}
                     </div>
                   )}
 
                   <form onSubmit={handleCreateAccount}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                      <div className="form-group">
-                        <label htmlFor="firstName" className="form-label">First Name</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                      <div>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          First Name <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
                         <input
                           type="text"
-                          id="firstName"
                           name="firstName"
                           value={formData.firstName}
                           onChange={handleFormChange}
-                          className={`form-input ${formErrors.firstName ? 'error' : ''}`}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            border: `1px solid ${formErrors.firstName ? '#ef4444' : '#e5e7eb'}`,
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            backgroundColor: '#FFFFFF',
+                            transition: 'border-color 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#1D3557';
+                            e.target.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = formErrors.firstName ? '#ef4444' : '#e5e7eb';
+                            e.target.style.backgroundColor = '#FFFFFF';
+                          }}
                           placeholder="First name"
                           disabled={isCreating}
                         />
-                        {formErrors.firstName && <div className="form-error">{formErrors.firstName}</div>}
+                        {formErrors.firstName && (
+                          <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '0.25rem 0 0 0' }}>
+                            {formErrors.firstName}
+                          </p>
+                        )}
                       </div>
 
-                      <div className="form-group">
-                        <label htmlFor="lastName" className="form-label">Last Name</label>
+                      <div>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Last Name <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
                         <input
                           type="text"
-                          id="lastName"
                           name="lastName"
                           value={formData.lastName}
                           onChange={handleFormChange}
-                          className={`form-input ${formErrors.lastName ? 'error' : ''}`}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            border: `1px solid ${formErrors.lastName ? '#ef4444' : '#e5e7eb'}`,
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            backgroundColor: '#FFFFFF',
+                            transition: 'border-color 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#1D3557';
+                            e.target.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = formErrors.lastName ? '#ef4444' : '#e5e7eb';
+                            e.target.style.backgroundColor = '#FFFFFF';
+                          }}
                           placeholder="Last name"
                           disabled={isCreating}
                         />
-                        {formErrors.lastName && <div className="form-error">{formErrors.lastName}</div>}
+                        {formErrors.lastName && (
+                          <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '0.25rem 0 0 0' }}>
+                            {formErrors.lastName}
+                          </p>
+                        )}
                       </div>
                     </div>
 
-                    <div className="form-group" style={{ marginBottom: '1rem' }}>
-                      <label htmlFor="email" className="form-label">Email Address</label>
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Email Address <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
                       <input
                         type="email"
-                        id="email"
                         name="email"
                         value={formData.email}
                         onChange={handleFormChange}
-                        className={`form-input ${formErrors.email ? 'error' : ''}`}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                          border: `1px solid ${formErrors.email ? '#ef4444' : '#e5e7eb'}`,
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          outline: 'none',
+                          backgroundColor: '#FFFFFF',
+                          transition: 'border-color 0.2s'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#1D3557';
+                          e.target.style.backgroundColor = '#FFFFFF';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = formErrors.email ? '#ef4444' : '#e5e7eb';
+                          e.target.style.backgroundColor = '#FFFFFF';
+                        }}
                         placeholder="admin@guc.edu.eg"
                         disabled={isCreating}
                       />
-                      {formErrors.email && <div className="form-error">{formErrors.email}</div>}
+                      {formErrors.email && (
+                        <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '0.25rem 0 0 0' }}>
+                          {formErrors.email}
+                        </p>
+                      )}
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                      <div className="form-group">
-                        <label htmlFor="password" className="form-label">Password</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                      <div>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Password <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
                         <input
                           type="password"
-                          id="password"
                           name="password"
                           value={formData.password}
                           onChange={handleFormChange}
-                          className={`form-input ${formErrors.password ? 'error' : ''}`}
-                          placeholder="Password"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            border: `1px solid ${formErrors.password ? '#ef4444' : '#e5e7eb'}`,
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            backgroundColor: '#FFFFFF',
+                            transition: 'border-color 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#1D3557';
+                            e.target.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = formErrors.password ? '#ef4444' : '#e5e7eb';
+                            e.target.style.backgroundColor = '#FFFFFF';
+                          }}
+                          placeholder="Password (min 6 characters)"
                           disabled={isCreating}
                         />
-                        {formErrors.password && <div className="form-error">{formErrors.password}</div>}
+                        {formErrors.password && (
+                          <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '0.25rem 0 0 0' }}>
+                            {formErrors.password}
+                          </p>
+                        )}
                       </div>
 
-                      <div className="form-group">
-                        <label htmlFor="role" className="form-label">Role</label>
+                      <div>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Role <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
                         <select
-                          id="role"
                           name="role"
                           value={formData.role}
                           onChange={handleFormChange}
-                          className={`form-input ${formErrors.role ? 'error' : ''}`}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            border: `1px solid ${formErrors.role ? '#ef4444' : '#e5e7eb'}`,
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            backgroundColor: '#FFFFFF',
+                            cursor: 'pointer',
+                            transition: 'border-color 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#1D3557';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = formErrors.role ? '#ef4444' : '#e5e7eb';
+                          }}
                           disabled={isCreating}
                         >
                           {roleOptions.map(role => (
                             <option key={role} value={role}>{role}</option>
                           ))}
                         </select>
-                        {formErrors.role && <div className="form-error">{formErrors.role}</div>}
+                        {formErrors.role && (
+                          <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '0.25rem 0 0 0' }}>
+                            {formErrors.role}
+                          </p>
+                        )}
                       </div>
                     </div>
 
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      disabled={isCreating}
-                      style={{ width: '100%' }}
-                    >
-                      {isCreating ? (
-                        <>
-                          <span className="spinner"></span>
-                          <span style={{ marginLeft: '8px' }}>Creating Account...</span>
-                        </>
-                      ) : 'Create Account'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'Admin' });
+                          setFormErrors({});
+                          setCreateMessage('');
+                        }}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          backgroundColor: '#f3f4f6',
+                          color: '#374151',
+                          border: 'none',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.backgroundColor = '#e5e7eb';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.backgroundColor = '#f3f4f6';
+                        }}
+                        disabled={isCreating}
+                      >
+                        Clear
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isCreating}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          backgroundColor: isCreating ? '#9ca3af' : '#1D3557',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          cursor: isCreating ? 'not-allowed' : 'pointer',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isCreating) {
+                            e.target.style.backgroundColor = '#0f172a';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isCreating) {
+                            e.target.style.backgroundColor = '#1D3557';
+                          }
+                        }}
+                      >
+                        {isCreating ? 'Creating Account...' : 'Create Account'}
+                      </button>
+                    </div>
                   </form>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* View All Accounts */}
-            {activeTab === 'view' && (
-              <div className="card" style={{ backgroundColor: 'var(--light-gray)' }}>
-                <div style={{ padding: '1rem' }}>
-                  <h3 style={{ color: 'var(--charcoal-black)', marginBottom: '1rem' }}>
-                    All Admin/Event Office Accounts
-                  </h3>
-                  
-                  <div style={{ display: 'grid', gap: '0.75rem' }}>
-                    {adminAccounts.length === 0 ? (
-                      <div className="card" style={{ backgroundColor: 'var(--white)' }}>
-                        <div style={{ padding: '1rem', color: 'var(--text-light)' }}>
-                          No admin accounts found.
-                        </div>
-                      </div>
-                    ) : (
-                      adminAccounts.map((account) => {
-                        const accountId = account._id || account.id;
-                        return (
-                          <div key={accountId} className="card" style={{ backgroundColor: 'var(--white)' }}>
-                            <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'grid', gap: '0.25rem' }}>
-                                <div style={{ fontWeight: 600, color: 'var(--charcoal-black)' }}>
-                                  {account.firstName} {account.lastName}
-                                </div>
-                                <div style={{ color: 'var(--text-light)', fontSize: '14px' }}>
-                                  {account.email}
-                                </div>
-                                <div style={{ 
-                                  fontSize: '12px',
-                                  color: 'var(--text-light)'
+              {/* View All Accounts */}
+              {activeTab === 'view' && (
+                <div style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '0.75rem',
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                  overflow: 'hidden'
+                }}>
+                  {adminAccounts.length === 0 ? (
+                    <div style={{ padding: '3rem 2rem', textAlign: 'center', color: '#6b7280' }}>
+                      No admin or Event Office accounts found.
+                    </div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f9fafb' }}>
+                          <th style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            textAlign: 'left'
+                          }}>
+                            Name
+                          </th>
+                          <th style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            textAlign: 'left'
+                          }}>
+                            Email
+                          </th>
+                          <th style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            textAlign: 'left'
+                          }}>
+                            Role
+                          </th>
+                          <th style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            textAlign: 'center'
+                          }}>
+                            Status
+                          </th>
+                          <th style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            textAlign: 'right'
+                          }}>
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody style={{ borderTop: '1px solid #e5e7eb' }}>
+                        {adminAccounts.map((account) => {
+                          const accountId = account._id || account.id;
+                          const accountName = account.name || `${account.firstName || ''} ${account.lastName || ''}`.trim() || 'Unknown';
+                          
+                          return (
+                            <tr
+                              key={accountId}
+                              style={{
+                                borderBottom: '1px solid #e5e7eb',
+                                transition: 'background-color 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                fontWeight: '500',
+                                color: '#111827'
+                              }}>
+                                {accountName}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                {account.email}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                {formatUserType(account.userType)}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                textAlign: 'center'
+                              }}>
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '0.25rem 0.75rem',
+                                  borderRadius: '9999px',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '500',
+                                  backgroundColor: account.status === 'active' ? '#d1fae5' : '#fee2e2',
+                                  color: account.status === 'active' ? '#065f46' : '#991b1b'
                                 }}>
-                                  Role: {formatUserType(account.userType)} • Created: {new Date(account.createdAt).toLocaleDateString()}
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                <span style={{ 
-                                  fontSize: '12px', 
-                                  color: (account.userType === 'Admin' || account.userType === 'event_office') ? 'var(--success-green)' : (account.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)')
-                                }}>
-                                  {(account.userType === 'Admin' || account.userType === 'event_office') ? 'Verified (Auto)' : (account.isVerified ? 'Verified' : 'Pending')}
+                                  {account.status === 'active' ? 'Active' : 'Blocked'}
                                 </span>
-                                <span style={{ 
-                                  fontSize: '12px', 
-                                  color: (account.userType === 'Admin' || account.userType === 'event_office') ? 'var(--success-green)' : (account.status === 'active' ? 'var(--success-green)' : 'var(--guc-red)')
-                                }}>
-                                  {(account.userType === 'Admin' || account.userType === 'event_office') ? 'Active (Auto)' : (account.status === 'active' ? 'Active' : 'Blocked')}
-                                </span>
-                                
-                                {/* Activation/Deactivation Button - Hidden for Admin and Event Office accounts */}
-                                {account.userType !== 'Admin' && account.userType !== 'event_office' && (
-                                  <button
-                                    className={account.status === 'active' ? 'btn btn-outline' : 'btn btn-primary'}
-                                    onClick={() => openActivationPasswordModal(accountId, account.status)}
-                                    disabled={activatingIds[accountId]}
-                                    style={{ 
-                                      padding: '4px 8px', 
-                                      fontSize: '12px',
-                                      backgroundColor: account.status === 'active' ? 'var(--guc-red)' : 'var(--success-green)',
-                                      color: 'white',
-                                      border: 'none'
-                                    }}
-                                    title={
-                                      account.status === 'active' 
-                                        ? 'Deactivate Account' 
-                                        : 'Activate Account'
-                                    }
-                                  >
-                                    {activatingIds[accountId] 
-                                      ? 'Updating...' 
-                                      : account.status === 'active' 
-                                        ? 'Deactivate' 
-                                        : 'Activate'
-                                    }
-                                  </button>
-                                )}
-
-                                {/* Verify/Unverify Button - Hidden for Admin and Event Office accounts */}
-                                {account.userType !== 'Admin' && account.userType !== 'event_office' && (
-                                  <button
-                                    className={account.isVerified ? 'btn btn-outline' : 'btn btn-primary'}
-                                    onClick={() => openVerificationPasswordModal(accountId, !!account.isVerified)}
-                                    disabled={activatingIds[accountId]}
-                                    style={{ 
-                                      padding: '4px 8px', 
-                                      fontSize: '12px',
-                                      backgroundColor: account.isVerified ? 'var(--success-green)' : 'var(--warning-yellow)',
-                                      color: 'white',
-                                      border: 'none'
-                                    }}
-                                    title={account.isVerified ? 'Unverify Account' : 'Verify Account'}
-                                  >
-                                    {account.isVerified ? 'Unverify' : 'Verify'}
-                                  </button>
-                                )}
-                                
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                textAlign: 'right'
+                              }}>
                                 <button
-                                  className="btn btn-outline"
                                   onClick={() => handleDeleteClick(account)}
-                                  style={{ padding: '4px 8px', fontSize: '12px', color: 'var(--guc-red)' }}
-                                  title="Delete Account"
+                                  disabled={isDeleting && deleteConfirm.account?._id === accountId}
+                                  style={{
+                                    padding: '0.5rem 1rem',
+                                    backgroundColor: '#ef4444',
+                                    color: '#FFFFFF',
+                                    border: 'none',
+                                    borderRadius: '0.5rem',
+                                    fontSize: '0.875rem',
+                                    fontWeight: '500',
+                                    cursor: (isDeleting && deleteConfirm.account?._id === accountId) ? 'not-allowed' : 'pointer',
+                                    opacity: (isDeleting && deleteConfirm.account?._id === accountId) ? 0.6 : 1,
+                                    transition: 'background-color 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!(isDeleting && deleteConfirm.account?._id === accountId)) {
+                                      e.target.style.backgroundColor = '#dc2626';
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!(isDeleting && deleteConfirm.account?._id === accountId)) {
+                                      e.target.style.backgroundColor = '#ef4444';
+                                    }
+                                  }}
                                 >
-                                  🗑️
+                                  {(isDeleting && deleteConfirm.account?._id === accountId) ? 'Deleting...' : 'Delete'}
                                 </button>
-                                
-                                {/* Status Message */}
-                                {activationMessages[accountId] && (
-                                  <span style={{ 
-                                    fontSize: '10px', 
-                                    color: activationMessages[accountId].includes('success') ? 'var(--success-green)' : 'var(--guc-red)',
-                                    marginLeft: '0.5rem'
-                                  }}>
-                                    {activationMessages[accountId]}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </>
+          )}
         </div>
-      </div>
+      </main>
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm.show && deleteConfirm.account && (
@@ -598,99 +1223,78 @@ const AdminManagement = () => {
               left: '50%',
               transform: 'translate(-50%, -50%)',
               width: 'min(90vw, 400px)',
-              backgroundColor: 'var(--white)',
-              borderRadius: '8px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
               boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
               zIndex: 1001
             }}
           >
-            <div style={{ padding: '1rem', borderBottom: '1px solid var(--medium-gray)' }}>
-              <h3 style={{ color: 'var(--guc-red)', margin: 0 }}>Confirm Deletion</h3>
-            </div>
-            <div style={{ padding: '1rem' }}>
-              <p style={{ marginBottom: '1rem' }}>
-                Are you sure you want to delete the account for <strong>{deleteConfirm.account.firstName} {deleteConfirm.account.lastName}</strong>?
-              </p>
-              <p style={{ fontSize: '14px', color: 'var(--text-light)', marginBottom: '1rem' }}>
-                This action cannot be undone.
-              </p>
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                <button
-                  className="btn btn-outline"
-                  onClick={handleDeleteCancel}
-                  disabled={isDeleting}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleDeleteConfirm}
-                  disabled={isDeleting}
-                  style={{ backgroundColor: 'var(--guc-red)', borderColor: 'var(--guc-red)' }}
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete Account'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Password Modal (Activation / Verification) */}
-      {passwordConfirm.show && (
-        <>
-          <div
-            onClick={closeActivationPasswordModal}
-            style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 1000 }}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            style={{
-              position: 'fixed',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 'min(90vw, 400px)',
-              backgroundColor: 'var(--white)',
-              borderRadius: '8px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-              zIndex: 1001
-            }}
-          >
-            <div style={{ padding: '1rem', borderBottom: '1px solid var(--medium-gray)' }}>
-              <h3 style={{ color: 'var(--guc-red)', margin: 0 }}>
-                {passwordConfirm.mode === 'activation' ? 'Password Required' : 'Password Required (Verification)'}
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb' }}>
+              <h3 style={{ color: '#111827', fontSize: '1.125rem', fontWeight: '600', margin: 0 }}>
+                Confirm Deletion
               </h3>
             </div>
-            <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-              <div style={{ fontSize: '14px', color: 'var(--text-light)' }}>
-                Enter your admin password to confirm this action.
-              </div>
-              <input
-                type="password"
-                value={passwordConfirm.value}
-                onChange={(e) => setPasswordConfirm(prev => ({ ...prev, value: e.target.value, error: '' }))}
-                className="form-input"
-                placeholder="Enter password"
-                disabled={passwordConfirm.submitting}
-              />
-              {passwordConfirm.error && (
-                <div className="form-error" style={{ color: 'var(--guc-red)', fontSize: '12px' }}>
-                  {passwordConfirm.error}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                <button className="btn btn-outline" onClick={closeActivationPasswordModal} disabled={passwordConfirm.submitting}>
+            <div style={{ padding: '1.5rem' }}>
+              <p style={{ marginBottom: '1rem', color: '#374151', fontSize: '0.875rem' }}>
+                Are you sure you want to delete the account for <strong>{deleteConfirm.account.name || `${deleteConfirm.account.firstName || ''} ${deleteConfirm.account.lastName || ''}`.trim()}</strong>?
+              </p>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+                This action cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={handleDeleteCancel}
+                  disabled={isDeleting}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: isDeleting ? 'not-allowed' : 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isDeleting) {
+                      e.target.style.backgroundColor = '#e5e7eb';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isDeleting) {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }
+                  }}
+                >
                   Cancel
                 </button>
                 <button
-                  className="btn btn-primary"
-                  onClick={submitPasswordConfirm}
-                  disabled={passwordConfirm.submitting}
-                  style={{ backgroundColor: 'var(--guc-red)', borderColor: 'var(--guc-red)' }}
+                  onClick={handleDeleteConfirm}
+                  disabled={isDeleting}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: isDeleting ? '#9ca3af' : '#ef4444',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: isDeleting ? 'not-allowed' : 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isDeleting) {
+                      e.target.style.backgroundColor = '#dc2626';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isDeleting) {
+                      e.target.style.backgroundColor = '#ef4444';
+                    }
+                  }}
                 >
-                  {passwordConfirm.submitting ? 'Confirming...' : 'Confirm'}
+                  {isDeleting ? 'Deleting...' : 'Delete Account'}
                 </button>
               </div>
             </div>

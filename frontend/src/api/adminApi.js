@@ -126,6 +126,25 @@ export const adminApiService = {
     }
   },
 
+  // Assign role and send verification email (for Staff/TA/Professor registration requests)
+  assignRoleAndSendVerification: async (userId, role) => {
+    try {
+      const response = await adminApi.post('/users/assign-role-and-verify', { userId, role });
+      return {
+        success: true,
+        data: response.data,
+        message: response.data.msg || 'Role assigned and verification email sent successfully',
+      };
+    } catch (error) {
+      console.error('Error assigning role and sending verification:', error);
+      return {
+        success: false,
+        message: error.response?.data?.msg || error.response?.data?.message || 'Failed to assign role and send verification email',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
   // Update user status (activate/deactivate)
   updateUserStatus: async (userId, isActive, confirmationPassword) => {
     try {

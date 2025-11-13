@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AdminUsers from './pages/AdminUsers';
 import AdminVendors from './pages/AdminVendors';
 import AdminEvents from './pages/AdminEvents';
+import AdminEventsView from './pages/AdminEventsView';
+import AdminPlatformBoothRequests from './pages/AdminPlatformBoothRequests';
 import AdminManagement from './pages/AdminManagement';
 import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
@@ -526,6 +528,26 @@ const AppContent = () => {
                 <ProtectedRoute>
                   <AdminOnly>
                     <AdminEvents />
+                  </AdminOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/events-view"
+              element={
+                <ProtectedRoute>
+                  <AdminOnly>
+                    <AdminEventsView />
+                  </AdminOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/platform-booth-requests"
+              element={
+                <ProtectedRoute>
+                  <AdminOnly>
+                    <AdminPlatformBoothRequests />
                   </AdminOnly>
                 </ProtectedRoute>
               }
