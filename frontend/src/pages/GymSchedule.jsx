@@ -10,6 +10,10 @@ const GymSchedule = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  const displayName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`
+    : user?.name || 'Events Office';
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth()); // 0-11
@@ -114,9 +118,6 @@ const GymSchedule = () => {
     setMonth(n.getMonth());
   };
 
-  const displayName = user?.firstName && user?.lastName 
-    ? `${user.firstName} ${user.lastName}`
-    : user?.name || 'User';
 
   return (
     <div style={{
@@ -152,7 +153,9 @@ const GymSchedule = () => {
                 justifyContent: 'center',
                 color: '#FFFFFF'
               }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
+                <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
+                </svg>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <h1 style={{
@@ -162,7 +165,7 @@ const GymSchedule = () => {
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  Student Events
+                  Events Office
                 </h1>
                 <p style={{
                   color: 'rgba(241, 250, 238, 0.7)',
@@ -181,24 +184,24 @@ const GymSchedule = () => {
           {sidebarOpen && (
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <Link
-                to="/dashboard"
+                to="/event-office"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                  backgroundColor: isActiveRoute('/event-office') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
                   textDecoration: 'none',
                   color: '#FFFFFF'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
+                  if (!isActiveRoute('/event-office')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
+                  if (!isActiveRoute('/event-office')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
@@ -218,120 +221,208 @@ const GymSchedule = () => {
               </Link>
 
               <Link
-                to="/student/events"
+                to="/event-office/events"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/event-office/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/events')) {
+                  if (!isActiveRoute('/event-office/events')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/events')) {
+                  if (!isActiveRoute('/event-office/events')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
                   fontSize: '1.25rem' 
                 }}>
                   explore
                 </span>
-                <p style={{
-                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/events') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Discover Events
-                </p>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/event-office/events') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    Discover Events
+                  </p>
+                )}
               </Link>
 
               <Link
-                to="/student/my-registrations"
+                to="/create-bazaar"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/my-registrations') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/create-bazaar') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/my-registrations')) {
+                  if (!isActiveRoute('/create-bazaar')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/my-registrations')) {
+                  if (!isActiveRoute('/create-bazaar')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  color: isActiveRoute('/create-bazaar') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
                   fontSize: '1.25rem' 
                 }}>
-                  event_note
+                  storefront
                 </span>
-                <p style={{
-                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/my-registrations') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  My Events
-                </p>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/create-bazaar') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/create-bazaar') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    Bazaars
+                  </p>
+                )}
               </Link>
 
               <Link
-                to="/student/courts"
+                to="/create-trip"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/courts') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/create-trip') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/courts')) {
+                  if (!isActiveRoute('/create-trip')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/courts')) {
+                  if (!isActiveRoute('/create-trip')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  color: isActiveRoute('/create-trip') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
                   fontSize: '1.25rem' 
                 }}>
-                  sports_tennis
+                  flight_takeoff
                 </span>
-                <p style={{
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/courts') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/create-trip') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/create-trip') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    Trips
+                  </p>
+                )}
+              </Link>
+
+              <Link
+                to="/create-conference"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/create-conference') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/create-conference')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/create-conference')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/create-conference') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
-                  Campus Courts
-                </p>
+                  groups
+                </span>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/create-conference') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/create-conference') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    Conferences
+                  </p>
+                )}
+              </Link>
+
+              <Link
+                to="/create-gym-session"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/create-gym-session') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/create-gym-session')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/create-gym-session')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  fitness_center
+                </span>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/create-gym-session') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    Create Gym Session
+                  </p>
+                )}
               </Link>
 
               <Link
@@ -343,8 +434,7 @@ const GymSchedule = () => {
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
                   backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none',
-                  color: '#FFFFFF'
+                  textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
                   if (!isActiveRoute('/gym-schedule')) {
@@ -357,18 +447,23 @@ const GymSchedule = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.25rem' }}>
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
                   calendar_month
                 </span>
-                <p style={{
-                  color: '#FFFFFF',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Gym Schedule
-                </p>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    View Gym Sessions
+                  </p>
+                )}
               </Link>
             </nav>
           )}
@@ -424,15 +519,14 @@ const GymSchedule = () => {
       }}>
         {/* Header */}
         <header style={{
-          backgroundColor: '#FFFFFF',
-          padding: '1.5rem 2rem',
-          borderBottom: '1px solid #e5e7eb',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '1rem'
+          borderBottom: '1px solid #e2e8f0',
+          padding: '1rem 2.5rem',
+          backgroundColor: '#FFFFFF'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               style={{
@@ -440,41 +534,72 @@ const GymSchedule = () => {
                 border: 'none',
                 cursor: 'pointer',
                 padding: '0.5rem',
-                borderRadius: '0.375rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#1D3557'
               }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f3f4f6';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'transparent';
-              }}
+              aria-label="Toggle sidebar"
             >
               <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
                 menu
               </span>
             </button>
-            <div>
-              <h1 style={{
-                color: '#1D3557',
-                fontSize: '1.5rem',
+            <h2 style={{
+              color: '#1D3557',
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              lineHeight: '1.25',
+              margin: 0
+            }}>
+              Bindly
+            </h2>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
                 fontWeight: '600',
+                color: '#1D3557',
                 margin: 0
               }}>
-                Gym Schedule
-              </h1>
+                {displayName}
+              </p>
               <p style={{
+                fontSize: '0.75rem',
                 color: '#6b7280',
-                fontSize: '0.875rem',
-                margin: 0,
-                marginTop: '0.25rem'
+                margin: 0
               }}>
-                View sessions for the selected month
+                Events Office
               </p>
             </div>
+            {user?.profilePicturePath ? (
+              <img
+                src={`http://localhost:5000${user.profilePicturePath}`}
+                alt="User profile"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                borderRadius: '50%',
+                backgroundColor: '#1D3557',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF',
+                fontSize: '0.875rem',
+                fontWeight: '600'
+              }}>
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
         </header>
 
@@ -482,8 +607,36 @@ const GymSchedule = () => {
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '2rem'
+          padding: '2rem',
+          backgroundColor: '#f8f6f6'
         }}>
+          {/* Page Title Box */}
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            marginBottom: '1.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            borderLeft: '4px solid #1D3557'
+          }}>
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.25rem',
+              fontWeight: '700',
+              margin: '0 0 0.25rem 0'
+            }}>
+              Gym Schedule
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '1rem',
+              fontWeight: '400',
+              margin: '0.25rem 0 0 0'
+            }}>
+              View sessions for the selected month
+            </p>
+          </div>
+
           {/* Filter and Navigation Toolbar */}
           <div style={{
             backgroundColor: '#FFFFFF',

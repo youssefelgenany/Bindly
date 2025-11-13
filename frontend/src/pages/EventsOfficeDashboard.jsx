@@ -540,7 +540,7 @@ const EventsOfficeDashboard = () => {
               lineHeight: '1.25',
               margin: 0
             }}>
-              Dashboard
+              Bindly
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -603,11 +603,31 @@ const EventsOfficeDashboard = () => {
               <div className="spinner"></div>
             </div>
           ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(12, 1fr)',
-              gap: '1.5rem'
-            }}>
+            <>
+              {/* Page Name Box */}
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                padding: '1rem 1.5rem',
+                borderRadius: '0.5rem',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                marginBottom: '2rem',
+                borderLeft: '4px solid #1D3557'
+              }}>
+                <h3 style={{
+                  color: '#1D3557',
+                  fontSize: '1.25rem',
+                  fontWeight: '600',
+                  margin: 0
+                }}>
+                  Dashboard
+                </h3>
+              </div>
+              
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(12, 1fr)',
+                gap: '1.5rem'
+              }}>
               {/* Left Column - Quick Stats and Recent Activity */}
               <div style={{
                 gridColumn: 'span 12',
@@ -894,6 +914,7 @@ const EventsOfficeDashboard = () => {
                 </ul>
               </div>
             </div>
+            </>
           )}
         </div>
       </main>
