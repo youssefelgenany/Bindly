@@ -97,7 +97,7 @@ exports.createConference = async (req, res) => {
 // 📈 Get sales report for events (admin and event office only)
 exports.getSalesReport = async (req, res) => {
   try {
-    const { startDate, endDate, type } = req.query || {};
+    const { startDate, endDate, type, sort } = req.query || {};
 
     const entries = Array.isArray(salesReport) ? [...salesReport] : [];
 
@@ -132,6 +132,8 @@ exports.getSalesReport = async (req, res) => {
       return true;
     });
 
+    const sortOrder = String(sort || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+
     const sortedReport = filteredEntries
       .map((entry) => {
         const ticketsSold = Number(entry.ticketsSold) || 0;
@@ -153,7 +155,11 @@ exports.getSalesReport = async (req, res) => {
           notes: entry.notes || null
         };
       })
-      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+      .sort((a, b) =>
+        sortOrder === 'asc'
+          ? a.totalRevenue - b.totalRevenue
+          : b.totalRevenue - a.totalRevenue
+      );
 
     const totals = sortedReport.reduce(
       (acc, entry) => {
