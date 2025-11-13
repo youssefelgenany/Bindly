@@ -21,7 +21,8 @@ const {
   payForEvent,
   cancelRegistration,
   getWalletTransactions,
-  getEventRatingsAndComments
+  getEventRatingsAndComments,
+  getSalesReport
 } = require("../controllers/eventController");
 const { verifyPayment } = require("../controllers/paymentVerificationController");
 const { sendWorkshopCompletionEmails } = require("../controllers/workshopCompletionController");
@@ -46,6 +47,14 @@ router.get("/student", protect, permit("Student", "Staff", "TA", "Professor", "E
 
 // 📅 Get all events for admin management (including pending)
 router.get("/admin/all", protect, permit("admin"), getAllEventsForAdmin);
+
+// 📈 Get sales report for events (Admin, Event Office)
+router.get(
+  "/sales/report",
+  protect,
+  permit("admin", "event_office", "Event Office", "Events Office"),
+  getSalesReport
+);
 
 // 📧 Send completion emails for workshops that ended today (Admin, Event Office)
 router.post(
