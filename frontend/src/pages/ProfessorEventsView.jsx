@@ -248,13 +248,34 @@ const ProfessorEventsView = () => {
     const startDate = new Date(event.startDate);
     if (isNaN(startDate.getTime())) return false;
     
-    // Filter out past events
+    // Filter out past events - use endDate to allow events that haven't ended yet
     const now = new Date();
     const eventEndDate = event.endDate ? new Date(event.endDate) : startDate;
-    if (isNaN(eventEndDate.getTime()) || eventEndDate < now) return false;
+    // Only filter out if endDate is valid and has passed
+    if (event.endDate && !isNaN(eventEndDate.getTime()) && eventEndDate < now) {
+      return false;
+    }
+    // If no endDate, use startDate (for backward compatibility)
+    if (!event.endDate && startDate < now) {
+      return false;
+    }
     
     const typeMatch = filter === 'all' || (event.type && event.type === filter);
     return typeMatch;
+  });
+  
+  console.log('🔍 ProfessorEventsView - Filtered events:', {
+    totalEvents: events.length,
+    filteredCount: filteredEvents.length,
+    workshopEvents: filteredEvents.filter(e => e.type === 'workshop').length,
+    workshopTitles: filteredEvents.filter(e => e.type === 'workshop').map(e => e.title),
+    allWorkshops: events.filter(e => e.type === 'workshop').map(e => ({
+      title: e.title,
+      status: e.status,
+      startDate: e.startDate,
+      endDate: e.endDate,
+      filtered: filteredEvents.some(f => f.id === e.id)
+    }))
   });
 
   const displayName = user?.firstName && user?.lastName 
