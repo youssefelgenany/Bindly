@@ -30,6 +30,7 @@ const EventsList = () => {
   const [workshopSaving, setWorkshopSaving] = useState(false);
   const [processingIds, setProcessingIds] = useState({}); // For tracking processing states
   const [actionMessages, setActionMessages] = useState({}); // For showing action feedback
+  const [expandedRows, setExpandedRows] = useState(new Set()); // Track expanded rows
 
   useEffect(() => {
     loadEvents();
@@ -57,8 +58,8 @@ const EventsList = () => {
           id: ev._id || ev.id,
           name: ev.title || ev.name,
           title: ev.title || ev.name,
-          type: ev.type || 'event', // Default to 'event' if no type
-          status: ev.status || 'approved', // Default to approved if no status
+          type: ev.type || 'event',
+          status: ev.status || 'approved',
           location: ev.location,
           startDate: ev.startDate,
           endDate: ev.endDate,
@@ -73,7 +74,12 @@ const EventsList = () => {
           extraResources: ev.extraResources,
           professorName: ev.creatorName || ev.professorName || ev.createdByName || ev.organizer,
           creatorFirstName: ev.creatorFirstName || ev.createdBy?.firstName,
-          creatorLastName: ev.creatorLastName || ev.createdBy?.lastName
+          creatorLastName: ev.creatorLastName || ev.createdBy?.lastName,
+          vendors: ev.vendors || [],
+          registeredCount: ev.registeredCount || 0,
+          faculty: ev.faculty,
+          professors: ev.professors,
+          bannerFile: ev.bannerFile
         }));
         console.log('🔍 Mapped events with status:', mapped);
         setEvents(mapped);
@@ -299,379 +305,815 @@ const EventsList = () => {
     }
   };
 
+  // Toggle row expansion
+  const toggleRowExpansion = (eventId) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(eventId)) {
+        newSet.delete(eventId);
+      } else {
+        newSet.add(eventId);
+      }
+      return newSet;
+    });
+  };
+
+  // Helper functions to determine if actions are allowed
+  const canEditEvent = (event) => {
+    if (event.type === 'bazaar') {
+      return new Date(event.startDate) > new Date();
+    }
+    if (event.type === 'trip') {
+      return new Date(event.startDate) > new Date();
+    }
+    if (event.type === 'conference') {
+      return true; // Can always edit conferences
+    }
+    if (event.type === 'workshop') {
+      return event.status !== 'approved'; // Can only edit if not already accepted
+    }
+    return false;
+  };
+
+  const canDeleteEvent = (event) => {
+    return (event.registeredCount || 0) === 0; // Can only delete if no registrations
+  };
+
+  const getEventStatus = (event) => {
+    const now = new Date();
+    const startDate = new Date(event.startDate);
+    const endDate = new Date(event.endDate);
+    
+    if (event.capacity && event.registeredCount >= event.capacity) {
+      return { label: 'Full', color: 'red' };
+    }
+    if (now >= startDate && now <= endDate) {
+      return { label: 'Active', color: 'green' };
+    }
+    if (now < startDate) {
+      return { label: 'Upcoming', color: 'blue' };
+    }
+    return { label: 'Past', color: 'gray' };
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   if (loading) {
     return (
-      <div className="events-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading events...</p>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        fontFamily: 'Inter, sans-serif'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="loading-spinner"></div>
+          <p style={{ marginTop: '1rem', color: '#6b7280' }}>Loading events...</p>
+        </div>
       </div>
     );
   }
 
+  const isEventsOffice = user?.userType === 'Event Office' || 
+                         user?.userType === 'Events Office' || 
+                         user?.userType === 'event_office' || 
+                         user?.role === 'event_office' || 
+                         user?.role === 'Event Office';
+
   return (
-    <div className="events-page">
-        <div className="events-header">
-          <h1>Events Management</h1>
-          <p>Manage all bazaars and trips</p>
-          
-          <div className="events-search">
-            <input 
-              type="text" 
-              className="form-input" 
-              placeholder="Search by event or professor name"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { setLoading(true); loadEvents(); } }}
-            />
-            <button className="btn btn-primary" onClick={() => { setLoading(true); loadEvents(); }}>Search</button>
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#f6f7f8',
+      fontFamily: 'Inter, sans-serif',
+      padding: '2rem'
+    }}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+        {/* Header */}
+        <header style={{
+          backgroundColor: '#FFFFFF',
+          padding: '1.5rem',
+          borderRadius: '0.75rem',
+          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+          marginBottom: '1.5rem'
+        }}>
+          <div style={{ marginBottom: '0.25rem' }}>
+            <h1 style={{
+              color: '#111827',
+              fontSize: '1.875rem',
+              fontWeight: '700',
+              lineHeight: '1.25',
+              margin: 0
+            }}>
+              All Upcoming Events
+            </h1>
           </div>
-          
-          <div className="events-actions">
-          {!(user?.role === 'admin' || user?.userType === 'Admin' || user?.userType === 'admin') && (
-            <button className="btn btn-outline" onClick={handleViewAll}>
-              View All Events
-            </button>
-          )}
-          {!(user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office') && (
-            <Link to="/create-bazaar" className="btn btn-primary">
-              Create New Bazaar
-            </Link>
-          )}
-          {!(user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office') && (
-            <Link to="/create-trip" className="btn btn-primary">
-              Create New Trip
-            </Link>
-          )}
-        </div>
+          <p style={{
+            color: '#6b7280',
+            fontSize: '1rem',
+            fontWeight: '400',
+            margin: 0
+          }}>
+            View, manage, and track all scheduled university events.
+          </p>
+        </header>
 
-        <div className="events-filters">
-          <button 
-            className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => setFilter('all')}
-          >
-            All Events
-          </button>
-          <button 
-            className={`filter-btn ${filter === 'bazaar' ? 'active' : ''}`}
-            onClick={() => setFilter('bazaar')}
-          >
-            Bazaars
-          </button>
-          <button 
-            className={`filter-btn ${filter === 'trip' ? 'active' : ''}`}
-            onClick={() => setFilter('trip')}
-          >
-            Trips
-          </button>
-          <button 
-            className={`filter-btn ${filter === 'conference' ? 'active' : ''}`}
-            onClick={() => setFilter('conference')}
-          >
-            Conferences
-          </button>
-          <button 
-            className={`filter-btn ${filter === 'workshop' ? 'active' : ''}`}
-            onClick={() => setFilter('workshop')}
-          >
-            Workshops
-          </button>
-          <button 
-            className={`filter-btn ${filter === 'booth' ? 'active' : ''}`}
-            onClick={() => setFilter('booth')}
-          >
-            Booths
-          </button>
-        </div>
-
-        {/* Status Filters - Only for Event Office users */}
-        {(
-          user?.userType === 'Event Office' ||
-          user?.userType === 'Events Office' ||
-          user?.userType === 'event_office' ||
-          user?.role === 'event_office' ||
-          user?.role === 'Event Office'
-        ) && (
-          <div className="events-filters" style={{ marginTop: '1rem' }}>
-            <h4 style={{ marginBottom: '0.5rem', color: 'var(--charcoal-black)' }}>Filter by Status:</h4>
-            <button 
-              className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('all')}
-            >
-              All Statuses
-            </button>
-            <button 
-              className={`filter-btn ${statusFilter === 'pending' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('pending')}
-              style={{ backgroundColor: statusFilter === 'pending' ? 'var(--warning-yellow)' : '', color: statusFilter === 'pending' ? 'var(--charcoal-black)' : '' }}
-            >
-              ⏳ Pending
-            </button>
-            <button 
-              className={`filter-btn ${statusFilter === 'approved' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('approved')}
-              style={{ backgroundColor: statusFilter === 'approved' ? 'var(--success-green)' : '', color: statusFilter === 'approved' ? 'white' : '' }}
-            >
-              ✓ Approved
-            </button>
-            <button 
-              className={`filter-btn ${statusFilter === 'rejected' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('rejected')}
-              style={{ backgroundColor: statusFilter === 'rejected' ? 'var(--guc-red)' : '', color: statusFilter === 'rejected' ? 'white' : '' }}
-            >
-              ✗ Rejected
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="events-list">
-        {error ? (
-          <div className="no-events">
-            <p style={{ color: 'var(--guc-red)' }}>{error}</p>
-            <button className="btn btn-outline" onClick={loadEvents}>Retry</button>
-          </div>
-        ) : filteredEvents.length === 0 ? (
-          <div className="no-events">
-            <p>No events found. Create your first event!</p>
-          </div>
-        ) : (
-          filteredEvents.map(event => (
-            <div key={event.id} className="event-card">
-              <div className="event-info">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                <h3>{event.name}</h3>
-                  {/* Status Badge - Only show for workshops and other non-trip/bazaar/conference events */}
-                  {event.type && event.type !== 'trip' && event.type !== 'bazaar' && event.type !== 'conference' && (
-                    <span style={{
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontWeight: '700',
-                      backgroundColor: event.status === 'approved' ? 'var(--success-green)' : 
-                                     event.status === 'rejected' ? 'var(--guc-red)' : 
-                                     event.status === 'pending' ? 'var(--warning-yellow)' : 'var(--text-light)',
-                      color: event.status === 'pending' ? 'var(--charcoal-black)' : 'white',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        {/* Filters Section */}
+        <div style={{
+          backgroundColor: '#FFFFFF',
+          padding: '1rem',
+          borderRadius: '0.75rem',
+          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+          marginBottom: '1.5rem'
+        }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem',
+            alignItems: 'center'
+          }}>
+            {/* Search */}
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                <div style={{ display: 'flex', width: '100%', height: '3rem' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingLeft: '1rem',
+                    border: '1px solid #e5e7eb',
+                    borderRight: 'none',
+                    backgroundColor: '#f9fafb',
+                    borderTopLeftRadius: '0.5rem',
+                    borderBottomLeftRadius: '0.5rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{ 
+                      fontSize: '1.5rem',
+                      color: '#9ca3af'
                     }}>
-                      {event.status === 'approved' ? '✓ APPROVED' : 
-                       event.status === 'rejected' ? '✗ REJECTED' : 
-                       event.status === 'pending' ? '⏳ PENDING' : 'UNKNOWN'}
+                      search
                     </span>
-                  )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search by Event Name/Professor"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { setLoading(true); loadEvents(); } }}
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem 1rem',
+                      border: '1px solid #e5e7eb',
+                      borderLeft: 'none',
+                      borderTopRightRadius: '0.5rem',
+                      borderBottomRightRadius: '0.5rem',
+                      fontSize: '1rem',
+                      outline: 'none',
+                      backgroundColor: '#FFFFFF'
+                    }}
+                  />
                 </div>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <p className="event-type">{(event.type || 'EVENT').toUpperCase()}</p>
-                </div>
-                <p className="event-location">📍 {event.location}</p>
-                <p className="event-date">
-                  🗓️ {new Date(event.startDate).toLocaleDateString()} - {new Date(event.endDate).toLocaleDateString()}
-                </p>
-                <p className="event-description">{event.description}</p>
-                
-                {event.type === 'workshop' && event.professorName && (
-                  <div className="workshop-details">
-                    <p>👨‍🏫 Professor: {event.professorName}</p>
-                  </div>
-                )}
-                
-                {event.type === 'trip' && (
-                  <div className="trip-details">
-                    <p>💰 Price: ${event.price}</p>
-                    <p>👥 Capacity: {event.capacity} people</p>
-                    {event.registrationDeadline && (
-                      <p>⏰ Registration Deadline: {new Date(event.registrationDeadline).toLocaleDateString()}</p>
-                    )}
-                  </div>
-                )}
-                
-                {event.type === 'bazaar' && event.registrationDeadline && (
-                  <div className="bazaar-details">
-                    <p>⏰ Registration Deadline: {new Date(event.registrationDeadline).toLocaleDateString()}</p>
-                  </div>
-                )}
-                
-                {event.type === 'booth' && event.extraResources && (
-                  <div className="booth-details">
-                    {(() => {
-                      try {
-                        const boothData = JSON.parse(event.extraResources);
-                        return (
-                          <>
-                            {boothData.boothSize && <p>📏 Booth Size: {boothData.boothSize}</p>}
-                            {boothData.durationWeeks && <p>⏱️ Duration: {boothData.durationWeeks} weeks</p>}
-                            {boothData.boothLocation && <p>📍 Booth Location: {boothData.boothLocation}</p>}
-                            {boothData.attendees && boothData.attendees.length > 0 && (
-                              <p>👥 Attendees: {boothData.attendees.length} registered</p>
-                            )}
-                          </>
-                        );
-                      } catch (e) {
-                        return null;
-                      }
-                    })()}
-                  </div>
-                )}
-              </div>
-              
-              <div className="event-actions">
-                {(
-                  user?.userType === 'Event Office' ||
-                  user?.userType === 'Events Office' ||
-                  user?.userType === 'event_office' ||
-                  user?.role === 'event_office' ||
-                  user?.role === 'Event Office'
-                ) ? (
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* Debug logging */}
-                    {console.log('🔍 Event status for buttons:', event.id, event.status)}
-                    {/* Status Management Buttons - Show Accept/Reject only for workshops and other non-trip/bazaar/conference events */}
-                    {event.type && event.type !== 'trip' && event.type !== 'bazaar' && event.type !== 'conference' && (
-                      <>
-                        <button
-                          className="btn btn-primary"
-                          onClick={() => handleEventStatusChange(event.id, 'approved')}
-                          disabled={!!processingIds[event.id] || event.status === 'approved'}
-                          style={{ 
-                            fontSize: '12px',
-                            opacity: event.status === 'approved' ? 0.6 : 1
-                          }}
-                        >
-                          {processingIds[event.id] ? 'Processing...' : '✓ Accept'}
-                        </button>
-                        <button
-                          className="btn btn-outline"
-                          onClick={() => handleEventStatusChange(event.id, 'rejected')}
-                          disabled={!!processingIds[event.id] || event.status === 'rejected'}
-                          style={{ 
-                            fontSize: '12px', 
-                            color: 'var(--guc-red)', 
-                            borderColor: 'var(--guc-red)',
-                            opacity: event.status === 'rejected' ? 0.6 : 1
-                          }}
-                        >
-                          {processingIds[event.id] ? 'Processing...' : '✗ Reject'}
-                        </button>
-                      </>
-                    )}
-
-                    {/* Edit Button */}
-                    {event.type === 'bazaar' ? (
-                      // Only show edit button if bazaar hasn't started yet
-                      new Date(event.startDate) > new Date() ? (
-                    <button 
-                      className="btn btn-secondary"
-                      onClick={() => openBazaarEdit(event)}
-                    >
-                      Edit
-                    </button>
-                      ) : (
-                        <span className="text-muted" style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                          Bazaar has started
-                        </span>
-                      )
-                  ) : event.type === 'conference' ? (
-                    <button 
-                      className="btn btn-secondary"
-                      onClick={() => openConferenceEdit(event)}
-                    >
-                      Edit
-                    </button>
-                    ) : event.type === 'trip' ? (
-                      // Only show edit button if trip hasn't started yet
-                      new Date(event.startDate) > new Date() ? (
-                        <button 
-                          className="btn btn-secondary"
-                          onClick={() => openTripEdit(event)}
-                        >
-                          Edit
-                        </button>
-                      ) : (
-                        <span className="text-muted" style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                          Trip has started
-                        </span>
-                      )
-                    ) : event.type === 'workshop' && (
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => {
-                          console.log('Edit button clicked, event:', event);
-                          setEditingWorkshop(event);
-                          setIsWorkshopModalOpen(true);
-                        }}
-                      >
-                        Edit
-                      </button>
-                    )}
-
-                    {/* Delete Button */}
-                    <button 
-                      className="btn btn-outline"
-                      onClick={() => handleEventDelete(event.id)}
-                      disabled={!!processingIds[event.id]}
-                      style={{ fontSize: '12px', color: 'var(--guc-red)', borderColor: 'var(--guc-red)' }}
-                    >
-                      {processingIds[event.id] ? 'Deleting...' : '🗑️ Delete'}
-                    </button>
-
-                    {/* Action Messages */}
-                    {actionMessages[event.id] && (
-                      <span style={{ 
-                        fontSize: '12px', 
-                        color: actionMessages[event.id].includes('successfully') ? 'var(--success-green)' : 'var(--guc-red)',
-                        marginLeft: '0.5rem'
-                      }}>
-                        {actionMessages[event.id]}
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  // Other roles: keep existing behavior (bazaar or trip)
-                  event.type === 'trip' ? (
-                    // Only show edit link if trip hasn't started yet
-                    new Date(event.startDate) > new Date() ? (
-                      <Link 
-                        to={`/edit-trip/${event.id}`}
-                        className="btn btn-secondary"
-                      >
-                        Edit
-                      </Link>
-                    ) : (
-                      <span className="text-muted" style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                        Trip has started
-                      </span>
-                    )
-                  ) : (
-                    // Handle bazaar and other event types for non-event office users
-                    event.type === 'bazaar' ? (
-                      // Only show edit link if bazaar hasn't started yet
-                      new Date(event.startDate) > new Date() ? (
-                        <Link 
-                          to={`/edit-bazaar/${event.id}`}
-                          className="btn btn-secondary"
-                        >
-                          Edit
-                        </Link>
-                      ) : (
-                        <span className="text-muted" style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                          Bazaar has started
-                        </span>
-                      )
-                    ) : (
-                  <Link 
-                    to={event.type === 'bazaar' ? `/edit-bazaar/${event.id}` : `/edit-trip/${event.id}`}
-                    className="btn btn-secondary"
-                  >
-                    Edit
-                  </Link>
-                    )
-                  )
-                )}
-              </div>
+              </label>
             </div>
-          ))
-        )}
+
+            {/* Type Filter */}
+            <div>
+              <label style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '3rem' }}>
+                <select
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    padding: '0.75rem 1rem',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    backgroundColor: '#FFFFFF',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="all">All Types</option>
+                  <option value="workshop">Workshops</option>
+                  <option value="trip">Trips</option>
+                  <option value="bazaar">Bazaars</option>
+                  <option value="booth">Booths</option>
+                  <option value="conference">Conferences</option>
+                </select>
+              </label>
+            </div>
+
+            {/* Apply Filters Button */}
+            <button
+              onClick={() => { setLoading(true); loadEvents(); }}
+              style={{
+                height: '3rem',
+                padding: '0 1.5rem',
+                backgroundColor: '#137fec',
+                color: '#FFFFFF',
+                borderRadius: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                border: 'none',
+                cursor: 'pointer',
+                width: '100%'
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#0f6fd6'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#137fec'}
+            >
+              Apply Filters
+            </button>
+          </div>
+        </div>
+
+        {/* Events Table */}
+        <div style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '0.75rem',
+          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+          overflowX: 'auto'
+        }}>
+          {error ? (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>
+              <p style={{ color: '#ef4444', marginBottom: '1rem' }}>{error}</p>
+              <button
+                onClick={loadEvents}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#137fec',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          ) : filteredEvents.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>
+              <p style={{ color: '#6b7280' }}>No events found.</p>
+            </div>
+          ) : (
+            <table style={{ width: '100%', textAlign: 'left' }}>
+              <thead style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <tr>
+                  <th style={{
+                    padding: '1rem 1.5rem',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    Event Name
+                  </th>
+                  <th style={{
+                    padding: '1rem 1.5rem',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    Type
+                  </th>
+                  <th style={{
+                    padding: '1rem 1.5rem',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    Date
+                  </th>
+                  <th style={{
+                    padding: '1rem 1.5rem',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    Location
+                  </th>
+                  <th style={{
+                    padding: '1rem 1.5rem',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    textAlign: 'center'
+                  }}>
+                    Status
+                  </th>
+                  <th style={{
+                    padding: '1rem 1.5rem',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    textAlign: 'right'
+                  }}>
+                    Actions
+                  </th>
+                  <th style={{ padding: '1rem 1.5rem', width: '48px' }}></th>
+                </tr>
+              </thead>
+              <tbody style={{ borderTop: '1px solid #e5e7eb' }}>
+                {filteredEvents.map(event => {
+                  const statusInfo = getEventStatus(event);
+                  const canEdit = canEditEvent(event);
+                  const canDelete = canDeleteEvent(event);
+                  const isExpanded = expandedRows.has(event.id);
+                  const statusColors = {
+                    blue: { bg: '#dbeafe', text: '#1e40af' },
+                    green: { bg: '#d1fae5', text: '#065f46' },
+                    red: { bg: '#fee2e2', text: '#991b1b' },
+                    gray: { bg: '#f3f4f6', text: '#4b5563' }
+                  };
+                  const statusStyle = statusColors[statusInfo.color] || statusColors.gray;
+
+                  return (
+                    <React.Fragment key={event.id}>
+                      <tr style={{
+                        borderBottom: '1px solid #e5e7eb',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <td style={{
+                          padding: '1rem 1.5rem',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          color: '#111827'
+                        }}>
+                          {event.name || event.title}
+                        </td>
+                        <td style={{
+                          padding: '1rem 1.5rem',
+                          fontSize: '0.875rem',
+                          color: '#6b7280'
+                        }}>
+                          {event.type ? event.type.charAt(0).toUpperCase() + event.type.slice(1) : 'Event'}
+                        </td>
+                        <td style={{
+                          padding: '1rem 1.5rem',
+                          fontSize: '0.875rem',
+                          color: '#6b7280'
+                        }}>
+                          {formatDate(event.startDate)}
+                        </td>
+                        <td style={{
+                          padding: '1rem 1.5rem',
+                          fontSize: '0.875rem',
+                          color: '#6b7280'
+                        }}>
+                          {event.location}
+                        </td>
+                        <td style={{
+                          padding: '1rem 1.5rem',
+                          textAlign: 'center'
+                        }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '9999px',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            backgroundColor: statusStyle.bg,
+                            color: statusStyle.text
+                          }}>
+                            {statusInfo.label}
+                          </span>
+                        </td>
+                        <td style={{
+                          padding: '1rem 1.5rem',
+                          textAlign: 'right'
+                        }}>
+                          {isEventsOffice && (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                              {/* Workshop Accept/Reject buttons */}
+                              {event.type === 'workshop' && event.status === 'pending' && (
+                                <>
+                                  <button
+                                    onClick={() => handleEventStatusChange(event.id, 'approved')}
+                                    disabled={!!processingIds[event.id]}
+                                    style={{
+                                      padding: '0.5rem',
+                                      borderRadius: '0.5rem',
+                                      border: 'none',
+                                      backgroundColor: 'transparent',
+                                      color: canEdit ? '#137fec' : '#d1d5db',
+                                      cursor: canEdit ? 'pointer' : 'not-allowed',
+                                      opacity: canEdit ? 1 : 0.5
+                                    }}
+                                    title={canEdit ? 'Accept Workshop' : 'Workshop already accepted'}
+                                    onMouseEnter={(e) => {
+                                      if (canEdit) {
+                                        e.target.style.backgroundColor = '#f3f4f6';
+                                        e.target.style.color = '#137fec';
+                                      }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (canEdit) {
+                                        e.target.style.backgroundColor = 'transparent';
+                                        e.target.style.color = '#137fec';
+                                      }
+                                    }}
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                      check_circle
+                                    </span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleEventStatusChange(event.id, 'rejected')}
+                                    disabled={!!processingIds[event.id]}
+                                    style={{
+                                      padding: '0.5rem',
+                                      borderRadius: '0.5rem',
+                                      border: 'none',
+                                      backgroundColor: 'transparent',
+                                      color: '#ef4444',
+                                      cursor: 'pointer'
+                                    }}
+                                    title="Reject Workshop"
+                                    onMouseEnter={(e) => {
+                                      e.target.style.backgroundColor = '#fee2e2';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.target.style.backgroundColor = 'transparent';
+                                    }}
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                      cancel
+                                    </span>
+                                  </button>
+                                </>
+                              )}
+                              
+                              {/* Edit Button */}
+                              <button
+                                onClick={() => {
+                                  if (event.type === 'bazaar') openBazaarEdit(event);
+                                  else if (event.type === 'conference') openConferenceEdit(event);
+                                  else if (event.type === 'trip') openTripEdit(event);
+                                  else if (event.type === 'workshop') {
+                                    setEditingWorkshop(event);
+                                    setIsWorkshopModalOpen(true);
+                                  }
+                                }}
+                                disabled={!canEdit}
+                                style={{
+                                  padding: '0.5rem',
+                                  borderRadius: '0.5rem',
+                                  border: 'none',
+                                  backgroundColor: 'transparent',
+                                  color: canEdit ? '#6b7280' : '#d1d5db',
+                                  cursor: canEdit ? 'pointer' : 'not-allowed',
+                                  opacity: canEdit ? 1 : 0.5
+                                }}
+                                title={canEdit ? 'Edit Event' : (event.type === 'bazaar' || event.type === 'trip' ? 'Cannot edit: event has started' : event.type === 'workshop' ? 'Cannot edit: workshop already accepted' : 'Cannot edit')}
+                                onMouseEnter={(e) => {
+                                  if (canEdit) {
+                                    e.target.style.backgroundColor = '#f3f4f6';
+                                    e.target.style.color = '#137fec';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (canEdit) {
+                                    e.target.style.backgroundColor = 'transparent';
+                                    e.target.style.color = '#6b7280';
+                                  }
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                  edit
+                                </span>
+                              </button>
+
+                              {/* Delete Button */}
+                              <button
+                                onClick={() => handleEventDelete(event.id)}
+                                disabled={!canDelete || !!processingIds[event.id]}
+                                style={{
+                                  padding: '0.5rem',
+                                  borderRadius: '0.5rem',
+                                  border: 'none',
+                                  backgroundColor: 'transparent',
+                                  color: canDelete ? '#ef4444' : '#fbbf24',
+                                  cursor: canDelete ? 'pointer' : 'not-allowed',
+                                  opacity: canDelete ? 1 : 0.5
+                                }}
+                                title={canDelete ? 'Delete Event' : 'Cannot delete: registrations exist'}
+                                onMouseEnter={(e) => {
+                                  if (canDelete) {
+                                    e.target.style.backgroundColor = '#fee2e2';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (canDelete) {
+                                    e.target.style.backgroundColor = 'transparent';
+                                  }
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                  delete
+                                </span>
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td style={{
+                          padding: '1rem 1.5rem',
+                          textAlign: 'right'
+                        }}>
+                          <button
+                            onClick={() => toggleRowExpansion(event.id)}
+                            style={{
+                              padding: '0.5rem',
+                              borderRadius: '0.5rem',
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              color: '#6b7280',
+                              cursor: 'pointer',
+                              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.backgroundColor = '#f3f4f6';
+                              e.target.style.color = '#137fec';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.backgroundColor = 'transparent';
+                              e.target.style.color = '#6b7280';
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                              expand_more
+                            </span>
+                          </button>
+                        </td>
+                      </tr>
+                      {/* Expanded Details Row */}
+                      {isExpanded && (
+                        <tr style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
+                          <td colSpan="7" style={{ padding: '1.5rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                              {/* Event Description */}
+                              {event.description && (
+                                <div>
+                                  <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
+                                    Description
+                                  </h4>
+                                  <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                    {event.description}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Event Details Grid */}
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                gap: '1rem'
+                              }}>
+                                {/* Start Date */}
+                                <div>
+                                  <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                    Start Date & Time
+                                  </h4>
+                                  <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                    {event.startDate ? new Date(event.startDate).toLocaleString() : 'N/A'}
+                                  </p>
+                                </div>
+
+                                {/* End Date */}
+                                <div>
+                                  <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                    End Date & Time
+                                  </h4>
+                                  <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                    {event.endDate ? new Date(event.endDate).toLocaleString() : 'N/A'}
+                                  </p>
+                                </div>
+
+                                {/* Registration Deadline */}
+                                {event.registrationDeadline && (
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                      Registration Deadline
+                                    </h4>
+                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                      {new Date(event.registrationDeadline).toLocaleString()}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Capacity */}
+                                {event.capacity && (
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                      Capacity
+                                    </h4>
+                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                      {event.registeredCount || 0} / {event.capacity} registered
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Price (for trips) */}
+                                {event.type === 'trip' && event.price && (
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                      Price
+                                    </h4>
+                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                      {event.price} EGP
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Professor (for workshops) */}
+                                {event.type === 'workshop' && (event.professorName || event.professors) && (
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                      Professor
+                                    </h4>
+                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                      {event.professorName || event.professors}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Faculty (for workshops) */}
+                                {event.type === 'workshop' && event.faculty && (
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                      Faculty
+                                    </h4>
+                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                      {event.faculty}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Budget (for conferences) */}
+                                {event.type === 'conference' && event.budget && (
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                      Budget
+                                    </h4>
+                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                      {event.budget} EGP
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Funding Source (for conferences) */}
+                                {event.type === 'conference' && event.fundingSource && (
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                      Funding Source
+                                    </h4>
+                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                      {event.fundingSource}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Website (for conferences) */}
+                                {event.type === 'conference' && event.website && (
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                      Website
+                                    </h4>
+                                    <a
+                                      href={event.website}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{
+                                        fontSize: '0.875rem',
+                                        color: '#137fec',
+                                        textDecoration: 'none'
+                                      }}
+                                    >
+                                      {event.website}
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Agenda (for conferences) */}
+                              {event.type === 'conference' && event.agenda && (
+                                <div>
+                                  <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
+                                    Agenda
+                                  </h4>
+                                  <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, whiteSpace: 'pre-wrap' }}>
+                                    {event.agenda}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Vendors (for bazaars and booths) */}
+                              {(event.type === 'bazaar' || event.type === 'booth') && event.vendors && event.vendors.length > 0 && (
+                                <div>
+                                  <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
+                                    Participating Vendors
+                                  </h4>
+                                  <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                                    gap: '0.75rem'
+                                  }}>
+                                    {event.vendors.map((vendor, idx) => (
+                                      <div
+                                        key={idx}
+                                        style={{
+                                          padding: '0.75rem',
+                                          backgroundColor: '#FFFFFF',
+                                          borderRadius: '0.5rem',
+                                          border: '1px solid #e5e7eb'
+                                        }}
+                                      >
+                                        <p style={{
+                                          fontSize: '0.875rem',
+                                          fontWeight: '500',
+                                          color: '#111827',
+                                          margin: '0 0 0.25rem 0'
+                                        }}>
+                                          {vendor.companyName || vendor.name || 'Vendor'}
+                                        </p>
+                                        {vendor.email && (
+                                          <p style={{
+                                            fontSize: '0.75rem',
+                                            color: '#6b7280',
+                                            margin: 0
+                                          }}>
+                                            {vendor.email}
+                                          </p>
+                                        )}
+                                        {vendor.contactName && (
+                                          <p style={{
+                                            fontSize: '0.75rem',
+                                            color: '#6b7280',
+                                            margin: 0
+                                          }}>
+                                            Contact: {vendor.contactName}
+                                          </p>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Bazaar Details */}
+                              {event.type === 'bazaar' && (
+                                <div>
+                                  <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
+                                    Bazaar Details
+                                  </h4>
+                                  <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                                    gap: '1rem'
+                                  }}>
+                                    {event.registrationDeadline && (
+                                      <div>
+                                        <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.25rem 0' }}>
+                                          Registration Deadline
+                                        </p>
+                                        <p style={{ fontSize: '0.875rem', color: '#111827', margin: 0 }}>
+                                          {new Date(event.registrationDeadline).toLocaleString()}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
       {isEditModalOpen && editingBazaar && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
