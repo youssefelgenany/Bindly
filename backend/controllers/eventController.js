@@ -7,6 +7,7 @@ const User = require("../models/userModel");
 const Payment = require("../models/paymentModel");
 const { sendReceiptEmail } = require("../utils/sendReceiptEmail");
 const { sendRefundEmail } = require("../utils/sendRefundEmail");
+const { salesReport } = require("../scripts/test-sales-report");
 
 // Initialize Stripe if secret key is available
 let stripe = null;
@@ -90,6 +91,65 @@ exports.createConference = async (req, res) => {
   } catch (err) {
     console.error("createConference error:", err);
     return res.status(500).json({ msg: "Server error", error: err.message });
+  }
+};
+
+// 📈 Get sales report for events (admin and event office only)
+exports.getSalesReport = async (req, res) => {
+  try {
+    const entries = Array.isArray(salesReport) ? [...salesReport] : [];
+
+    const sortedReport = entries
+      .map((entry) => {
+        const ticketsSold = Number(entry.ticketsSold) || 0;
+        const totalRevenue = Number(entry.totalRevenue) || 0;
+        const averageTicketPrice =
+          ticketsSold > 0 ? Number((totalRevenue / ticketsSold).toFixed(2)) : null;
+
+        return {
+          id: entry.id || entry.eventName,
+          eventName: entry.eventName,
+          totalRevenue,
+          ticketsSold,
+          ticketPrice: entry.ticketPrice ?? null,
+          averageTicketPrice,
+          category: entry.category || null,
+          location: entry.location || null,
+          startDate: entry.startDate || null,
+          endDate: entry.endDate || null,
+          notes: entry.notes || null
+        };
+      })
+      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+    const totals = sortedReport.reduce(
+      (acc, entry) => {
+        acc.totalRevenue += entry.totalRevenue;
+        acc.totalTicketsSold += entry.ticketsSold;
+        return acc;
+      },
+      { totalRevenue: 0, totalTicketsSold: 0 }
+    );
+
+    const response = {
+      success: true,
+      generatedAt: new Date().toISOString(),
+      currency: "EGP",
+      totalRevenue: totals.totalRevenue,
+      totalTicketsSold: totals.totalTicketsSold,
+      averageRevenuePerEvent: sortedReport.length
+        ? Number((totals.totalRevenue / sortedReport.length).toFixed(2))
+        : 0,
+      report: sortedReport
+    };
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error("Server error in getSalesReport:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to generate sales report"
+    });
   }
 };
 
