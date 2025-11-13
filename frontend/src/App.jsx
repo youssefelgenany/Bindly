@@ -390,6 +390,14 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/gym-schedule"
+              element={
+                <ProtectedRoute>
+                  <GymSchedule />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/courts"
               element={
                 <ProtectedRoute>
