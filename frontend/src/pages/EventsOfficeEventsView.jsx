@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { eventsApiService, bazaarApi, tripApi } from '../api/eventsApi';
 import { adminApiService } from '../api/adminApi';
+import { vendorRequestApi } from '../api/vendorRequestApi';
 import BazaarForm from '../components/BazaarForm';
 import ConferenceForm from '../components/ConferenceForm';
 import TripForm from '../components/TripForm';
@@ -36,6 +37,8 @@ const EventsOfficeEventsView = () => {
   const [processingIds, setProcessingIds] = useState({});
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
+  const [vendorRequests, setVendorRequests] = useState({}); // eventId -> array of requests
+  const [loadingVendorRequests, setLoadingVendorRequests] = useState({}); // eventId -> boolean
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -324,17 +327,6 @@ const EventsOfficeEventsView = () => {
   };
 
   // Toggle row expansion
-  const toggleRowExpansion = (eventId) => {
-    setExpandedRows(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(eventId)) {
-        newSet.delete(eventId);
-      } else {
-        newSet.add(eventId);
-      }
-      return newSet;
-    });
-  };
 
   // Helper functions to determine if actions are allowed
   const canEditEvent = (event) => {
@@ -477,6 +469,81 @@ const EventsOfficeEventsView = () => {
     } finally {
       setTripSaving(false);
     }
+  };
+
+  // Load vendor requests for an event
+  const loadVendorRequests = useCallback(async (eventId, eventType) => {
+    if (!eventId || (eventType !== 'bazaar' && eventType !== 'booth')) return;
+    
+    try {
+      setLoadingVendorRequests(prev => ({ ...prev, [eventId]: true }));
+      const result = await vendorRequestApi.getByEvent(eventId, eventType);
+      
+      if (result.success) {
+        setVendorRequests(prev => ({
+          ...prev,
+          [eventId]: result.requests || []
+        }));
+      } else {
+        console.error('Failed to load vendor requests:', result.message);
+        setVendorRequests(prev => ({
+          ...prev,
+          [eventId]: []
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading vendor requests:', error);
+      setVendorRequests(prev => ({
+        ...prev,
+        [eventId]: []
+      }));
+    } finally {
+      setLoadingVendorRequests(prev => ({ ...prev, [eventId]: false }));
+    }
+  }, []);
+
+  // Handle vendor request status update
+  const handleVendorRequestStatus = async (requestId, status, eventId) => {
+    try {
+      setProcessingIds(prev => ({ ...prev, [requestId]: true }));
+      const result = await vendorRequestApi.updateStatus(requestId, status);
+      
+      if (result.success) {
+        // Reload vendor requests for this event
+        const event = events.find(e => e.id === eventId);
+        if (event) {
+          await loadVendorRequests(eventId, event.type);
+        }
+        // Also reload events to update vendor lists
+        await loadEvents();
+      } else {
+        alert(result.message || 'Failed to update vendor request status');
+      }
+    } catch (error) {
+      console.error('Error updating vendor request status:', error);
+      alert('An error occurred while updating vendor request status');
+    } finally {
+      setProcessingIds(prev => {
+        const newState = { ...prev };
+        delete newState[requestId];
+        return newState;
+      });
+    }
+  };
+
+  // Toggle row expansion and load vendor requests if needed
+  const toggleRowExpansion = (eventId, eventType) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(eventId)) {
+      newExpanded.delete(eventId);
+    } else {
+      newExpanded.add(eventId);
+      // Load vendor requests when expanding
+      if (eventType === 'bazaar' || eventType === 'booth') {
+        loadVendorRequests(eventId, eventType);
+      }
+    }
+    setExpandedRows(newExpanded);
   };
 
   const displayName = user?.firstName && user?.lastName 
@@ -1424,7 +1491,7 @@ const EventsOfficeEventsView = () => {
                             textAlign: 'right'
                           }}>
                             <button
-                              onClick={() => toggleRowExpansion(event.id)}
+                              onClick={() => toggleRowExpansion(event.id, event.type)}
                               style={{
                                 padding: '0.5rem',
                                 borderRadius: '0.5rem',
@@ -1664,6 +1731,254 @@ const EventsOfficeEventsView = () => {
                                   </div>
                                 )}
 
+                                {/* Vendor Participation Requests (for bazaars and booths) */}
+                                {(event.type === 'bazaar' || event.type === 'booth') && (
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>
+                                      Vendor Participation Requests
+                                    </h4>
+                                    {loadingVendorRequests[event.id] ? (
+                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                        Loading vendor requests...
+                                      </p>
+                                    ) : vendorRequests[event.id] && vendorRequests[event.id].length > 0 ? (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        {vendorRequests[event.id].map((request) => {
+                                          const vendor = request.vendor || {};
+                                          const status = request.status || 'pending';
+                                          const isProcessing = !!processingIds[request._id];
+                                          
+                                          return (
+                                            <div
+                                              key={request._id}
+                                              style={{
+                                                padding: '1rem',
+                                                backgroundColor: '#FFFFFF',
+                                                borderRadius: '0.5rem',
+                                                border: '1px solid #e5e7eb',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '0.75rem'
+                                              }}
+                                            >
+                                              {/* Vendor Info */}
+                                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                <div style={{ flex: 1 }}>
+                                                  <p style={{
+                                                    fontSize: '0.875rem',
+                                                    fontWeight: '600',
+                                                    color: '#111827',
+                                                    margin: '0 0 0.25rem 0'
+                                                  }}>
+                                                    {vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Vendor'}
+                                                  </p>
+                                                  {vendor.email && (
+                                                    <p style={{
+                                                      fontSize: '0.75rem',
+                                                      color: '#6b7280',
+                                                      margin: '0 0 0.5rem 0'
+                                                    }}>
+                                                      {vendor.email}
+                                                    </p>
+                                                  )}
+                                                  
+                                                  {/* Attendees */}
+                                                  {request.attendees && request.attendees.length > 0 && (
+                                                    <div style={{ marginTop: '0.5rem' }}>
+                                                      <p style={{
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: '500',
+                                                        color: '#374151',
+                                                        margin: '0 0 0.25rem 0'
+                                                      }}>
+                                                        Attendees:
+                                                      </p>
+                                                      {request.attendees.map((attendee, idx) => (
+                                                        <p key={idx} style={{
+                                                          fontSize: '0.75rem',
+                                                          color: '#6b7280',
+                                                          margin: '0 0 0.25rem 0',
+                                                          paddingLeft: '0.5rem'
+                                                        }}>
+                                                          • {attendee.name} ({attendee.email})
+                                                        </p>
+                                                      ))}
+                                                    </div>
+                                                  )}
+
+                                                  {/* Booth Size */}
+                                                  {request.boothSize && (
+                                                    <p style={{
+                                                      fontSize: '0.75rem',
+                                                      color: '#6b7280',
+                                                      margin: '0.25rem 0 0 0'
+                                                    }}>
+                                                      Booth Size: {request.boothSize}
+                                                    </p>
+                                                  )}
+
+                                                  {/* Duration (for booths) */}
+                                                  {request.durationWeeks && (
+                                                    <p style={{
+                                                      fontSize: '0.75rem',
+                                                      color: '#6b7280',
+                                                      margin: '0.25rem 0 0 0'
+                                                    }}>
+                                                      Duration: {request.durationWeeks} week{request.durationWeeks !== 1 ? 's' : ''}
+                                                    </p>
+                                                  )}
+
+                                                  {/* Booth Location */}
+                                                  {request.boothLocation && (
+                                                    <p style={{
+                                                      fontSize: '0.75rem',
+                                                      color: '#6b7280',
+                                                      margin: '0.25rem 0 0 0'
+                                                    }}>
+                                                      Location: {request.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                                    </p>
+                                                  )}
+
+                                                  {/* Message */}
+                                                  {request.message && (
+                                                    <div style={{ marginTop: '0.5rem' }}>
+                                                      <p style={{
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: '500',
+                                                        color: '#374151',
+                                                        margin: '0 0 0.25rem 0'
+                                                      }}>
+                                                        Message:
+                                                      </p>
+                                                      <p style={{
+                                                        fontSize: '0.75rem',
+                                                        color: '#6b7280',
+                                                        margin: 0,
+                                                        fontStyle: 'italic',
+                                                        paddingLeft: '0.5rem'
+                                                      }}>
+                                                        "{request.message}"
+                                                      </p>
+                                                    </div>
+                                                  )}
+
+                                                  {/* Request Date */}
+                                                  {request.createdAt && (
+                                                    <p style={{
+                                                      fontSize: '0.75rem',
+                                                      color: '#9ca3af',
+                                                      margin: '0.5rem 0 0 0'
+                                                    }}>
+                                                      Requested: {new Date(request.createdAt).toLocaleDateString()}
+                                                    </p>
+                                                  )}
+                                                </div>
+
+                                                {/* Status Badge and Actions */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+                                                  {/* Status Badge */}
+                                                  <div style={{
+                                                    padding: '0.25rem 0.75rem',
+                                                    borderRadius: '0.375rem',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '500',
+                                                    backgroundColor: 
+                                                      status === 'accepted' ? '#d1fae5' :
+                                                      status === 'rejected' ? '#fee2e2' :
+                                                      '#fef3c7',
+                                                    color:
+                                                      status === 'accepted' ? '#065f46' :
+                                                      status === 'rejected' ? '#991b1b' :
+                                                      '#92400e'
+                                                  }}>
+                                                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                                                  </div>
+
+                                                  {/* Action Buttons (only show for pending) */}
+                                                  {status === 'pending' && (
+                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                      <button
+                                                        onClick={() => handleVendorRequestStatus(request._id, 'accepted', event.id)}
+                                                        disabled={isProcessing}
+                                                        style={{
+                                                          padding: '0.5rem 1rem',
+                                                          borderRadius: '0.375rem',
+                                                          border: 'none',
+                                                          backgroundColor: isProcessing ? '#9ca3af' : '#10b981',
+                                                          color: '#FFFFFF',
+                                                          fontSize: '0.75rem',
+                                                          fontWeight: '500',
+                                                          cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                                          display: 'flex',
+                                                          alignItems: 'center',
+                                                          gap: '0.25rem',
+                                                          transition: 'background-color 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                          if (!isProcessing) {
+                                                            e.target.style.backgroundColor = '#059669';
+                                                          }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                          if (!isProcessing) {
+                                                            e.target.style.backgroundColor = '#10b981';
+                                                          }
+                                                        }}
+                                                      >
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                                          check
+                                                        </span>
+                                                        Accept
+                                                      </button>
+                                                      <button
+                                                        onClick={() => handleVendorRequestStatus(request._id, 'rejected', event.id)}
+                                                        disabled={isProcessing}
+                                                        style={{
+                                                          padding: '0.5rem 1rem',
+                                                          borderRadius: '0.375rem',
+                                                          border: 'none',
+                                                          backgroundColor: isProcessing ? '#9ca3af' : '#ef4444',
+                                                          color: '#FFFFFF',
+                                                          fontSize: '0.75rem',
+                                                          fontWeight: '500',
+                                                          cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                                          display: 'flex',
+                                                          alignItems: 'center',
+                                                          gap: '0.25rem',
+                                                          transition: 'background-color 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                          if (!isProcessing) {
+                                                            e.target.style.backgroundColor = '#dc2626';
+                                                          }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                          if (!isProcessing) {
+                                                            e.target.style.backgroundColor = '#ef4444';
+                                                          }
+                                                        }}
+                                                      >
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                                          close
+                                                        </span>
+                                                        Reject
+                                                      </button>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : (
+                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                        No vendor participation requests for this event.
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+
                                 {/* Bazaar Details */}
                                 {event.type === 'bazaar' && (
                                   <div>
@@ -1704,13 +2019,74 @@ const EventsOfficeEventsView = () => {
 
       {/* Edit Modals */}
       {isEditModalOpen && editingBazaar && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
-          <div className="card" style={{ width: 'min(560px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: '#FFFFFF', borderRadius: '12px' }}>
-            <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: '#FFFFFF', zIndex: 1 }}>
-              <h3 className="card-title">Edit Bazaar</h3>
-              <button className="btn btn-outline" onClick={closeBazaarEdit}>✕</button>
+        <div style={{ 
+          position: 'fixed', 
+          inset: 0, 
+          background: 'rgba(0, 0, 0, 0.5)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          zIndex: 3000, 
+          padding: '1rem' 
+        }}>
+          <div style={{ 
+            width: 'min(600px, 90vw)', 
+            maxHeight: '85vh', 
+            overflowY: 'auto', 
+            background: '#FFFFFF', 
+            borderRadius: '0.75rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              position: 'sticky', 
+              top: 0, 
+              background: '#FFFFFF', 
+              zIndex: 1 
+            }}>
+              <h3 style={{ 
+                color: '#1D3557', 
+                fontSize: '1.25rem', 
+                fontWeight: '700', 
+                margin: 0 
+              }}>
+                Edit Bazaar
+              </h3>
+              <button 
+                onClick={closeBazaarEdit}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: '0.375rem',
+                  color: '#6b7280',
+                  fontSize: '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2rem',
+                  height: '2rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  close
+                </span>
+              </button>
             </div>
-            <div style={{ padding: '1rem' }}>
+            <div style={{ padding: '1.5rem' }}>
               <BazaarForm
                 onSubmit={handleBazaarUpdate}
                 loading={saving}
@@ -1731,13 +2107,74 @@ const EventsOfficeEventsView = () => {
       )}
 
       {isConferenceModalOpen && editingConference && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
-          <div className="card" style={{ width: 'min(560px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: '#FFFFFF', borderRadius: '12px' }}>
-            <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: '#FFFFFF', zIndex: 1 }}>
-              <h3 className="card-title">Edit Conference</h3>
-              <button className="btn btn-outline" onClick={closeConferenceEdit}>✕</button>
+        <div style={{ 
+          position: 'fixed', 
+          inset: 0, 
+          background: 'rgba(0, 0, 0, 0.5)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          zIndex: 3000, 
+          padding: '1rem' 
+        }}>
+          <div style={{ 
+            width: 'min(600px, 90vw)', 
+            maxHeight: '85vh', 
+            overflowY: 'auto', 
+            background: '#FFFFFF', 
+            borderRadius: '0.75rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              position: 'sticky', 
+              top: 0, 
+              background: '#FFFFFF', 
+              zIndex: 1 
+            }}>
+              <h3 style={{ 
+                color: '#1D3557', 
+                fontSize: '1.25rem', 
+                fontWeight: '700', 
+                margin: 0 
+              }}>
+                Edit Conference
+              </h3>
+              <button 
+                onClick={closeConferenceEdit}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: '0.375rem',
+                  color: '#6b7280',
+                  fontSize: '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2rem',
+                  height: '2rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  close
+                </span>
+              </button>
             </div>
-            <div style={{ padding: '1rem' }}>
+            <div style={{ padding: '1.5rem' }}>
               <ConferenceForm
                 onSubmit={handleConferenceUpdate}
                 loading={conferenceSaving}
@@ -1763,13 +2200,74 @@ const EventsOfficeEventsView = () => {
       )}
 
       {isTripModalOpen && editingTrip && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
-          <div className="card" style={{ width: 'min(560px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: '#FFFFFF', borderRadius: '12px' }}>
-            <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: '#FFFFFF', zIndex: 1 }}>
-              <h3 className="card-title">Edit Trip</h3>
-              <button className="btn btn-outline" onClick={closeTripEdit}>✕</button>
+        <div style={{ 
+          position: 'fixed', 
+          inset: 0, 
+          background: 'rgba(0, 0, 0, 0.5)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          zIndex: 3000, 
+          padding: '1rem' 
+        }}>
+          <div style={{ 
+            width: 'min(600px, 90vw)', 
+            maxHeight: '85vh', 
+            overflowY: 'auto', 
+            background: '#FFFFFF', 
+            borderRadius: '0.75rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              position: 'sticky', 
+              top: 0, 
+              background: '#FFFFFF', 
+              zIndex: 1 
+            }}>
+              <h3 style={{ 
+                color: '#1D3557', 
+                fontSize: '1.25rem', 
+                fontWeight: '700', 
+                margin: 0 
+              }}>
+                Edit Trip
+              </h3>
+              <button 
+                onClick={closeTripEdit}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: '0.375rem',
+                  color: '#6b7280',
+                  fontSize: '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2rem',
+                  height: '2rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  close
+                </span>
+              </button>
             </div>
-            <div style={{ padding: '1rem' }}>
+            <div style={{ padding: '1.5rem' }}>
               <TripForm
                 onSubmit={handleTripUpdate}
                 loading={tripSaving}
