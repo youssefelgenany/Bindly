@@ -140,15 +140,48 @@ const API_BASE = 'http://localhost:5000/api';
 export const bazaarApi = {
   create: async (bazaarData) => {
     const token = localStorage.getItem('token');
+    if (!token) {
+      return {
+        success: false,
+        message: 'No authentication token found. Please log in again.'
+      };
+    }
+
     const response = await fetch(`${API_BASE}/bazaars`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(bazaarData),
     });
-    return await response.json();
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      // Handle 401 Unauthorized specifically
+      if (response.status === 401) {
+        // Clear invalid token
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        return {
+          success: false,
+          message: data.msg || data.message || 'Invalid/expired token. Please log in again.',
+          error: data,
+          requiresLogin: true
+        };
+      }
+      
+      return {
+        success: false,
+        message: data.message || data.error || data.msg || 'Failed to create bazaar',
+        error: data
+      };
+    }
+    return {
+      success: true,
+      ...data
+    };
   },
 
   update: async (id, bazaarData) => {

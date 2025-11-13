@@ -297,40 +297,64 @@ const login = async (req, res) => {
   
 
   try {
-    
     const { email, password } = req.body;
-   console.log("user",req.body);
+    
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required' });
+    }
+    
+    console.log("Login attempt for email:", email);
+    
     // Try to find user in User model first
     let user = await User.findOne({ email });
-    console.log("user",user);
-    console.log("secret",process.env.JWT_SECRET);
+    console.log("User found in User model:", user ? 'Yes' : 'No');
+    
     // If not found in User model, try Admin model
     if (!user) {
       user = await Admin.findOne({ email });
+      console.log("User found in Admin model:", user ? 'Yes' : 'No');
     }
     
-    if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    if (!user) {
+      console.log("No user found with email:", email);
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    // Check if user has comparePassword method
+    if (!user.comparePassword || typeof user.comparePassword !== 'function') {
+      console.error('User model does not have comparePassword method');
+      return res.status(500).json({ success: false, message: 'Internal server error: User model issue' });
+    }
 
     const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    if (!isPasswordValid) {
+      console.log("Invalid password for email:", email);
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    // Helper function to safely build user response
+    const buildUserResponse = (user) => {
+      return {
+        id: user._id,
+        email: user.email || '',
+        firstName: user.firstName || null,
+        lastName: user.lastName || null,
+        name: user.name || null, // For admin accounts
+        userType: user.userType || user.role || null,
+        role: user.role || user.userType || null,
+        gucId: user.gucId || null,
+        department: user.department || null,
+        profilePicturePath: user.profilePicturePath || null,
+        companyName: user.companyName || null,
+        isVerified: user.isVerified !== undefined ? user.isVerified : false,
+        status: user.status || 'blocked',
+        createdAt: user.createdAt || new Date()
+      };
+    };
 
     // Check verification status for ALL user types (including admin)
-    if (!user.isVerified) {
-      const userResponse = {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        name: user.name, // For admin accounts
-        userType: user.userType,
-        role: user.role || user.userType, // Include role for Admin model users, or userType for User model users
-        gucId: user.gucId,
-        companyName: user.companyName,
-        isVerified: user.isVerified,
-        status: user.status,
-        createdAt: user.createdAt
-      };
-      
+    if (user.isVerified === false || user.isVerified === undefined) {
+      const userResponse = buildUserResponse(user);
       return res.status(403).json({ 
         success: false, 
         code: 'AWAITING_VERIFICATION',
@@ -340,22 +364,8 @@ const login = async (req, res) => {
     }
 
     // Block login for inactive users (including admin)
-    if (user.status !== 'active') {
-      const userResponse = {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        name: user.name, // For admin accounts
-        userType: user.userType,
-        role: user.role || user.userType, // Include role for Admin model users, or userType for User model users
-        gucId: user.gucId,
-        companyName: user.companyName,
-        isVerified: user.isVerified,
-        status: user.status,
-        createdAt: user.createdAt
-      };
-      
+    if (user.status && user.status !== 'active') {
+      const userResponse = buildUserResponse(user);
       return res.status(403).json({
         success: false,
         code: 'AWAITING_VERIFICATION',
@@ -364,32 +374,30 @@ const login = async (req, res) => {
       });
     }
 
+    // Check JWT_SECRET
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET is not set in environment variables');
+      return res.status(500).json({ success: false, message: 'Server configuration error' });
+    }
+
     const token = jwt.sign(
       { userId: user._id, email: user.email, role: user.role || user.userType  },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    const userResponse = {
-      id: user._id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      name: user.name, // For admin accounts
-      userType: user.userType,
-      role: user.role || user.userType, // Include role for Admin model users, or userType for User model users
-      gucId: user.gucId,
-      department: user.department,
-      profilePicturePath: user.profilePicturePath,
-      companyName: user.companyName,
-      isVerified: user.isVerified,
-      createdAt: user.createdAt
-    };
+    const userResponse = buildUserResponse(user);
 
+    console.log("Login successful for user:", user.email);
     res.json({ success: true, message: 'Login successful', user: userResponse, token });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error', 
+      error: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred during login'
+    });
   }
 };
 
