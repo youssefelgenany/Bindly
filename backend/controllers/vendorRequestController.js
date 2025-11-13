@@ -59,6 +59,7 @@ const getAllVendorRequests = async (req, res) => {
       return {
         _id: r._id,
         status: r.status,
+        eventType: r.eventType || null, // Include eventType for filtering
         // vendor details (may be undefined if not present)
         vendor: r.vendor ? {
           _id: r.vendor._id,
@@ -80,10 +81,13 @@ const getAllVendorRequests = async (req, res) => {
         // raw fields that might be useful
         bazaar: r.bazaar || null,
         booth: r.booth || null,
+        standaloneBooth: r.standaloneBooth || null,
         attendees: r.attendees || [],
         boothSize: r.boothSize,
         durationWeeks: r.durationWeeks,
         boothLocation: r.boothLocation,
+        boothId: r.boothId || null,
+        startDate: r.startDate || null,
         message: r.message || '',
         voteCount: voteCountMap[String(r._id)] || 0,
         createdAt: r.createdAt,
@@ -127,32 +131,207 @@ const createVendorRequest = async (req, res) => {
       message
     } = req.body;
 
-    // Get vendor ID from authenticated user
-    const vendorId = req.user.id;
-
-    // Create the vendor request
-    const vendorRequest = new VendorRequest({
-      vendor: vendorId,
+    console.log('🔍 createVendorRequest - Received data:', {
       eventType,
-      attendees,
+      attendeesCount: attendees?.length,
       boothSize,
       durationWeeks,
       boothLocation,
       boothId,
-      startDate: startDate ? new Date(startDate) : undefined,
-      message,
-      status: 'pending'
+      startDate,
+      hasMessage: !!message
     });
 
+    // Get vendor ID from authenticated user
+    const vendorId = req.user._id || req.user.id;
+    console.log('🔍 createVendorRequest - Vendor ID:', vendorId);
+    console.log('🔍 createVendorRequest - req.user:', req.user);
+    
+    if (!vendorId) {
+      return res.status(401).json({ 
+        message: 'User ID not found in authentication token',
+        error: 'Missing vendor ID'
+      });
+    }
+
+    // Validate required fields
+    if (!eventType) {
+      return res.status(400).json({ 
+        message: 'Event type is required',
+        error: 'Missing eventType field'
+      });
+    }
+
+    if (!attendees || !Array.isArray(attendees) || attendees.length === 0) {
+      return res.status(400).json({ 
+        message: 'At least one attendee is required',
+        error: 'Missing or empty attendees array'
+      });
+    }
+
+    // Validate attendees structure
+    if (!Array.isArray(attendees)) {
+      return res.status(400).json({ 
+        message: 'Attendees must be an array',
+        error: 'Invalid attendees format'
+      });
+    }
+
+    for (let i = 0; i < attendees.length; i++) {
+      const attendee = attendees[i];
+      if (!attendee || typeof attendee !== 'object') {
+        return res.status(400).json({ 
+          message: `Attendee at index ${i} is invalid`,
+          error: 'Invalid attendee structure'
+        });
+      }
+      if (!attendee.name || typeof attendee.name !== 'string' || attendee.name.trim() === '') {
+        return res.status(400).json({ 
+          message: `Attendee at index ${i} must have a valid name`,
+          error: 'Missing or invalid attendee name'
+        });
+      }
+      if (!attendee.email || typeof attendee.email !== 'string' || attendee.email.trim() === '') {
+        return res.status(400).json({ 
+          message: `Attendee at index ${i} must have a valid email`,
+          error: 'Missing or invalid attendee email'
+        });
+      }
+      // Clean the attendee data
+      attendees[i] = {
+        name: attendee.name.trim(),
+        email: attendee.email.trim()
+      };
+    }
+
+    // Validate eventType enum
+    const validEventTypes = ['bazaar', 'booth', 'standaloneBooth', 'platformBooth'];
+    if (!validEventTypes.includes(eventType)) {
+      return res.status(400).json({ 
+        message: `Invalid event type. Must be one of: ${validEventTypes.join(', ')}`,
+        error: `Invalid eventType: ${eventType}`
+      });
+    }
+
+    // Validate boothSize if provided
+    if (boothSize && !['2x2', '4x4'].includes(boothSize)) {
+      return res.status(400).json({ 
+        message: 'Booth size must be either "2x2" or "4x4"',
+        error: `Invalid boothSize: ${boothSize}`
+      });
+    }
+
+    // Validate durationWeeks if provided
+    if (durationWeeks !== undefined && durationWeeks !== null) {
+      const duration = parseInt(durationWeeks);
+      if (isNaN(duration) || duration < 1 || duration > 4) {
+        return res.status(400).json({ 
+          message: 'Duration must be a number between 1 and 4 weeks',
+          error: `Invalid durationWeeks: ${durationWeeks}`
+        });
+      }
+    }
+
+    // Validate boothLocation if provided
+    if (boothLocation) {
+      const validLocations = [
+        'main-entrance', 'food-court', 'central-plaza', 'student-center',
+        'library-area', 'gym-entrance', 'parking-lot', 'garden-section',
+        'auditorium-hall', 'cafeteria-area'
+      ];
+      if (!validLocations.includes(boothLocation)) {
+        return res.status(400).json({ 
+          message: `Invalid booth location. Must be one of: ${validLocations.join(', ')}`,
+          error: `Invalid boothLocation: ${boothLocation}`
+        });
+      }
+    }
+
+    // Prepare data object, only including fields with valid values
+    const requestData = {
+      vendor: vendorId,
+      eventType,
+      attendees,
+      status: 'pending'
+    };
+
+    // Only add optional fields if they have valid values
+    if (boothSize && (boothSize === '2x2' || boothSize === '4x4')) {
+      requestData.boothSize = boothSize;
+    }
+
+    if (durationWeeks !== undefined && durationWeeks !== null && durationWeeks !== '') {
+      const duration = parseInt(durationWeeks);
+      if (!isNaN(duration) && duration >= 1 && duration <= 4) {
+        requestData.durationWeeks = duration;
+      }
+    }
+
+    if (boothLocation && boothLocation.trim() !== '') {
+      requestData.boothLocation = boothLocation.trim();
+    }
+
+    if (boothId && boothId.trim() !== '') {
+      requestData.boothId = boothId.trim();
+    }
+
+    if (startDate) {
+      const date = new Date(startDate);
+      if (!isNaN(date.getTime())) {
+        requestData.startDate = date;
+      }
+    }
+
+    if (message && message.trim() !== '') {
+      requestData.message = message.trim();
+    }
+
+    console.log('🔍 createVendorRequest - Final request data:', requestData);
+
+    // Create the vendor request
+    const vendorRequest = new VendorRequest(requestData);
+
+    console.log('🔍 createVendorRequest - Created VendorRequest object:', vendorRequest);
+
     await vendorRequest.save();
+    console.log('🔍 createVendorRequest - Saved successfully with ID:', vendorRequest._id);
 
     res.status(201).json({
       message: 'Vendor request created successfully',
       request: vendorRequest
     });
   } catch (error) {
-    console.error('Error creating vendor request:', error);
-    res.status(500).json({ message: 'Error creating vendor request', error: error.message });
+    console.error('❌ Error creating vendor request:', error);
+    console.error('❌ Error stack:', error.stack);
+    
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = {};
+      Object.keys(error.errors).forEach(key => {
+        validationErrors[key] = error.errors[key].message;
+      });
+      console.error('❌ Mongoose Validation Errors:', validationErrors);
+      return res.status(400).json({ 
+        message: 'Validation error',
+        error: error.message,
+        validationErrors: Object.values(validationErrors),
+        details: validationErrors
+      });
+    }
+
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      return res.status(409).json({ 
+        message: 'A vendor request with these details already exists',
+        error: error.message
+      });
+    }
+
+    res.status(500).json({ 
+      message: 'Error creating vendor request', 
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 
@@ -168,14 +347,75 @@ const updateVendorRequestStatus = async (req, res) => {
   }
 
   try {
-    const request = await VendorRequest.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    );
-
+    // Find the request first to check if it's a platform booth request
+    const request = await VendorRequest.findById(id).populate('vendor', 'companyName firstName lastName email');
+    
     if (!request) {
       return res.status(404).json({ message: "Vendor request not found" });
+    }
+
+    // Update the request status
+    request.status = status;
+    await request.save();
+
+    // If accepting a platform booth request, create an event
+    if (status === 'accepted' && request.eventType === 'platformBooth') {
+      // Check if an event was already created for this request
+      if (request.booth) {
+        console.log('⚠️ Event already exists for this platform booth request:', request.booth);
+      } else {
+        try {
+          // Calculate dates
+          const startDate = request.startDate || new Date();
+          const durationWeeks = request.durationWeeks || 1;
+          const endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + (durationWeeks * 7));
+
+          // Format location name
+          const locationName = request.boothLocation 
+            ? request.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+            : 'Platform';
+
+          // Create event title
+          const vendorName = request.vendor?.companyName || 
+            `${request.vendor?.firstName || ''} ${request.vendor?.lastName || ''}`.trim() || 
+            'Vendor';
+          const eventTitle = `Platform Booth - ${vendorName} - ${locationName}`;
+
+          // Create the event
+          const newEvent = new Event({
+            title: eventTitle,
+            description: request.message || `Platform booth reservation by ${vendorName} at ${locationName}`,
+            type: 'standaloneBooth',
+            startDate: startDate,
+            endDate: endDate,
+            location: locationName,
+            boothSize: request.boothSize || '2x2',
+            boothNumber: request.boothId ? (parseInt(request.boothId) || 1) : 1, // Use boothId if available, otherwise default to 1
+            boothStatus: 'taken', // Mark as taken since it's being reserved
+            currentOwner: request.vendor._id, // Set the vendor as the current owner
+            occupancyEndDate: endDate, // Set the occupancy end date
+            status: 'approved',
+            createdBy: req.user._id || req.user.id,
+            capacity: 1, // Platform booths typically have capacity of 1
+            registeredCount: 0
+          });
+
+          await newEvent.save();
+          console.log('✅ Created event for platform booth request:', newEvent._id);
+
+          // Link the event to the vendor request
+          request.booth = newEvent._id;
+          await request.save();
+          console.log('✅ Linked event to vendor request');
+        } catch (eventError) {
+          console.error('❌ Error creating event for platform booth:', eventError);
+          console.error('❌ Error details:', eventError.message);
+          console.error('❌ Error stack:', eventError.stack);
+          // Re-throw the error so the main catch block can handle it
+          throw new Error(`Failed to create event for platform booth: ${eventError.message}`);
+        }
+      }
     }
 
     res.status(200).json({
@@ -183,7 +423,8 @@ const updateVendorRequestStatus = async (req, res) => {
       updatedRequest: request,
     });
   } catch (error) {
-    res.status(500).json({ message: "Error updating vendor request", error });
+    console.error('❌ Error updating vendor request status:', error);
+    res.status(500).json({ message: "Error updating vendor request", error: error.message });
   }
 };
 

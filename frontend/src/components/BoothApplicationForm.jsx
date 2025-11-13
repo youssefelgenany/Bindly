@@ -1,13 +1,9 @@
 import React, { useState } from 'react';
-import CampusMapSelector from './CampusMapSelector';
 
 const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
     const [formData, setFormData] = useState({
         attendees: [{ name: '', email: '' }],
-        boothSize: '',
-        durationWeeks: '',
-        boothLocation: '',
-        message: ''
+        boothSize: ''
     });
     const [submitting, setSubmitting] = useState(false);
     const [submitMessage, setSubmitMessage] = useState({ type: '', text: '' });
@@ -44,15 +40,6 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
             setSubmitMessage({ type: 'error', text: 'Please select a booth size.' });
             return;
         }
-        if (!formData.durationWeeks) {
-            setSubmitMessage({ type: 'error', text: 'Please select duration of booth setup.' });
-            return;
-        }
-        // Only require booth location for bazaar booths, not standalone booths
-        if (booth.type !== 'standaloneBooth' && !formData.boothLocation) {
-            setSubmitMessage({ type: 'error', text: 'Please select a booth location on the campus map.' });
-            return;
-        }
         if (cleanAttendees.length === 0) {
             setSubmitMessage({ type: 'error', text: 'Please add at least one attendee (name and email).' });
             return;
@@ -65,14 +52,10 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
         try {
             setSubmitting(true);
             const result = await onSubmit({
-                eventType: booth.type === 'standaloneBooth' ? 'standaloneBooth' : 'booth',
+                eventType: booth.type === 'standaloneBooth' ? 'standaloneBooth' : 'bazaar',
                 eventId: booth._id,
                 attendees: cleanAttendees,
-                boothSize: formData.boothSize,
-                durationWeeks: formData.durationWeeks,
-                boothLocation: formData.boothLocation,
-                message: formData.message,
-                isStandalone: booth.type === 'standaloneBooth'
+                boothSize: formData.boothSize
             });
 
             const successText = result?.message || 'Booth application submitted successfully!';
@@ -81,10 +64,7 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
             // Reset form
             setFormData({
                 attendees: [{ name: '', email: '' }],
-                boothSize: '',
-                durationWeeks: '',
-                boothLocation: '',
-                message: ''
+                boothSize: ''
             });
 
             // Close form after 2 seconds
@@ -294,67 +274,6 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
                                 </p>
                             </div>
 
-                            {/* Duration */}
-                            <div style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                                    Duration of Booth Setup *
-                                </label>
-                                <select
-                                    value={formData.durationWeeks}
-                                    onChange={(e) => setFormData({ ...formData, durationWeeks: e.target.value })}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.5rem',
-                                        border: '1px solid #ced4da',
-                                        borderRadius: '4px',
-                                        fontSize: '0.9rem'
-                                    }}
-                                    required
-                                >
-                                    <option value="">Select duration</option>
-                                    <option value="1">1 week</option>
-                                    <option value="2">2 weeks</option>
-                                    <option value="3">3 weeks</option>
-                                    <option value="4">4 weeks</option>
-                                </select>
-                                <p style={{
-                                    margin: '0.25rem 0 0 0',
-                                    color: '#6c757d',
-                                    fontSize: '0.8rem',
-                                    fontStyle: 'italic'
-                                }}>
-                                    ⏱️ Choose how long you want to keep your booth set up (1-4 weeks)
-                                </p>
-                            </div>
-
-                            {/* Booth Location - Only show for bazaar booths, not standalone booths */}
-                            {booth.type !== 'standaloneBooth' && (
-                                <CampusMapSelector
-                                    selectedLocation={formData.boothLocation}
-                                    onLocationSelect={(location) => setFormData({ ...formData, boothLocation: location })}
-                                />
-                            )}
-
-                            {/* Additional Message */}
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                                    Additional Message (Optional)
-                                </label>
-                                <textarea
-                                    placeholder="Any special requirements or notes..."
-                                    value={formData.message}
-                                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                                    rows={3}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.5rem',
-                                        border: '1px solid #ced4da',
-                                        borderRadius: '4px',
-                                        fontSize: '0.9rem',
-                                        resize: 'vertical'
-                                    }}
-                                />
-                            </div>
                         </div>
 
                         {/* Submit Message */}
