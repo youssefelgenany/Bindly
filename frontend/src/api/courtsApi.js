@@ -81,9 +81,8 @@ const courtsApiService = {
   getCourtAvailability: async (courtId, date) => {
     try {
       console.log('🏀 API: Getting court availability for:', courtId, 'on:', date);
-      const response = await courtsApi.get(`/${courtId}/availability`, { 
-        params: { date } 
-      });
+      // Backend expects date as URL parameter: /:courtId/availability/:date
+      const response = await courtsApi.get(`/${courtId}/availability/${date}`);
       console.log('🏀 API: Availability response:', response.data);
       return { success: true, data: response.data };
     } catch (error) {
