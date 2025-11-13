@@ -70,7 +70,11 @@ const StaffEventsView = () => {
         }))
         .filter(ev => {
           const type = (ev.type || '').toLowerCase();
-          return type !== 'standalonebooth' && type !== 'standalone booth';
+          const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+          // Only keep events with valid types and non-empty title/location
+          return validTypes.includes(type) && 
+                 ev.title && ev.title.trim() !== '' && 
+                 ev.location && ev.location.trim() !== '';
         });
         setEvents(mapped);
       } else {
@@ -186,7 +190,6 @@ const StaffEventsView = () => {
     const colors = {
       bazaar: '#F48FB1', // Light pink
       trip: '#2196F3',
-      sports: '#FF9800',
       seminar: '#9C27B0',
       workshop: '#607D8B',
       conference: '#795548',
