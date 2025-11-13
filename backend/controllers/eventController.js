@@ -8,6 +8,7 @@ const Payment = require("../models/paymentModel");
 const { sendReceiptEmail } = require("../utils/sendReceiptEmail");
 const { sendRefundEmail } = require("../utils/sendRefundEmail");
 const { salesReport } = require("../scripts/test-sales-report");
+const { notifyNewEventCreated } = require("../services/notificationService");
 
 // Initialize Stripe if secret key is available
 let stripe = null;
@@ -72,6 +73,10 @@ exports.createEvent = async (req, res) => {
     });
 
     await newEvent.save();
+    
+    // Send notifications to all eligible users about the new event
+    await notifyNewEventCreated(newEvent);
+    
     res.status(201).json({ msg: "Event created successfully", event: newEvent });
   } catch (err) {
     console.error("❌ Error creating event:", err);
