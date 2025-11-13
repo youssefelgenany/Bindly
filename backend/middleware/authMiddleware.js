@@ -28,6 +28,7 @@ const protect = async (req, res, next) => {
     // normalize the shape used everywhere
     req.user = {
       _id: user._id,
+      id: user._id,  // Add id alias for compatibility
       userType: user.userType || user.role,   // Use userType if available, otherwise use role
       role: decoded.role,        // Include role from JWT token
       email: user.email

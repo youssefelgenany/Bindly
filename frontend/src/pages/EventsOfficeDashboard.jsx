@@ -27,47 +27,189 @@ const EventsOfficeDashboard = () => {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
 
-      // Fetch events to calculate stats
-      const eventsRes = await axios.get('http://localhost:5000/api/events', { headers });
+      // Fetch all data in parallel
+      const [eventsRes, vendorRequestsRes] = await Promise.all([
+        axios.get('http://localhost:5000/api/events', { headers }).catch(err => {
+          console.error('Error fetching events:', err);
+          return { data: [] };
+        }),
+        axios.get('http://localhost:5000/api/vendor-requests', { headers }).catch(err => {
+          console.error('Error fetching vendor requests:', err);
+          return { data: { success: false, requests: [] } };
+        })
+      ]);
       
-      if (eventsRes.data?.success) {
-        const events = eventsRes.data.data || [];
-        const now = new Date();
-        
-        const totalEvents = events.length;
-        const upcomingEvents = events.filter(e => new Date(e.startDate) > now).length;
-        const pendingApproval = events.filter(e => e.status === 'pending').length;
+      // Handle different response formats
+      // The /api/events endpoint returns an array directly
+      let events = [];
+      if (Array.isArray(eventsRes.data)) {
+        events = eventsRes.data;
+      } else if (eventsRes.data?.success) {
+        events = eventsRes.data.data || eventsRes.data.events || [];
+      } else if (eventsRes.data?.events) {
+        events = eventsRes.data.events;
+      }
+      
+      let vendorRequests = [];
+      if (vendorRequestsRes.data?.success) {
+        vendorRequests = vendorRequestsRes.data.requests || [];
+      } else if (Array.isArray(vendorRequestsRes.data)) {
+        vendorRequests = vendorRequestsRes.data;
+      } else if (vendorRequestsRes.data?.requests) {
+        vendorRequests = vendorRequestsRes.data.requests;
+      }
+      
+      console.log('📊 Dashboard Data:', {
+        eventsCount: events.length,
+        vendorRequestsCount: vendorRequests.length,
+        eventsSample: events.slice(0, 2),
+        vendorRequestsSample: vendorRequests.slice(0, 2)
+      });
+      
+      const now = new Date();
+      
+      // Calculate stats
+      const totalEvents = events.length;
+      const upcomingEvents = events.filter(e => {
+        const startDate = new Date(e.startDate || e.start);
+        return startDate > now;
+      }).length;
+      const pendingApproval = events.filter(e => e.status === 'pending').length;
 
-        setStats({
-          totalEvents,
-          upcomingEvents,
-          pendingApproval
+      setStats({
+        totalEvents,
+        upcomingEvents,
+        pendingApproval
+      });
+
+      // Generate recent activities from multiple sources
+      const activities = [];
+      
+      // 1. New created events (last 7 days)
+      const recentEvents = events
+        .filter(e => {
+          const created = new Date(e.createdAt || e.created);
+          const daysDiff = (now - created) / (1000 * 60 * 60 * 24);
+          return daysDiff <= 7;
+        })
+        .map(event => ({
+          id: event._id,
+          type: 'event_created',
+          eventType: event.type,
+          title: event.title || event.name,
+          timestamp: event.createdAt || event.created,
+          icon: getEventIcon(event.type),
+          action: 'A new event was created',
+          user: event.createdBy?.name || event.createdBy?.firstName || 'Unknown'
+        }));
+
+      // 2. Events that started today or recently
+      const startedEvents = events
+        .filter(e => {
+          const startDate = new Date(e.startDate || e.start);
+          const daysDiff = (now - startDate) / (1000 * 60 * 60 * 24);
+          return daysDiff >= 0 && daysDiff <= 1; // Started today or yesterday
+        })
+        .map(event => ({
+          id: event._id,
+          type: 'event_started',
+          eventType: event.type,
+          title: event.title || event.name,
+          timestamp: event.startDate || event.start,
+          icon: getEventIcon(event.type),
+          action: 'An event has started',
+          user: null
+        }));
+
+      // 3. Vendor requests (new, accepted, rejected)
+      const recentVendorRequests = vendorRequests
+        .filter(req => {
+          const created = new Date(req.createdAt || req.created);
+          const daysDiff = (now - created) / (1000 * 60 * 60 * 24);
+          return daysDiff <= 7;
+        })
+        .map(request => {
+          const vendorName = request.vendor?.companyName || 
+            `${request.vendor?.firstName || ''} ${request.vendor?.lastName || ''}`.trim() || 
+            'Unknown Vendor';
+          const eventName = request.event?.name || request.eventName || 'Event';
+          
+          let action = '';
+          let icon = 'storefront';
+          
+          if (request.status === 'accepted') {
+            action = `Vendor request accepted for ${eventName}`;
+            icon = 'check_circle';
+          } else if (request.status === 'rejected') {
+            action = `Vendor request rejected for ${eventName}`;
+            icon = 'cancel';
+          } else {
+            action = `New vendor request from ${vendorName} for ${eventName}`;
+            icon = 'storefront';
+          }
+          
+          return {
+            id: request._id,
+            type: 'vendor_request',
+            eventType: request.eventType || 'bazaar',
+            title: eventName,
+            timestamp: request.createdAt || request.created,
+            icon: icon,
+            action: action,
+            user: vendorName
+          };
         });
 
-        // Generate recent activity from events
-        const activities = events
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-          .slice(0, 3)
-          .map((event, index) => ({
-            id: event._id,
-            type: event.type,
-            title: event.title || event.name,
-            timestamp: event.createdAt,
-            icon: getEventIcon(event.type),
-            user: index === 0 ? 'Anna Müller' : null,
-            action: index === 0 ? 'approved the budget for' : 'A new event'
-          }));
-        
-        setRecentActivity(activities);
+      // Combine and sort all activities by timestamp
+      const allActivities = [...recentEvents, ...startedEvents, ...recentVendorRequests]
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, 10); // Show last 10 activities
+      
+      setRecentActivity(allActivities);
 
-        // Generate upcoming deadlines (mock data for now)
-        setUpcomingDeadlines([
-          { id: 1, task: 'Finalize vendor list for Winter Bazaar', due: 'Tomorrow', color: '#ef4444' },
-          { id: 2, task: 'Submit transport request for Geology Trip', due: 'In 3 days', color: '#f97316' },
-          { id: 3, task: 'Confirm speaker for Tech Conference', due: 'In 1 week', color: '#eab308' },
-          { id: 4, task: 'Book venue for Alumni Gala', due: 'In 2 weeks', color: '#eab308' }
-        ]);
-      }
+      // Generate upcoming deadlines from events with registration deadlines
+      const deadlines = events
+        .filter(e => {
+          if (!e.registrationDeadline) return false;
+          const deadline = new Date(e.registrationDeadline);
+          return deadline > now; // Only future deadlines
+        })
+        .map(event => {
+          const deadline = new Date(event.registrationDeadline);
+          const daysDiff = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+          
+          let dueText = '';
+          let color = '#eab308'; // Default yellow
+          
+          if (daysDiff === 0) {
+            dueText = 'Today';
+            color = '#ef4444'; // Red
+          } else if (daysDiff === 1) {
+            dueText = 'Tomorrow';
+            color = '#ef4444'; // Red
+          } else if (daysDiff <= 3) {
+            dueText = `In ${daysDiff} days`;
+            color = '#f97316'; // Orange
+          } else if (daysDiff <= 7) {
+            dueText = `In ${daysDiff} days`;
+            color = '#eab308'; // Yellow
+          } else {
+            dueText = `In ${daysDiff} days`;
+            color = '#eab308'; // Yellow
+          }
+          
+          return {
+            id: event._id,
+            task: `Registration deadline for ${event.title || event.name}`,
+            due: dueText,
+            color: color,
+            deadline: deadline
+          };
+        })
+        .sort((a, b) => a.deadline - b.deadline) // Sort by deadline (nearest first)
+        .slice(0, 5); // Show top 5 upcoming deadlines
+      
+      setUpcomingDeadlines(deadlines);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -368,6 +510,47 @@ const EventsOfficeDashboard = () => {
                   margin: 0
                 }}>
                   Conferences
+                </p>
+              )}
+            </Link>
+
+            <Link
+              to="/event-office/platform-booth-requests"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.5rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: isActiveRoute('/event-office/platform-booth-requests') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                textDecoration: 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActiveRoute('/event-office/platform-booth-requests')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActiveRoute('/event-office/platform-booth-requests')) {
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ 
+                color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                fontSize: '1.25rem' 
+              }}>
+                location_on
+              </span>
+              {sidebarOpen && (
+                <p style={{
+                  color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/platform-booth-requests') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Platform Booths
                 </p>
               )}
             </Link>
@@ -787,7 +970,7 @@ const EventsOfficeDashboard = () => {
                     gap: '1rem'
                   }}>
                     {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
-                      <li key={activity.id} style={{
+                      <li key={`${activity.type}-${activity.id}-${index}`} style={{
                         display: 'flex',
                         alignItems: 'flex-start',
                         gap: '1rem'
