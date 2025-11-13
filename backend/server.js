@@ -47,6 +47,7 @@ const courtRoutes = require("./routes/courtRoutes");
 const boothRoutes = require("./routes/boothRoutes");
 const gymSessionRoutes = require("./routes/gymSessionRoutes");
 const devEmailRoutes = require("./routes/devEmailRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 const { verifyByToken } = require("./controllers/authVerifyController");
 
 // Mount routes
@@ -66,6 +67,7 @@ app.use("/api/student-registrations", studentRegistrationRoutes);
 app.use("/api/courts", courtRoutes);
 app.use("/api/booths", boothRoutes);
 app.use("/api/gym-sessions", gymSessionRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Development email routes (only in development)
 if (process.env.NODE_ENV !== 'production') {
@@ -77,7 +79,11 @@ app.get("/api/verify", verifyByToken);
 
 // Connect to MongoDB Atlas
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('✅ Connected to MongoDB Atlas'))
+  .then(() => {
+    console.log('✅ Connected to MongoDB Atlas');
+    const { initializeNotificationScheduler } = require('./services/notificationScheduler');
+    initializeNotificationScheduler();
+  })
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // Test route

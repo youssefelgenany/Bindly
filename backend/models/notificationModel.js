@@ -9,7 +9,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['workshop_approved', 'workshop_rejected', 'workshop_edits_requested', 'event_announcement', 'system'],
+    enum: ['workshop_approved', 'workshop_rejected', 'workshop_edits_requested', 'event_announcement', 'system', 'event_reminder', 'workshop_reminder', 'trip_reminder', 'gym_session_reminder', 'conference_reminder'],
     required: true
   },
   title: {
@@ -30,6 +30,11 @@ const notificationSchema = new mongoose.Schema({
   relatedEvent: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Event',
+    default: null
+  },
+  relatedGymSession: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'GymSession',
     default: null
   },
   isRead: {
