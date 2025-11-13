@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import ProfessorDashboardOverview from '../components/ProfessorDashboardOverview';
 import StudentDashboard from '../components/StudentDashboard';
+import StaffDashboard from '../components/StaffDashboard';
+import TADashboard from '../components/TADashboard';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -87,10 +89,22 @@ const Dashboard = () => {
 
   const isAdmin = user?.role === 'admin' || user?.userType === 'admin' || user?.userType === 'Admin';
   const isStudent = user?.userType === 'Student' || user?.userType === 'student';
+  const isStaff = user?.userType === 'Staff';
+  const isTA = user?.userType === 'TA';
 
   // Show Student Dashboard for students
   if (isStudent) {
     return <StudentDashboard />;
+  }
+
+  // Show Staff Dashboard for staff
+  if (isStaff) {
+    return <StaffDashboard />;
+  }
+
+  // Show TA Dashboard for TAs
+  if (isTA) {
+    return <TADashboard />;
   }
 
   return (
