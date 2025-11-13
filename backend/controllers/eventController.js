@@ -7,6 +7,7 @@ const User = require("../models/userModel");
 const Payment = require("../models/paymentModel");
 const { sendReceiptEmail } = require("../utils/sendReceiptEmail");
 const { sendRefundEmail } = require("../utils/sendRefundEmail");
+const { salesReport } = require("../scripts/test-sales-report");
 
 // Initialize Stripe if secret key is available
 let stripe = null;
@@ -101,6 +102,104 @@ exports.createConference = async (req, res) => {
   } catch (err) {
     console.error("createConference error:", err);
     return res.status(500).json({ msg: "Server error", error: err.message });
+  }
+};
+
+// 📈 Get sales report for events (admin and event office only)
+exports.getSalesReport = async (req, res) => {
+  try {
+    const { startDate, endDate, type, sort } = req.query || {};
+
+    const entries = Array.isArray(salesReport) ? [...salesReport] : [];
+
+    const normalizeType = (value) =>
+      String(value || '')
+        .trim()
+        .toLowerCase();
+
+    const requestedType = type ? normalizeType(type) : null;
+
+    const filteredEntries = entries.filter((entry) => {
+      const entryType = normalizeType(entry.type || entry.category);
+
+      if (requestedType && entryType !== requestedType) {
+        return false;
+      }
+
+      if (startDate) {
+        const entryStart = new Date(entry.startDate);
+        if (Number.isNaN(entryStart.getTime()) || entryStart < new Date(startDate)) {
+          return false;
+        }
+      }
+
+      if (endDate) {
+        const entryEnd = new Date(entry.endDate || entry.startDate);
+        if (Number.isNaN(entryEnd.getTime()) || entryEnd > new Date(endDate)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    const sortOrder = String(sort || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+
+    const sortedReport = filteredEntries
+      .map((entry) => {
+        const ticketsSold = Number(entry.ticketsSold) || 0;
+        const totalRevenue = Number(entry.totalRevenue) || 0;
+        const averageTicketPrice =
+          ticketsSold > 0 ? Number((totalRevenue / ticketsSold).toFixed(2)) : null;
+
+        return {
+          id: entry.id || entry.eventName,
+          eventName: entry.eventName,
+          totalRevenue,
+          ticketsSold,
+          ticketPrice: entry.ticketPrice ?? null,
+          averageTicketPrice,
+          category: entry.category || null,
+          location: entry.location || null,
+          startDate: entry.startDate || null,
+          endDate: entry.endDate || null,
+          notes: entry.notes || null
+        };
+      })
+      .sort((a, b) =>
+        sortOrder === 'asc'
+          ? a.totalRevenue - b.totalRevenue
+          : b.totalRevenue - a.totalRevenue
+      );
+
+    const totals = sortedReport.reduce(
+      (acc, entry) => {
+        acc.totalRevenue += entry.totalRevenue;
+        acc.totalTicketsSold += entry.ticketsSold;
+        return acc;
+      },
+      { totalRevenue: 0, totalTicketsSold: 0 }
+    );
+
+    const response = {
+      success: true,
+      generatedAt: new Date().toISOString(),
+      currency: "EGP",
+      totalRevenue: totals.totalRevenue,
+      totalTicketsSold: totals.totalTicketsSold,
+      averageRevenuePerEvent: sortedReport.length
+        ? Number((totals.totalRevenue / sortedReport.length).toFixed(2))
+        : 0,
+      report: sortedReport
+    };
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error("Server error in getSalesReport:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to generate sales report"
+    });
   }
 };
 

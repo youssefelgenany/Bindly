@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {
+  getPendingVendorRequestNotifications,
   getAllVendorRequests,
   getVendorRequestById,
   createVendorRequest,
@@ -15,10 +16,28 @@ const { protect, permit } = require('../middleware/authMiddleware');
 router.post('/', protect, permit('vendor'), createVendorRequest);
 
 // Route to get all vendor requests - Events Office / Admin
-router.get('/', protect, permit('event_office', 'admin'), getAllVendorRequests);
+router.get(
+  '/',
+  protect,
+  permit('event_office', 'admin', 'Event Office', 'Events Office'),
+  getAllVendorRequests
+);
+
+// Route to get pending vendor requests notifications - Events Office / Admin
+router.get(
+  '/pending/notifications',
+  protect,
+  permit('event_office', 'admin', 'Event Office', 'Events Office'),
+  getPendingVendorRequestNotifications
+);
 
 // Route to get a single vendor request by ID - Events Office / Admin
-router.get('/:id', protect, permit('event_office', 'admin'), getVendorRequestById);
+router.get(
+  '/:id',
+  protect,
+  permit('event_office', 'admin', 'Event Office', 'Events Office'),
+  getVendorRequestById
+);
 
 // Route to update vendor request status (accept/reject) - Events Office / Admin
 router.patch('/:id/status', protect, permit('event_office', 'admin'), updateVendorRequestStatus);
