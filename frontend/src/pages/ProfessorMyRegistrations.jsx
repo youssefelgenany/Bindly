@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import professorApiService from '../api/professorApi';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
 import { useAuth } from '../contexts/AuthContext';
 
-const StudentMyRegistrations = () => {
+const ProfessorMyRegistrations = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -22,13 +23,7 @@ const StudentMyRegistrations = () => {
     navigate('/login');
   };
 
-  useEffect(() => {
-    if (user && user.email) {
-      loadMyRegistrations();
-    }
-  }, [user]);
-
-  const loadMyRegistrations = async () => {
+  const loadMyRegistrations = useCallback(async () => {
     if (!user?.email) {
       setError('User email not available');
       setLoading(false);
@@ -39,22 +34,79 @@ const StudentMyRegistrations = () => {
     setError('');
 
     try {
+      console.log('🔍 Loading professor registrations...');
+      
+      // Professors register through StudentRegistrationForm which uses studentRegistrationApi
+      // So we need to check the student registration API, not the professor registration API
       const result = await studentRegistrationApi.getMyRegistrations(user.email);
+      console.log('📦 Raw API result:', result);
       
       if (result.success) {
-        setRegistrations(result.data.registrations || []);
+        // Student registration API returns { registrations: [...] }
+        let rawRegistrations = result.data?.registrations || [];
+        
+        console.log('📋 Raw registrations:', rawRegistrations);
+        console.log('📊 Number of registrations:', rawRegistrations.length);
+        
+        // The student registration API already formats the data correctly
+        // So we can use it directly, but we need to ensure all fields are present
+        const formattedRegistrations = rawRegistrations.map(reg => ({
+          id: reg.id,
+          eventId: reg.eventId,
+          eventTitle: reg.eventTitle,
+          eventType: reg.eventType,
+          eventDate: reg.eventDate,
+          eventEndDate: reg.eventEndDate,
+          eventLocation: reg.eventLocation,
+          eventDescription: reg.eventDescription || '',
+          capacity: reg.capacity || null,
+          registeredCount: reg.registeredCount || 0,
+          studentName: reg.studentName || (user?.firstName && user?.lastName 
+            ? `${user.firstName} ${user.lastName}` 
+            : user?.name || 'Professor'),
+          professorName: reg.studentName || (user?.firstName && user?.lastName 
+            ? `${user.firstName} ${user.lastName}` 
+            : user?.name || 'Professor'),
+          studentId: reg.studentId || user?.gucId || null,
+          studentEmail: reg.studentEmail || user?.email || '',
+          professorEmail: reg.studentEmail || user?.email || '',
+          status: reg.status || 'approved',
+          registeredAt: reg.registeredAt || new Date(),
+          emergencyContact: reg.emergencyContact || null,
+          dietaryRequirements: reg.dietaryRequirements || null,
+          medicalConditions: reg.medicalConditions || null
+        }));
+        
+        console.log('✨ Final formatted registrations:', formattedRegistrations);
+        console.log('📊 Final count:', formattedRegistrations.length);
+        setRegistrations(formattedRegistrations);
       } else {
+        console.error('❌ API returned error:', result.message);
         setError(result.message || 'Failed to fetch registrations');
         setRegistrations([]);
       }
     } catch (err) {
-      console.error('Error loading registrations:', err);
+      console.error('❌ Error loading registrations:', err);
+      console.error('❌ Error details:', err.response?.data || err.message);
       setError(err.message || 'An unexpected error occurred. Please try again.');
       setRegistrations([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user && user.email) {
+      loadMyRegistrations();
+    }
+  }, [user, loadMyRegistrations]);
+
+  // Refresh registrations when navigating to this page
+  useEffect(() => {
+    if (location.pathname === '/professor/events' && user && user.email) {
+      loadMyRegistrations();
+    }
+  }, [location.pathname, user, loadMyRegistrations]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
@@ -83,10 +135,19 @@ const StudentMyRegistrations = () => {
   const getStatusColor = (status) => {
     const colors = {
       approved: '#059669',
+      registered: '#059669',
       pending: '#f59e0b',
       rejected: '#dc2626'
     };
     return colors[status?.toLowerCase()] || '#6b7280';
+  };
+
+  const getDisplayStatus = (status) => {
+    // Map "approved" to "registered" for display
+    if (status?.toLowerCase() === 'approved') {
+      return 'registered';
+    }
+    return status;
   };
 
   const getDaysUntilEvent = (dateString) => {
@@ -104,7 +165,7 @@ const StudentMyRegistrations = () => {
 
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
-    : user?.name || 'Student';
+    : user?.name || 'Professor';
 
   if (loading) {
     return (
@@ -173,7 +234,7 @@ const StudentMyRegistrations = () => {
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  Student Events
+                  Professor Portal
                 </h1>
                 <p style={{
                   color: 'rgba(241, 250, 238, 0.7)',
@@ -231,37 +292,37 @@ const StudentMyRegistrations = () => {
               </Link>
 
               <Link
-                to="/student/events"
+                to="/professor/all-events"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/professor/all-events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/events')) {
+                  if (!isActiveRoute('/professor/all-events')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/events')) {
+                  if (!isActiveRoute('/professor/all-events')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '1.25rem'
                 }}>
                   explore
                 </span>
                 <p style={{
-                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/events') ? '700' : '500',
+                  fontWeight: isActiveRoute('/professor/all-events') ? '700' : '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
@@ -270,37 +331,37 @@ const StudentMyRegistrations = () => {
               </Link>
 
               <Link
-                to="/student/my-registrations"
+                to="/professor/events"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/my-registrations') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/professor/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/my-registrations')) {
+                  if (!isActiveRoute('/professor/events')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/my-registrations')) {
+                  if (!isActiveRoute('/professor/events')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '1.25rem'
                 }}>
                   event
                 </span>
                 <p style={{
-                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/my-registrations') ? '700' : '500',
+                  fontWeight: isActiveRoute('/professor/events') ? '700' : '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
@@ -309,80 +370,119 @@ const StudentMyRegistrations = () => {
               </Link>
 
               <Link
-                to="/student/courts"
+                to="/professor/my-workshops"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/courts') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/professor/my-workshops') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/courts')) {
+                  if (!isActiveRoute('/professor/my-workshops')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/courts')) {
+                  if (!isActiveRoute('/professor/my-workshops')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '1.25rem'
                 }}>
-                  sports_tennis
+                  work
                 </span>
                 <p style={{
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/courts') ? '700' : '500',
+                  fontWeight: isActiveRoute('/professor/my-workshops') ? '700' : '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  Campus Courts
+                  My Workshops
                 </p>
               </Link>
 
               <Link
-                to="/gym"
+                to="/gym-schedule"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/gym') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/gym')) {
+                  if (!isActiveRoute('/gym-schedule')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/gym')) {
+                  if (!isActiveRoute('/gym-schedule')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '1.25rem'
                 }}>
-                  fitness_center
+                  calendar_month
                 </span>
                 <p style={{
-                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/gym') ? '700' : '500',
+                  fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  Gym Sessions
+                  View Gym Sessions
+                </p>
+              </Link>
+
+              <Link
+                to="/professor/create-workshop"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/professor/create-workshop') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/professor/create-workshop')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/professor/create-workshop')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{
+                  color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '1.25rem'
+                }}>
+                  add_circle
+                </span>
+                <p style={{
+                  color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/professor/create-workshop') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Create Workshop
                 </p>
               </Link>
             </nav>
@@ -490,7 +590,7 @@ const StudentMyRegistrations = () => {
                 color: '#6b7280',
                 margin: 0
               }}>
-                Student
+                Professor
               </p>
             </div>
             {user?.profilePicturePath ? (
@@ -573,7 +673,7 @@ const StudentMyRegistrations = () => {
                 You haven't registered for any events yet. Browse events to get started!
               </p>
               <button
-                onClick={() => navigate('/student/events')}
+                onClick={() => navigate('/professor/all-events')}
                 style={{
                   padding: '0.75rem 1.5rem',
                   borderRadius: '0.5rem',
@@ -652,7 +752,7 @@ const StudentMyRegistrations = () => {
                         letterSpacing: '0.05em'
                       }}>
                         {registration.eventType}
-        </div>
+                      </div>
                       <div style={{
                         padding: '0.375rem 0.875rem',
                         borderRadius: '0.5rem',
@@ -663,9 +763,9 @@ const StudentMyRegistrations = () => {
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em'
                       }}>
-                        {registration.status}
-        </div>
-      </div>
+                        {getDisplayStatus(registration.status)}
+                      </div>
+                    </div>
 
                     <h3 style={{
                       color: '#1D3557',
@@ -698,7 +798,7 @@ const StudentMyRegistrations = () => {
                         }}>
                           calendar_today
                         </span>
-          <span>{formatDate(registration.eventDate)}</span>
+                        <span>{formatDate(registration.eventDate)}</span>
                         {getDaysUntilEvent(registration.eventDate) && (
                           <span style={{
                             fontSize: '0.75rem',
@@ -712,7 +812,7 @@ const StudentMyRegistrations = () => {
                             {getDaysUntilEvent(registration.eventDate)}
                           </span>
                         )}
-        </div>
+                      </div>
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -726,9 +826,9 @@ const StudentMyRegistrations = () => {
                         }}>
                           location_on
                         </span>
-          <span>{registration.eventLocation}</span>
-        </div>
-        {registration.capacity && (
+                        <span>{registration.eventLocation}</span>
+                      </div>
+                      {registration.capacity && (
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -743,8 +843,8 @@ const StudentMyRegistrations = () => {
                             people
                           </span>
                           <span>{registration.registeredCount || 0}/{registration.capacity} registered</span>
-          </div>
-        )}
+                        </div>
+                      )}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -759,10 +859,10 @@ const StudentMyRegistrations = () => {
                           schedule
                         </span>
                         <span>Registered: {formatDate(registration.registeredAt)}</span>
-        </div>
-      </div>
+                      </div>
+                    </div>
 
-      {registration.eventDescription && (
+                    {registration.eventDescription && (
                       <p style={{
                         color: '#6b7280',
                         fontSize: '0.8125rem',
@@ -885,7 +985,7 @@ const StudentMyRegistrations = () => {
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em'
                 }}>
-                  {selectedRegistration.status}
+                  {getDisplayStatus(selectedRegistration.status)}
                 </div>
               </div>
               
@@ -1039,18 +1139,20 @@ const StudentMyRegistrations = () => {
                 }}>
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Name</div>
-                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentName}</div>
+                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentName || selectedRegistration.professorName || displayName}</div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Student ID</div>
-                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentId}</div>
-          </div>
+                  {selectedRegistration.studentId && (
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Student ID</div>
+                      <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentId}</div>
+                    </div>
+                  )}
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Email</div>
-                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentEmail}</div>
-          </div>
-          </div>
-        </div>
+                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentEmail || selectedRegistration.professorEmail || user?.email}</div>
+                  </div>
+                </div>
+              </div>
 
               {selectedRegistration.eventType === 'trip' && (
                 <div style={{
@@ -1084,35 +1186,36 @@ const StudentMyRegistrations = () => {
                       <div>
                         <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Emergency Contact</div>
                         <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.emergencyContact.name}</div>
-                </div>
+                      </div>
                       {selectedRegistration.emergencyContact.phone && (
                         <div>
                           <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Contact Phone</div>
                           <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.emergencyContact.phone}</div>
-                  </div>
-                )}
+                        </div>
+                      )}
                     </div>
                   )}
                   {selectedRegistration.dietaryRequirements && (
                     <div style={{ marginBottom: '0.75rem' }}>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Dietary Requirements</div>
                       <div style={{ color: '#374151', fontSize: '0.875rem' }}>{selectedRegistration.dietaryRequirements}</div>
-              </div>
-            )}
+                    </div>
+                  )}
                   {selectedRegistration.medicalConditions && (
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Medical Conditions</div>
                       <div style={{ color: '#374151', fontSize: '0.875rem' }}>{selectedRegistration.medicalConditions}</div>
-              </div>
-            )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+        </div>
         )}
       </div>
-    </div>
-          </div>
-        )}
-    </div>
   );
 };
 
-export default StudentMyRegistrations;
+export default ProfessorMyRegistrations;
+

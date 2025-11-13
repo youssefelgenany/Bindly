@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AdminUsers from './pages/AdminUsers';
 import AdminVendors from './pages/AdminVendors';
 import AdminEvents from './pages/AdminEvents';
+import AdminEventsView from './pages/AdminEventsView';
+import AdminPlatformBoothRequests from './pages/AdminPlatformBoothRequests';
 import AdminManagement from './pages/AdminManagement';
 import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
@@ -11,12 +13,13 @@ import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import EventsOfficeDashboard from './pages/EventsOfficeDashboard';
 import PendingVerification from './pages/PendingVerification';
-import ProfessorEvents from './pages/ProfessorEvents';
-import ProfessorAllEvents from './pages/ProfessorAllEvents';
+import ProfessorMyRegistrations from './pages/ProfessorMyRegistrations';
+import ProfessorEventsView from './pages/ProfessorEventsView';
+import CreateWorkshop from './pages/CreateWorkshop';
+import MyWorkshops from './pages/MyWorkshops';
 import GymSchedule from './pages/GymSchedule';
 import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
-import ProfessorGymSchedule from './pages/ProfessorGymSchedule';
 import VendorDashboard from './pages/VendorDashboard';
 import CreateConference from './pages/CreateConfrence';
 import EditConfrences from './pages/EditConfrences';
@@ -455,7 +458,7 @@ const AppContent = () => {
               path="/professor/events"
               element={
                 <ProtectedRoute>
-                  <ProfessorEvents />
+                  <ProfessorMyRegistrations />
                 </ProtectedRoute>
               }
             />
@@ -463,7 +466,23 @@ const AppContent = () => {
               path="/professor/all-events"
               element={
                 <ProtectedRoute>
-                  <ProfessorAllEvents />
+                  <ProfessorEventsView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/professor/create-workshop"
+              element={
+                <ProtectedRoute>
+                  <CreateWorkshop />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/professor/my-workshops"
+              element={
+                <ProtectedRoute>
+                  <MyWorkshops />
                 </ProtectedRoute>
               }
             />
@@ -479,7 +498,7 @@ const AppContent = () => {
               path="/professor/gym-schedule"
               element={
                 <ProtectedRoute>
-                  <ProfessorGymSchedule />
+                  <GymSchedule />
                 </ProtectedRoute>
               }
             />
@@ -509,6 +528,26 @@ const AppContent = () => {
                 <ProtectedRoute>
                   <AdminOnly>
                     <AdminEvents />
+                  </AdminOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/events-view"
+              element={
+                <ProtectedRoute>
+                  <AdminOnly>
+                    <AdminEventsView />
+                  </AdminOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/platform-booth-requests"
+              element={
+                <ProtectedRoute>
+                  <AdminOnly>
+                    <AdminPlatformBoothRequests />
                   </AdminOnly>
                 </ProtectedRoute>
               }
