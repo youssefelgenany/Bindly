@@ -4,6 +4,67 @@ const VendorRequest = require('../models/vendorRequest');
 const Event = require('../models/eventModel');
 const VendorVote = require('../models/vendorVoteModel');
 
+const getPendingVendorRequestNotifications = async (req, res) => {
+  try {
+    const limitParam = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isNaN(limitParam) ? 10 : Math.min(Math.max(limitParam, 1), 50);
+
+    const pendingRequests = await VendorRequest.find({ status: 'pending' })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate('vendor', 'companyName firstName lastName email phoneNumber')
+      .populate('bazaar', 'title name location startDate endDate')
+      .populate('booth', 'title name location startDate endDate')
+      .lean();
+
+    const notifications = pendingRequests.map((request) => {
+      const eventInfo = request.bazaar || request.booth || null;
+      const vendorInfo = request.vendor || {};
+
+      return {
+        id: request._id,
+        status: request.status,
+        submittedAt: request.createdAt,
+        eventType: request.eventType || (request.bazaar ? 'bazaar' : request.booth ? 'booth' : null),
+        event: eventInfo
+          ? {
+              id: eventInfo._id,
+              name: eventInfo.name || eventInfo.title || request.eventName || 'Untitled Event',
+              location: eventInfo.location || null,
+              startDate: eventInfo.startDate || null,
+              endDate: eventInfo.endDate || null
+            }
+          : null,
+        vendor: {
+          id: vendorInfo._id || null,
+          companyName: vendorInfo.companyName || null,
+          firstName: vendorInfo.firstName || null,
+          lastName: vendorInfo.lastName || null,
+          email: vendorInfo.email || null,
+          phoneNumber: vendorInfo.phoneNumber || null
+        },
+        boothSize: request.boothSize || null,
+        durationWeeks: request.durationWeeks || null,
+        boothLocation: request.boothLocation || null,
+        attendeesCount: Array.isArray(request.attendees) ? request.attendees.length : 0,
+        message: request.message || null
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      totalPending: notifications.length,
+      notifications
+    });
+  } catch (error) {
+    console.error('getPendingVendorRequestNotifications error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to fetch pending vendor request notifications'
+    });
+  }
+};
+
 // @desc View all vendor participation requests
 // @route GET /api/vendor-requests
 // @access Events Office / Admin
@@ -609,6 +670,7 @@ const getVendorRequestVotes = async (req, res) => {
 };
 
 module.exports = {
+  getPendingVendorRequestNotifications,
   getAllVendorRequests,
   getVendorRequestById,
   createVendorRequest,
