@@ -22,8 +22,7 @@ const vendorRequestSchema = new mongoose.Schema({
   },
   // Denormalized event info for easy rendering without populate
   eventName: { type: String },
-  eventType: { type: String, enum: ['bazaar', 'booth', 'platform-booth'] },
-  eventType: { type: String, enum: ['bazaar', 'booth', 'standaloneBooth'] },
+  eventType: { type: String, enum: ['bazaar', 'booth', 'standaloneBooth', 'platformBooth'] },
   attendees: [
     {
       name: { type: String, required: true },

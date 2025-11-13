@@ -383,12 +383,47 @@ module.exports.getMyAcceptedUpcoming = async (req, res) => {
       return res.json({ success: true, events: list });
     }
 
+    // Fetch accepted platform booth requests
+    const fetchAcceptedPlatformBooths = async () => {
+      const query = {
+        vendor: vendorId,
+        status: 'accepted',
+        eventType: 'platformBooth'
+      };
+      const requests = await VendorRequest.find(query).lean();
+      return (requests || []).map(r => ({
+        _id: r._id,
+        title: 'Platform Booth',
+        name: `Platform Booth - ${r.boothLocation ? r.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Location TBD'}`,
+        description: r.message || 'Platform booth reservation',
+        startDate: r.startDate || r.createdAt,
+        endDate: r.startDate ? new Date(new Date(r.startDate).getTime() + (r.durationWeeks || 1) * 7 * 24 * 60 * 60 * 1000) : null,
+        location: r.boothLocation ? r.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Platform',
+        type: 'platformBooth',
+        eventType: 'platformBooth',
+        attendees: r.attendees || [],
+        boothSize: r.boothSize || undefined,
+        durationWeeks: r.durationWeeks || undefined,
+        boothLocation: r.boothLocation || undefined
+      }));
+    };
+
+    if (type === 'platformBooth') {
+      const list = await fetchAcceptedPlatformBooths();
+      return res.json({ success: true, events: list });
+    }
+
     // If no specific type requested, return combined list
-    const [bazaars, booths] = await Promise.all([
+    const [bazaars, booths, platformBooths] = await Promise.all([
       fetchForType('bazaar'),
-      fetchForType('booth')
+      fetchForType('booth'),
+      fetchAcceptedPlatformBooths()
     ]);
-    const combined = [...bazaars, ...booths].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    const combined = [...bazaars, ...booths, ...platformBooths].sort((a, b) => {
+      const dateA = new Date(a.startDate || 0);
+      const dateB = new Date(b.startDate || 0);
+      return dateA - dateB; // Ascending: nearest first
+    });
     return res.json({ success: true, events: combined });
   } catch (error) {
     console.error('Server error in getMyAcceptedUpcoming:', error);
@@ -462,6 +497,36 @@ module.exports.getMyRequests = async (req, res) => {
       return [];
     };
 
+    // Fetch platform booth requests (they don't have bazaar/booth fields)
+    const fetchPlatformBooths = async () => {
+      const query = {
+        vendor: vendorId,
+        ...(status === 'all' ? {} : { status }),
+        eventType: 'platformBooth'
+      };
+      const requests = await VendorRequest.find(query).lean();
+      return (requests || []).map(r => ({
+        _id: r._id, // Use request ID as the main ID
+        title: 'Platform Booth',
+        name: `Platform Booth - ${r.boothLocation ? r.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Location TBD'}`,
+        description: r.message || 'Platform booth reservation request',
+        startDate: r.startDate || r.createdAt,
+        endDate: r.startDate ? new Date(new Date(r.startDate).getTime() + (r.durationWeeks || 1) * 7 * 24 * 60 * 60 * 1000) : null,
+        location: r.boothLocation ? r.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Platform',
+        type: 'platformBooth',
+        eventType: 'platformBooth',
+        requestId: r._id,
+        status: r.status,
+        attendees: r.attendees || [],
+        boothSize: r.boothSize || undefined,
+        durationWeeks: r.durationWeeks || undefined,
+        boothLocation: r.boothLocation || undefined,
+        boothId: r.boothId || undefined,
+        createdAt: r.createdAt,
+        message: r.message || undefined
+      }));
+    };
+
     if (type === 'bazaar' || type === 'booth' || type === 'standaloneBooth') {
       // Treat standaloneBooth the same as booth since they're both stored in Event collection
       const actualType = type === 'standaloneBooth' ? 'booth' : type;
@@ -469,11 +534,22 @@ module.exports.getMyRequests = async (req, res) => {
       return res.json({ success: true, events: list, status });
     }
 
-    const [bazaars, booths] = await Promise.all([
+    if (type === 'platformBooth') {
+      const list = await fetchPlatformBooths();
+      return res.json({ success: true, events: list, status });
+    }
+
+    // If no type specified, fetch all types
+    const [bazaars, booths, platformBooths] = await Promise.all([
       fetchForType('bazaar'),
-      fetchForType('booth')
+      fetchForType('booth'),
+      fetchPlatformBooths()
     ]);
-    const combined = [...bazaars, ...booths].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    const combined = [...bazaars, ...booths, ...platformBooths].sort((a, b) => {
+      const dateA = new Date(a.createdAt || a.startDate || 0);
+      const dateB = new Date(b.createdAt || b.startDate || 0);
+      return dateB - dateA; // Most recent first
+    });
     return res.json({ success: true, events: combined, status });
   } catch (error) {
     console.error('Server error in getMyRequests:', error);

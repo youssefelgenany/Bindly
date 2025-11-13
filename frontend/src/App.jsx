@@ -38,7 +38,11 @@ import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
 import CourtAvailability from './pages/CourtAvailability';
 import PlatformBoothReservation from './pages/PlatformBoothReservation';
+import PlatformBooths from './pages/PlatformBooths';
 import EventsOfficeEventsView from './pages/EventsOfficeEventsView';
+import VendorAcceptedEvents from './pages/VendorAcceptedEvents';
+import VendorMyRequests from './pages/VendorMyRequests';
+import PlatformBoothRequests from './pages/PlatformBoothRequests';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -304,6 +308,30 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/vendor/platform-booths"
+              element={
+                <ProtectedRoute>
+                  <PlatformBooths />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vendor/accepted-events"
+              element={
+                <ProtectedRoute>
+                  <VendorAcceptedEvents />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vendor/my-requests"
+              element={
+                <ProtectedRoute>
+                  <VendorMyRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/event-office/vendor-requests"
               element={
                 <ProtectedRoute>
@@ -319,6 +347,16 @@ const AppContent = () => {
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <EventsOfficeEventsView />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/event-office/platform-booth-requests"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <PlatformBoothRequests />
                   </EventsOfficeOnly>
                 </ProtectedRoute>
               }
