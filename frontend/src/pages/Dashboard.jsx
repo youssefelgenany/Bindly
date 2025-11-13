@@ -6,6 +6,7 @@ import ProfessorDashboardOverview from '../components/ProfessorDashboardOverview
 import StudentDashboard from '../components/StudentDashboard';
 import StaffDashboard from '../components/StaffDashboard';
 import TADashboard from '../components/TADashboard';
+import AdminDashboard from './AdminDashboard';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -91,6 +92,11 @@ const Dashboard = () => {
   const isStudent = user?.userType === 'Student' || user?.userType === 'student';
   const isStaff = user?.userType === 'Staff';
   const isTA = user?.userType === 'TA';
+
+  // Show Admin Dashboard for admins
+  if (isAdmin) {
+    return <AdminDashboard />;
+  }
 
   // Show Student Dashboard for students
   if (isStudent) {
