@@ -40,26 +40,89 @@ const CreateBazaar = () => {
     setLoading(true);
     setMessage({ type: '', text: '' });
 
+    // Validate required fields
+    if (!formData.name || !formData.location || !formData.startDate || !formData.endDate || !formData.registrationDeadline) {
+      setMessage({ 
+        type: 'error', 
+        text: 'Please fill in all required fields' 
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
-      const result = await bazaarApi.create(formData);
+      // Check if token exists
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setMessage({ 
+          type: 'error', 
+          text: 'You are not logged in. Please log in and try again.' 
+        });
+        setTimeout(() => navigate('/login'), 2000);
+        setLoading(false);
+        return;
+      }
+
+      // Format dates to ISO string format for backend
+      const submitData = {
+        ...formData,
+        startDate: formData.startDate ? new Date(formData.startDate).toISOString() : formData.startDate,
+        endDate: formData.endDate ? new Date(formData.endDate).toISOString() : formData.endDate,
+        registrationDeadline: formData.registrationDeadline ? new Date(formData.registrationDeadline).toISOString() : formData.registrationDeadline
+      };
+
+      console.log('Submitting bazaar data:', submitData);
+      const result = await bazaarApi.create(submitData);
       
-      if (result.message && result.message.includes('successfully')) {
+      console.log('Bazaar creation result:', result);
+      
+      // Check for authentication errors
+      if (result.message && (result.message.includes('Invalid/expired token') || result.message.includes('No token provided') || result.message.includes('Authentication'))) {
+        setMessage({ 
+          type: 'error', 
+          text: 'Your session has expired. Please log in again.' 
+        });
+        // Clear invalid token
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setTimeout(() => navigate('/login'), 2000);
+        setLoading(false);
+        return;
+      }
+      
+      if (result.success || (result.message && result.message.toLowerCase().includes('success'))) {
         setMessage({ 
           type: 'success', 
           text: 'Bazaar created successfully! Redirecting...' 
         });
         setTimeout(() => navigate('/event-office'), 2000);
       } else {
+        const errorMsg = result.message || result.error || result.msg || 'Error creating bazaar';
+        console.error('Bazaar creation error:', errorMsg, result);
         setMessage({ 
           type: 'error', 
-          text: result.message || 'Error creating bazaar' 
+          text: errorMsg 
         });
       }
     } catch (error) {
-      setMessage({ 
-        type: 'error', 
-        text: 'Network error. Please try again.' 
-      });
+      console.error('Bazaar creation exception:', error);
+      const errorMsg = error?.response?.data?.message || error?.message || 'Network error. Please try again.';
+      
+      // Check for 401 Unauthorized errors
+      if (errorMsg.includes('Invalid/expired token') || errorMsg.includes('Unauthorized') || error?.response?.status === 401) {
+        setMessage({ 
+          type: 'error', 
+          text: 'Your session has expired. Please log in again.' 
+        });
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setTimeout(() => navigate('/login'), 2000);
+      } else {
+        setMessage({ 
+          type: 'error', 
+          text: errorMsg 
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -164,6 +227,47 @@ const CreateBazaar = () => {
                 }}>
                   Dashboard
                 </p>
+              </Link>
+
+              <Link
+                to="/events"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/events')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/events')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  event
+                </span>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/events') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    Events
+                  </p>
+                )}
               </Link>
 
             <Link
@@ -457,7 +561,7 @@ const CreateBazaar = () => {
               lineHeight: '1.25',
               margin: 0
             }}>
-              Create a New Bazaar
+              Bindly
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -516,6 +620,27 @@ const CreateBazaar = () => {
           overflowY: 'auto',
           backgroundColor: '#f8f6f6'
         }}>
+          {/* Page Name Box */}
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            padding: '1rem 1.5rem',
+            borderRadius: '0.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            marginBottom: '2rem',
+            borderLeft: '4px solid #1D3557',
+            maxWidth: '1200px',
+            margin: '0 auto 2rem auto'
+          }}>
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              Create Bazaar
+            </h3>
+          </div>
+          
       {message.text && (
             <div style={{
               padding: '0.75rem 1rem',

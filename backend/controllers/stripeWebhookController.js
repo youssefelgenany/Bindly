@@ -1,4 +1,12 @@
-const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
+let stripe = null;
+try {
+  if (process.env.STRIPE_SECRET_KEY) {
+    stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  }
+} catch (error) {
+  console.warn('⚠️ Stripe module not installed. Stripe webhook functionality will be disabled.');
+  console.warn('   To enable Stripe, run: npm install stripe');
+}
 const Payment = require('../models/paymentModel');
 const Registration = require('../models/registrationModel');
 const StudentRegistration = require('../models/studentRegistrationModel');
