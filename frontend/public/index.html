@@ -13,6 +13,40 @@
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#2d3e5f",
+              "background-light": "#f8f9fa",
+              "background-dark": "#121212",
+              "card-light": "#ffffff",
+              "card-dark": "#1e1e1e",
+              "text-light-primary": "#1f2937",
+              "text-dark-primary": "#f9fafb",
+              "text-light-secondary": "#6b7280",
+              "text-dark-secondary": "#9ca3af",
+              "sidebar-text": "#d1d5db",
+              "sidebar-text-hover": "#ffffff",
+              "sidebar-active-bg": "#4a5b7d"
+            },
+            fontFamily: {
+              display: ["Roboto", "sans-serif"]
+            },
+            borderRadius: {
+              DEFAULT: "0.75rem",
+              lg: "0.5rem",
+              xl: "0.75rem",
+              full: "9999px"
+            }
+          }
+        }
+      };
+    </script>
     <title>Bindly - GUC Platform</title>
   </head>
   <body>

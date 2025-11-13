@@ -1,11 +1,35 @@
 const express = require('express');
-const { viewUpcomingEvents, applyToEvent, getParticipants, getMyAcceptedUpcoming, getMyRequests } = require('../controllers/vendorController.js');
+const {
+  viewUpcomingEvents,
+  applyToEvent,
+  getParticipants,
+  getMyAcceptedUpcoming,
+  getMyRequests,
+  getLoyaltyProgramVendors
+} = require('../controllers/vendorController.js');
 const { protect, permit } = require('../middleware/authMiddleware.js');
 
 const router = express.Router();
 
 // Publicly list upcoming events for vendors to browse
 router.get('/events/upcoming', viewUpcomingEvents); // ?type=bazaar or booth
+
+// Loyalty program vendors list (requires authenticated campus community roles)
+router.get(
+  '/loyalty-program/vendors',
+  protect,
+  permit(
+    'Student',
+    'admin',
+    'Professor',
+    'Staff',
+    'TA',
+    'event_office',
+    'Event Office',
+    'Events Office'
+  ),
+  getLoyaltyProgramVendors
+);
 
 // Applying to an event requires authenticated Vendor
 router.post('/apply', protect, permit('Vendor'), applyToEvent); // Requires eventType (bazaar/booth) in body

@@ -14,7 +14,8 @@ router.get('/', getAllCourts);
 router.get('/:courtId/availability/:date', getCourtAvailability);
 
 // Protected routes - require authentication
-router.post('/book', protect, bookCourt);
+// Students only can book courts
+router.post('/book', protect, permit('Student'), bookCourt);
 router.get('/my-bookings', protect, getMyBookings);
 router.put('/bookings/:bookingId/cancel', protect, cancelBooking);
 

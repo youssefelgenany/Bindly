@@ -207,7 +207,7 @@ exports.registerStudentForEvent = async (req, res) => {
       
       try {
         const mailOptions = {
-          from: "Bindly <salmaahmed1504@gmail.com>",
+          from: process.env.SMTP_FROM || `Bindly <${process.env.SMTP_USER}>`,
           to: studentEmail,
           subject: 'Verify Your Student Account - Bindly',
           html: html
@@ -308,26 +308,29 @@ exports.getStudentRegistrationsByEmail = async (req, res) => {
 
     console.log('🔍 Found registrations:', registrations.length);
 
-    // Format the response
-    const formattedRegistrations = registrations.map(reg => ({
-      id: reg._id,
-      eventTitle: reg.event.title,
-      eventType: reg.event.type,
-      eventDate: reg.event.startDate,
-      eventEndDate: reg.event.endDate,
-      eventLocation: reg.event.location,
-      eventDescription: reg.event.description,
-      capacity: reg.event.capacity,
-      registeredCount: reg.event.registeredCount,
-      studentName: reg.studentName,
-      studentId: reg.studentId,
-      studentEmail: reg.studentEmail,
-      status: reg.status,
-      registeredAt: reg.registeredAt,
-      emergencyContact: reg.emergencyContact,
-      dietaryRequirements: reg.dietaryRequirements,
-      medicalConditions: reg.medicalConditions
-    }));
+    // Format the response - filter out registrations with deleted events
+    const formattedRegistrations = registrations
+      .filter(reg => reg.event && reg.event !== null) // Filter out registrations where event was deleted
+      .map(reg => ({
+        id: reg._id,
+        eventId: reg.event?._id ? String(reg.event._id) : null, // Include event ID for checking registration status
+        eventTitle: reg.event?.title || 'Event Deleted',
+        eventType: reg.event?.type || 'unknown',
+        eventDate: reg.event?.startDate || null,
+        eventEndDate: reg.event?.endDate || null,
+        eventLocation: reg.event?.location || 'N/A',
+        eventDescription: reg.event?.description || '',
+        capacity: reg.event?.capacity || null,
+        registeredCount: reg.event?.registeredCount || 0,
+        studentName: reg.studentName,
+        studentId: reg.studentId,
+        studentEmail: reg.studentEmail,
+        status: reg.status,
+        registeredAt: reg.registeredAt,
+        emergencyContact: reg.emergencyContact,
+        dietaryRequirements: reg.dietaryRequirements,
+        medicalConditions: reg.medicalConditions
+      }));
 
     console.log('🔍 Formatted registrations:', formattedRegistrations.length);
 

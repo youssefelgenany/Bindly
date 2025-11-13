@@ -1606,3 +1606,45 @@ exports.getWalletTransactions = async (req, res) => {
     });
   }
 };
+
+// 📊 Get ratings and comments for an event (placeholder until schema is created)
+exports.getEventRatingsAndComments = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify event exists
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        msg: "Event not found" 
+      });
+    }
+
+    // Placeholder response - will be replaced when rating/comment schema is created
+    res.status(200).json({
+      success: true,
+      message: "Ratings and comments retrieved successfully",
+      eventId: id,
+      ratings: {
+        average: null,
+        count: 0,
+        distribution: {
+          5: 0,
+          4: 0,
+          3: 0,
+          2: 0,
+          1: 0
+        }
+      },
+      comments: []
+    });
+  } catch (err) {
+    console.error("❌ Error fetching ratings and comments:", err);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message 
+    });
+  }
+};

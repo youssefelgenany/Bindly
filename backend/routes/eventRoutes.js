@@ -20,9 +20,11 @@ const {
   getFavoriteEvents,
   payForEvent,
   cancelRegistration,
-  getWalletTransactions
+  getWalletTransactions,
+  getEventRatingsAndComments
 } = require("../controllers/eventController");
 const { verifyPayment } = require("../controllers/paymentVerificationController");
+const { sendWorkshopCompletionEmails } = require("../controllers/workshopCompletionController");
 
 const { protect, permit } = require("../middleware/authMiddleware");
 
@@ -44,6 +46,14 @@ router.get("/student", protect, permit("Student", "Staff", "TA", "Professor", "E
 
 // 📅 Get all events for admin management (including pending)
 router.get("/admin/all", protect, permit("admin"), getAllEventsForAdmin);
+
+// 📧 Send completion emails for workshops that ended today (Admin, Event Office)
+router.post(
+  "/workshops/send-completion-emails",
+  protect,
+  permit("admin", "event_office"),
+  sendWorkshopCompletionEmails
+);
 
 // 👤 Get logged-in user's event registrations
 router.get("/my/registrations", protect, getMyRegistrations);
@@ -67,6 +77,11 @@ router.get(
 
 // 👥 Get registrations for a specific event (for event creators)
 router.get("/:id/registrations", protect, getEventRegistrations);
+
+// 📊 Get ratings and comments for an event (all authenticated users can view)
+router.get("/:id/ratings", protect, getEventRatingsAndComments);
+router.get("/:id/comments", protect, getEventRatingsAndComments);
+router.get("/:id/feedback", protect, getEventRatingsAndComments);
 
 // 🔍 Get a specific event by its ID
 router.get("/:id", protect, getEventById);

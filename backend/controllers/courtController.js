@@ -1,17 +1,43 @@
 const Court = require('../models/courtModel');
 const CourtBooking = require('../models/courtBookingModel');
+const User = require('../models/userModel');
 
 // Get all courts with availability
 exports.getAllCourts = async (req, res) => {
   try {
-    const { type, date } = req.query;
+    const { type, date, includeInactive } = req.query;
     
-    let query = { isActive: true };
+    // Build query - by default only show active courts unless includeInactive is true
+    let query = {};
+    if (includeInactive !== 'true') {
+      query.isActive = true;
+    }
     if (type) {
       query.type = type;
     }
 
     const courts = await Court.find(query).sort({ name: 1 });
+    
+    // If no courts found, check if any courts exist at all
+    if (courts.length === 0) {
+      const totalCourts = await Court.countDocuments({});
+      if (totalCourts === 0) {
+        console.log('⚠️ No courts found in database. Consider running the seed script.');
+        return res.status(200).json({
+          success: true,
+          message: 'No courts found in database. Please seed the courts first.',
+          courts: [],
+          hint: 'Run: node backend/scripts/seedCourts.js'
+        });
+      } else {
+        // Courts exist but are filtered out (probably all inactive)
+        return res.status(200).json({
+          success: true,
+          message: 'No active courts found. Use ?includeInactive=true to see all courts.',
+          courts: []
+        });
+      }
+    }
     
     // If date is provided, get availability for that date
     if (date) {
@@ -121,16 +147,46 @@ exports.getCourtAvailability = async (req, res) => {
   }
 };
 
-// Book a court
+// Book a court (Students only)
 exports.bookCourt = async (req, res) => {
   try {
     const { courtId, bookingDate, startTime, endTime, purpose, participants, notes } = req.body;
     const userId = req.user._id;
 
+    // Verify user is a Student
+    if (req.user.userType !== 'Student') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only students can book courts'
+      });
+    }
+
     if (!courtId || !bookingDate || !startTime || !endTime) {
       return res.status(400).json({
         success: false,
         message: 'Court ID, booking date, start time, and end time are required'
+      });
+    }
+
+    // Get user details to extract name and GUC ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Extract student name and GUC ID
+    const studentName = user.firstName && user.lastName 
+      ? `${user.firstName} ${user.lastName}`.trim()
+      : user.name || user.email.split('@')[0];
+    const studentGucId = user.gucId || null;
+
+    if (!studentGucId) {
+      return res.status(400).json({
+        success: false,
+        message: 'GUC ID is required. Please update your profile with your GUC ID.'
       });
     }
 
@@ -143,11 +199,12 @@ exports.bookCourt = async (req, res) => {
       });
     }
 
-    // Check for time conflicts
+    // Validate that the selected time slot is available
     const targetDate = new Date(bookingDate);
     const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
     const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
 
+    // Check for time conflicts
     const conflictingBooking = await CourtBooking.findOne({
       court: courtId,
       bookingDate: { $gte: startOfDay, $lte: endOfDay },
@@ -160,17 +217,43 @@ exports.bookCourt = async (req, res) => {
     if (conflictingBooking) {
       return res.status(400).json({
         success: false,
-        message: 'Time slot is already booked'
+        message: 'Time slot is already booked. Please choose a different time.'
       });
     }
 
-    // Create booking
+    // Validate time slot is within available hours (9 AM to 10 PM)
+    const startHour = parseInt(startTime.split(':')[0]);
+    const endHour = parseInt(endTime.split(':')[0]);
+    if (startHour < 9 || endHour > 22 || startHour >= endHour) {
+      return res.status(400).json({
+        success: false,
+        message: 'Booking time must be between 9:00 AM and 10:00 PM, and end time must be after start time'
+      });
+    }
+
+    // Calculate duration automatically (in minutes)
+    const start = new Date(`2000-01-01T${startTime}:00`);
+    const end = new Date(`2000-01-01T${endTime}:00`);
+    const duration = Math.round((end - start) / (1000 * 60)); // Duration in minutes
+
+    // Validate duration is within allowed range
+    if (duration < 30 || duration > 240) {
+      return res.status(400).json({
+        success: false,
+        message: 'Booking duration must be between 30 minutes and 4 hours'
+      });
+    }
+
+    // Create booking with automatically included student information
     const booking = new CourtBooking({
       court: courtId,
       user: userId,
+      studentName: studentName,
+      studentGucId: studentGucId,
       bookingDate: new Date(bookingDate),
       startTime,
       endTime,
+      duration: duration, // Automatically calculated
       purpose,
       participants: participants || [],
       notes,
@@ -179,12 +262,16 @@ exports.bookCourt = async (req, res) => {
 
     await booking.save();
     await booking.populate('court', 'name type location');
-    await booking.populate('user', 'firstName lastName email');
+    await booking.populate('user', 'firstName lastName email gucId');
 
     res.status(201).json({
       success: true,
       message: 'Court booking request submitted successfully',
-      booking
+      booking: {
+        ...booking.toObject(),
+        studentName: booking.studentName,
+        studentGucId: booking.studentGucId
+      }
     });
   } catch (error) {
     console.error('Error booking court:', error);

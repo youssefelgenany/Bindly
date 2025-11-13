@@ -250,6 +250,47 @@ const EventsOfficeDashboard = () => {
               </Link>
 
             <Link
+              to="/event-office/events"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.5rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: isActiveRoute('/event-office/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                textDecoration: 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActiveRoute('/event-office/events')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActiveRoute('/event-office/events')) {
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ 
+                color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                fontSize: '1.25rem' 
+              }}>
+                explore
+              </span>
+              {sidebarOpen && (
+                <p style={{
+                  color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/events') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Discover Events
+                </p>
+              )}
+            </Link>
+
+            <Link
               to="/create-bazaar"
               style={{
                 display: 'flex',
@@ -408,7 +449,48 @@ const EventsOfficeDashboard = () => {
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  Gym Sessions
+                  Create Gym Session
+                </p>
+              )}
+            </Link>
+
+            <Link
+              to="/gym-schedule"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.5rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                textDecoration: 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActiveRoute('/gym-schedule')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActiveRoute('/gym-schedule')) {
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ 
+                color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                fontSize: '1.25rem' 
+              }}>
+                calendar_month
+              </span>
+              {sidebarOpen && (
+                <p style={{
+                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  View Gym Sessions
                 </p>
               )}
             </Link>

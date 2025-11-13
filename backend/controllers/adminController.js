@@ -1,5 +1,8 @@
 const crypto = require("crypto");
 const User = require("../models/userModel");
+const Event = require("../models/eventModel");
+const StudentRegistration = require("../models/studentRegistrationModel");
+const Registration = require("../models/registrationModel");
 const { sendVerificationEmail } = require("../utils/mailer");
 
 // Admin assigns correct role (staff/TA/professor) and sends email
@@ -579,6 +582,181 @@ exports.sendVerificationEmail = async (req, res) => {
       success: false,
       message: "Failed to send verification email",
       error: error.message,
+    });
+  }
+};
+
+// Get attendees report for Events Office/Admin
+exports.getAttendeesReport = async (req, res) => {
+  try {
+    console.log('📊 Generating attendees report...');
+
+    // Extract filter parameters from query string
+    const { eventName, eventType, startDate, endDate } = req.query;
+    
+    console.log('🔍 Filters applied:', { eventName, eventType, startDate, endDate });
+
+    // Build event filter object
+    const eventFilter = {};
+    
+    // Filter by event name (case-insensitive partial match)
+    if (eventName) {
+      eventFilter.title = { $regex: eventName, $options: 'i' };
+    }
+    
+    // Filter by event type
+    if (eventType) {
+      eventFilter.type = eventType;
+    }
+    
+    // Filter by date range
+    if (startDate || endDate) {
+      // Match events that overlap with the date range
+      if (startDate && endDate) {
+        // Event overlaps with the date range: starts before endDate AND ends after startDate
+        eventFilter.$and = [
+          { startDate: { $lte: new Date(endDate) } },
+          { endDate: { $gte: new Date(startDate) } }
+        ];
+      } else if (startDate) {
+        // Event ends on or after startDate
+        eventFilter.endDate = { $gte: new Date(startDate) };
+      } else if (endDate) {
+        // Event starts on or before endDate
+        eventFilter.startDate = { $lte: new Date(endDate) };
+      }
+    }
+
+    // Get filtered events
+    const allEvents = await Event.find(eventFilter).lean();
+    console.log(`📅 Found ${allEvents.length} events matching filters`);
+    
+    // Get event IDs for filtering registrations
+    const eventIds = allEvents.map(e => e._id);
+    
+    // Initialize empty arrays for registrations
+    let studentRegistrations = [];
+    let regularRegistrations = [];
+    
+    // Only query registrations if there are events matching the filter
+    if (eventIds.length > 0) {
+      // Get student registrations for filtered events (for workshops and trips)
+      studentRegistrations = await StudentRegistration.find({
+        event: { $in: eventIds },
+        status: { $in: ['approved', 'pending'] } // Only count approved/pending registrations
+      }).lean();
+      
+      // Get regular registrations for filtered events (for other event types)
+      regularRegistrations = await Registration.find({
+        event: { $in: eventIds },
+        status: { $in: ['approved', 'pending'] } // Only count approved/pending registrations
+      }).lean();
+    }
+
+    // Initialize report structure
+    const report = {
+      summary: {
+        totalEvents: allEvents.length,
+        totalAttendees: 0,
+        totalStudentRegistrations: studentRegistrations.length,
+        totalRegularRegistrations: regularRegistrations.length,
+      },
+      byEventType: {},
+      byEvent: []
+    };
+
+    // Process student registrations (workshops and trips)
+    const studentRegByEvent = {};
+    studentRegistrations.forEach(reg => {
+      const eventId = reg.event.toString();
+      if (!studentRegByEvent[eventId]) {
+        studentRegByEvent[eventId] = 0;
+      }
+      studentRegByEvent[eventId]++;
+    });
+
+    // Process regular registrations
+    const regularRegByEvent = {};
+    regularRegistrations.forEach(reg => {
+      const eventId = reg.event.toString();
+      if (!regularRegByEvent[eventId]) {
+        regularRegByEvent[eventId] = 0;
+      }
+      regularRegByEvent[eventId]++;
+    });
+
+    // Aggregate by event type and build per-event details
+    allEvents.forEach(event => {
+      const eventId = event._id.toString();
+      const eventType = event.type || 'other';
+      
+      // Count attendees for this event
+      const studentRegCount = studentRegByEvent[eventId] || 0;
+      const regularRegCount = regularRegByEvent[eventId] || 0;
+      const totalAttendees = studentRegCount + regularRegCount;
+
+      // Initialize event type in report if not exists
+      if (!report.byEventType[eventType]) {
+        report.byEventType[eventType] = {
+          eventCount: 0,
+          totalAttendees: 0,
+          studentRegistrations: 0,
+          regularRegistrations: 0
+        };
+      }
+
+      // Update event type totals
+      report.byEventType[eventType].eventCount++;
+      report.byEventType[eventType].totalAttendees += totalAttendees;
+      report.byEventType[eventType].studentRegistrations += studentRegCount;
+      report.byEventType[eventType].regularRegistrations += regularRegCount;
+
+      // Add per-event details
+      report.byEvent.push({
+        eventId: eventId,
+        title: event.title,
+        type: eventType,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        location: event.location,
+        capacity: event.capacity,
+        registeredCount: event.registeredCount || 0,
+        actualAttendees: totalAttendees,
+        studentRegistrations: studentRegCount,
+        regularRegistrations: regularRegCount,
+        status: event.status
+      });
+    });
+
+    // Calculate total attendees
+    report.summary.totalAttendees = report.summary.totalStudentRegistrations + report.summary.totalRegularRegistrations;
+
+    // Sort events by start date (most recent first)
+    report.byEvent.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+
+    console.log('✅ Attendees report generated successfully');
+    console.log(`   Total Events: ${report.summary.totalEvents}`);
+    console.log(`   Total Attendees: ${report.summary.totalAttendees}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Attendees report fetched successfully',
+      report: report,
+      filters: {
+        eventName: eventName || null,
+        eventType: eventType || null,
+        startDate: startDate || null,
+        endDate: endDate || null
+      },
+      generatedAt: new Date()
+    });
+
+  } catch (error) {
+    console.error('❌ Error generating attendees report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate attendees report',
+      error: error.message
     });
   }
 };

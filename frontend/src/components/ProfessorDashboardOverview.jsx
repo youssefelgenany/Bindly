@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import professorApiService from '../api/professorApi';
 
 const ProfessorDashboardOverview = () => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalEventsCreated: 0,
@@ -68,6 +71,11 @@ const ProfessorDashboardOverview = () => {
     return date.toLocaleDateString();
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '2rem' }}>
@@ -94,9 +102,18 @@ const ProfessorDashboardOverview = () => {
 
   return (
     <div style={{ marginTop: '2rem' }}>
-      <h3 style={{ color: 'var(--charcoal-black)', marginBottom: '1.5rem', fontSize: '1.5rem', fontWeight: 600 }}>
-        Event Overview
-      </h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h3 style={{ color: 'var(--charcoal-black)', fontSize: '1.5rem', fontWeight: 600, margin: 0 }}>
+          Event Overview
+        </h3>
+        <button
+          onClick={handleLogout}
+          className="btn btn-outline"
+          style={{ padding: '8px 16px', fontSize: '14px' }}
+        >
+          Logout
+        </button>
+      </div>
 
       {/* Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
