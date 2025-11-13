@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
-import ProfessorDashboardOverview from '../components/ProfessorDashboardOverview';
+import ProfessorDashboard from '../components/ProfessorDashboard';
 import StudentDashboard from '../components/StudentDashboard';
 import StaffDashboard from '../components/StaffDashboard';
 import TADashboard from '../components/TADashboard';
@@ -92,6 +92,7 @@ const Dashboard = () => {
   const isStudent = user?.userType === 'Student' || user?.userType === 'student';
   const isStaff = user?.userType === 'Staff';
   const isTA = user?.userType === 'TA';
+  const isProfessor = user?.userType === 'Professor';
 
   // Show Admin Dashboard for admins
   if (isAdmin) {
@@ -113,6 +114,11 @@ const Dashboard = () => {
     return <TADashboard />;
   }
 
+  // Show Professor Dashboard for professors
+  if (isProfessor) {
+    return <ProfessorDashboard />;
+  }
+
   return (
     <div style={{ padding: '2rem' }}>
       <div className="container">
@@ -126,10 +132,6 @@ const Dashboard = () => {
             </p>
           </div>
 
-          {/* Professor Dashboard Overview */}
-          {user?.userType === 'Professor' && (
-            <ProfessorDashboardOverview />
-          )}
 
           {/* Admin Dashboard Overview */}
           {isAdmin && (

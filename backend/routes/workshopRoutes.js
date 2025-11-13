@@ -34,8 +34,8 @@ router.put('/notifications/read-all', protect, permit('Professor'), markAllNotif
 // routes/workshopRoutes.js
 router.post('/', protect, permit('Professor'), createWorkshop);
 
-router.put('/:id', updateWorkshop);
-router.delete('/:id', deleteWorkshop);
+router.put('/:id', protect, permit('Professor'), updateWorkshop);
+router.delete('/:id', protect, permit('Professor'), deleteWorkshop);
 
 // Events Office routes (no professor-id needed)
 router.get('/', getAllWorkshops);

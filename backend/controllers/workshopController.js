@@ -126,16 +126,70 @@ const updateWorkshop = async (req, res) => {
       return res.status(403).json({ error: 'Only professors can update workshops' });
     }
 
+    // Validate required fields
+    const { workshopName, location, startDate, endDate, startTime, endTime, registrationDeadline, 
+            shortDescription, fullAgenda, facultyResponsible, professorsParticipating, 
+            requiredBudget, fundingSource, capacity } = req.body;
+
+    if (!workshopName || !location || !startDate || !endDate || !startTime || !endTime || 
+        !registrationDeadline || !shortDescription || !fullAgenda || !facultyResponsible || 
+        !professorsParticipating || requiredBudget === undefined || !fundingSource || !capacity) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Validate enum values
+    const validLocations = ['GUC Cairo', 'GUC Berlin'];
+    if (!validLocations.includes(location)) {
+      return res.status(400).json({ error: 'Invalid location. Must be GUC Cairo or GUC Berlin' });
+    }
+
+    const validFaculties = ['MET', 'IET', 'EMS', 'BI', 'MGT', 'Dentistry', 'AA', 'Pharm', 'Arch'];
+    if (!validFaculties.includes(facultyResponsible)) {
+      return res.status(400).json({ error: 'Invalid faculty responsible' });
+    }
+
+    const validFundingSources = ['external', 'GUC'];
+    if (!validFundingSources.includes(fundingSource)) {
+      return res.status(400).json({ error: 'Invalid funding source. Must be external or GUC' });
+    }
+
+    // Validate short description length
+    if (shortDescription.length > 200) {
+      return res.status(400).json({ error: 'Short description must be 200 characters or less' });
+    }
+
+    // Validate professors participating is an array
+    if (!Array.isArray(professorsParticipating) || professorsParticipating.length === 0) {
+      return res.status(400).json({ error: 'At least one participating professor is required' });
+    }
+
     const workshop = await Workshop.findOneAndUpdate(
       { _id: req.params.id, professorId: req.user._id },
-      { ...req.body, updatedAt: new Date() },
-      { new: true }
+      { 
+        ...req.body, 
+        updatedAt: new Date(),
+        // Ensure status is not changed by professor (only Events Office can change status)
+        status: req.body.status || undefined
+      },
+      { new: true, runValidators: true }
     );
 
-    if (!workshop) return res.status(404).json({ error: 'Workshop not found or not authorized' });
+    if (!workshop) {
+      return res.status(404).json({ error: 'Workshop not found or not authorized' });
+    }
+
     res.json(workshop);
   } catch (e) {
-    res.status(400).json({ error: 'Failed to update workshop' });
+    console.error('Error updating workshop:', e);
+    // Return more detailed error message
+    if (e.name === 'ValidationError') {
+      const errors = Object.values(e.errors).map(err => err.message).join(', ');
+      return res.status(400).json({ error: `Validation error: ${errors}` });
+    }
+    if (e.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid workshop ID format' });
+    }
+    res.status(400).json({ error: e.message || 'Failed to update workshop' });
   }
 };
 

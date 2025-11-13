@@ -47,8 +47,14 @@ const Events = () => {
     // In case backend doesn't filter everything yet
     let list = events || [];
     
-    // Exclude 'other' type events
-    list = list.filter(e => e.type !== 'other');
+    // Only include valid event types with non-empty data
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+    list = list.filter(e => {
+      const type = (e.type || '').toLowerCase();
+      return validTypes.includes(type) && 
+             e.title && e.title.trim() !== '' && 
+             e.location && e.location.trim() !== '';
+    });
     
     // Search by event name or professor name
     if (searchQuery.trim()) {

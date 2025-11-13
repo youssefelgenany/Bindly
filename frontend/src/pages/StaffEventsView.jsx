@@ -1,10 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { eventsApiService } from '../api/eventsApi';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { eventsApiService } from '../api/eventsApi';
+import { studentRegistrationApi } from '../api/studentRegistrationApi';
 import StudentRegistrationForm from '../components/StudentRegistrationForm';
+import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
 
 const StaffEventsView = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -13,73 +19,34 @@ const StaffEventsView = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
   const [registrationEvent, setRegistrationEvent] = useState(null);
+  const [showWorkshopEditModal, setShowWorkshopEditModal] = useState(false);
+  const [selectedWorkshop, setSelectedWorkshop] = useState(null);
+  const [registeredEventIds, setRegisteredEventIds] = useState(new Set());
 
-  useEffect(() => {
-    loadEvents();
-  }, [filter]);
+  const isActiveRoute = (path) => {
+    return location.pathname === path;
+  };
 
-  // Auto-search with debounce
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchQuery !== '') {
-        setLoading(true);
-        loadEvents();
-      }
-    }, 500); // 500ms delay
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
-
-  const loadEvents = async () => {
+  const loadEvents = useCallback(async () => {
     try {
       setError('');
-      console.log('🔍 Frontend search query:', searchQuery);
-      
-      // Check if search query matches an event type
-      const queryLower = searchQuery.toLowerCase().trim();
-      let searchType = filter;
-      let searchQueryProcessed = searchQuery;
-      
-      // Auto-detect event type from search query
-      if (queryLower === 'trip' || queryLower === 'trips') {
-        searchType = 'trip';
-        searchQueryProcessed = ''; // Clear the search query since we're filtering by type
-        setFilter('trip'); // Update the filter state to reflect the active filter
-        setSearchQuery(''); // Clear the search input to show the filter is applied
-      } else if (queryLower === 'workshop' || queryLower === 'workshops') {
-        searchType = 'workshop';
-        searchQueryProcessed = ''; // Clear the search query since we're filtering by type
-        setFilter('workshop'); // Update the filter state to reflect the active filter
-        setSearchQuery(''); // Clear the search input to show the filter is applied
-      } else if (queryLower === 'bazaar' || queryLower === 'bazaars') {
-        searchType = 'bazaar';
-        searchQueryProcessed = ''; // Clear the search query since we're filtering by type
-        setFilter('bazaar'); // Update the filter state to reflect the active filter
-        setSearchQuery(''); // Clear the search input to show the filter is applied
-      } else if (queryLower === 'conference' || queryLower === 'conferences') {
-        searchType = 'conference';
-        searchQueryProcessed = ''; // Clear the search query since we're filtering by type
-        setFilter('conference'); // Update the filter state to reflect the active filter
-        setSearchQuery(''); // Clear the search input to show the filter is applied
-      } else if (queryLower === 'booth' || queryLower === 'booths') {
-        searchType = 'booth';
-        searchQueryProcessed = ''; // Clear the search query since we're filtering by type
-        setFilter('booth'); // Update the filter state to reflect the active filter
-        setSearchQuery(''); // Clear the search input to show the filter is applied
-      }
-      
+      setLoading(true);
       const result = await eventsApiService.getStudentEvents({
-        q: searchQueryProcessed && searchQueryProcessed.trim() ? searchQueryProcessed.trim() : undefined,
-        type: searchType !== 'all' ? searchType : undefined
+        q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
+        type: filter !== 'all' ? filter : undefined
       });
       
       if (result.success) {
-        console.log('🔍 Staff events data:', result.data);
-        let mapped = (result.data || []).map(ev => ({
+        const mapped = (result.data || []).map(ev => ({
           id: ev._id || ev.id,
           title: ev.title,
           type: ev.type,
-          status: ev.status || 'approved',
+          status: ev.status || 'pending',
           location: ev.location,
           startDate: ev.startDate,
           endDate: ev.endDate,
@@ -98,28 +65,69 @@ const StaffEventsView = () => {
           bannerFile: ev.bannerFile,
           creatorName: ev.creatorName,
           creatorRole: ev.creatorRole,
-          vendors: ev.vendors || []
-        }));
-
-        // All users can see all event types now
-
+          vendors: ev.vendors || [],
+          vendorRequests: ev.vendorRequests || []
+        }))
+        .filter(ev => {
+          const type = (ev.type || '').toLowerCase();
+          const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+          // Only keep events with valid types and non-empty title/location
+          return validTypes.includes(type) && 
+                 ev.title && ev.title.trim() !== '' && 
+                 ev.location && ev.location.trim() !== '';
+        });
         setEvents(mapped);
       } else {
         setEvents([]);
         const msg = result.message || (typeof result.error === 'string' ? result.error : 'Failed to fetch events');
         setError(msg);
-        console.error('Failed to fetch events:', msg);
       }
     } catch (error) {
       setError(error?.message || 'Error loading events');
-      console.error('Error loading events:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchQuery, filter]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [filter, loadEvents]);
+
+  // Load user's registrations to check which events they're registered for
+  useEffect(() => {
+    const loadUserRegistrations = async () => {
+      if (!user?.email) return;
+      
+      try {
+        const result = await studentRegistrationApi.getMyRegistrations(user.email);
+        if (result.success && result.data.registrations) {
+          // Extract event IDs from registrations
+          const registeredIds = new Set();
+          result.data.registrations.forEach(reg => {
+            // Check for eventId in the formatted response
+            if (reg.eventId) {
+              registeredIds.add(String(reg.eventId));
+            }
+            // Fallback: check if event object exists with _id
+            else if (reg.event && typeof reg.event === 'object' && reg.event._id) {
+              registeredIds.add(String(reg.event._id));
+            } 
+            // Fallback: check if event is a string ID
+            else if (reg.event && typeof reg.event === 'string') {
+              registeredIds.add(reg.event);
+            }
+          });
+          setRegisteredEventIds(registeredIds);
+        }
+      } catch (error) {
+        console.error('Error loading user registrations:', error);
+      }
+    };
+
+    loadUserRegistrations();
+  }, [user]);
 
   const handleSearch = () => {
-    setLoading(true);
     loadEvents();
   };
 
@@ -129,13 +137,28 @@ const StaffEventsView = () => {
   };
 
   const handleRegistrationSuccess = (registrationData) => {
-    console.log('Registration successful:', registrationData);
-    // You could show a success message or refresh the events list
+    setShowRegistrationForm(false);
+    // Add the event ID to registered set
+    if (registrationEvent?.id) {
+      setRegisteredEventIds(prev => new Set([...prev, String(registrationEvent.id)]));
+    }
+    setRegistrationEvent(null);
+    loadEvents();
   };
 
   const handleCloseRegistrationForm = () => {
     setShowRegistrationForm(false);
     setRegistrationEvent(null);
+  };
+
+  const handleCloseWorkshopEditModal = () => {
+    setShowWorkshopEditModal(false);
+    setSelectedWorkshop(null);
+  };
+
+  const handleWorkshopEditRequest = (event) => {
+    setSelectedWorkshop(event);
+    setShowWorkshopEditModal(true);
   };
 
   const formatDate = (dateString) => {
@@ -157,7 +180,7 @@ const StaffEventsView = () => {
     const diffTime = eventDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    if (diffDays < 0) return null; // Event already passed
+    if (diffDays < 0) return null;
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Tomorrow';
     return `In ${diffDays} days`;
@@ -167,7 +190,6 @@ const StaffEventsView = () => {
     const colors = {
       bazaar: '#F48FB1', // Light pink
       trip: '#2196F3',
-      sports: '#FF9800',
       seminar: '#9C27B0',
       workshop: '#607D8B',
       conference: '#795548',
@@ -177,352 +199,1282 @@ const StaffEventsView = () => {
     return colors[type] || colors.other;
   };
 
-  const EventCard = ({ event }) => (
-    <div className="event-card" onClick={() => setSelectedEvent(event)}>
-      <div className="event-header">
-        <div className="event-type-badge" style={{ backgroundColor: getEventTypeColor(event.type) }}>
-          {event.type.toUpperCase()}
-        </div>
-        <div className="event-status">
-          {event.status === 'approved' ? '✅ Approved' : event.status}
-        </div>
-      </div>
-      
-      <div className="event-countdown">
-        <span className="countdown-text">{getDaysUntilEvent(event.startDate)}</span>
-      </div>
-      
-      <h3 className="event-title">{event.title}</h3>
-      
-      <div className="event-details">
-        <div className="detail-item">
-          <span className="detail-label">📅 Date:</span>
-          <span>{formatDate(event.startDate)} - {formatDate(event.endDate)}</span>
-        </div>
-        <div className="detail-item">
-          <span className="detail-label">📍 Location:</span>
-          <span>{event.location}</span>
-        </div>
-        {event.registrationDeadline && (
-          <div className="detail-item">
-            <span className="detail-label">⏰ Registration Deadline:</span>
-            <span>{formatDate(event.registrationDeadline)}</span>
-          </div>
-        )}
-        {event.price && (
-          <div className="detail-item">
-            <span className="detail-label">💰 Price:</span>
-            <span>${event.price}</span>
-          </div>
-        )}
-        {event.capacity && (
-          <div className="detail-item">
-            <span className="detail-label">👥 Capacity:</span>
-            <span>{event.registeredCount || 0}/{event.capacity}</span>
-          </div>
-        )}
-      </div>
-
-      {event.description && (
-        <p className="event-description">{event.description}</p>
-      )}
-
-      {event.type === 'bazaar' && event.vendors && event.vendors.length > 0 && (
-        <div className="vendors-preview">
-          <span className="vendors-count">🏪 {event.vendors.length} vendor{event.vendors.length !== 1 ? 's' : ''} participating</span>
-        </div>
-      )}
-
-      {event.creatorName && (
-        <div className="event-creator">
-          <span className="detail-label">👤 Organized by:</span>
-          <span className="creator-name">{event.creatorName}</span>
-          <span className="creator-role">({event.creatorRole})</span>
-        </div>
-      )}
-
-      {(event.type === 'workshop' || event.type === 'trip') && (
-        <div className="registration-section">
-          <button 
-            className="register-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRegisterClick(event);
-            }}
-          >
-            📝 Register for {event.type === 'workshop' ? 'Workshop' : 'Trip'}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-
-  const EventModal = ({ event, onClose }) => {
-    if (!event) return null;
-
-    return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>{event.title}</h2>
-            <button className="close-button" onClick={onClose}>×</button>
-          </div>
-          
-          <div className="modal-body">
-            <div className="event-type-badge" style={{ backgroundColor: getEventTypeColor(event.type) }}>
-              {event.type.toUpperCase()}
-            </div>
-            
-            <div className="event-countdown-modal">
-              <span className="countdown-text">{getDaysUntilEvent(event.startDate)}</span>
-            </div>
-            
-            <div className="event-info-grid">
-              <div className="info-section">
-                <h3>📅 Event Details</h3>
-                <div className="detail-item">
-                  <span className="detail-label">Start Date:</span>
-                  <span>{formatDate(event.startDate)}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">End Date:</span>
-                  <span>{formatDate(event.endDate)}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Location:</span>
-                  <span>{event.location}</span>
-                </div>
-                {event.registrationDeadline && (
-                  <div className="detail-item">
-                    <span className="detail-label">Registration Deadline:</span>
-                    <span>{formatDate(event.registrationDeadline)}</span>
-                  </div>
-                )}
-              </div>
-
-              {(event.price || event.capacity) && (
-                <div className="info-section">
-                  <h3>💰 Registration Info</h3>
-                  {event.price && (
-                    <div className="detail-item">
-                      <span className="detail-label">Price:</span>
-                      <span>${event.price}</span>
-                    </div>
-                  )}
-                  {event.capacity && (
-                    <div className="detail-item">
-                      <span className="detail-label">Capacity:</span>
-                      <span>{event.registeredCount || 0}/{event.capacity}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {event.creatorName && (
-                <div className="info-section">
-                  <h3>👤 Organizer</h3>
-                  <div className="detail-item">
-                    <span className="detail-label">Name:</span>
-                    <span>{event.creatorName}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Role:</span>
-                    <span>{event.creatorRole}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {event.description && (
-              <div className="info-section">
-                <h3>📝 Description</h3>
-                <p className="event-description">{event.description}</p>
-              </div>
-            )}
-
-            {event.type === 'bazaar' && event.vendors && event.vendors.length > 0 && (
-              <div className="info-section">
-                <h3>🏪 Participating Vendors</h3>
-                <div className="vendors-grid">
-                  {event.vendors.map((vendor, index) => (
-                    <div key={vendor.id || index} className="vendor-card">
-                      <h4>{vendor.companyName}</h4>
-                      {vendor.email && <p className="vendor-email">{vendor.email}</p>}
-                      {vendor.boothSize && <p className="vendor-booth">Booth Size: {vendor.boothSize}</p>}
-                      {vendor.attendees && vendor.attendees.length > 0 && (
-                        <div className="vendor-attendees">
-                          <p className="attendees-label">Attendees:</p>
-                          <ul>
-                            {vendor.attendees.map((attendee, idx) => (
-                              <li key={idx}>{attendee.name} ({attendee.email})</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {(event.agenda || event.website || event.faculty || event.professors) && (
-              <div className="info-section">
-                <h3>📋 Additional Information</h3>
-                {event.agenda && (
-                  <div className="detail-item">
-                    <span className="detail-label">Agenda:</span>
-                    <p>{event.agenda}</p>
-                  </div>
-                )}
-                {event.website && (
-                  <div className="detail-item">
-                    <span className="detail-label">Website:</span>
-                    <a href={event.website} target="_blank" rel="noopener noreferrer">{event.website}</a>
-                  </div>
-                )}
-                {event.faculty && (
-                  <div className="detail-item">
-                    <span className="detail-label">Faculty:</span>
-                    <span>{event.faculty}</span>
-                  </div>
-                )}
-                {event.professors && (
-                  <div className="detail-item">
-                    <span className="detail-label">Professors:</span>
-                    <span>{event.professors}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="student-events-container">
-        <div className="loading">Loading events...</div>
-      </div>
-    );
-  }
+  const displayName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`
+    : user?.name || (user?.userType === 'TA' ? 'TA' : 'Staff');
+  
+  const userRole = user?.userType === 'TA' ? 'Teaching Assistant' : 'Staff';
 
   return (
-    <div className="student-events-container">
-      <div className="page-header">
-        <h1>📅 Upcoming Events</h1>
-        <p>View all upcoming events and participating vendors for bazaars</p>
-      </div>
+    <div style={{
+      display: 'flex',
+      height: '100vh',
+      fontFamily: 'Inter, sans-serif',
+      backgroundColor: '#f8f6f6'
+    }}>
+      {/* Left Sidebar */}
+      <aside style={{
+        width: sidebarOpen ? '16rem' : '0',
+        flexShrink: 0,
+        backgroundColor: '#1D3557',
+        padding: sidebarOpen ? '1.5rem' : '0',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        overflow: 'hidden',
+        transition: 'width 0.3s ease, padding 0.3s ease'
+      }}>
+        {/* Top Section - Logo and Navigation */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {/* Logo and Branding */}
+          {sidebarOpen && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                borderRadius: '50%',
+                backgroundColor: '#457B9D',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF'
+              }}>
+                <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
+                </svg>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <h1 style={{
+                  color: '#FFFFFF',
+                  fontSize: '1rem',
+                  fontWeight: '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  {user?.userType === 'TA' ? 'TA Events' : 'Staff Events'}
+                </h1>
+                <p style={{
+                  color: 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: '400',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  University Portal
+                </p>
+              </div>
+            </div>
+          )}
 
-      <div className="search-filters">
-        <div className="search-bar">
-          <input
-            type="text"
-            placeholder="Search by event name, professor name, location, description, or type (trip, workshop, bazaar, conference, booth)..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          />
-          <button onClick={handleSearch}>🔍 Search</button>
-          {searchQuery && (
-            <button 
-              onClick={() => {
-                setSearchQuery('');
-                setLoading(true);
-                loadEvents();
-              }}
-              className="clear-search-btn"
-            >
-              ✕ Clear
-            </button>
+          {/* Navigation */}
+          {sidebarOpen && (
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <Link
+                to="/dashboard"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                  textDecoration: 'none',
+                  color: '#FFFFFF'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/dashboard')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/dashboard')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.25rem' }}>
+                  dashboard
+                </span>
+                <p style={{
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Dashboard
+                </p>
+              </Link>
+
+              <Link
+                to="/staff/events"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/staff/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/staff/events')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/staff/events')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/staff/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  explore
+                </span>
+                <p style={{
+                  color: isActiveRoute('/staff/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/staff/events') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Discover Events
+                </p>
+              </Link>
+
+              <Link
+                to="/staff/my-registrations"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/staff/my-registrations') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/staff/my-registrations')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/staff/my-registrations')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/staff/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  event
+                </span>
+                <p style={{
+                  color: isActiveRoute('/staff/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/staff/my-registrations') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  My Events
+                </p>
+              </Link>
+
+              <Link
+                to="/gym-schedule"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/gym-schedule')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/gym-schedule')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  calendar_month
+                </span>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    View Gym Sessions
+                  </p>
+                )}
+              </Link>
+            </nav>
           )}
         </div>
         
-        <div className="filter-buttons">
-          <button 
-            className={filter === 'all' ? 'active' : ''} 
-            onClick={() => setFilter('all')}
+        {/* Logout Button - Fixed at bottom */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textAlign: 'left',
+              width: '100%'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
           >
-            All Events
-          </button>
-          <button 
-            className={filter === 'bazaar' ? 'active' : ''} 
-            onClick={() => setFilter('bazaar')}
-          >
-            Bazaars
-          </button>
-          <button 
-            className={filter === 'trip' ? 'active' : ''} 
-            onClick={() => setFilter('trip')}
-          >
-            Trips
-          </button>
-          <button 
-            className={filter === 'workshop' ? 'active' : ''} 
-            onClick={() => setFilter('workshop')}
-          >
-            Workshops
-          </button>
-          <button 
-            className={filter === 'conference' ? 'active' : ''} 
-            onClick={() => setFilter('conference')}
-          >
-            Conferences
-          </button>
-          <button 
-            className={filter === 'booth' ? 'active' : ''} 
-            onClick={() => setFilter('booth')}
-          >
-            Booths
+            <span className="material-symbols-outlined" style={{ color: 'rgba(241, 250, 238, 0.7)', fontSize: '1.25rem' }}>
+              logout
+            </span>
+            {sidebarOpen && (
+              <p style={{
+                color: 'rgba(241, 250, 238, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                lineHeight: 'normal',
+                margin: 0
+              }}>
+                Logout
+              </p>
+            )}
           </button>
         </div>
-      </div>
+      </aside>
 
-      {error && (
-        <div className="error-message">
-          ❌ {error}
-        </div>
-      )}
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
+        {/* Header */}
+        <header style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '1rem 2.5rem',
+          backgroundColor: '#FFFFFF'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#1D3557'
+              }}
+              aria-label="Toggle sidebar"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                menu
+              </span>
+            </button>
+            <h2 style={{
+              color: '#1D3557',
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              lineHeight: '1.25',
+              margin: 0
+            }}>
+              Discover Events
+            </h2>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#1D3557',
+                margin: 0
+              }}>
+                {displayName}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                margin: 0
+              }}>
+                {userRole}
+              </p>
+            </div>
+            {user?.profilePicturePath ? (
+              <img
+                src={`http://localhost:5000${user.profilePicturePath}`}
+                alt="User profile"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                borderRadius: '50%',
+                backgroundColor: '#1D3557',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF',
+                fontWeight: '600'
+              }}>
+                {(user?.firstName?.[0] || user?.name?.[0] || (user?.userType === 'TA' ? 'T' : 'S')).toUpperCase()}
+              </div>
+            )}
+          </div>
+        </header>
 
-      {!loading && events.length > 0 && (
-        <div className="search-results-info">
-          <p>Found {events.length} upcoming event{events.length !== 1 ? 's' : ''} 
-            {searchQuery && ` matching "${searchQuery}"`}
-            {filter !== 'all' && ` in ${filter} category`}
-          </p>
-          {filter !== 'all' && (
-            <p style={{ fontSize: '14px', color: '#6c757d', marginTop: '5px' }}>
-              💡 Tip: You can also type "{filter}" in the search box to filter by event type
-            </p>
+        {/* Content */}
+        <div style={{
+          flex: 1,
+          padding: '2rem',
+          overflowY: 'auto',
+          backgroundColor: '#f8f6f6'
+        }}>
+          {/* Search and Filters */}
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+          }}>
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', alignItems: 'center' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <span className="material-symbols-outlined" style={{
+                  position: 'absolute',
+                  left: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#9ca3af',
+                  fontSize: '1.25rem',
+                  pointerEvents: 'none'
+                }}>
+                  search
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search by event name, professor name, location, or description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e5e7eb',
+                    backgroundColor: '#f9fafb',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1e40af';
+                    e.target.style.backgroundColor = '#ffffff';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.backgroundColor = '#f9fafb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+              <button
+                onClick={handleSearch}
+                style={{
+                  padding: '0.875rem 1.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#1e40af',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#1e3a8a';
+                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#1e40af';
+                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                }}
+              >
+                Search
+              </button>
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    loadEvents();
+                  }}
+                  style={{
+                    padding: '0.875rem 1rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#f3f4f6',
+                    color: '#6b7280',
+                    border: '1px solid #e5e7eb',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#e5e7eb';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setFilter(type)}
+                  style={{
+                    padding: '0.625rem 1.25rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: filter === type ? '#1e40af' : '#f9fafb',
+                    color: filter === type ? '#FFFFFF' : '#6b7280',
+                    border: filter === type ? 'none' : '1px solid #e5e7eb',
+                    cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: filter === type ? '600' : '500',
+                    textTransform: 'capitalize',
+                    transition: 'all 0.2s',
+                    boxShadow: filter === type ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (filter !== type) {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                      e.target.style.borderColor = '#d1d5db';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (filter !== type) {
+                      e.target.style.backgroundColor = '#f9fafb';
+                      e.target.style.borderColor = '#e5e7eb';
+                    }
+                  }}
+                >
+                  {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error && (
+            <div style={{
+              padding: '0.75rem 1rem',
+              marginBottom: '1.5rem',
+              borderRadius: '0.375rem',
+              backgroundColor: '#fee2e2',
+              color: '#991b1b',
+              fontSize: '0.875rem'
+            }}>
+              {error}
+            </div>
+          )}
+
+          {loading ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '4rem 2rem',
+              color: '#6b7280',
+              fontSize: '0.875rem'
+            }}>
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                border: '3px solid #e5e7eb',
+                borderTop: '3px solid #1e40af',
+                borderRadius: '50%',
+                margin: '0 auto 1rem',
+                display: 'inline-block'
+              }} className="spinner"></div>
+              <p style={{ margin: 0, color: '#6b7280' }}>Loading events...</p>
+            </div>
+          ) : events.length === 0 ? (
+            <div style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              padding: '4rem 2rem',
+              textAlign: 'center',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+            }}>
+              <div style={{
+                fontSize: '3rem',
+                marginBottom: '1rem',
+                opacity: 0.5
+              }}>📅</div>
+              <p style={{
+                color: '#374151',
+                fontSize: '1.125rem',
+                fontWeight: '500',
+                marginBottom: '0.5rem',
+                marginTop: 0
+              }}>
+                No upcoming events found
+              </p>
+              <p style={{
+                color: '#6b7280',
+                fontSize: '0.875rem',
+                marginBottom: '1.5rem',
+                marginTop: 0
+              }}>
+                Only events that haven't started yet are shown.
+              </p>
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilter('all');
+                  loadEvents();
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#1e40af',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#1e3a8a';
+                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#1e40af';
+                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                }}
+              >
+                Show All Upcoming Events
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{
+                marginBottom: '1.5rem',
+                color: '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}>
+                Found {events.length} upcoming event{events.length !== 1 ? 's' : ''}
+                {searchQuery && ` matching "${searchQuery}"`}
+                {filter !== 'all' && ` in ${filter} category`}
+              </div>
+              
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                {events.map(event => (
+                  <div
+                    key={event.id}
+                    onClick={() => setSelectedEvent(event)}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '0.75rem',
+                      padding: '1.5rem',
+                      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      border: '1px solid #e5e7eb',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.borderColor = '#1e40af';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div style={{
+                        padding: '0.375rem 0.875rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: getEventTypeColor(event.type),
+                        color: '#FFFFFF',
+                        fontSize: '0.6875rem',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        {event.type}
+                      </div>
+                      {getDaysUntilEvent(event.startDate) && (
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#1e40af',
+                          fontWeight: '600',
+                          backgroundColor: '#eff6ff',
+                          padding: '0.25rem 0.625rem',
+                          borderRadius: '0.375rem'
+                        }}>
+                          {getDaysUntilEvent(event.startDate)}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <h3 style={{
+                      color: '#1D3557',
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      marginBottom: '1rem',
+                      marginTop: 0,
+                      lineHeight: '1.4'
+                    }}>
+                      {event.title}
+                    </h3>
+                    
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.625rem',
+                      marginBottom: '1rem',
+                      flex: 1
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.625rem',
+                        fontSize: '0.8125rem',
+                        color: '#6b7280'
+                      }}>
+                        <span className="material-symbols-outlined" style={{
+                          fontSize: '1.125rem',
+                          color: '#9ca3af'
+                        }}>
+                          calendar_today
+                        </span>
+                        <span>{formatDate(event.startDate)}</span>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.625rem',
+                        fontSize: '0.8125rem',
+                        color: '#6b7280'
+                      }}>
+                        <span className="material-symbols-outlined" style={{
+                          fontSize: '1.125rem',
+                          color: '#9ca3af'
+                        }}>
+                          location_on
+                        </span>
+                        <span>{event.location}</span>
+                      </div>
+                      {event.price && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            attach_money
+                          </span>
+                          <span style={{ fontWeight: '500', color: '#059669' }}>${event.price}</span>
+                        </div>
+                      )}
+                      {event.capacity && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            people
+                          </span>
+                          <span>{event.registeredCount || 0}/{event.capacity} registered</span>
+                        </div>
+                      )}
+                      {(event.type === 'bazaar' || event.type === 'booth') && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            storefront
+                          </span>
+                          <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {event.description && (
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.8125rem',
+                        marginBottom: '1rem',
+                        marginTop: 0,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        lineHeight: '1.5'
+                      }}>
+                        {event.description}
+                      </p>
+                    )}
+
+                    {(event.type === 'workshop' || event.type === 'trip') && (
+                      registeredEventIds.has(String(event.id)) ? (
+                        <button
+                          disabled
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: '#10b981',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            cursor: 'not-allowed',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            marginTop: 'auto',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
+                          Registered
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRegisterClick(event);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: '#1e40af',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            transition: 'all 0.2s',
+                            marginTop: 'auto',
+                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#1e3a8a';
+                            e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = '#1e40af';
+                            e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                          }}
+                        >
+                          Register for {event.type === 'workshop' ? 'Workshop' : 'Trip'}
+                        </button>
+                      )
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
-      )}
+      </main>
 
-      <div className="events-grid">
-        {events.length === 0 ? (
-          <div className="no-events">
-            <p>No upcoming events found matching your criteria.</p>
-            <p style={{ fontSize: '14px', color: '#6c757d', marginTop: '10px' }}>
-              Only events that haven't started yet are shown.
-            </p>
-            <button onClick={() => { setSearchQuery(''); setFilter('all'); setLoading(true); loadEvents(); }}>
-              Show All Upcoming Events
-            </button>
+      {/* Event Modal */}
+      {selectedEvent && (
+        <div
+          onClick={() => setSelectedEvent(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem',
+            backdropFilter: 'blur(4px)'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '600px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                margin: 0
+              }}>
+                {selectedEvent.title}
+              </h2>
+              <button
+                onClick={() => setSelectedEvent(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.25rem',
+                  transition: 'background-color 0.2s',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2rem',
+                  height: '2rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{
+                padding: '0.375rem 0.875rem',
+                borderRadius: '0.5rem',
+                backgroundColor: getEventTypeColor(selectedEvent.type),
+                color: '#FFFFFF',
+                fontSize: '0.6875rem',
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                display: 'inline-block',
+                marginBottom: '1.5rem'
+              }}>
+                {selectedEvent.type}
+              </div>
+              
+              <div style={{
+                display: 'grid',
+                gap: '1rem',
+                marginBottom: '1.5rem',
+                padding: '1rem',
+                backgroundColor: '#f9fafb',
+                borderRadius: '0.5rem'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem'
+                }}>
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.25rem',
+                    color: '#9ca3af'
+                  }}>
+                    calendar_today
+                  </span>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Start Date</div>
+                    <div style={{ color: '#374151', fontWeight: '500' }}>{formatDate(selectedEvent.startDate)}</div>
+                  </div>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem'
+                }}>
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.25rem',
+                    color: '#9ca3af'
+                  }}>
+                    event
+                  </span>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>End Date</div>
+                    <div style={{ color: '#374151', fontWeight: '500' }}>{formatDate(selectedEvent.endDate)}</div>
+                  </div>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem'
+                }}>
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.25rem',
+                    color: '#9ca3af'
+                  }}>
+                    location_on
+                  </span>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Location</div>
+                    <div style={{ color: '#374151', fontWeight: '500' }}>{selectedEvent.location}</div>
+                  </div>
+                </div>
+                {selectedEvent.registrationDeadline && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      schedule
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Registration Deadline</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>{formatDate(selectedEvent.registrationDeadline)}</div>
+                    </div>
+                  </div>
+                )}
+                {selectedEvent.price && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      attach_money
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Price</div>
+                      <div style={{ color: '#059669', fontWeight: '600' }}>${selectedEvent.price}</div>
+                    </div>
+                  </div>
+                )}
+                {selectedEvent.capacity && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      people
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Capacity</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>{selectedEvent.registeredCount || 0}/{selectedEvent.capacity} registered</div>
+                    </div>
+                  </div>
+                )}
+                {(selectedEvent.type === 'bazaar' || selectedEvent.type === 'booth') && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      storefront
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Vendors</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>{(selectedEvent.vendors && selectedEvent.vendors.length) || 0} vendor{((selectedEvent.vendors && selectedEvent.vendors.length) || 0) !== 1 ? 's' : ''} participating</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {((selectedEvent.type === 'bazaar' || selectedEvent.type === 'booth') && selectedEvent.vendors && selectedEvent.vendors.length > 0) ? (
+                <div style={{
+                  marginBottom: '1.5rem',
+                  padding: '1rem',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '0.5rem'
+                }}>
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#9ca3af',
+                    marginBottom: '0.75rem',
+                    fontWeight: '500',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                      storefront
+                    </span>
+                    Participating Vendors ({selectedEvent.vendors.length})
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem'
+                  }}>
+                    {selectedEvent.vendors.map((vendor, idx) => (
+                      <div key={vendor._id || idx} style={{
+                        padding: '0.75rem',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '0.375rem',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <div style={{
+                          fontWeight: '600',
+                          color: '#1D3557',
+                          fontSize: '0.875rem',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {vendor.name || vendor.companyName || 'Vendor'}
+                        </div>
+                        {vendor.contactName && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginBottom: '0.25rem'
+                          }}>
+                            Contact: {vendor.contactName}
+                          </div>
+                        )}
+                        {vendor.email && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginBottom: '0.25rem'
+                          }}>
+                            {vendor.email}
+                          </div>
+                        )}
+                        {selectedEvent.type === 'booth' && vendor.boothSize && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginTop: '0.25rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                              square_foot
+                            </span>
+                            Booth Size: {vendor.boothSize}
+                            {vendor.durationWeeks && ` • Duration: ${vendor.durationWeeks} week${vendor.durationWeeks !== 1 ? 's' : ''}`}
+                            {vendor.boothLocation && ` • Location: ${vendor.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedEvent.description && (
+                <div style={{
+                  marginBottom: '1.5rem',
+                  padding: '1rem',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '0.5rem'
+                }}>
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#9ca3af',
+                    marginBottom: '0.5rem',
+                    fontWeight: '500',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    Description
+                  </div>
+                  <p style={{
+                    color: '#374151',
+                    lineHeight: '1.6',
+                    margin: 0,
+                    fontSize: '0.875rem'
+                  }}>
+                    {selectedEvent.description}
+                  </p>
+                </div>
+              )}
+
+              {(selectedEvent.type === 'workshop' || selectedEvent.type === 'trip') && (
+                registeredEventIds.has(String(selectedEvent.id)) ? (
+                  <button
+                    disabled
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem 1rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#10b981',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      cursor: 'not-allowed',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>check_circle</span>
+                    Registered
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRegisterClick(selectedEvent);
+                      setSelectedEvent(null);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem 1rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#1e40af',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#1e3a8a';
+                      e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#1e40af';
+                      e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                    }}
+                  >
+                    Register for {selectedEvent.type === 'workshop' ? 'Workshop' : 'Trip'}
+                  </button>
+                )
+              )}
+            </div>
           </div>
-        ) : (
-          events.map(event => (
-            <EventCard key={event.id} event={event} />
-          ))
-        )}
-      </div>
-
-      <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+        </div>
+      )}
 
       {/* Registration Form Modal */}
       {showRegistrationForm && registrationEvent && (
-        <div className="modal-overlay" onClick={handleCloseRegistrationForm}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div
+          onClick={handleCloseRegistrationForm}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.5rem',
+              maxWidth: '600px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
             <StudentRegistrationForm
               event={registrationEvent}
               onClose={handleCloseRegistrationForm}
@@ -530,6 +1482,16 @@ const StaffEventsView = () => {
             />
           </div>
         </div>
+      )}
+
+      {/* Workshop Edit Request Modal */}
+      {showWorkshopEditModal && selectedWorkshop && (
+        <WorkshopEditRequestModal
+          open={showWorkshopEditModal}
+          onClose={handleCloseWorkshopEditModal}
+          workshop={selectedWorkshop}
+          onSubmitted={handleCloseWorkshopEditModal}
+        />
       )}
     </div>
   );

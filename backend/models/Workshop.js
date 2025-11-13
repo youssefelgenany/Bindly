@@ -41,7 +41,7 @@ const workshopSchema = new mongoose.Schema({
   },
   facultyResponsible: { 
     type: String, 
-    enum: ['MET', 'IET', 'APT', 'BMT', 'SST', 'Other'], 
+    enum: ['MET', 'IET', 'EMS', 'BI', 'MGT', 'Dentistry', 'AA', 'Pharm', 'Arch'], 
     required: true 
   },
   professorsParticipating: { 
