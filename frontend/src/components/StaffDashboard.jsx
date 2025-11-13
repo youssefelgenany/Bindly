@@ -317,6 +317,47 @@ const StaffDashboard = () => {
                                     My Events
                                 </p>
                             </Link>
+
+                            <Link
+                                to="/gym-schedule"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    padding: '0.5rem 0.75rem',
+                                    borderRadius: '0.5rem',
+                                    backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                                    textDecoration: 'none'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isActiveRoute('/gym-schedule')) {
+                                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isActiveRoute('/gym-schedule')) {
+                                        e.target.style.backgroundColor = 'transparent';
+                                    }
+                                }}
+                            >
+                                <span className="material-symbols-outlined" style={{ 
+                                    color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                                    fontSize: '1.25rem' 
+                                }}>
+                                    calendar_month
+                                </span>
+                                {sidebarOpen && (
+                                    <p style={{
+                                        color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                                        fontSize: '0.875rem',
+                                        fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
+                                        lineHeight: 'normal',
+                                        margin: 0
+                                    }}>
+                                        View Gym Sessions
+                                    </p>
+                                )}
+                            </Link>
                         </nav>
                     )}
                 </div>

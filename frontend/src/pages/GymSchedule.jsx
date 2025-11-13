@@ -13,7 +13,7 @@ const GymSchedule = () => {
   
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
-    : user?.name || 'Events Office';
+    : user?.name || (user?.userType === 'TA' ? 'TA' : user?.userType === 'Staff' ? 'Staff' : 'Events Office');
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth()); // 0-11
@@ -165,7 +165,7 @@ const GymSchedule = () => {
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  Events Office
+                  {user?.userType === 'TA' ? 'TA Events' : user?.userType === 'Staff' ? 'Staff Events' : 'Events Office'}
                 </h1>
                 <p style={{
                   color: 'rgba(241, 250, 238, 0.7)',
@@ -184,24 +184,24 @@ const GymSchedule = () => {
           {sidebarOpen && (
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <Link
-                to="/event-office"
+                to={user?.userType === 'TA' || user?.userType === 'Staff' ? "/dashboard" : "/event-office"}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/event-office') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                  backgroundColor: isActiveRoute(user?.userType === 'TA' || user?.userType === 'Staff' ? '/dashboard' : '/event-office') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
                   textDecoration: 'none',
                   color: '#FFFFFF'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/event-office')) {
+                  if (!isActiveRoute(user?.userType === 'TA' || user?.userType === 'Staff' ? '/dashboard' : '/event-office')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/event-office')) {
+                  if (!isActiveRoute(user?.userType === 'TA' || user?.userType === 'Staff' ? '/dashboard' : '/event-office')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
@@ -221,250 +221,214 @@ const GymSchedule = () => {
               </Link>
 
               <Link
-                to="/event-office/events"
+                to={user?.userType === 'TA' || user?.userType === 'Staff' ? "/staff/events" : "/event-office/events"}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/event-office/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute(user?.userType === 'TA' || user?.userType === 'Staff' ? '/staff/events' : '/event-office/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/event-office/events')) {
+                  if (!isActiveRoute(user?.userType === 'TA' || user?.userType === 'Staff' ? '/staff/events' : '/event-office/events')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/event-office/events')) {
+                  if (!isActiveRoute(user?.userType === 'TA' || user?.userType === 'Staff' ? '/staff/events' : '/event-office/events')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  color: isActiveRoute(user?.userType === 'TA' || user?.userType === 'Staff' ? '/staff/events' : '/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
                   fontSize: '1.25rem' 
                 }}>
                   explore
                 </span>
                 {sidebarOpen && (
                   <p style={{
-                    color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    color: isActiveRoute(user?.userType === 'TA' || user?.userType === 'Staff' ? '/staff/events' : '/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                     fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/event-office/events') ? '700' : '500',
+                    fontWeight: isActiveRoute(user?.userType === 'TA' || user?.userType === 'Staff' ? '/staff/events' : '/event-office/events') ? '700' : '500',
                     lineHeight: 'normal',
                     margin: 0
                   }}>
-                    Discover Events
+                  Discover Events
                   </p>
                 )}
               </Link>
 
-              <Link
-                to="/create-bazaar"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/create-bazaar') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/create-bazaar')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/create-bazaar')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/create-bazaar') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  storefront
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/create-bazaar') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/create-bazaar') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    Bazaars
-                  </p>
-                )}
-              </Link>
+              {/* Only show these for Events Office users */}
+              {(user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office') && (
+                <>
+                  <Link
+                    to="/create-bazaar"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: isActiveRoute('/create-bazaar') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActiveRoute('/create-bazaar')) {
+                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActiveRoute('/create-bazaar')) {
+                        e.target.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ 
+                      color: isActiveRoute('/create-bazaar') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                      fontSize: '1.25rem' 
+                    }}>
+                      storefront
+                    </span>
+                    {sidebarOpen && (
+                      <p style={{
+                        color: isActiveRoute('/create-bazaar') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                        fontSize: '0.875rem',
+                        fontWeight: isActiveRoute('/create-bazaar') ? '700' : '500',
+                        lineHeight: 'normal',
+                        margin: 0
+                      }}>
+                        Bazaars
+                      </p>
+                    )}
+                  </Link>
 
-              <Link
-                to="/create-trip"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/create-trip') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/create-trip')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/create-trip')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/create-trip') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  flight_takeoff
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/create-trip') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/create-trip') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    Trips
-                  </p>
-                )}
-              </Link>
+                  <Link
+                    to="/create-trip"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: isActiveRoute('/create-trip') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActiveRoute('/create-trip')) {
+                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActiveRoute('/create-trip')) {
+                        e.target.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ 
+                      color: isActiveRoute('/create-trip') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                      fontSize: '1.25rem' 
+                    }}>
+                      flight_takeoff
+                    </span>
+                    {sidebarOpen && (
+                      <p style={{
+                        color: isActiveRoute('/create-trip') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                        fontSize: '0.875rem',
+                        fontWeight: isActiveRoute('/create-trip') ? '700' : '500',
+                        lineHeight: 'normal',
+                        margin: 0
+                      }}>
+                        Trips
+                      </p>
+                    )}
+                  </Link>
 
-              <Link
-                to="/create-conference"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/create-conference') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/create-conference')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/create-conference')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/create-conference') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  groups
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/create-conference') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/create-conference') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    Conferences
-                  </p>
-                )}
-              </Link>
+                  <Link
+                    to="/create-conference"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: isActiveRoute('/create-conference') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActiveRoute('/create-conference')) {
+                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActiveRoute('/create-conference')) {
+                        e.target.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ 
+                      color: isActiveRoute('/create-conference') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                      fontSize: '1.25rem' 
+                    }}>
+                      groups
+                    </span>
+                    {sidebarOpen && (
+                      <p style={{
+                        color: isActiveRoute('/create-conference') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                        fontSize: '0.875rem',
+                        fontWeight: isActiveRoute('/create-conference') ? '700' : '500',
+                        lineHeight: 'normal',
+                        margin: 0
+                      }}>
+                        Conferences
+                      </p>
+                    )}
+                  </Link>
 
-              <Link
-                to="/event-office/platform-booth-requests"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/event-office/platform-booth-requests') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/event-office/platform-booth-requests')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/event-office/platform-booth-requests')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  location_on
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/event-office/platform-booth-requests') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    Platform Booths
-                  </p>
-                )}
-              </Link>
-
-              <Link
-                to="/create-gym-session"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/create-gym-session') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/create-gym-session')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/create-gym-session')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  fitness_center
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/create-gym-session') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    Create Gym Session
-                  </p>
-                )}
-              </Link>
+                  <Link
+                    to="/create-gym-session"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: isActiveRoute('/create-gym-session') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActiveRoute('/create-gym-session')) {
+                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActiveRoute('/create-gym-session')) {
+                        e.target.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ 
+                      color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                      fontSize: '1.25rem' 
+                    }}>
+                      fitness_center
+                    </span>
+                    {sidebarOpen && (
+                      <p style={{
+                        color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                        fontSize: '0.875rem',
+                        fontWeight: isActiveRoute('/create-gym-session') ? '700' : '500',
+                        lineHeight: 'normal',
+                        margin: 0
+                      }}>
+                        Create Gym Session
+                      </p>
+                    )}
+                  </Link>
+                </>
+              )}
 
               <Link
                 to="/gym-schedule"
@@ -611,7 +575,7 @@ const GymSchedule = () => {
                 color: '#6b7280',
                 margin: 0
               }}>
-                Events Office
+                {user?.userType === 'TA' ? 'Teaching Assistant' : user?.userType === 'Staff' ? 'Staff' : 'Events Office'}
               </p>
             </div>
             {user?.profilePicturePath ? (
@@ -648,31 +612,31 @@ const GymSchedule = () => {
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '2rem',
+          padding: '1rem',
           backgroundColor: '#f8f6f6'
         }}>
           {/* Page Title Box */}
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '0.75rem',
-            padding: '1.5rem',
-            marginBottom: '1.5rem',
+            padding: '0.75rem 1rem',
+            marginBottom: '1rem',
             boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
             borderLeft: '4px solid #1D3557'
           }}>
             <h3 style={{
               color: '#1D3557',
-              fontSize: '1.25rem',
+              fontSize: '1rem',
               fontWeight: '700',
-              margin: '0 0 0.25rem 0'
+              margin: '0 0 0.125rem 0'
             }}>
               Gym Schedule
             </h3>
             <p style={{
               color: '#6b7280',
-              fontSize: '1rem',
+              fontSize: '0.875rem',
               fontWeight: '400',
-              margin: '0.25rem 0 0 0'
+              margin: '0.125rem 0 0 0'
             }}>
               View sessions for the selected month
             </p>
@@ -682,12 +646,12 @@ const GymSchedule = () => {
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '0.75rem',
-            padding: '1.5rem',
-            marginBottom: '1.5rem',
+            padding: '1rem',
+            marginBottom: '1rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '1.5rem',
+            gap: '1rem',
             flexWrap: 'wrap'
           }}>
             {/* Month Navigation */}
@@ -897,15 +861,15 @@ const GymSchedule = () => {
             <div style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '0.75rem',
-              padding: '1.5rem'
+              padding: '1rem'
             }}>
               {/* Calendar Grid */}
               {/* Day Headers */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(7, 1fr)',
-                gap: '0.5rem',
-                marginBottom: '0.5rem'
+                gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+                gap: '0.5rem 0.375rem',
+                marginBottom: '0.375rem'
               }}>
                 {daysOfWeek.map(day => (
                   <div
@@ -914,8 +878,8 @@ const GymSchedule = () => {
                       textAlign: 'center',
                       fontWeight: '600',
                       color: '#1D3557',
-                      fontSize: '0.875rem',
-                      padding: '0.5rem'
+                      fontSize: '0.75rem',
+                      padding: '0.375rem'
                     }}
                   >
                     {day}
@@ -926,19 +890,19 @@ const GymSchedule = () => {
               {/* Calendar Days */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(7, 1fr)',
-                gap: '0.5rem'
+                gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+                gap: '0.5rem 0.375rem'
               }}>
                 {/* Empty cells for days before month starts */}
                 {Array.from({ length: startDay }).map((_, i) => (
                   <div
                     key={`empty-${i}`}
                     style={{
-                      minHeight: '8rem',
+                      minHeight: '6.5rem',
                       backgroundColor: '#f8f6f6',
                       border: '1px solid #e5e7eb',
-                      borderRadius: '0.5rem',
-                      padding: '0.5rem'
+                      borderRadius: '0.375rem',
+                      padding: '0.375rem'
                     }}
                   />
                 ))}
@@ -954,23 +918,23 @@ const GymSchedule = () => {
                     <div
                       key={key}
                       style={{
-                        minHeight: '8rem',
+                        minHeight: '6.5rem',
                         backgroundColor: isToday ? '#e0e7ff' : '#FFFFFF',
                         border: isToday ? '2px solid #1e40af' : '1px solid #e5e7eb',
-                        borderRadius: '0.5rem',
-                        padding: '0.5rem',
+                        borderRadius: '0.375rem',
+                        padding: '0.375rem',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '0.25rem',
+                        gap: '0.125rem',
                         position: 'relative'
                       }}
                     >
                       {/* Day Number */}
                       <div style={{
-                        fontSize: '0.875rem',
+                        fontSize: '0.75rem',
                         fontWeight: isToday ? '600' : '500',
                         color: isToday ? '#1e40af' : '#1D3557',
-                        marginBottom: '0.25rem'
+                        marginBottom: '0.125rem'
                       }}>
                         {day}
                       </div>
@@ -979,16 +943,16 @@ const GymSchedule = () => {
                       <div style={{
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '0.25rem',
+                        gap: '0.125rem',
                         flex: 1,
                         overflowY: 'auto'
                       }}>
                         {daySessions.length === 0 ? (
                           <div style={{
-                            fontSize: '0.75rem',
+                            fontSize: '0.625rem',
                             color: '#9ca3af',
                             textAlign: 'center',
-                            marginTop: '0.25rem'
+                            marginTop: '0.125rem'
                           }}>
                             No sessions
                           </div>
@@ -1020,9 +984,9 @@ const GymSchedule = () => {
                                   style={{
                                     backgroundColor: sessionColor,
                                     color: '#1D3557',
-                                    borderRadius: '0.375rem',
-                                    padding: '0.375rem 0.5rem',
-                                    fontSize: '0.75rem',
+                                    borderRadius: '0.25rem',
+                                    padding: '0.25rem 0.375rem',
+                                    fontSize: '0.625rem',
                                     cursor: 'pointer',
                                     transition: 'opacity 0.2s, transform 0.2s',
                                     boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
@@ -1042,12 +1006,12 @@ const GymSchedule = () => {
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
                                     whiteSpace: 'nowrap',
-                                    marginBottom: '0.125rem'
+                                    marginBottom: '0.0625rem'
                                   }}>
                                     {typeLabel}
                                   </div>
                                   <div style={{
-                                    fontSize: '0.6875rem',
+                                    fontSize: '0.5625rem',
                                     opacity: 0.8,
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
