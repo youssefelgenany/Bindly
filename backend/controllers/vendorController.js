@@ -5,6 +5,41 @@ const VendorRequest = require('../models/vendorRequest.js');
 const Event = require('../models/eventModel.js');
 const { sampleVendors } = require('../scripts/test-vendor-loyalty-program.js');
 
+// Get all vendors (for admin/events office to get vendor IDs)
+module.exports.getAllVendors = async (req, res) => {
+  try {
+    const vendors = await User.find({ userType: 'Vendor' })
+      .select('_id companyName email firstName lastName vendorLogoPath vendorTaxCardPath isVerified status createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const vendorList = vendors.map((vendor) => ({
+      id: vendor._id,
+      companyName: vendor.companyName || null,
+      email: vendor.email,
+      firstName: vendor.firstName || null,
+      lastName: vendor.lastName || null,
+      isVerified: vendor.isVerified || false,
+      status: vendor.status || 'blocked',
+      hasLogo: !!vendor.vendorLogoPath,
+      hasTaxCard: !!vendor.vendorTaxCardPath,
+      createdAt: vendor.createdAt
+    }));
+
+    return res.status(200).json({
+      success: true,
+      count: vendorList.length,
+      vendors: vendorList
+    });
+  } catch (error) {
+    console.error('Server error in getAllVendors:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to fetch vendors'
+    });
+  }
+};
+
 module.exports.getLoyaltyProgramVendors = async (req, res) => {
   try {
     const vendors = (sampleVendors || []).map((vendor) => ({
