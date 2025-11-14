@@ -48,6 +48,14 @@ const eventSchema = new mongoose.Schema({
     enum: ['pending', 'approved', 'rejected', 'cancelled'],
     default: 'approved',
   },
+  isRestricted: {
+    type: Boolean,
+    default: false,
+  },
+  allowedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
