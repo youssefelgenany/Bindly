@@ -999,27 +999,47 @@ exports.registerForEvent = async (req, res) => {
 
         console.log(`🔍 Found ${allRegistrations.length} registration(s) with QR codes for this event`);
 
-        // Send QR codes to each vendor (don't wait for completion)
-        for (const vendorRequest of vendorRequests) {
-          if (vendorRequest.vendor && vendorRequest.vendor.email) {
-            console.log(`📧 Sending QR codes email to vendor: ${vendorRequest.vendor.email}`);
-            sendQRCodesToVendor(vendorRequest.vendor, holder, allRegistrations)
+        // Send QR codes to each unique vendor (don't wait for completion)
+        // Some vendors may have multiple accepted vendor requests for the same event
+        // (e.g., booth + standaloneBooth). Deduplicate by vendor _id so we send
+        // only one email per vendor address.
+        const seenVendorKeys = new Set();
+        const uniqueVendors = [];
+        for (const vr of vendorRequests) {
+          const v = vr.vendor;
+          if (!v) continue;
+          // Prefer deduplication by email (lowercased) when available,
+          // otherwise fall back to vendor id.
+          const emailKey = v.email ? String(v.email).toLowerCase().trim() : null;
+          const idKey = v._id ? String(v._id) : (v.id ? String(v.id) : null);
+          const vid = emailKey || idKey;
+          if (!vid) continue;
+          if (!seenVendorKeys.has(vid)) {
+            seenVendorKeys.add(vid);
+            uniqueVendors.push(v);
+          }
+        }
+
+        for (const vendor of uniqueVendors) {
+          if (vendor && vendor.email) {
+            console.log(`📧 Sending QR codes email to vendor: ${vendor.email}`);
+            sendQRCodesToVendor(vendor, holder, allRegistrations)
               .then(result => {
                 if (result.sent) {
-                  console.log(`✅ QR codes email sent to vendor: ${vendorRequest.vendor.email}`);
+                  console.log(`✅ QR codes email sent to vendor: ${vendor.email}`);
                 } else if (result.stored) {
-                  console.log(`✅ QR codes email stored in database for vendor: ${vendorRequest.vendor.email}`);
+                  console.log(`✅ QR codes email stored in database for vendor: ${vendor.email}`);
                   console.log('📧 View emails at: http://localhost:5000/api/dev/emails');
                 } else {
-                  console.log(`⚠️ QR codes email could not be sent/stored for vendor: ${vendorRequest.vendor.email}`);
+                  console.log(`⚠️ QR codes email could not be sent/stored for vendor: ${vendor.email}`);
                   console.log(`   Reason: ${result.reason || result.error || 'Unknown'}`);
                 }
               })
               .catch(error => {
-                console.error(`❌ Error sending QR codes email to vendor ${vendorRequest.vendor.email}:`, error);
+                console.error(`❌ Error sending QR codes email to vendor ${vendor.email}:`, error);
               });
           } else {
-            console.warn('⚠️ Vendor request found but vendor email is missing:', vendorRequest._id);
+            console.warn('⚠️ Vendor found but vendor email is missing or invalid:', vendor);
           }
         }
       } catch (error) {
@@ -1341,7 +1361,225 @@ exports.registerForEvent = async (req, res) => {
 
     res.json({ msg: 'Successfully registered for event' });
   } catch (err) {
-    console.error('Registration error:', err);
-    res.status(500).json({ msg: 'Server error' });
+    console.error("❌ Error cancelling registration:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
+// 💰 Get wallet transactions for the logged-in user
+exports.getWalletTransactions = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const user = await User.findById(userId).select('walletBalance walletTransactions');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        msg: "User not found"
+      });
+    }
+
+    // Sort transactions by date (newest first)
+    const transactions = (user.walletTransactions || []).sort((a, b) => {
+      const dateA = a.createdAt || new Date(0);
+      const dateB = b.createdAt || new Date(0);
+      return dateB - dateA;
+    });
+
+    return res.status(200).json({
+      success: true,
+      walletBalance: user.walletBalance || 0,
+      transactions: transactions.map(tx => ({
+        id: tx._id,
+        amount: tx.amount,
+        type: tx.type,
+        description: tx.description,
+        balanceAfter: tx.balanceAfter,
+        reference: tx.reference,
+        createdAt: tx.createdAt
+      })),
+      count: transactions.length
+    });
+
+  } catch (err) {
+    console.error("❌ Error fetching wallet transactions:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
+// 📊 Get ratings and comments for an event (placeholder until schema is created)
+// 💬 Submit a comment on an event
+exports.submitComment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comment, rating } = req.body;
+    const userId = req.user._id;
+
+    if (!comment || !comment.trim()) {
+      return res.status(400).json({
+        success: false,
+        msg: "Comment cannot be empty"
+      });
+    }
+
+    // Verify event exists
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        msg: "Event not found"
+      });
+    }
+
+    // Placeholder response - will be replaced when comment schema is created
+    res.status(201).json({
+      success: true,
+      message: "Comment submitted successfully",
+      comment: {
+        _id: new require('mongoose').Types.ObjectId(),
+        eventId: id,
+        userId,
+        text: comment,
+        rating: rating || null,
+        createdAt: new Date()
+      }
+    });
+  } catch (err) {
+    console.error("❌ Error submitting comment:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
+// 🗑️ Delete a comment from an event
+exports.deleteComment = async (req, res) => {
+  try {
+    const { id, commentId } = req.params;
+    const userId = req.user._id;
+
+    // Verify event exists
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        msg: "Event not found"
+      });
+    }
+
+    // Placeholder response - will be replaced when comment schema is created
+    res.status(200).json({
+      success: true,
+      message: "Comment deleted successfully",
+      commentId
+    });
+  } catch (err) {
+    console.error("❌ Error deleting comment:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
+exports.getEventRatingsAndComments = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify event exists
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        msg: "Event not found"
+      });
+    }
+
+    // Placeholder response - will be replaced when rating/comment schema is created
+    res.status(200).json({
+      success: true,
+      message: "Ratings and comments retrieved successfully",
+      eventId: id,
+      ratings: {
+        average: null,
+        count: 0,
+        distribution: {
+          5: 0,
+          4: 0,
+          3: 0,
+          2: 0,
+          1: 0
+        }
+      },
+      comments: []
+    });
+  } catch (err) {
+    console.error("❌ Error fetching ratings and comments:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
+// 🗑️ Cleanup endpoint to delete invalid/empty events
+exports.cleanupInvalidEvents = async (req, res) => {
+  try {
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+
+    // Find events that should be deleted:
+    // 1. Events with invalid types
+    // 2. Events with empty/null title
+    // 3. Events with empty/null location
+    const invalidEvents = await Event.find({
+      $or: [
+        { type: { $nin: validTypes } },
+        { title: { $in: [null, ''] } },
+        { location: { $in: [null, ''] } },
+        {
+          $or: [
+            { title: { $exists: false } },
+            { location: { $exists: false } }
+          ]
+        }
+      ]
+    });
+
+    const deletedCount = invalidEvents.length;
+
+    // Delete invalid events
+    if (invalidEvents.length > 0) {
+      const eventIds = invalidEvents.map(e => e._id);
+      await Event.deleteMany({ _id: { $in: eventIds } });
+
+      // Also clean up related registrations
+      await StudentRegistration.deleteMany({ event: { $in: eventIds } });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Cleanup completed. Deleted ${deletedCount} invalid events.`,
+      deletedCount
+    });
+  } catch (err) {
+    console.error("❌ Error cleaning up invalid events:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error during cleanup",
+      error: err.message
+    });
   }
 };

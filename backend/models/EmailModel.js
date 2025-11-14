@@ -15,11 +15,11 @@ const emailSchema = new mongoose.Schema({
   },
   verificationToken: {
     type: String,
-    required: true
+    required: false
   },
   verificationUrl: {
     type: String,
-    required: true
+    required: false
   },
   sentAt: {
     type: Date,
