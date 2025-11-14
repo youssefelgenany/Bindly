@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const Email = require('../models/EmailModel');
 
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -23,36 +24,31 @@ async function sendVendorRequestStatusEmail(vendor, request, status) {
             return { sent: false, stored: false, error: 'Vendor email not found' };
         }
 
-        // Determine message based on status
-        let statusMessage = '';
+        // Determine status color based on status
         let statusColor = '#666';
-        let actionText = '';
-
         switch (status.toLowerCase()) {
             case 'accepted':
-                statusMessage = 'Your vendor participation request has been ACCEPTED!';
                 statusColor = '#27ae60';
-                actionText = request.paymentDeadline
-                    ? `Please note: A participation fee of ${request.participationFee || 'TBD'} EGP is due by ${new Date(request.paymentDeadline).toLocaleDateString()}.`
-                    : 'Please await further instructions regarding the participation fee.';
                 break;
             case 'rejected':
-                statusMessage = 'Your vendor participation request has been REJECTED.';
                 statusColor = '#d32f2f';
-                actionText = 'If you have any questions, please contact the Events Office.';
                 break;
             case 'cancelled':
-                statusMessage = 'Your vendor participation request has been CANCELLED.';
                 statusColor = '#f57c00';
-                actionText = 'If you have any questions, please contact the Events Office.';
                 break;
             case 'pending':
-                statusMessage = 'Your vendor participation request is under review.';
                 statusColor = '#1976d2';
-                actionText = 'We will notify you once a decision has been made.';
                 break;
-            default:
-                statusMessage = `Your vendor participation request status: ${status}`;
+        }
+
+        // Get event name based on event type
+        let eventName = 'Event';
+        if (request.bazaar) {
+            eventName = request.bazaar.title || request.bazaar.name || 'Bazaar';
+        } else if (request.booth) {
+            eventName = request.booth.title || request.booth.name || 'Booth';
+        } else if (request.standaloneBooth) {
+            eventName = request.standaloneBooth.title || request.standaloneBooth.name || 'Standalone Booth';
         }
 
         const html = `
@@ -62,37 +58,70 @@ async function sendVendorRequestStatusEmail(vendor, request, status) {
           <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
         </div>
         
-        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-          <h2 style="color: ${statusColor}; margin-top: 0;">${statusMessage}</h2>
-          <p>Hi ${vendor.name || 'there'},</p>
-          <p>${actionText}</p>
+        <div style="background: #2a2a2a; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+          <h2 style="color: white; margin-top: 0; margin-bottom: 10px;">
+            ${status.toLowerCase() === 'accepted' ? '✅' : status.toLowerCase() === 'rejected' ? '❌' : '⏳'} Vendor Request ${status.charAt(0).toUpperCase() + status.slice(1)}
+          </h2>
+          <p style="color: #ccc; margin: 0;">Hi ${vendor.firstName || vendor.companyName || vendor.name || 'there'},</p>
+          <p style="color: #ccc; margin: 10px 0;">
+            Your request to participate in the <strong>${eventName}</strong> has been <span style="color: ${statusColor}; font-weight: bold;">${status.toLowerCase()}</span>.
+          </p>
         </div>
 
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background: white; border: 1px solid #e9ecef;">
-          <tr>
-            <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Event</td>
-            <td style="padding: 12px; border: 1px solid #e9ecef;">${request.event?.title || request.eventId || 'N/A'}</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Status</td>
-            <td style="padding: 12px; border: 1px solid #e9ecef; color: ${statusColor}; font-weight: bold;">${status.charAt(0).toUpperCase() + status.slice(1)}</td>
-          </tr>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+          <h3 style="color: #333; margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #e9ecef; padding-bottom: 10px;">Request Details</h3>
+          
+          <div style="margin-bottom: 12px;">
+            <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Event Type:</span>
+            <span style="color: #666;">${request.eventType === 'bazaar' ? 'Bazaar' : request.eventType === 'booth' ? 'Booth' : request.eventType === 'standaloneBooth' ? 'Standalone Booth' : 'Platform Booth'}</span>
+          </div>
+          
+          <div style="margin-bottom: 12px;">
+            <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Event Name:</span>
+            <span style="color: #666;">${eventName}</span>
+          </div>
+          
+          ${request.boothSize ? `
+          <div style="margin-bottom: 12px;">
+            <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Booth Size:</span>
+            <span style="color: #666;">${request.boothSize}</span>
+          </div>
+          ` : ''}
+          
+          <div style="margin-bottom: 12px;">
+            <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Status:</span>
+            <span style="color: ${statusColor}; font-weight: bold;">${status.charAt(0).toUpperCase() + status.slice(1)}</span>
+          </div>
+
           ${request.participationFee ? `
-          <tr>
-            <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Participation Fee</td>
-            <td style="padding: 12px; border: 1px solid #e9ecef;">${request.participationFee} EGP</td>
-          </tr>
+          <div style="margin-bottom: 12px;">
+            <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Participation Fee:</span>
+            <span style="color: #666;">${request.participationFee} EGP</span>
+          </div>
           ` : ''}
+
           ${request.paymentDeadline ? `
-          <tr>
-            <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Payment Deadline</td>
-            <td style="padding: 12px; border: 1px solid #e9ecef;">${new Date(request.paymentDeadline).toLocaleDateString()}</td>
-          </tr>
+          <div style="margin-bottom: 0;">
+            <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Payment Deadline:</span>
+            <span style="color: #666;">${new Date(request.paymentDeadline).toLocaleDateString()}</span>
+          </div>
           ` : ''}
-        </table>
+        </div>
+
+        ${status.toLowerCase() === 'accepted' ? `
+        <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #27ae60;">
+          <p style="margin: 0; color: #2e7d32; font-weight: bold;">🎉 Congratulations!</p>
+          <p style="margin: 8px 0 0 0; color: #558b2f;">Your participation has been approved. Please complete the payment to confirm your participation.</p>
+        </div>
+        ` : status.toLowerCase() === 'rejected' ? `
+        <div style="background: #ffebee; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #d32f2f;">
+          <p style="margin: 0; color: #c62828; font-weight: bold;">Request Status</p>
+          <p style="margin: 8px 0 0 0; color: #d32f2f;">Unfortunately, your request was not approved at this time. If you have questions, please contact the Events Office.</p>
+        </div>
+        ` : ''}
 
         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-          <p style="margin: 0; color: #666; font-size: 14px;">If you have any questions, please contact the Events Office at events@guc.edu.eg</p>
+          <p style="margin: 0; color: #666; font-size: 14px;">If you have any questions, please contact the Events Office at <strong>events@guc.edu.eg</strong></p>
         </div>
 
         <div style="text-align: center; color: #999; font-size: 12px;">
@@ -102,9 +131,9 @@ async function sendVendorRequestStatusEmail(vendor, request, status) {
     `;
 
         const mailOptions = {
-            from: process.env.SMTP_USER,
+            from: `Bindly <${process.env.SMTP_USER}>`,
             to: vendor.email,
-            subject: `Vendor Request Update: ${statusMessage.split('!')[0]}`,
+            subject: `Your ${eventName} Request Has Been ${status.charAt(0).toUpperCase() + status.slice(1)} - Event`,
             html
         };
 
@@ -113,15 +142,74 @@ async function sendVendorRequestStatusEmail(vendor, request, status) {
             try {
                 const info = await transporter.sendMail(mailOptions);
                 console.log(`✅ Email sent successfully to ${vendor.email}:`, info.messageId);
-                return { sent: true, stored: false };
+
+                // Store copy in dev DB
+                try {
+                    const emailDoc = new Email({
+                        userInfo: {
+                            name: vendor.firstName || vendor.companyName || vendor.name || 'Unknown',
+                            userType: 'Vendor',
+                            email: vendor.email
+                        },
+                        to: vendor.email,
+                        subject: mailOptions.subject,
+                        html,
+                        sentAt: new Date()
+                    });
+                    await emailDoc.save();
+                    console.log(`✅ Stored sent email in dev DB: ${emailDoc._id}`);
+                } catch (dbError) {
+                    console.warn(`⚠️ Could not store email in dev DB:`, dbError.message);
+                }
+
+                return { sent: true, stored: true, messageId: info.messageId };
             } catch (emailError) {
                 console.warn(`⚠️ Could not send email to ${vendor.email}:`, emailError.message);
-                // Email failed, but don't throw - the status update succeeded
-                return { sent: false, stored: false, emailError: emailError.message };
+
+                // Store in DB as fallback
+                try {
+                    const emailDoc = new Email({
+                        userInfo: {
+                            name: vendor.firstName || vendor.companyName || vendor.name || 'Unknown',
+                            userType: 'Vendor',
+                            email: vendor.email
+                        },
+                        to: vendor.email,
+                        subject: mailOptions.subject,
+                        html,
+                        sentAt: new Date()
+                    });
+                    await emailDoc.save();
+                    console.log(`✅ Stored unsent email in dev DB (fallback): ${emailDoc._id}`);
+                    return { sent: false, stored: true, emailError: emailError.message };
+                } catch (dbError) {
+                    console.error(`❌ Could not store email in dev DB:`, dbError.message);
+                    return { sent: false, stored: false, emailError: emailError.message, dbError: dbError.message };
+                }
             }
         } else {
             console.log('⚠️ Email service not configured (SMTP not set up)');
-            return { sent: false, stored: false };
+
+            // Store in DB
+            try {
+                const emailDoc = new Email({
+                    userInfo: {
+                        name: vendor.firstName || vendor.companyName || vendor.name || 'Unknown',
+                        userType: 'Vendor',
+                        email: vendor.email
+                    },
+                    to: vendor.email,
+                    subject: mailOptions.subject,
+                    html,
+                    sentAt: new Date()
+                });
+                await emailDoc.save();
+                console.log(`✅ Stored email in dev DB (SMTP not configured): ${emailDoc._id}`);
+                return { sent: false, stored: true };
+            } catch (dbError) {
+                console.error(`❌ Could not store email in dev DB:`, dbError.message);
+                return { sent: false, stored: false, dbError: dbError.message };
+            }
         }
     } catch (error) {
         console.error('❌ Error in sendVendorRequestStatusEmail:', error);

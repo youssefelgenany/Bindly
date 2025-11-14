@@ -2,13 +2,13 @@ const nodemailer = require('nodemailer');
 const Email = require('../models/EmailModel');
 
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-    },
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT || 587),
+  secure: process.env.SMTP_SECURE === "true",
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
 });
 
 /**
@@ -19,38 +19,38 @@ const transporter = nodemailer.createTransport({
  * @returns {Promise<Object>} Result object
  */
 async function sendQRCodesToVendor(vendor, event, registrations = []) {
-    try {
-        if (!vendor || !vendor.email) {
-            return {
-                sent: false,
-                stored: false,
-                error: 'Vendor email not found'
-            };
-        }
+  try {
+    if (!vendor || !vendor.email) {
+      return {
+        sent: false,
+        stored: false,
+        error: 'Vendor email not found'
+      };
+    }
 
-        if (!registrations || registrations.length === 0) {
-            return {
-                sent: false,
-                stored: false,
-                error: 'No registrations with QR codes found'
-            };
-        }
+    if (!registrations || registrations.length === 0) {
+      return {
+        sent: false,
+        stored: false,
+        error: 'No registrations with QR codes found'
+      };
+    }
 
-        // Filter registrations with QR codes
-        const registrationsWithQR = registrations.filter(reg => reg.qrCode);
+    // Filter registrations with QR codes
+    const registrationsWithQR = registrations.filter(reg => reg.qrCode);
 
-        if (registrationsWithQR.length === 0) {
-            return {
-                sent: false,
-                stored: false,
-                error: 'No registrations have QR codes generated'
-            };
-        }
+    if (registrationsWithQR.length === 0) {
+      return {
+        sent: false,
+        stored: false,
+        error: 'No registrations have QR codes generated'
+      };
+    }
 
-        // Create HTML table with QR codes
-        const qrCodesHTML = registrationsWithQR.map((registration, index) => {
-            const user = registration.user || {};
-            return `
+    // Create HTML table with QR codes
+    const qrCodesHTML = registrationsWithQR.map((registration, index) => {
+      const user = registration.user || {};
+      return `
         <tr style="border-bottom: 1px solid #ddd;">
           <td style="padding: 12px; text-align: center;">${index + 1}</td>
           <td style="padding: 12px;">${user.firstName || 'N/A'} ${user.lastName || ''}</td>
@@ -60,13 +60,13 @@ async function sendQRCodesToVendor(vendor, event, registrations = []) {
           </td>
         </tr>
       `;
-        }).join('');
+    }).join('');
 
-        const vendorName = vendor.companyName || `${vendor.firstName} ${vendor.lastName}`;
-        const eventName = event.name || event.title || 'Event';
-        const eventDate = event.startDate ? new Date(event.startDate).toLocaleDateString() : 'TBD';
+    const vendorName = vendor.companyName || `${vendor.firstName} ${vendor.lastName}`;
+    const eventName = event.name || event.title || 'Event';
+    const eventDate = event.startDate ? new Date(event.startDate).toLocaleDateString() : 'TBD';
 
-        const html = `
+    const html = `
       <div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px;">
         <div style="text-align: center; margin-bottom: 30px;">
           <h1 style="color: #d32f2f; margin: 0;">Bindly</h1>
@@ -127,102 +127,106 @@ async function sendQRCodesToVendor(vendor, event, registrations = []) {
       </div>
     `;
 
-        const mailOptions = {
-            from: process.env.SMTP_USER,
-            to: vendor.email,
-            subject: `Visitor QR Codes - ${eventName}`,
-            html
-        };
+    const defaultFrom = process.env.SMTP_FROM && process.env.SMTP_FROM.trim()
+      ? process.env.SMTP_FROM.trim()
+      : (process.env.SMTP_USER ? `Bindly <${process.env.SMTP_USER}>` : 'Bindly <no-reply@bindly.com>');
 
-        // Try to send email
-        if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-            try {
-                const info = await transporter.sendMail(mailOptions);
-                console.log(`✅ QR codes email sent to vendor ${vendor.email}:`, info.messageId);
-                // Store a copy in dev email DB for visibility even when SMTP is configured
-                try {
-                    const saved = await Email.create({
-                        to: vendor.email,
-                        subject: mailOptions.subject,
-                        html: mailOptions.html,
-                        verificationToken: '',
-                        verificationUrl: '',
-                        sentAt: new Date(),
-                        isRead: false,
-                        userInfo: {
-                            name: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim(),
-                            userType: 'Vendor',
-                            email: vendor.email
-                        }
-                    });
-                    console.log('✅ Stored sent email in dev DB:', saved._id);
-                } catch (storeErr) {
-                    console.error('❌ Failed to store sent email in dev DB:', storeErr.message);
-                }
-                return {
-                    sent: true,
-                    stored: true,
-                    messageId: info.messageId
-                };
-            } catch (emailError) {
-                console.warn(`⚠️ Could not send email to vendor ${vendor.email}:`, emailError.message);
-                // Try to store the email in dev DB as a fallback
-                try {
-                    const saved = await Email.create({
-                        to: vendor.email,
-                        subject: mailOptions.subject,
-                        html: mailOptions.html,
-                        verificationToken: '',
-                        verificationUrl: '',
-                        sentAt: new Date(),
-                        isRead: false,
-                        userInfo: {
-                            name: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim(),
-                            userType: 'Vendor',
-                            email: vendor.email
-                        }
-                    });
-                    console.log('✅ Email stored in dev DB as fallback:', saved._id);
-                    return { sent: false, stored: true, id: saved._id };
-                } catch (storeErr) {
-                    console.error('❌ Failed to store fallback email:', storeErr.message);
-                    return { sent: false, stored: false, reason: emailError.message };
-                }
+    const mailOptions = {
+      from: defaultFrom,
+      to: vendor.email,
+      subject: `Visitor QR Codes - ${eventName}`,
+      html
+    };
+
+    // Try to send email
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`✅ QR codes email sent to vendor ${vendor.email}:`, info.messageId);
+        // Store a copy in dev email DB for visibility even when SMTP is configured
+        try {
+          const saved = await Email.create({
+            to: vendor.email,
+            subject: mailOptions.subject,
+            html: mailOptions.html,
+            verificationToken: '',
+            verificationUrl: '',
+            sentAt: new Date(),
+            isRead: false,
+            userInfo: {
+              name: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim(),
+              userType: 'Vendor',
+              email: vendor.email
             }
-        } else {
-            console.log('⚠️ Email service not configured (SMTP not set up) - storing email to dev DB');
-            try {
-                const saved = await Email.create({
-                    to: vendor.email,
-                    subject: mailOptions.subject,
-                    html: mailOptions.html,
-                    verificationToken: '',
-                    verificationUrl: '',
-                    sentAt: new Date(),
-                    isRead: false,
-                    userInfo: {
-                        name: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim(),
-                        userType: 'Vendor',
-                        email: vendor.email
-                    }
-                });
-                console.log('✅ QR codes email stored in dev DB for vendor:', vendor.email);
-                return { sent: false, stored: true, id: saved._id };
-            } catch (storeErr) {
-                console.error('❌ Failed to store email in dev DB:', storeErr.message);
-                return { sent: false, stored: false, reason: storeErr.message };
-            }
+          });
+          console.log('✅ Stored sent email in dev DB:', saved._id);
+        } catch (storeErr) {
+          console.error('❌ Failed to store sent email in dev DB:', storeErr.message);
         }
-    } catch (error) {
-        console.error('❌ Error in sendQRCodesToVendor:', error);
         return {
-            sent: false,
-            stored: false,
-            error: error.message
+          sent: true,
+          stored: true,
+          messageId: info.messageId
         };
+      } catch (emailError) {
+        console.warn(`⚠️ Could not send email to vendor ${vendor.email}:`, emailError.message);
+        // Try to store the email in dev DB as a fallback
+        try {
+          const saved = await Email.create({
+            to: vendor.email,
+            subject: mailOptions.subject,
+            html: mailOptions.html,
+            verificationToken: '',
+            verificationUrl: '',
+            sentAt: new Date(),
+            isRead: false,
+            userInfo: {
+              name: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim(),
+              userType: 'Vendor',
+              email: vendor.email
+            }
+          });
+          console.log('✅ Email stored in dev DB as fallback:', saved._id);
+          return { sent: false, stored: true, id: saved._id };
+        } catch (storeErr) {
+          console.error('❌ Failed to store fallback email:', storeErr.message);
+          return { sent: false, stored: false, reason: emailError.message };
+        }
+      }
+    } else {
+      console.log('⚠️ Email service not configured (SMTP not set up) - storing email to dev DB');
+      try {
+        const saved = await Email.create({
+          to: vendor.email,
+          subject: mailOptions.subject,
+          html: mailOptions.html,
+          verificationToken: '',
+          verificationUrl: '',
+          sentAt: new Date(),
+          isRead: false,
+          userInfo: {
+            name: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim(),
+            userType: 'Vendor',
+            email: vendor.email
+          }
+        });
+        console.log('✅ QR codes email stored in dev DB for vendor:', vendor.email);
+        return { sent: false, stored: true, id: saved._id };
+      } catch (storeErr) {
+        console.error('❌ Failed to store email in dev DB:', storeErr.message);
+        return { sent: false, stored: false, reason: storeErr.message };
+      }
     }
+  } catch (error) {
+    console.error('❌ Error in sendQRCodesToVendor:', error);
+    return {
+      sent: false,
+      stored: false,
+      error: error.message
+    };
+  }
 }
 
 module.exports = {
-    sendQRCodesToVendor
+  sendQRCodesToVendor
 };

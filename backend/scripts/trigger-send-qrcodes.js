@@ -36,9 +36,28 @@ const EVENT_ID = '6917419e2796a76f458dc70b'; // Test Bazaar for QR Codes
 
         console.log('Found registrations:', registrations.length);
 
+        // Deduplicate vendors by email (lowercased) or id to avoid sending
+        // multiple emails to the same vendor address when there are
+        // multiple accepted vendor requests.
+        const seen = new Set();
+        const uniqueVendors = [];
         for (const vr of vendorRequests) {
-            console.log('Sending/storing email for vendor:', vr.vendor?.email);
-            const result = await sendQRCodesToVendor(vr.vendor, event, registrations);
+            const v = vr.vendor;
+            if (!v) continue;
+            const emailKey = v.email ? String(v.email).toLowerCase().trim() : null;
+            const idKey = v._id ? String(v._id) : (v.id ? String(v.id) : null);
+            const key = emailKey || idKey;
+            if (!key) continue;
+            if (!seen.has(key)) {
+                seen.add(key);
+                uniqueVendors.push(v);
+            }
+        }
+
+        console.log('Unique vendors to notify:', uniqueVendors.length);
+        for (const vendor of uniqueVendors) {
+            console.log('Sending/storing email for vendor:', vendor?.email);
+            const result = await sendQRCodesToVendor(vendor, event, registrations);
             console.log('Result:', result);
         }
 

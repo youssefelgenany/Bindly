@@ -999,27 +999,47 @@ exports.registerForEvent = async (req, res) => {
 
         console.log(`🔍 Found ${allRegistrations.length} registration(s) with QR codes for this event`);
 
-        // Send QR codes to each vendor (don't wait for completion)
-        for (const vendorRequest of vendorRequests) {
-          if (vendorRequest.vendor && vendorRequest.vendor.email) {
-            console.log(`📧 Sending QR codes email to vendor: ${vendorRequest.vendor.email}`);
-            sendQRCodesToVendor(vendorRequest.vendor, holder, allRegistrations)
+        // Send QR codes to each unique vendor (don't wait for completion)
+        // Some vendors may have multiple accepted vendor requests for the same event
+        // (e.g., booth + standaloneBooth). Deduplicate by vendor _id so we send
+        // only one email per vendor address.
+        const seenVendorKeys = new Set();
+        const uniqueVendors = [];
+        for (const vr of vendorRequests) {
+          const v = vr.vendor;
+          if (!v) continue;
+          // Prefer deduplication by email (lowercased) when available,
+          // otherwise fall back to vendor id.
+          const emailKey = v.email ? String(v.email).toLowerCase().trim() : null;
+          const idKey = v._id ? String(v._id) : (v.id ? String(v.id) : null);
+          const vid = emailKey || idKey;
+          if (!vid) continue;
+          if (!seenVendorKeys.has(vid)) {
+            seenVendorKeys.add(vid);
+            uniqueVendors.push(v);
+          }
+        }
+
+        for (const vendor of uniqueVendors) {
+          if (vendor && vendor.email) {
+            console.log(`📧 Sending QR codes email to vendor: ${vendor.email}`);
+            sendQRCodesToVendor(vendor, holder, allRegistrations)
               .then(result => {
                 if (result.sent) {
-                  console.log(`✅ QR codes email sent to vendor: ${vendorRequest.vendor.email}`);
+                  console.log(`✅ QR codes email sent to vendor: ${vendor.email}`);
                 } else if (result.stored) {
-                  console.log(`✅ QR codes email stored in database for vendor: ${vendorRequest.vendor.email}`);
+                  console.log(`✅ QR codes email stored in database for vendor: ${vendor.email}`);
                   console.log('📧 View emails at: http://localhost:5000/api/dev/emails');
                 } else {
-                  console.log(`⚠️ QR codes email could not be sent/stored for vendor: ${vendorRequest.vendor.email}`);
+                  console.log(`⚠️ QR codes email could not be sent/stored for vendor: ${vendor.email}`);
                   console.log(`   Reason: ${result.reason || result.error || 'Unknown'}`);
                 }
               })
               .catch(error => {
-                console.error(`❌ Error sending QR codes email to vendor ${vendorRequest.vendor.email}:`, error);
+                console.error(`❌ Error sending QR codes email to vendor ${vendor.email}:`, error);
               });
           } else {
-            console.warn('⚠️ Vendor request found but vendor email is missing:', vendorRequest._id);
+            console.warn('⚠️ Vendor found but vendor email is missing or invalid:', vendor);
           }
         }
       } catch (error) {
@@ -1941,6 +1961,83 @@ exports.getWalletTransactions = async (req, res) => {
 };
 
 // 📊 Get ratings and comments for an event (placeholder until schema is created)
+// 💬 Submit a comment on an event
+exports.submitComment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comment, rating } = req.body;
+    const userId = req.user._id;
+
+    if (!comment || !comment.trim()) {
+      return res.status(400).json({
+        success: false,
+        msg: "Comment cannot be empty"
+      });
+    }
+
+    // Verify event exists
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        msg: "Event not found"
+      });
+    }
+
+    // Placeholder response - will be replaced when comment schema is created
+    res.status(201).json({
+      success: true,
+      message: "Comment submitted successfully",
+      comment: {
+        _id: new require('mongoose').Types.ObjectId(),
+        eventId: id,
+        userId,
+        text: comment,
+        rating: rating || null,
+        createdAt: new Date()
+      }
+    });
+  } catch (err) {
+    console.error("❌ Error submitting comment:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
+// 🗑️ Delete a comment from an event
+exports.deleteComment = async (req, res) => {
+  try {
+    const { id, commentId } = req.params;
+    const userId = req.user._id;
+
+    // Verify event exists
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        msg: "Event not found"
+      });
+    }
+
+    // Placeholder response - will be replaced when comment schema is created
+    res.status(200).json({
+      success: true,
+      message: "Comment deleted successfully",
+      commentId
+    });
+  } catch (err) {
+    console.error("❌ Error deleting comment:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
 exports.getEventRatingsAndComments = async (req, res) => {
   try {
     const { id } = req.params;
