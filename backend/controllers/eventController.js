@@ -7,6 +7,7 @@ const User = require("../models/userModel");
 const Payment = require("../models/paymentModel");
 const { sendReceiptEmail } = require("../utils/sendReceiptEmail");
 const { sendRefundEmail } = require("../utils/sendRefundEmail");
+const { sendCommentWarningEmail } = require("../utils/sendCommentWarningEmail");
 const { salesReport } = require("../scripts/test-sales-report");
 const { notifyNewEventCreated } = require("../services/notificationService");
 
@@ -1965,13 +1966,23 @@ exports.getWalletTransactions = async (req, res) => {
 exports.submitComment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { comment, rating } = req.body;
+    const { text } = req.body;
     const userId = req.user._id;
+    const userType = req.user.userType;
+    const userEmail = req.user.email;
 
-    if (!comment || !comment.trim()) {
+    // Validate input
+    if (!text || !text.trim()) {
       return res.status(400).json({
         success: false,
-        msg: "Comment cannot be empty"
+        msg: "Comment text is required"
+      });
+    }
+
+    if (text.trim().length > 1000) {
+      return res.status(400).json({
+        success: false,
+        msg: "Comment text cannot exceed 1000 characters"
       });
     }
 
@@ -1984,17 +1995,63 @@ exports.submitComment = async (req, res) => {
       });
     }
 
-    // Placeholder response - will be replaced when comment schema is created
+    // Check if user has attended/registered for this event
+    // For Student/Staff/TA/Professor, they must be registered to comment
+    const allowedUserTypes = ['Student', 'Staff', 'TA', 'Professor'];
+    if (allowedUserTypes.includes(userType)) {
+      // Check Registration model (for general event registrations)
+      const registration = await Registration.findOne({
+        event: id,
+        user: userId,
+        status: { $in: ['approved', 'pending'] }
+      });
+
+      // Check StudentRegistration model (for workshop/trip registrations)
+      let studentRegistration = null;
+      if (userEmail) {
+        studentRegistration = await StudentRegistration.findOne({
+          event: id,
+          studentEmail: userEmail.toLowerCase(),
+          status: { $in: ['approved', 'pending'] }
+        });
+      }
+
+      // User must be registered in at least one of the registration systems
+      if (!registration && !studentRegistration) {
+        return res.status(403).json({
+          success: false,
+          msg: "You can only comment on events you have attended/registered for"
+        });
+      }
+    }
+
+    // Add comment to event
+    event.comments.push({
+      user: userId,
+      text: text.trim(),
+      createdAt: new Date()
+    });
+
+    await event.save();
+
+    // Populate user info for response
+    await event.populate('comments.user', 'firstName lastName email userType');
+    const newComment = event.comments[event.comments.length - 1];
+
     res.status(201).json({
       success: true,
       message: "Comment submitted successfully",
       comment: {
-        _id: new require('mongoose').Types.ObjectId(),
-        eventId: id,
-        userId,
-        text: comment,
-        rating: rating || null,
-        createdAt: new Date()
+        _id: newComment._id,
+        text: newComment.text,
+        user: {
+          _id: newComment.user._id,
+          firstName: newComment.user.firstName,
+          lastName: newComment.user.lastName,
+          email: newComment.user.email,
+          userType: newComment.user.userType
+        },
+        createdAt: newComment.createdAt
       }
     });
   } catch (err) {
@@ -2012,9 +2069,12 @@ exports.deleteComment = async (req, res) => {
   try {
     const { id, commentId } = req.params;
     const userId = req.user._id;
+    const userType = req.user.userType;
+    // Accept reason from body or query parameter
+    const reason = req.body?.reason || req.query?.reason;
 
     // Verify event exists
-    const event = await Event.findById(id);
+    const event = await Event.findById(id).populate('comments.user', 'firstName lastName email userType');
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -2022,11 +2082,84 @@ exports.deleteComment = async (req, res) => {
       });
     }
 
-    // Placeholder response - will be replaced when comment schema is created
+    // Find the comment
+    const comment = event.comments.id(commentId);
+    if (!comment) {
+      return res.status(404).json({
+        success: false,
+        msg: "Comment not found"
+      });
+    }
+
+    // Check permissions: owner or admin/event_office
+    const commentUserId = comment.user._id ? comment.user._id.toString() : comment.user.toString();
+    const isOwner = commentUserId === userId.toString();
+    // Check for admin (case-insensitive) - also check req.user.role from JWT token
+    const userTypeLower = (userType || '').toLowerCase();
+    const roleLower = (req.user.role || '').toLowerCase();
+    const isAdmin = userTypeLower === 'admin' ||
+      roleLower === 'admin' ||
+      userType === 'event_office' ||
+      userType === 'Event Office' ||
+      userType === 'Events Office' ||
+      roleLower === 'event_office';
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        msg: "You can only delete your own comments or be an admin/event office to delete any comment"
+      });
+    }
+
+    // Store comment info before deletion for email
+    let commentUser = null;
+    if (comment.user && typeof comment.user === 'object' && comment.user.email) {
+      commentUser = comment.user;
+    } else if (comment.user) {
+      commentUser = await User.findById(comment.user).select('firstName lastName email userType');
+    }
+
+    const commentText = comment.text;
+    const eventTitle = event.title;
+    const isInappropriate = reason === 'inappropriate' || reason === 'Inappropriate';
+
+    // Delete the comment
+    event.comments.pull(commentId);
+    await event.save();
+
+    // Send warning email if deleted for being inappropriate and user is not the owner
+    if (isInappropriate && !isOwner && commentUser && commentUser.email) {
+      try {
+        const userName = commentUser.firstName
+          ? `${commentUser.firstName} ${commentUser.lastName || ''}`.trim()
+          : commentUser.email;
+
+        // Only send email to Student, Staff, Events Office, TA, or Professor
+        const allowedUserTypes = ['Student', 'Staff', 'event_office', 'Event Office', 'Events Office', 'TA', 'Professor'];
+        if (allowedUserTypes.includes(commentUser.userType)) {
+          const emailResult = await sendCommentWarningEmail(
+            commentUser.email,
+            userName,
+            eventTitle,
+            commentText
+          );
+
+          if (emailResult.sent) {
+            console.log('✅ Comment warning email sent successfully to:', commentUser.email);
+          } else {
+            console.error('❌ Comment warning email not sent:', emailResult.error || emailResult.reason);
+          }
+        }
+      } catch (emailError) {
+        console.error('❌ Exception while sending comment warning email:', emailError);
+        // Don't fail the deletion if email fails
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: "Comment deleted successfully",
-      commentId
+      deletedCommentId: commentId
     });
   } catch (err) {
     console.error("❌ Error deleting comment:", err);
@@ -2043,7 +2176,7 @@ exports.getEventRatingsAndComments = async (req, res) => {
     const { id } = req.params;
 
     // Verify event exists
-    const event = await Event.findById(id);
+    const event = await Event.findById(id).populate('comments.user', 'firstName lastName email userType');
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -2051,23 +2184,44 @@ exports.getEventRatingsAndComments = async (req, res) => {
       });
     }
 
-    // Placeholder response - will be replaced when rating/comment schema is created
+    // Calculate average rating
+    let averageRating = 0;
+    let ratingCount = 0;
+    const ratingDistribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+
+    if (event.ratings && event.ratings.length > 0) {
+      ratingCount = event.ratings.length;
+      const sum = event.ratings.reduce((acc, r) => {
+        ratingDistribution[r.rating] = (ratingDistribution[r.rating] || 0) + 1;
+        return acc + r.rating;
+      }, 0);
+      averageRating = (sum / ratingCount).toFixed(2);
+    }
+
+    // Format comments with user information
+    const comments = (event.comments || []).map(comment => ({
+      _id: comment._id,
+      text: comment.text,
+      user: {
+        _id: comment.user?._id || comment.user,
+        firstName: comment.user?.firstName || '',
+        lastName: comment.user?.lastName || '',
+        email: comment.user?.email || '',
+        userType: comment.user?.userType || ''
+      },
+      createdAt: comment.createdAt
+    }));
+
     res.status(200).json({
       success: true,
       message: "Ratings and comments retrieved successfully",
       eventId: id,
       ratings: {
-        average: null,
-        count: 0,
-        distribution: {
-          5: 0,
-          4: 0,
-          3: 0,
-          2: 0,
-          1: 0
-        }
+        average: parseFloat(averageRating),
+        count: ratingCount,
+        distribution: ratingDistribution
       },
-      comments: []
+      comments: comments
     });
   } catch (err) {
     console.error("❌ Error fetching ratings and comments:", err);
