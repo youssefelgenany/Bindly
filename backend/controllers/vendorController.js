@@ -3,6 +3,7 @@ const Bazaar = require('../models/bazaarModel.js'); // legacy (unused for upcomi
 const Booth = require('../models/boothModel.js');   // legacy (unused for upcoming)
 const VendorRequest = require('../models/vendorRequest.js');
 const Event = require('../models/eventModel.js');
+const VendorLoyaltyProgram = require('../models/vendorLoyaltyProgramModel.js');
 const { sampleVendors } = require('../scripts/test-vendor-loyalty-program.js');
 const path = require('path');
 const fs = require('fs').promises;
@@ -84,14 +85,14 @@ module.exports.viewUpcomingEvents = async (req, res) => {
 
     // Handle standaloneBooth type separately
     if (type === 'standaloneBooth') {
-      const standaloneBooths = await Event.find({ 
+      const standaloneBooths = await Event.find({
         type: 'booth', // Changed from 'standaloneBooth' to 'booth' to show real booth events
         status: 'approved' // Show approved booth events
       })
         .populate('createdBy', 'firstName lastName email')
         .sort({ startDate: 1 })
         .lean();
-      
+
       // Map booth events structure to match frontend expectations
       const mappedBooths = standaloneBooths.map(booth => ({
         _id: booth._id,
@@ -106,7 +107,7 @@ module.exports.viewUpcomingEvents = async (req, res) => {
         status: booth.status,
         type: 'standaloneBooth' // Keep the frontend type as standaloneBooth for compatibility
       }));
-      
+
       return res.json(mappedBooths);
     }
 
@@ -241,7 +242,7 @@ module.exports.applyToEvent = async (req, res) => {
     // Fetch event from 'events' collection or standalone booth from 'booths' collection
     let event = await Event.findById(eventId);
     let isStandaloneBooth = false;
-    
+
     // If not found in events, check if it's a standalone booth
     if (!event) {
       event = await Booth.findById(eventId);
@@ -255,7 +256,7 @@ module.exports.applyToEvent = async (req, res) => {
         };
       }
     }
-    
+
     if (!event) return res.status(404).json({ message: 'Invalid event or booth' });
     if (event.type !== 'bazaar' && event.type !== 'booth') {
       return res.status(400).json({ message: 'Event type must be bazaar or booth' });
@@ -268,7 +269,7 @@ module.exports.applyToEvent = async (req, res) => {
     if (event.type === 'booth') {
       // Check if this is a standalone booth event based on eventType parameter
       const isStandaloneBooth = eventType === 'standaloneBooth';
-      
+
       if (isStandaloneBooth) {
         // For standalone booth events, only duration is required
         if (!durationWeeks || durationWeeks < 1 || durationWeeks > 4) {
@@ -293,13 +294,13 @@ module.exports.applyToEvent = async (req, res) => {
       }
     }
 
-    const existingRequest = await VendorRequest.findOne({ 
-      vendor: vendorId, 
+    const existingRequest = await VendorRequest.findOne({
+      vendor: vendorId,
       $or: [
-        { bazaar: eventId }, 
+        { bazaar: eventId },
         { booth: eventId },
         { standaloneBooth: eventId }
-      ] 
+      ]
     });
     if (existingRequest) {
       // Update existing application instead of rejecting duplicates
@@ -601,9 +602,9 @@ module.exports.uploadVendorDocuments = async (req, res) => {
   try {
     // Check if user is authenticated
     if (!req.user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: 'Authentication required' 
+        message: 'Authentication required'
       });
     }
 
@@ -612,15 +613,15 @@ module.exports.uploadVendorDocuments = async (req, res) => {
     // Verify vendor role
     const vendor = await User.findById(vendorId);
     if (!vendor) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Vendor not found' 
+        message: 'Vendor not found'
       });
     }
     if (vendor.userType !== 'Vendor') {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
-        message: 'Only vendors can upload documents' 
+        message: 'Only vendors can upload documents'
       });
     }
 
@@ -630,9 +631,9 @@ module.exports.uploadVendorDocuments = async (req, res) => {
 
     // Check if at least one file is provided
     if (!logo && !taxCard) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Please provide at least one file (vendorLogo or vendorTaxCard)' 
+        message: 'Please provide at least one file (vendorLogo or vendorTaxCard)'
       });
     }
 
@@ -645,9 +646,9 @@ module.exports.uploadVendorDocuments = async (req, res) => {
       const logoExt = path.extname(logo.originalname).toLowerCase();
       const validImageExts = ['.png', '.jpg', '.jpeg', '.jfif', '.jpe', '.jif', '.webp', '.gif', '.bmp'];
       if (!validImageExts.includes(logoExt)) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: 'Logo must be an image file (PNG, JPG, JPEG, JFIF, WEBP, GIF, or BMP)' 
+          message: 'Logo must be an image file (PNG, JPG, JPEG, JFIF, WEBP, GIF, or BMP)'
         });
       }
 
@@ -667,9 +668,9 @@ module.exports.uploadVendorDocuments = async (req, res) => {
       const taxExt = path.extname(taxCard.originalname).toLowerCase();
       const validTaxExts = ['.pdf', '.png', '.jpg', '.jpeg', '.jfif', '.jpe', '.jif', '.webp', '.gif', '.bmp'];
       if (!validTaxExts.includes(taxExt)) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: 'Tax card must be a PDF or image file' 
+          message: 'Tax card must be a PDF or image file'
         });
       }
 
@@ -712,10 +713,306 @@ module.exports.uploadVendorDocuments = async (req, res) => {
     });
   } catch (error) {
     console.error('Error uploading vendor documents:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
       message: 'Error uploading documents',
-      error: error.message 
+      error: error.message
+    });
+  }
+};
+
+// 🎯 Apply to Vendor Loyalty Program
+module.exports.applyToLoyaltyProgram = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const { discountRate, discountType, promoCode, termsAndConditions, validFrom, validUntil, description, category } = req.body;
+
+    // Validate required fields
+    if (!discountRate || !promoCode || !termsAndConditions) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: discountRate, promoCode, termsAndConditions'
+      });
+    }
+
+    // Validate discount rate
+    if (typeof discountRate !== 'number' || discountRate < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Discount rate must be a positive number'
+      });
+    }
+
+    // Validate discount type
+    if (discountType && !['percentage', 'amount'].includes(discountType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Discount type must be either "percentage" or "amount"'
+      });
+    }
+
+    // Get vendor details
+    const vendor = await User.findById(vendorId);
+    if (!vendor || vendor.userType !== 'Vendor') {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    // Check if vendor already has a loyalty program application
+    const existingApplication = await VendorLoyaltyProgram.findOne({
+      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`
+    });
+
+    if (existingApplication) {
+      return res.status(400).json({
+        success: false,
+        message: 'You already have an active loyalty program application. Update it instead.'
+      });
+    }
+
+    // Create new loyalty program application
+    const loyaltyApplication = new VendorLoyaltyProgram({
+      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`,
+      description: description || '',
+      category: category || '',
+      discountRate,
+      discountType: discountType || 'percentage',
+      promoCode: promoCode.toUpperCase(),
+      termsAndConditions,
+      validFrom: validFrom ? new Date(validFrom) : new Date(),
+      validUntil: validUntil ? new Date(validUntil) : null,
+      isActive: true,
+      logoUrl: vendor.vendorLogoPath || null
+    });
+
+    await loyaltyApplication.save();
+
+    return res.status(201).json({
+      success: true,
+      message: 'Loyalty program application submitted successfully',
+      application: {
+        _id: loyaltyApplication._id,
+        vendorName: loyaltyApplication.vendorName,
+        discountRate: loyaltyApplication.discountRate,
+        discountType: loyaltyApplication.discountType,
+        promoCode: loyaltyApplication.promoCode,
+        termsAndConditions: loyaltyApplication.termsAndConditions,
+        validFrom: loyaltyApplication.validFrom,
+        validUntil: loyaltyApplication.validUntil,
+        isActive: loyaltyApplication.isActive,
+        createdAt: loyaltyApplication.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Error applying to loyalty program:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error submitting loyalty program application',
+      error: error.message
+    });
+  }
+};
+
+// 📋 Get My Loyalty Program Application
+module.exports.getMyLoyaltyApplication = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+
+    // Get vendor details
+    const vendor = await User.findById(vendorId);
+    if (!vendor || vendor.userType !== 'Vendor') {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    // Find vendor's loyalty program application
+    const application = await VendorLoyaltyProgram.findOne({
+      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'No loyalty program application found'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      application: {
+        _id: application._id,
+        vendorName: application.vendorName,
+        description: application.description,
+        category: application.category,
+        discountRate: application.discountRate,
+        discountType: application.discountType,
+        promoCode: application.promoCode,
+        termsAndConditions: application.termsAndConditions,
+        validFrom: application.validFrom,
+        validUntil: application.validUntil,
+        isActive: application.isActive,
+        logoUrl: application.logoUrl,
+        createdAt: application.createdAt,
+        updatedAt: application.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching loyalty program application:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching loyalty program application',
+      error: error.message
+    });
+  }
+};
+
+// ✏️ Update My Loyalty Program Application
+module.exports.updateLoyaltyApplication = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const { discountRate, discountType, promoCode, termsAndConditions, validFrom, validUntil, description, category, isActive } = req.body;
+
+    // Get vendor details
+    const vendor = await User.findById(vendorId);
+    if (!vendor || vendor.userType !== 'Vendor') {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    // Find vendor's loyalty program application
+    const application = await VendorLoyaltyProgram.findOne({
+      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'No loyalty program application found'
+      });
+    }
+
+    // Update fields if provided
+    if (discountRate !== undefined) {
+      if (typeof discountRate !== 'number' || discountRate < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Discount rate must be a positive number'
+        });
+      }
+      application.discountRate = discountRate;
+    }
+
+    if (discountType) {
+      if (!['percentage', 'amount'].includes(discountType)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Discount type must be either "percentage" or "amount"'
+        });
+      }
+      application.discountType = discountType;
+    }
+
+    if (promoCode) application.promoCode = promoCode.toUpperCase();
+    if (termsAndConditions) application.termsAndConditions = termsAndConditions;
+    if (description !== undefined) application.description = description;
+    if (category !== undefined) application.category = category;
+    if (validFrom) application.validFrom = new Date(validFrom);
+    if (validUntil) application.validUntil = new Date(validUntil);
+    if (isActive !== undefined) application.isActive = isActive;
+
+    await application.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Loyalty program application updated successfully',
+      application: {
+        _id: application._id,
+        vendorName: application.vendorName,
+        description: application.description,
+        category: application.category,
+        discountRate: application.discountRate,
+        discountType: application.discountType,
+        promoCode: application.promoCode,
+        termsAndConditions: application.termsAndConditions,
+        validFrom: application.validFrom,
+        validUntil: application.validUntil,
+        isActive: application.isActive,
+        createdAt: application.createdAt,
+        updatedAt: application.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error('Error updating loyalty program application:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error updating loyalty program application',
+      error: error.message
+    });
+  }
+};
+
+// ❌ Cancel Loyalty Program Application
+module.exports.cancelLoyaltyProgram = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+
+    // Get vendor details
+    const vendor = await User.findById(vendorId);
+    if (!vendor || vendor.userType !== 'Vendor') {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    // Find vendor's loyalty program application
+    const application = await VendorLoyaltyProgram.findOne({
+      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'No loyalty program application found to cancel'
+      });
+    }
+
+    // Check if already inactive
+    if (!application.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Your loyalty program application is already cancelled'
+      });
+    }
+
+    // Mark as inactive (soft delete approach - preserve data)
+    application.isActive = false;
+    await application.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Loyalty program application cancelled successfully',
+      application: {
+        _id: application._id,
+        vendorName: application.vendorName,
+        promoCode: application.promoCode,
+        isActive: application.isActive,
+        cancelledAt: new Date(),
+        message: 'Your loyalty program has been deactivated. You can reactivate it anytime.'
+      }
+    });
+  } catch (error) {
+    console.error('Error cancelling loyalty program:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error cancelling loyalty program application',
+      error: error.message
     });
   }
 };

@@ -24,13 +24,13 @@ if (process.env.STRIPE_SECRET_KEY) {
 // 🎯 Create a new event (Admin or Event Office)
 exports.createEvent = async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      type,
-      startDate,
-      endDate,
-      location,
+    const { 
+      title, 
+      description, 
+      type, 
+      startDate, 
+      endDate, 
+      location, 
       capacity,
       agenda,
       faculty,
@@ -73,10 +73,10 @@ exports.createEvent = async (req, res) => {
     });
 
     await newEvent.save();
-
+    
     // Send notifications to all eligible users about the new event
     await notifyNewEventCreated(newEvent);
-
+    
     res.status(201).json({ msg: "Event created successfully", event: newEvent });
   } catch (err) {
     console.error("❌ Error creating event:", err);
@@ -227,26 +227,26 @@ exports.getAllEvents = async (req, res) => {
         { location: { $ne: '' } }
       ]
     };
-
+    
     // For non-admin/event-office users, only show approved events
     // Check if user is admin or event office
     const isAdminOrEventOffice = req.user && (
-      req.user.userType === 'admin' ||
-      req.user.userType === 'Event Office' ||
-      req.user.userType === 'Events Office' ||
+      req.user.userType === 'admin' || 
+      req.user.userType === 'Event Office' || 
+      req.user.userType === 'Events Office' || 
       req.user.userType === 'event_office' ||
       req.user.role === 'admin' ||
       req.user.role === 'event_office' ||
       req.user.role === 'Event Office'
     );
-
+    
     console.log('🔍 getAllEvents - User type check:', {
       userType: req.user?.userType,
       role: req.user?.role,
       isAdminOrEventOffice: isAdminOrEventOffice,
       statusQuery: status
     });
-
+    
     // If status is not explicitly requested and user is not admin/event office, default to approved
     if (!status || status === 'all') {
       if (!isAdminOrEventOffice) {
@@ -259,9 +259,9 @@ exports.getAllEvents = async (req, res) => {
       baseMatch.status = status;
       console.log('🔍 Filtering by status:', status);
     }
-
+    
     console.log('🔍 Final baseMatch filter:', JSON.stringify(baseMatch, null, 2));
-
+    
     if (type) {
       const typeMap = {
         workshops: 'workshop',
@@ -298,45 +298,43 @@ exports.getAllEvents = async (req, res) => {
 
     pipeline.push(
       { $sort: { startDate: 1 } },
-      {
-        $project: {
-          _id: 1,
-          title: 1,
-          name: 1,
-          description: 1,
-          type: 1,
-          startDate: 1,
-          endDate: 1,
-          registrationDeadline: 1,
-          location: 1,
-          capacity: 1,
-          price: 1,
-          registeredCount: 1,
-          status: 1,
-          createdAt: 1,
-          updatedAt: 1,
-          agenda: 1,
-          website: 1,
-          budget: 1,
-          fundingSource: 1,
-          extraResources: 1,
-          // Workshop-specific fields
-          faculty: 1,
-          professors: 1,
-          bannerFile: 1,
-          createdBy: {
-            _id: '$creator._id',
-            firstName: '$creator.firstName',
-            lastName: '$creator.lastName',
-            email: '$creator.email',
-            userType: '$creator.userType'
-          }
+      { $project: {
+        _id: 1,
+        title: 1,
+        name: 1,
+        description: 1,
+        type: 1,
+        startDate: 1,
+        endDate: 1,
+        registrationDeadline: 1,
+        location: 1,
+        capacity: 1,
+        price: 1,
+        registeredCount: 1,
+        status: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        agenda: 1,
+        website: 1,
+        budget: 1,
+        fundingSource: 1,
+        extraResources: 1,
+        // Workshop-specific fields
+        faculty: 1,
+        professors: 1,
+        bannerFile: 1,
+        createdBy: {
+          _id: '$creator._id',
+          firstName: '$creator.firstName',
+          lastName: '$creator.lastName',
+          email: '$creator.email',
+          userType: '$creator.userType'
         }
-      }
+      } }
     );
 
     const events = await Event.aggregate(pipeline);
-
+    
     const workshopEvents = events.filter(e => e.type === 'workshop');
     console.log('🔍 getAllEvents - Query results:', {
       totalEvents: events.length,
@@ -351,7 +349,7 @@ exports.getAllEvents = async (req, res) => {
         endDateIsFuture: e.endDate ? new Date(e.endDate) > new Date() : 'no endDate'
       }))
     });
-
+    
     // For bazaars and booths, get vendor information
     const eventsWithVendors = await Promise.all(events.map(async (e) => {
       const baseEvent = {
@@ -448,18 +446,18 @@ exports.getAllEvents = async (req, res) => {
 exports.getAllEventsForStudents = async (req, res) => {
   try {
     const { q, type, status } = req.query;
-
+    
     console.log('🔍 Student search query:', q);
     console.log('🔍 User type:', req.user.userType);
     console.log('🔍 User role:', req.user.role);
     console.log('🔍 User ID:', req.user._id);
     console.log('🔍 Event type filter:', type);
     console.log('🔍 Status filter:', status);
-
+    
     // Build filter - Event Office users can see all events, others only see approved
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     const now = new Date();
-    const filter = {
+    const filter = { 
       // Show events that haven't ended yet (endDate is in the future or null)
       $or: [
         { endDate: { $gt: now } },
@@ -476,23 +474,23 @@ exports.getAllEventsForStudents = async (req, res) => {
         { location: { $ne: '' } }
       ]
     };
-
+    
     // Only filter by status for non-Event Office users
-    const isEventOffice = req.user.userType === 'Event Office' ||
-      req.user.userType === 'Events Office' ||
-      req.user.userType === 'event_office' ||
-      req.user.role === 'event_office' ||
-      req.user.role === 'Event Office' ||
-      req.user.userType === 'event office' ||
-      req.user.role === 'event office';
-
+    const isEventOffice = req.user.userType === 'Event Office' || 
+                         req.user.userType === 'Events Office' || 
+                         req.user.userType === 'event_office' || 
+                         req.user.role === 'event_office' || 
+                         req.user.role === 'Event Office' ||
+                         req.user.userType === 'event office' ||
+                         req.user.role === 'event office';
+    
     if (!isEventOffice) {
       filter.status = 'approved';
       console.log('🔍 Non-Event Office user - filtering to approved only');
     } else {
       console.log('🔍 Event Office user - showing all statuses');
     }
-
+    
     if (type && type !== 'all') {
       const typeMap = {
         workshops: 'workshop',
@@ -583,7 +581,7 @@ exports.getAllEventsForStudents = async (req, res) => {
     ];
 
     const events = await Event.aggregate(pipeline);
-
+    
     console.log('🔍 Found events:', events.length);
     if (q) {
       console.log('🔍 Search results for query "' + q + '":', events.map(e => ({
@@ -592,7 +590,7 @@ exports.getAllEventsForStudents = async (req, res) => {
         creator: e.createdBy
       })));
     }
-
+    
     console.log('🔍 Found events:', events.length);
     console.log('🔍 Events by type:', events.reduce((acc, ev) => {
       acc[ev.type] = (acc[ev.type] || 0) + 1;
@@ -602,21 +600,21 @@ exports.getAllEventsForStudents = async (req, res) => {
       acc[ev.status] = (acc[ev.status] || 0) + 1;
       return acc;
     }, {}));
-
+    
     // For each event, get vendor details if it's a bazaar
     const eventsWithVendors = await Promise.all(
       events.map(async (event) => {
         let vendors = [];
-
+        
         if (event.type === 'bazaar') {
           try {
             const vendorRequests = await VendorRequest.find({
               bazaar: event._id,
               status: 'accepted'
             })
-              .populate('vendor', 'companyName firstName lastName email')
-              .select('vendor attendees boothSize createdAt');
-
+            .populate('vendor', 'companyName firstName lastName email')
+            .select('vendor attendees boothSize createdAt');
+            
             vendors = vendorRequests.map(req => ({
               id: req._id,
               companyName: req.vendor?.companyName || `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim(),
@@ -630,7 +628,7 @@ exports.getAllEventsForStudents = async (req, res) => {
             vendors = [];
           }
         }
-
+        
         return {
           ...event,
           vendors,
@@ -648,9 +646,9 @@ exports.getAllEventsForStudents = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error fetching events for students:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
-      msg: "Server error"
+      msg: "Server error" 
     });
   }
 };
@@ -660,7 +658,7 @@ exports.getAllEventsForAdmin = async (req, res) => {
   try {
     const { q, type, status } = req.query;
     console.log('🔍 Admin requesting events with query:', { q, type, status });
-
+    
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     const filter = {
       type: { $in: validTypes }, // Only valid event types
@@ -696,7 +694,7 @@ exports.getAllEventsForAdmin = async (req, res) => {
     // Add vendor information for workshops and booths
     const eventsWithVendors = await Promise.all(events.map(async (event) => {
       const baseEvent = event.toObject();
-
+      
       // Add vendor information for workshops, booths, and bazaars
       if (event.type === 'workshop' || event.type === 'booth' || event.type === 'bazaar') {
         try {
@@ -762,9 +760,9 @@ exports.getAllEventsForAdmin = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error fetching events for admin:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
-      message: "Server error"
+      message: "Server error" 
     });
   }
 };
@@ -786,7 +784,7 @@ exports.updateEvent = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-
+    
     console.log('🔍 Updating event:', id);
     console.log('🔍 Updates:', updates);
 
@@ -823,16 +821,16 @@ exports.updateEvent = async (req, res) => {
 exports.deleteEvent = async (req, res) => {
   try {
     console.log('🗑️ Delete event request:', { eventId: req.params.id, user: req.user });
-
+    
     const event = await Event.findById(req.params.id);
     if (!event) {
       console.log('❌ Event not found:', req.params.id);
       return res.status(404).json({ msg: "Event not found" });
     }
 
-    console.log('📊 Event found:', {
-      id: event._id,
-      title: event.title,
+    console.log('📊 Event found:', { 
+      id: event._id, 
+      title: event.title, 
       registeredCount: event.registeredCount,
       createdBy: event.createdBy,
       userType: req.user.userType,
@@ -924,21 +922,21 @@ exports.registerForEvent = async (req, res) => {
       try {
         const User = require('../models/userModel');
         const user = await User.findById(userId);
-
+        
         if (!user) {
           console.warn('⚠️ User not found for QR code generation:', userId);
         }
-
+        
         const { generateQRCode } = require('../utils/generateQRCode');
-
+        
         const qrResult = await generateQRCode(
           registration._id.toString(),
           {
             userId: userId,
             eventId: id,
             eventName: holder.name || holder.title,
-            userName: user?.firstName && user?.lastName
-              ? `${user.firstName} ${user.lastName}`
+            userName: user?.firstName && user?.lastName 
+              ? `${user.firstName} ${user.lastName}` 
               : user?.name || user?.email || 'Visitor',
             userEmail: user?.email || null
           }
@@ -970,10 +968,10 @@ exports.registerForEvent = async (req, res) => {
       try {
         const VendorRequest = require('../models/vendorRequest');
         const { sendQRCodesToVendor } = require('../utils/sendQRCodesToVendor');
-
+        
         console.log('🔍 Looking for vendor requests for event:', id);
         console.log('🔍 Event type:', holder.type);
-
+        
         // Find all accepted vendor requests for this event
         const vendorRequests = await VendorRequest.find({
           $or: [
@@ -984,7 +982,7 @@ exports.registerForEvent = async (req, res) => {
         }).populate('vendor', 'email firstName lastName companyName');
 
         console.log(`🔍 Found ${vendorRequests.length} accepted vendor request(s) for this event`);
-
+        
         if (vendorRequests.length === 0) {
           console.log('⚠️ No accepted vendor requests found for this event. QR code email will not be sent.');
           console.log('💡 Make sure you have:');
@@ -1042,7 +1040,7 @@ exports.registerForEvent = async (req, res) => {
       name: err.name,
       code: err.code
     });
-    return res.status(500).json({
+    return res.status(500).json({ 
       msg: "Server error",
       error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
@@ -1069,7 +1067,7 @@ exports.getMyRegistrations = async (req, res) => {
 exports.getMyEvents = async (req, res) => {
   try {
     console.log('🎓 Professor requesting their events, user ID:', req.user._id);
-
+    
     const events = await Event.find({ createdBy: req.user._id })
       .populate('createdBy', 'firstName lastName email')
       .sort({ createdAt: -1 });
@@ -1083,9 +1081,9 @@ exports.getMyEvents = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error fetching professor events:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
-      message: "Server error"
+      message: "Server error" 
     });
   }
 };
@@ -1094,9 +1092,9 @@ exports.getMyEvents = async (req, res) => {
 exports.getMyWorkshops = async (req, res) => {
   try {
     console.log('🎓 Professor requesting their workshops, user ID:', req.user._id);
-
+    
     // Filter events where type is 'workshop' and createdBy matches the professor
-    const workshops = await Event.find({
+    const workshops = await Event.find({ 
       createdBy: req.user._id,
       type: 'workshop'
     })
@@ -1113,9 +1111,9 @@ exports.getMyWorkshops = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error fetching professor workshops:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
-      message: "Server error"
+      message: "Server error" 
     });
   }
 };
@@ -1125,18 +1123,18 @@ exports.getEventRegistrations = async (req, res) => {
   try {
     const eventId = req.params.id;
     console.log('👥 Fetching registrations for event:', eventId);
-
+    
     // First verify the event exists and the user created it
     const event = await Event.findById(eventId);
     if (!event) {
       return res.status(404).json({ msg: "Event not found" });
     }
-
+    
     // Check if the user created this event (or is admin)
     if (event.createdBy.toString() !== req.user._id.toString() && req.user.userType !== 'Admin') {
       return res.status(403).json({ msg: "Not authorized to view registrations for this event" });
     }
-
+    
     // Get registrations for this event with user details
     const registrations = await Registration.find({ event: eventId })
       .populate('user', 'firstName lastName email gucId userType')
@@ -1162,9 +1160,9 @@ exports.getEventRegistrations = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error fetching event registrations:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
-      message: "Server error"
+      message: "Server error" 
     });
   }
 };
@@ -1175,47 +1173,47 @@ exports.getWorkshopParticipants = async (req, res) => {
     const { workshopId } = req.params;
     console.log('🎓 Professor requesting participants for workshop:', workshopId);
     console.log('🎓 Professor ID:', req.user._id);
-
+    
     // Verify the workshop exists and is a workshop
     const workshop = await Event.findById(workshopId);
     if (!workshop) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        message: 'Workshop not found'
+        message: 'Workshop not found' 
       });
     }
-
+    
     // Verify it's a workshop
     if (workshop.type !== 'workshop') {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        message: 'This endpoint is only for workshops'
+        message: 'This endpoint is only for workshops' 
       });
     }
-
+    
     // Verify the professor created this workshop
     if (workshop.createdBy.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
+      return res.status(403).json({ 
         success: false,
-        message: 'You can only view participants for workshops you created'
+        message: 'You can only view participants for workshops you created' 
       });
     }
-
+    
     // Get all student registrations for this workshop
-    const participants = await StudentRegistration.find({
+    const participants = await StudentRegistration.find({ 
       event: workshopId,
       eventType: 'workshop'
     })
       .sort({ registeredAt: -1 })
       .lean();
-
+    
     console.log('📊 Found participants:', participants.length);
-
+    
     // Calculate remaining spots
     const totalCapacity = workshop.capacity || 0;
     const currentRegistrations = participants.length;
     const remainingSpots = Math.max(0, totalCapacity - currentRegistrations);
-
+    
     // Format participants data
     const formattedParticipants = participants.map(participant => ({
       id: participant._id,
@@ -1226,7 +1224,7 @@ exports.getWorkshopParticipants = async (req, res) => {
       registeredAt: participant.registeredAt,
       createdAt: participant.createdAt
     }));
-
+    
     res.status(200).json({
       success: true,
       message: 'Workshop participants fetched successfully',
@@ -1242,9 +1240,9 @@ exports.getWorkshopParticipants = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error fetching workshop participants:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
-      message: "Server error"
+      message: "Server error" 
     });
   }
 };
@@ -1258,26 +1256,26 @@ exports.addToFavorites = async (req, res) => {
     // Verify event exists
     const event = await Event.findById(id);
     if (!event) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        msg: "Event not found"
+        msg: "Event not found" 
       });
     }
 
     // Get user and check if event is already in favorites
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        msg: "User not found"
+        msg: "User not found" 
       });
     }
 
     // Check if already in favorites (compare as strings)
     if (user.favoriteEvents && user.favoriteEvents.some(eventId => eventId.toString() === id)) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        msg: "Event is already in your favorites"
+        msg: "Event is already in your favorites" 
       });
     }
 
@@ -1295,9 +1293,9 @@ exports.addToFavorites = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error adding event to favorites:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
-      msg: "Server error"
+      msg: "Server error" 
     });
   }
 };
@@ -1311,17 +1309,17 @@ exports.removeFromFavorites = async (req, res) => {
     // Get user
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        msg: "User not found"
+        msg: "User not found" 
       });
     }
 
     // Check if event is in favorites (compare as strings)
     if (!user.favoriteEvents || !user.favoriteEvents.some(eventId => eventId.toString() === id)) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        msg: "Event is not in your favorites"
+        msg: "Event is not in your favorites" 
       });
     }
 
@@ -1338,9 +1336,9 @@ exports.removeFromFavorites = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error removing event from favorites:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
-      msg: "Server error"
+      msg: "Server error" 
     });
   }
 };
@@ -1361,9 +1359,9 @@ exports.getFavoriteEvents = async (req, res) => {
       });
 
     if (!user) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        msg: "User not found"
+        msg: "User not found" 
       });
     }
 
@@ -1373,7 +1371,7 @@ exports.getFavoriteEvents = async (req, res) => {
         if (!event) return null; // Handle deleted events
 
         const baseEvent = event.toObject ? event.toObject() : event;
-
+        
         // Add vendor information for bazaars
         let vendors = [];
         if (event.type === 'bazaar') {
@@ -1382,9 +1380,9 @@ exports.getFavoriteEvents = async (req, res) => {
               bazaar: event._id,
               status: 'accepted'
             })
-              .populate('vendor', 'companyName firstName lastName email')
-              .select('vendor attendees boothSize createdAt');
-
+            .populate('vendor', 'companyName firstName lastName email')
+            .select('vendor attendees boothSize createdAt');
+            
             vendors = vendorRequests.map(req => ({
               id: req._id,
               companyName: req.vendor?.companyName || `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim(),
@@ -1421,9 +1419,9 @@ exports.getFavoriteEvents = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error fetching favorite events:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
-      msg: "Server error"
+      msg: "Server error" 
     });
   }
 };
@@ -1434,13 +1432,13 @@ async function deductWallet(userId, amount, description, reference) {
   if (!user) {
     throw new Error('User not found');
   }
-
+  
   if (user.walletBalance < amount) {
     throw new Error('Insufficient wallet balance');
   }
-
+  
   user.walletBalance -= amount;
-
+  
   // Add transaction record
   const walletTransaction = {
     amount: -amount, // Negative for payment
@@ -1451,7 +1449,7 @@ async function deductWallet(userId, amount, description, reference) {
     createdAt: new Date()
   };
   user.walletTransactions.push(walletTransaction);
-
+  
   await user.save();
   return user.walletBalance;
 }
@@ -1461,10 +1459,10 @@ async function createStripeSession(event, user) {
   if (!stripe) {
     throw new Error('Stripe is not configured');
   }
-
+  
   const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
   const amountInCents = Math.round(event.price * 100); // Convert to cents
-
+  
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],
     line_items: [
@@ -1490,7 +1488,7 @@ async function createStripeSession(event, user) {
       eventTitle: event.title || event.name,
     },
   });
-
+  
   return session;
 }
 
@@ -1502,16 +1500,16 @@ exports.payForEvent = async (req, res) => {
     const userId = req.user._id;
 
     if (!paymentMethod || !['wallet', 'card'].includes(paymentMethod)) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        msg: "Payment method must be 'wallet' or 'card'"
+        msg: "Payment method must be 'wallet' or 'card'" 
       });
     }
 
     // Find the event
     let event = await Event.findById(id);
     let isTrip = false;
-
+    
     // If not found, try Trip
     if (!event) {
       const trip = await Trip.findById(id);
@@ -1522,26 +1520,26 @@ exports.payForEvent = async (req, res) => {
     }
 
     if (!event) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        msg: "Event not found"
+        msg: "Event not found" 
       });
     }
 
     // Check if event has a price
     const amount = event.price || 0;
     if (amount <= 0) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        msg: "This event is free. No payment required."
+        msg: "This event is free. No payment required." 
       });
     }
 
     // Check if user is registered for this event
     // Try Registration model first
-    let registration = await Registration.findOne({
-      event: id,
-      user: userId
+    let registration = await Registration.findOne({ 
+      event: id, 
+      user: userId 
     });
 
     // If not found, try StudentRegistration
@@ -1556,26 +1554,26 @@ exports.payForEvent = async (req, res) => {
     }
 
     if (!registration) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        msg: "You are not registered for this event"
+        msg: "You are not registered for this event" 
       });
     }
 
     // Check if already paid
     if (registration.paid) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        msg: "Payment already completed for this registration"
+        msg: "Payment already completed for this registration" 
       });
     }
 
     // Get user details
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        msg: "User not found"
+        msg: "User not found" 
       });
     }
 
@@ -1584,7 +1582,7 @@ exports.payForEvent = async (req, res) => {
       try {
         const eventTitle = event.title || event.name || 'Event';
         const paymentDescription = `Payment for ${eventTitle}`;
-
+        
         // Create payment record first to get payment ID
         const payment = await Payment.create({
           user: userId,
@@ -1596,12 +1594,12 @@ exports.payForEvent = async (req, res) => {
 
         // Deduct from wallet with transaction record
         const newBalance = await deductWallet(
-          userId,
-          amount,
+          userId, 
+          amount, 
           paymentDescription,
           payment._id.toString()
         );
-
+        
         // Mark registration as paid
         registration.paid = true;
         await registration.save();
@@ -1630,9 +1628,9 @@ exports.payForEvent = async (req, res) => {
         });
       } catch (error) {
         if (error.message === 'Insufficient wallet balance') {
-          return res.status(400).json({
+          return res.status(400).json({ 
             success: false,
-            msg: "Insufficient wallet balance"
+            msg: "Insufficient wallet balance" 
           });
         }
         throw error;
@@ -1642,15 +1640,15 @@ exports.payForEvent = async (req, res) => {
     // Handle card payment with Stripe
     if (paymentMethod === 'card') {
       if (!stripe) {
-        return res.status(500).json({
+        return res.status(500).json({ 
           success: false,
-          msg: "Card payments are not available. Stripe is not configured."
+          msg: "Card payments are not available. Stripe is not configured." 
         });
       }
 
       try {
         const session = await createStripeSession(event, user);
-
+        
         // Create pending payment record
         const payment = await Payment.create({
           user: userId,
@@ -1675,20 +1673,20 @@ exports.payForEvent = async (req, res) => {
         });
       } catch (error) {
         console.error('❌ Stripe session creation error:', error);
-        return res.status(500).json({
+        return res.status(500).json({ 
           success: false,
           msg: "Failed to create payment session",
-          error: error.message
+          error: error.message 
         });
       }
     }
 
   } catch (err) {
     console.error("❌ Error processing payment:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
       msg: "Server error",
-      error: err.message
+      error: err.message 
     });
   }
 };
@@ -1704,7 +1702,7 @@ exports.cancelRegistration = async (req, res) => {
     // Find the event
     let event = await Event.findById(id);
     let isTrip = false;
-
+    
     if (!event) {
       const trip = await Trip.findById(id);
       if (trip) {
@@ -1714,18 +1712,18 @@ exports.cancelRegistration = async (req, res) => {
     }
 
     if (!event) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        msg: "Event not found"
+        msg: "Event not found" 
       });
     }
 
     // Check if cancellation is allowed (at least 2 weeks before event)
     const eventStartDate = event.startDate;
     if (!eventStartDate) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        msg: "Event start date is not set"
+        msg: "Event start date is not set" 
       });
     }
 
@@ -1735,7 +1733,7 @@ exports.cancelRegistration = async (req, res) => {
 
     // Check if event has already started
     if (daysUntilEvent < 0) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
         msg: "Cannot cancel registration for an event that has already started or passed.",
         daysUntilEvent: daysUntilEvent,
@@ -1745,7 +1743,7 @@ exports.cancelRegistration = async (req, res) => {
 
     // Check if at least 2 weeks (14 days) remain
     if (daysUntilEvent < 14) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
         msg: `Cancellation is only allowed if there are at least 2 weeks remaining until the event. The event starts in ${daysUntilEvent} day(s).`,
         daysUntilEvent: daysUntilEvent,
@@ -1757,9 +1755,9 @@ exports.cancelRegistration = async (req, res) => {
     console.log(`✅ Cancellation allowed. Event starts in ${daysUntilEvent} days.`);
 
     // Find registration - try Registration model first
-    let registration = await Registration.findOne({
-      event: id,
-      user: userId
+    let registration = await Registration.findOne({ 
+      event: id, 
+      user: userId 
     });
     let registrationType = 'registration';
 
@@ -1776,26 +1774,26 @@ exports.cancelRegistration = async (req, res) => {
     }
 
     if (!registration) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        msg: "You are not registered for this event"
+        msg: "You are not registered for this event" 
       });
     }
 
     // Check if already cancelled
     if (registration.status === 'cancelled') {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        msg: "Registration is already cancelled"
+        msg: "Registration is already cancelled" 
       });
     }
 
     // Get user details
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        msg: "User not found"
+        msg: "User not found" 
       });
     }
 
@@ -1813,11 +1811,11 @@ exports.cancelRegistration = async (req, res) => {
 
       if (payment) {
         refundAmount = payment.amount;
-
+        
         // Refund to wallet
         console.log('💰 Processing refund of', refundAmount, 'EGP to wallet...');
         user.walletBalance += refundAmount;
-
+        
         // Add transaction record
         const walletTransaction = {
           amount: refundAmount,
@@ -1829,11 +1827,11 @@ exports.cancelRegistration = async (req, res) => {
         };
         user.walletTransactions.push(walletTransaction);
         await user.save();
-
+        
         // Update payment status to refunded
         payment.status = 'refunded';
         await payment.save();
-
+        
         refundProcessed = true;
         console.log('✅ Refund processed. New wallet balance:', user.walletBalance);
       } else {
@@ -1851,7 +1849,7 @@ exports.cancelRegistration = async (req, res) => {
     if (refundProcessed && refundAmount > 0) {
       const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
       const eventTitle = event.title || event.name || 'Event';
-
+      
       try {
         const emailResult = await sendRefundEmail(
           user.email,
@@ -1886,10 +1884,10 @@ exports.cancelRegistration = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Error cancelling registration:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
       msg: "Server error",
-      error: err.message
+      error: err.message 
     });
   }
 };
@@ -1900,11 +1898,11 @@ exports.getWalletTransactions = async (req, res) => {
     const userId = req.user._id;
 
     const user = await User.findById(userId).select('walletBalance walletTransactions');
-
+    
     if (!user) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        msg: "User not found"
+        msg: "User not found" 
       });
     }
 
@@ -1932,10 +1930,10 @@ exports.getWalletTransactions = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Error fetching wallet transactions:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
       msg: "Server error",
-      error: err.message
+      error: err.message 
     });
   }
 };
@@ -1948,9 +1946,9 @@ exports.getEventRatingsAndComments = async (req, res) => {
     // Verify event exists
     const event = await Event.findById(id);
     if (!event) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        msg: "Event not found"
+        msg: "Event not found" 
       });
     }
 
@@ -1974,10 +1972,10 @@ exports.getEventRatingsAndComments = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error fetching ratings and comments:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
       msg: "Server error",
-      error: err.message
+      error: err.message 
     });
   }
 };
@@ -1986,7 +1984,7 @@ exports.getEventRatingsAndComments = async (req, res) => {
 exports.cleanupInvalidEvents = async (req, res) => {
   try {
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
-
+    
     // Find events that should be deleted:
     // 1. Events with invalid types
     // 2. Events with empty/null title
@@ -1996,22 +1994,20 @@ exports.cleanupInvalidEvents = async (req, res) => {
         { type: { $nin: validTypes } },
         { title: { $in: [null, ''] } },
         { location: { $in: [null, ''] } },
-        {
-          $or: [
-            { title: { $exists: false } },
-            { location: { $exists: false } }
-          ]
-        }
+        { $or: [
+          { title: { $exists: false } },
+          { location: { $exists: false } }
+        ]}
       ]
     });
 
     const deletedCount = invalidEvents.length;
-
+    
     // Delete invalid events
     if (invalidEvents.length > 0) {
       const eventIds = invalidEvents.map(e => e._id);
       await Event.deleteMany({ _id: { $in: eventIds } });
-
+      
       // Also clean up related registrations
       await StudentRegistration.deleteMany({ event: { $in: eventIds } });
     }
@@ -2023,100 +2019,10 @@ exports.cleanupInvalidEvents = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error cleaning up invalid events:", err);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
       msg: "Server error during cleanup",
-      error: err.message
-    });
-  }
-};
-
-// 💬 Submit a comment for an event
-exports.submitComment = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { comment, rating } = req.body;
-    const userId = req.user.id;
-
-    if (!comment || !rating) {
-      return res.status(400).json({ msg: "Comment and rating are required" });
-    }
-
-    if (rating < 1 || rating > 5) {
-      return res.status(400).json({ msg: "Rating must be between 1 and 5" });
-    }
-
-    const event = await Event.findById(id);
-    if (!event) {
-      return res.status(404).json({ msg: "Event not found" });
-    }
-
-    // Initialize comments array if not exists
-    if (!event.comments) {
-      event.comments = [];
-    }
-
-    event.comments.push({
-      userId,
-      comment,
-      rating,
-      createdAt: new Date()
-    });
-
-    await event.save();
-
-    res.status(201).json({
-      success: true,
-      message: "Comment submitted successfully",
-      event
-    });
-  } catch (err) {
-    console.error("❌ Error submitting comment:", err);
-    res.status(500).json({
-      success: false,
-      msg: "Server error while submitting comment",
-      error: err.message
-    });
-  }
-};
-
-// 🗑️ Delete a comment from an event
-exports.deleteComment = async (req, res) => {
-  try {
-    const { id, commentId } = req.params;
-    const userId = req.user.id;
-
-    const event = await Event.findById(id);
-    if (!event) {
-      return res.status(404).json({ msg: "Event not found" });
-    }
-
-    // Find the comment
-    const comment = event.comments?.find(c => c._id?.toString() === commentId);
-    if (!comment) {
-      return res.status(404).json({ msg: "Comment not found" });
-    }
-
-    // Check if user is owner of comment or admin
-    if (comment.userId?.toString() !== userId && req.user.role !== 'admin' && req.user.role !== 'event_office') {
-      return res.status(403).json({ msg: "Not authorized to delete this comment" });
-    }
-
-    // Remove the comment
-    event.comments = event.comments.filter(c => c._id?.toString() !== commentId);
-    await event.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Comment deleted successfully",
-      event
-    });
-  } catch (err) {
-    console.error("❌ Error deleting comment:", err);
-    res.status(500).json({
-      success: false,
-      msg: "Server error while deleting comment",
-      error: err.message
+      error: err.message 
     });
   }
 };

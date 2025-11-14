@@ -8,7 +8,8 @@ const {
   updateVendorRequestStatus,
   voteForVendorRequest,
   removeVote,
-  getVendorRequestVotes
+  getVendorRequestVotes,
+  cancelVendorRequest
 } = require('../controllers/vendorRequestController');
 const { protect, permit } = require('../middleware/authMiddleware');
 
@@ -50,6 +51,9 @@ router.delete('/:id/vote', protect, permit('Student', 'Staff', 'TA', 'Professor'
 
 // Route to get vote count and user's vote status - All authenticated users
 router.get('/:id/votes', protect, getVendorRequestVotes);
+
+// Route to cancel vendor request - Vendor (only if not paid yet)
+router.delete('/:requestId/cancel', protect, permit('vendor'), cancelVendorRequest);
 
 module.exports = router;
 
