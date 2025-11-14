@@ -21,7 +21,19 @@ try {
 }
 
 // Middleware
-app.use(express.json());
+// Configure JSON parser to handle empty bodies gracefully
+app.use(express.json({
+  strict: false
+}));
+// Handle empty JSON body errors
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    // Empty or invalid JSON body - set to empty object
+    req.body = {};
+    return next();
+  }
+  next(err);
+});
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:3001'], // React app URL

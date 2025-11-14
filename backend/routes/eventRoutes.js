@@ -22,6 +22,8 @@ const {
   cancelRegistration,
   getWalletTransactions,
   getEventRatingsAndComments,
+  submitComment,
+  deleteComment,
   cleanupInvalidEvents,
   getSalesReport
 } = require("../controllers/eventController");
@@ -92,6 +94,21 @@ router.get("/:id/registrations", protect, getEventRegistrations);
 router.get("/:id/ratings", protect, getEventRatingsAndComments);
 router.get("/:id/comments", protect, getEventRatingsAndComments);
 router.get("/:id/feedback", protect, getEventRatingsAndComments);
+
+// 💬 Submit a comment (Student, Staff, TA, Professor)
+router.post(
+  "/:id/comments",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  submitComment
+);
+
+// 🗑️ Delete a comment (owner or admin)
+router.delete(
+  "/:id/comments/:commentId",
+  protect,
+  deleteComment
+);
 
 // 🔍 Get a specific event by its ID
 router.get("/:id", protect, getEventById);
