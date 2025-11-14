@@ -4,6 +4,8 @@ const Booth = require('../models/boothModel.js');   // legacy (unused for upcomi
 const VendorRequest = require('../models/vendorRequest.js');
 const Event = require('../models/eventModel.js');
 const { sampleVendors } = require('../scripts/test-vendor-loyalty-program.js');
+const path = require('path');
+const fs = require('fs').promises;
 
 // Get all vendors (for admin/events office to get vendor IDs)
 module.exports.getAllVendors = async (req, res) => {
@@ -589,5 +591,131 @@ module.exports.getMyRequests = async (req, res) => {
   } catch (error) {
     console.error('Server error in getMyRequests:', error);
     return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// @desc Upload/Update vendor tax card and logo
+// @route POST /api/vendor/my/documents
+// @access Vendor (authenticated)
+module.exports.uploadVendorDocuments = async (req, res) => {
+  try {
+    // Check if user is authenticated
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Authentication required' 
+      });
+    }
+
+    const vendorId = req.user._id || req.user.id;
+
+    // Verify vendor role
+    const vendor = await User.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Vendor not found' 
+      });
+    }
+    if (vendor.userType !== 'Vendor') {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Only vendors can upload documents' 
+      });
+    }
+
+    const files = req.files || {};
+    const logo = files.vendorLogo && files.vendorLogo[0];
+    const taxCard = files.vendorTaxCard && files.vendorTaxCard[0];
+
+    // Check if at least one file is provided
+    if (!logo && !taxCard) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Please provide at least one file (vendorLogo or vendorTaxCard)' 
+      });
+    }
+
+    const updateData = {};
+    const filesToDelete = [];
+
+    // Handle logo upload
+    if (logo) {
+      // Validate logo is an image
+      const logoExt = path.extname(logo.originalname).toLowerCase();
+      const validImageExts = ['.png', '.jpg', '.jpeg', '.jfif', '.jpe', '.jif', '.webp', '.gif', '.bmp'];
+      if (!validImageExts.includes(logoExt)) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Logo must be an image file (PNG, JPG, JPEG, JFIF, WEBP, GIF, or BMP)' 
+        });
+      }
+
+      // Delete old logo if exists
+      if (vendor.vendorLogoPath) {
+        const oldLogoPath = path.join(__dirname, '..', vendor.vendorLogoPath);
+        filesToDelete.push(oldLogoPath);
+      }
+
+      // Set new logo path
+      updateData.vendorLogoPath = '/uploads/' + logo.filename;
+    }
+
+    // Handle tax card upload
+    if (taxCard) {
+      // Validate tax card is PDF or image
+      const taxExt = path.extname(taxCard.originalname).toLowerCase();
+      const validTaxExts = ['.pdf', '.png', '.jpg', '.jpeg', '.jfif', '.jpe', '.jif', '.webp', '.gif', '.bmp'];
+      if (!validTaxExts.includes(taxExt)) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Tax card must be a PDF or image file' 
+        });
+      }
+
+      // Delete old tax card if exists
+      if (vendor.vendorTaxCardPath) {
+        const oldTaxPath = path.join(__dirname, '..', vendor.vendorTaxCardPath);
+        filesToDelete.push(oldTaxPath);
+      }
+
+      // Set new tax card path
+      updateData.vendorTaxCardPath = '/uploads/' + taxCard.filename;
+    }
+
+    // Delete old files (don't fail if file doesn't exist)
+    for (const filePath of filesToDelete) {
+      try {
+        await fs.unlink(filePath);
+      } catch (error) {
+        // File might not exist, continue
+        console.log(`Note: Could not delete old file ${filePath}:`, error.message);
+      }
+    }
+
+    // Update vendor in database
+    Object.assign(vendor, updateData);
+    await vendor.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Documents uploaded successfully',
+      vendor: {
+        id: vendor._id,
+        companyName: vendor.companyName,
+        email: vendor.email,
+        hasLogo: !!vendor.vendorLogoPath,
+        hasTaxCard: !!vendor.vendorTaxCardPath,
+        logoPath: vendor.vendorLogoPath || null,
+        taxCardPath: vendor.vendorTaxCardPath || null
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading vendor documents:', error);
+    return res.status(500).json({ 
+      success: false,
+      message: 'Error uploading documents',
+      error: error.message 
+    });
   }
 };

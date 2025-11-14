@@ -1,8 +1,15 @@
 // controllers/vendorRequestController.js
 const mongoose = require('mongoose');
+const path = require('path');
+const fs = require('fs').promises;
 const VendorRequest = require('../models/vendorRequest');
 const Event = require('../models/eventModel');
 const VendorVote = require('../models/vendorVoteModel');
+const Payment = require('../models/paymentModel');
+const User = require('../models/userModel');
+const { sendVendorRequestStatusEmail } = require('../utils/sendVendorRequestStatusEmail');
+const { sendReceiptEmail } = require('../utils/sendReceiptEmail');
+const { calculateVendorParticipationFee } = require('../utils/calculateVendorFee');
 
 const getPendingVendorRequestNotifications = async (req, res) => {
   try {
@@ -417,7 +424,56 @@ const updateVendorRequestStatus = async (req, res) => {
 
     // Update the request status
     request.status = status;
+    
+    // If accepting, calculate fee and set payment deadline
+    if (status === 'accepted') {
+      try {
+        // Calculate participation fee
+        const fee = calculateVendorParticipationFee(request);
+        request.participationFee = fee;
+        request.paymentStatus = 'pending';
+        
+        // Set payment deadline: 3 days from now
+        const deadline = new Date();
+        deadline.setDate(deadline.getDate() + 3);
+        request.paymentDeadline = deadline;
+        
+        console.log(`💰 Calculated participation fee: ${fee} EGP`);
+        console.log(`📅 Payment deadline: ${deadline.toISOString()}`);
+      } catch (error) {
+        console.error('❌ Error calculating participation fee:', error);
+        // Continue with acceptance even if fee calculation fails
+        // Admin can manually set fee later if needed
+      }
+    } else if (status === 'rejected') {
+      // Clear payment info if rejected
+      request.participationFee = null;
+      request.paymentStatus = null;
+      request.paymentDeadline = null;
+      request.paidAt = null;
+    }
+    
     await request.save();
+
+    // Send email notification to vendor (don't wait for it to complete)
+    if (request.vendor && request.vendor.email) {
+      sendVendorRequestStatusEmail(request.vendor, request, status)
+        .then(result => {
+          if (result.sent) {
+            console.log(`✅ Email notification sent to vendor: ${request.vendor.email}`);
+          } else if (result.stored) {
+            console.log(`✅ Email notification stored in database for vendor: ${request.vendor.email}`);
+          } else {
+            console.log(`⚠️ Email notification could not be sent/stored for vendor: ${request.vendor.email}`);
+          }
+        })
+        .catch(error => {
+          console.error('❌ Error sending vendor request status email:', error);
+          // Don't throw - email failure shouldn't break the status update
+        });
+    } else {
+      console.log('⚠️ Vendor email not found, skipping email notification');
+    }
 
     // If accepting a platform booth request, create an event
     if (status === 'accepted' && request.eventType === 'platformBooth') {
@@ -447,7 +503,7 @@ const updateVendorRequestStatus = async (req, res) => {
           const newEvent = new Event({
             title: eventTitle,
             description: request.message || `Platform booth reservation by ${vendorName} at ${locationName}`,
-            type: 'standaloneBooth',
+            type: 'booth',  // Use 'booth' instead of 'standaloneBooth' as Event model enum doesn't include 'standaloneBooth'
             startDate: startDate,
             endDate: endDate,
             location: locationName,
@@ -669,6 +725,550 @@ const getVendorRequestVotes = async (req, res) => {
   }
 };
 
+// @desc Upload individual IDs for a vendor request
+// @route POST /api/vendor-requests/:requestId/individual-ids
+// @access Vendor (owner of the request)
+const uploadIndividualIds = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const vendorId = req.user._id || req.user.id;
+
+    console.log('🔍 uploadIndividualIds - Request ID:', requestId);
+    console.log('🔍 uploadIndividualIds - Vendor ID:', vendorId);
+
+    // Validate MongoDB ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(requestId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request ID format. Please provide a valid vendor request ID.'
+      });
+    }
+
+    // Find the vendor request
+    const vendorRequest = await VendorRequest.findById(requestId);
+    if (!vendorRequest) {
+      console.log('❌ Vendor request not found with ID:', requestId);
+      
+      // Check if there are any vendor requests for this vendor
+      const vendorRequests = await VendorRequest.find({ vendor: vendorId }).select('_id eventName eventType status').limit(5);
+      console.log('📋 Available vendor requests for this vendor:', vendorRequests.length);
+      
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor request not found',
+        hint: vendorRequests.length > 0 
+          ? `Available request IDs: ${vendorRequests.map(r => r._id).join(', ')}`
+          : 'You may not have any vendor requests yet. Create one first.'
+      });
+    }
+
+    // Verify the vendor owns this request
+    const requestVendorId = vendorRequest.vendor.toString();
+    if (requestVendorId !== vendorId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only upload IDs for your own vendor requests'
+      });
+    }
+
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an individual IDs file (PDF or image)'
+      });
+    }
+
+    // Validate file type
+    const fileExt = path.extname(req.file.originalname).toLowerCase();
+    const validExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.jfif', '.jpe', '.jif', '.webp', '.gif', '.bmp'];
+    
+    if (!validExtensions.includes(fileExt)) {
+      // Delete the uploaded file if invalid
+      try {
+        await fs.unlink(req.file.path);
+      } catch (error) {
+        console.log('Error deleting invalid file:', error.message);
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: `Invalid file type. Allowed types: ${validExtensions.join(', ')}`
+      });
+    }
+
+    // Delete old file if exists
+    if (vendorRequest.individualIdsPath) {
+      const oldFilePath = path.join(__dirname, '..', vendorRequest.individualIdsPath);
+      try {
+        await fs.unlink(oldFilePath);
+        console.log('Deleted old individual IDs file:', oldFilePath);
+      } catch (error) {
+        // File might not exist, continue
+        console.log('Note: Could not delete old file:', error.message);
+      }
+    }
+
+    // Update vendor request with new file path
+    vendorRequest.individualIdsPath = '/uploads/' + req.file.filename;
+    await vendorRequest.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Individual IDs uploaded successfully',
+      vendorRequest: {
+        id: vendorRequest._id,
+        eventType: vendorRequest.eventType,
+        eventName: vendorRequest.eventName,
+        hasIndividualIds: !!vendorRequest.individualIdsPath,
+        individualIdsPath: vendorRequest.individualIdsPath
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading individual IDs:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error uploading individual IDs',
+      error: error.message
+    });
+  }
+};
+
+// @desc Get payment details for a vendor request
+// @route GET /api/vendor-requests/:requestId/payment
+// @access Vendor (owner of the request)
+const getVendorRequestPayment = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const vendorId = req.user._id || req.user.id;
+
+    // Find the vendor request
+    const vendorRequest = await VendorRequest.findById(requestId);
+    if (!vendorRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor request not found'
+      });
+    }
+
+    // Verify the vendor owns this request
+    const requestVendorId = vendorRequest.vendor.toString();
+    if (requestVendorId !== vendorId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only view payment details for your own vendor requests'
+      });
+    }
+
+    // Check if request is accepted
+    if (vendorRequest.status !== 'accepted') {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment is only required for accepted requests'
+      });
+    }
+
+    // Check if payment is required
+    if (!vendorRequest.participationFee || vendorRequest.participationFee <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No payment required for this request'
+      });
+    }
+
+    // Check if already paid
+    const existingPayment = await Payment.findOne({
+      vendorRequest: requestId,
+      user: vendorId,
+      status: 'success'
+    });
+
+    // Calculate days until deadline
+    let daysUntilDeadline = null;
+    let isOverdue = false;
+    if (vendorRequest.paymentDeadline) {
+      const now = new Date();
+      const deadline = new Date(vendorRequest.paymentDeadline);
+      const diffTime = deadline - now;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      daysUntilDeadline = diffDays;
+      isOverdue = diffTime < 0;
+    }
+
+    return res.status(200).json({
+      success: true,
+      payment: {
+        requestId: vendorRequest._id,
+        eventName: vendorRequest.eventName,
+        eventType: vendorRequest.eventType,
+        amount: vendorRequest.participationFee,
+        paymentStatus: vendorRequest.paymentStatus,
+        paymentDeadline: vendorRequest.paymentDeadline,
+        paidAt: vendorRequest.paidAt,
+        daysUntilDeadline: daysUntilDeadline,
+        isOverdue: isOverdue,
+        isPaid: existingPayment !== null || vendorRequest.paymentStatus === 'paid'
+      }
+    });
+  } catch (error) {
+    console.error('Error getting vendor request payment:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error getting payment details',
+      error: error.message
+    });
+  }
+};
+
+// @desc Pay participation fee for a vendor request
+// @route POST /api/vendor-requests/:requestId/payment
+// @access Vendor (owner of the request)
+const payVendorRequestFee = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { paymentMethod } = req.body;
+    const vendorId = req.user._id || req.user.id;
+
+    if (!paymentMethod || !['wallet', 'card'].includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment method must be 'wallet' or 'card'"
+      });
+    }
+
+    // Find the vendor request
+    const vendorRequest = await VendorRequest.findById(requestId).populate('vendor');
+    if (!vendorRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor request not found'
+      });
+    }
+
+    // Verify the vendor owns this request
+    const requestVendorId = vendorRequest.vendor._id.toString();
+    if (requestVendorId !== vendorId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only pay for your own vendor requests'
+      });
+    }
+
+    // Check if request is accepted
+    if (vendorRequest.status !== 'accepted') {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment is only required for accepted requests'
+      });
+    }
+
+    // Check if payment is required
+    if (!vendorRequest.participationFee || vendorRequest.participationFee <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No payment required for this request'
+      });
+    }
+
+    // Check if already paid
+    if (vendorRequest.paymentStatus === 'paid') {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment already completed for this request'
+      });
+    }
+
+    // Check if payment deadline has passed
+    if (vendorRequest.paymentDeadline && new Date() > new Date(vendorRequest.paymentDeadline)) {
+      vendorRequest.paymentStatus = 'overdue';
+      await vendorRequest.save();
+      return res.status(400).json({
+        success: false,
+        message: 'Payment deadline has passed. Please contact the Events Office.'
+      });
+    }
+
+    // Handle wallet payment
+    if (paymentMethod === 'wallet') {
+      const vendor = await User.findById(vendorId);
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: 'Vendor not found'
+        });
+      }
+
+      if (!vendor.walletBalance || vendor.walletBalance < vendorRequest.participationFee) {
+        return res.status(400).json({
+          success: false,
+          message: 'Insufficient wallet balance',
+          required: vendorRequest.participationFee,
+          available: vendor.walletBalance || 0
+        });
+      }
+
+      // Deduct from wallet
+      vendor.walletBalance -= vendorRequest.participationFee;
+      vendor.walletTransactions.push({
+        amount: -vendorRequest.participationFee,
+        type: 'payment',
+        description: `Participation fee for ${vendorRequest.eventName}`,
+        balanceAfter: vendor.walletBalance,
+        reference: vendorRequest._id.toString()
+      });
+      await vendor.save();
+
+      // Create payment record
+      const payment = new Payment({
+        user: vendorId,
+        vendorRequest: requestId,
+        amount: vendorRequest.participationFee,
+        paymentMethod: 'wallet',
+        status: 'success'
+      });
+      await payment.save();
+
+      // Update vendor request
+      vendorRequest.paymentStatus = 'paid';
+      vendorRequest.paidAt = new Date();
+      await vendorRequest.save();
+
+      // Send payment receipt email (don't wait for it to complete)
+      // Get vendor's personal name for greeting
+      const vendorPersonalName = `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || vendor.companyName || 'Vendor';
+      const vendorCompanyName = vendor.companyName || 'Your Company';
+      
+      // Build event title with more details
+      let eventTitle = vendorRequest.eventName || 'Vendor Request';
+      if (vendorRequest.eventType) {
+        const eventTypeDisplay = {
+          'bazaar': 'Bazaar',
+          'booth': 'Booth',
+          'standaloneBooth': 'Standalone Booth',
+          'platformBooth': 'Platform Booth'
+        }[vendorRequest.eventType] || vendorRequest.eventType;
+        
+        if (vendorRequest.eventName) {
+          eventTitle = `${eventTypeDisplay} - ${vendorRequest.eventName}`;
+        } else {
+          eventTitle = `${eventTypeDisplay} Participation`;
+        }
+      }
+      
+      // Build additional details for receipt
+      const receiptDetails = {
+        eventType: vendorRequest.eventType,
+        boothSize: vendorRequest.boothSize,
+        durationWeeks: vendorRequest.durationWeeks,
+        boothLocation: vendorRequest.boothLocation
+      };
+      
+      sendReceiptEmail(
+        vendor.email,
+        vendorPersonalName,
+        eventTitle,
+        vendorRequest.participationFee,
+        'wallet',
+        vendorRequest.paidAt,
+        receiptDetails
+      )
+        .then(result => {
+          if (result.sent) {
+            console.log(`✅ Payment receipt email sent to vendor: ${vendor.email}`);
+          } else if (result.reason === 'SMTP not configured') {
+            console.log(`📧 Payment receipt email stored in database for vendor: ${vendor.email}`);
+            console.log('📧 View emails at: http://localhost:5000/api/dev/emails');
+          } else {
+            console.log(`⚠️ Payment receipt email could not be sent for vendor: ${vendor.email}`);
+          }
+        })
+        .catch(error => {
+          console.error('❌ Error sending payment receipt email:', error);
+          // Don't throw - email failure shouldn't break the payment
+        });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Payment completed successfully',
+        payment: {
+          id: payment._id,
+          amount: payment.amount,
+          method: payment.paymentMethod,
+          status: payment.status,
+          paidAt: vendorRequest.paidAt
+        }
+      });
+    }
+
+    // Handle card payment (Stripe)
+    if (paymentMethod === 'card') {
+      const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
+      
+      if (!stripe) {
+        return res.status(500).json({
+          success: false,
+          message: 'Card payments are not available. Stripe is not configured.'
+        });
+      }
+
+      // Get vendor details
+      const vendor = await User.findById(vendorId);
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: 'Vendor not found'
+        });
+      }
+
+      const vendorName = vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Vendor';
+
+      // Create payment record first
+      const payment = new Payment({
+        user: vendorId,
+        vendorRequest: requestId,
+        amount: vendorRequest.participationFee,
+        paymentMethod: 'card',
+        status: 'pending'
+      });
+      await payment.save();
+
+      // Create Stripe checkout session
+      const clientUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'egp',
+              product_data: {
+                name: `Participation Fee - ${vendorRequest.eventName}`,
+                description: `${vendorRequest.eventType} participation fee for ${vendorName}`
+              },
+              unit_amount: vendorRequest.participationFee * 100 // Convert to piastres (EGP * 100)
+            },
+            quantity: 1
+          }
+        ],
+        mode: 'payment',
+        success_url: `${clientUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}&type=vendor-request&requestId=${requestId}`,
+        cancel_url: `${clientUrl}/payment-cancel?type=vendor-request&requestId=${requestId}`,
+        metadata: {
+          paymentId: payment._id.toString(),
+          vendorRequestId: requestId,
+          userId: vendorId.toString(),
+          type: 'vendor-request'
+        }
+      });
+
+      // Update payment with session ID
+      payment.stripeSessionId = session.id;
+      await payment.save();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Stripe checkout session created',
+        checkoutUrl: session.url,
+        sessionId: session.id
+      });
+    }
+  } catch (error) {
+    console.error('Error processing vendor request payment:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error processing payment',
+      error: error.message
+    });
+  }
+};
+
+// @desc Cancel a vendor request (vendor can only cancel if payment hasn't been made)
+// @route DELETE /api/vendor-requests/:requestId
+// @access Vendor (owner only)
+const cancelVendorRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const vendorId = req.user._id || req.user.id;
+
+    console.log('🔍 cancelVendorRequest - Request ID:', requestId);
+    console.log('🔍 cancelVendorRequest - Vendor ID:', vendorId);
+
+    // Validate request ID format
+    if (!mongoose.Types.ObjectId.isValid(requestId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request ID format'
+      });
+    }
+
+    // Find the vendor request
+    const vendorRequest = await VendorRequest.findById(requestId);
+    if (!vendorRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor request not found'
+      });
+    }
+
+    // Check if vendor owns this request
+    const requestVendorId = vendorRequest.vendor.toString();
+    if (requestVendorId !== vendorId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only cancel your own vendor requests'
+      });
+    }
+
+    // Check if request is already cancelled
+    if (vendorRequest.status === 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: 'This vendor request has already been cancelled'
+      });
+    }
+
+    // Check if payment has been made
+    if (vendorRequest.paymentStatus === 'paid' || vendorRequest.paidAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot cancel vendor request. Payment has already been made. Please contact the Events Office for assistance.',
+        paymentStatus: vendorRequest.paymentStatus,
+        paidAt: vendorRequest.paidAt
+      });
+    }
+
+    // Cancel the request
+    vendorRequest.status = 'cancelled';
+    
+    // Clear payment-related fields if they exist (since request is cancelled before payment)
+    if (vendorRequest.paymentStatus === 'pending') {
+      vendorRequest.paymentStatus = null;
+      vendorRequest.paymentDeadline = null;
+    }
+
+    await vendorRequest.save();
+
+    console.log('✅ Vendor request cancelled successfully:', requestId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vendor request cancelled successfully',
+      vendorRequest: {
+        id: vendorRequest._id,
+        status: vendorRequest.status,
+        eventType: vendorRequest.eventType,
+        eventName: vendorRequest.eventName
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error cancelling vendor request:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error cancelling vendor request',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getPendingVendorRequestNotifications,
   getAllVendorRequests,
@@ -678,4 +1278,8 @@ module.exports = {
   voteForVendorRequest,
   removeVote,
   getVendorRequestVotes,
+  uploadIndividualIds,
+  getVendorRequestPayment,
+  payVendorRequestFee,
+  cancelVendorRequest,
 };

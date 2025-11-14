@@ -58,8 +58,31 @@ const permit = (...roles) => {
     }
 
     const userRole = normalizeRole(req.user.userType);
+    
+    // Debug logging (can be removed in production)
+    console.log('🔍 Permission check:', {
+      userRole: userRole,
+      allowedRoles: allowed,
+      userType: req.user.userType,
+      role: req.user.role,
+      userId: req.user._id
+    });
+    
     if (!allowed.includes(userRole)) {
-      return res.status(403).json({ success: false, message: 'Insufficient permissions' });
+      console.log('❌ Permission denied:', {
+        userRole,
+        allowedRoles: allowed,
+        userType: req.user.userType
+      });
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Insufficient permissions',
+        debug: process.env.NODE_ENV === 'development' ? {
+          userRole,
+          allowedRoles: allowed,
+          userType: req.user.userType
+        } : undefined
+      });
     }
 
     next();

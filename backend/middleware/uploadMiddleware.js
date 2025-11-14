@@ -21,13 +21,61 @@ const storage = multer.diskStorage({
 
 function fileFilter(req, file, cb) {
   // Accept images for logo; accept images or pdf for tax card
-  const allowed = [
-    'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf'
+  const allowedMimeTypes = [
+    'image/png', 
+    'image/jpeg', 
+    'image/jpg', 
+    'image/webp', 
+    'application/pdf',
+    'image/gif', // Additional image type
+    'image/bmp',  // Additional image type
+    'application/octet-stream' // Generic binary - we'll validate by extension
   ];
-  if (!allowed.includes(file.mimetype)) {
-    return cb(new Error('Invalid file type'));
+  
+  // Also check file extension as fallback (some clients send incorrect MIME types)
+  const ext = path.extname(file.originalname).toLowerCase();
+  const allowedExtensions = [
+    '.png', 
+    '.jpg', 
+    '.jpeg', 
+    '.jfif',  // JPEG File Interchange Format
+    '.jpe',   // JPEG variant
+    '.jif',   // JPEG variant
+    '.webp', 
+    '.pdf', 
+    '.gif', 
+    '.bmp'
+  ];
+  
+  // Image extensions that are valid even with application/octet-stream MIME type
+  const imageExtensions = ['.png', '.jpg', '.jpeg', '.jfif', '.jpe', '.jif', '.webp', '.gif', '.bmp'];
+  
+  // Debug logging (can be removed in production)
+  console.log('📁 File upload attempt:', {
+    fieldname: file.fieldname,
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    extension: ext
+  });
+  
+  // Check MIME type
+  const isValidMimeType = allowedMimeTypes.includes(file.mimetype);
+  
+  // Check extension
+  const isValidExtension = allowedExtensions.includes(ext);
+  
+  // Special case: application/octet-stream with valid image extension should be accepted
+  const isOctetStreamWithImageExt = file.mimetype === 'application/octet-stream' && imageExtensions.includes(ext);
+  
+  // Accept if: valid MIME type OR valid extension OR octet-stream with image extension
+  if (isValidMimeType || isValidExtension || isOctetStreamWithImageExt) {
+    console.log('✅ File accepted');
+    return cb(null, true);
   }
-  cb(null, true);
+  
+  const errorMsg = `Invalid file type. Allowed types: ${allowedExtensions.join(', ')}. Received: ${file.mimetype || 'unknown'} (${ext || 'no extension'})`;
+  console.log('❌ File rejected:', errorMsg);
+  return cb(new Error(errorMsg));
 }
 
 const upload = multer({
@@ -45,9 +93,13 @@ const uploadVendorFiles = upload.fields([
 // Profile picture upload (single file)
 const uploadProfilePicture = upload.single('profilePicture');
 
+// Individual IDs upload (single file - PDF or image)
+const uploadIndividualIds = upload.single('individualIds');
+
 module.exports = {
   uploadVendorFiles,
-  uploadProfilePicture
+  uploadProfilePicture,
+  uploadIndividualIds
 };
 
 

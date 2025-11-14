@@ -7,7 +7,6 @@ const User = require("../models/userModel");
 const Payment = require("../models/paymentModel");
 const { sendReceiptEmail } = require("../utils/sendReceiptEmail");
 const { sendRefundEmail } = require("../utils/sendRefundEmail");
-const { sendCommentWarningEmail } = require("../utils/sendCommentWarningEmail");
 const { salesReport } = require("../scripts/test-sales-report");
 const { notifyNewEventCreated } = require("../services/notificationService");
 
@@ -901,27 +900,131 @@ exports.registerForEvent = async (req, res) => {
       return res.status(400).json({ msg: "You are already registered" });
     }
 
-    // Create registration (store the same id in `event` field)
-    // Map userType to lowercase to match Registration model enum
-    let role = (req.user.userType || req.user.role || "student").toLowerCase();
-    // Ensure role matches enum values
-    const validRoles = ['student', 'staff', 'TA', 'professor', 'vendor'];
-    if (!validRoles.includes(role)) {
-      // Default to student if role doesn't match
-      role = 'student';
+    // Normalize role to match Registration model enum (lowercase)
+    let userRole = (req.user.userType || req.user.role || "student").toLowerCase();
+    // Map common role variations to valid enum values
+    if (userRole === 'ta') {
+      userRole = 'TA'; // TA is capitalized in the enum
+    } else if (!['student', 'staff', 'TA', 'professor', 'vendor'].includes(userRole)) {
+      userRole = 'student'; // Default to student if role doesn't match enum
     }
-    
+
+    // Create registration (store the same id in `event` field)
     const registration = await Registration.create({
       event: id,                 // works for both Event and Trip ids
       user: userId,
-      role: role,
+      role: userRole,
       status: "approved"
     });
 
-    // Optionally increment registeredCount for Events only (Trips don’t have this field)
+    // Generate QR code for bazaar/booth events (after registration is created to include registration ID)
+    if (holderType === "event" && (holder.type === 'bazaar' || holder.type === 'booth' || holder.type === 'platformBooth' || holder.type === 'standaloneBooth')) {
+      try {
+        const User = require('../models/userModel');
+        const user = await User.findById(userId);
+        
+        if (!user) {
+          console.warn('⚠️ User not found for QR code generation:', userId);
+        }
+        
+        const { generateQRCode } = require('../utils/generateQRCode');
+        
+        const qrResult = await generateQRCode(
+          registration._id.toString(),
+          {
+            userId: userId,
+            eventId: id,
+            eventName: holder.name || holder.title,
+            userName: user?.firstName && user?.lastName 
+              ? `${user.firstName} ${user.lastName}` 
+              : user?.name || user?.email || 'Visitor',
+            userEmail: user?.email || null
+          }
+        );
+
+        if (qrResult.success) {
+          registration.qrCode = qrResult.qrCodeDataUrl;
+          registration.qrCodeData = qrResult.qrDataString;
+          await registration.save();
+          console.log('✅ QR code generated for registration:', registration._id);
+        } else {
+          console.warn('⚠️ QR code generation failed:', qrResult.error);
+        }
+      } catch (error) {
+        console.error('❌ Error generating QR code:', error);
+        console.error('❌ QR code error stack:', error.stack);
+        // Don't fail the registration if QR code generation fails
+      }
+    }
+
+    // Optionally increment registeredCount for Events only (Trips don't have this field)
     if (holderType === "event") {
       holder.registeredCount = (holder.registeredCount || 0) + 1;
       await holder.save();
+    }
+
+    // Send QR codes to vendors for bazaar/booth events
+    if (holderType === "event" && (holder.type === 'bazaar' || holder.type === 'booth' || holder.type === 'platformBooth' || holder.type === 'standaloneBooth')) {
+      try {
+        const VendorRequest = require('../models/vendorRequest');
+        const { sendQRCodesToVendor } = require('../utils/sendQRCodesToVendor');
+        
+        console.log('🔍 Looking for vendor requests for event:', id);
+        console.log('🔍 Event type:', holder.type);
+        
+        // Find all accepted vendor requests for this event
+        const vendorRequests = await VendorRequest.find({
+          $or: [
+            { bazaar: id, status: 'accepted' },
+            { booth: id, status: 'accepted' },
+            { standaloneBooth: id, status: 'accepted' }
+          ]
+        }).populate('vendor', 'email firstName lastName companyName');
+
+        console.log(`🔍 Found ${vendorRequests.length} accepted vendor request(s) for this event`);
+        
+        if (vendorRequests.length === 0) {
+          console.log('⚠️ No accepted vendor requests found for this event. QR code email will not be sent.');
+          console.log('💡 Make sure you have:');
+          console.log('   1. Created a vendor request linked to this event');
+          console.log('   2. Accepted the vendor request (status = "accepted")');
+        }
+
+        // Get all registrations for this event with QR codes
+        const allRegistrations = await Registration.find({ event: id })
+          .populate('user', 'email firstName lastName name')
+          .sort({ registeredAt: -1 });
+
+        console.log(`🔍 Found ${allRegistrations.length} registration(s) with QR codes for this event`);
+
+        // Send QR codes to each vendor (don't wait for completion)
+        for (const vendorRequest of vendorRequests) {
+          if (vendorRequest.vendor && vendorRequest.vendor.email) {
+            console.log(`📧 Sending QR codes email to vendor: ${vendorRequest.vendor.email}`);
+            sendQRCodesToVendor(vendorRequest.vendor, holder, allRegistrations)
+              .then(result => {
+                if (result.sent) {
+                  console.log(`✅ QR codes email sent to vendor: ${vendorRequest.vendor.email}`);
+                } else if (result.stored) {
+                  console.log(`✅ QR codes email stored in database for vendor: ${vendorRequest.vendor.email}`);
+                  console.log('📧 View emails at: http://localhost:5000/api/dev/emails');
+                } else {
+                  console.log(`⚠️ QR codes email could not be sent/stored for vendor: ${vendorRequest.vendor.email}`);
+                  console.log(`   Reason: ${result.reason || result.error || 'Unknown'}`);
+                }
+              })
+              .catch(error => {
+                console.error(`❌ Error sending QR codes email to vendor ${vendorRequest.vendor.email}:`, error);
+              });
+          } else {
+            console.warn('⚠️ Vendor request found but vendor email is missing:', vendorRequest._id);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error sending QR codes to vendors:', error);
+        console.error('❌ Error stack:', error.stack);
+        // Don't fail the registration if email fails
+      }
     }
 
     return res.status(201).json({
@@ -931,7 +1034,16 @@ exports.registerForEvent = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error registering for event/trip:", err);
-    return res.status(500).json({ msg: "Server error" });
+    console.error("❌ Error stack:", err.stack);
+    console.error("❌ Error details:", {
+      message: err.message,
+      name: err.name,
+      code: err.code
+    });
+    return res.status(500).json({ 
+      msg: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 };
 
@@ -1826,13 +1938,13 @@ exports.getWalletTransactions = async (req, res) => {
   }
 };
 
-// 📊 Get ratings and comments for an event
+// 📊 Get ratings and comments for an event (placeholder until schema is created)
 exports.getEventRatingsAndComments = async (req, res) => {
   try {
     const { id } = req.params;
 
     // Verify event exists
-    const event = await Event.findById(id).populate('comments.user', 'firstName lastName email userType');
+    const event = await Event.findById(id);
     if (!event) {
       return res.status(404).json({ 
         success: false,
@@ -1840,44 +1952,23 @@ exports.getEventRatingsAndComments = async (req, res) => {
       });
     }
 
-    // Calculate average rating
-    let averageRating = 0;
-    let ratingCount = 0;
-    const ratingDistribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-    
-    if (event.ratings && event.ratings.length > 0) {
-      ratingCount = event.ratings.length;
-      const sum = event.ratings.reduce((acc, r) => {
-        ratingDistribution[r.rating] = (ratingDistribution[r.rating] || 0) + 1;
-        return acc + r.rating;
-      }, 0);
-      averageRating = (sum / ratingCount).toFixed(2);
-    }
-
-    // Format comments with user information
-    const comments = (event.comments || []).map(comment => ({
-      _id: comment._id,
-      text: comment.text,
-      user: {
-        _id: comment.user?._id || comment.user,
-        firstName: comment.user?.firstName || '',
-        lastName: comment.user?.lastName || '',
-        email: comment.user?.email || '',
-        userType: comment.user?.userType || ''
-      },
-      createdAt: comment.createdAt
-    }));
-
+    // Placeholder response - will be replaced when rating/comment schema is created
     res.status(200).json({
       success: true,
       message: "Ratings and comments retrieved successfully",
       eventId: id,
       ratings: {
-        average: parseFloat(averageRating),
-        count: ratingCount,
-        distribution: ratingDistribution
+        average: null,
+        count: 0,
+        distribution: {
+          5: 0,
+          4: 0,
+          3: 0,
+          2: 0,
+          1: 0
+        }
       },
-      comments: comments
+      comments: []
     });
   } catch (err) {
     console.error("❌ Error fetching ratings and comments:", err);
@@ -1885,215 +1976,6 @@ exports.getEventRatingsAndComments = async (req, res) => {
       success: false,
       msg: "Server error",
       error: err.message 
-    });
-  }
-};
-
-// 💬 Submit a comment on an event
-exports.submitComment = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { text } = req.body;
-    const userId = req.user._id;
-    const userType = req.user.userType;
-    const userEmail = req.user.email;
-
-    // Validate input
-    if (!text || !text.trim()) {
-      return res.status(400).json({
-        success: false,
-        msg: "Comment text is required"
-      });
-    }
-
-    if (text.trim().length > 1000) {
-      return res.status(400).json({
-        success: false,
-        msg: "Comment text cannot exceed 1000 characters"
-      });
-    }
-
-    // Verify event exists
-    const event = await Event.findById(id);
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        msg: "Event not found"
-      });
-    }
-
-    // Check if user has attended/registered for this event
-    // For Student/Staff/TA/Professor, they must be registered to comment
-    const allowedUserTypes = ['Student', 'Staff', 'TA', 'Professor'];
-    if (allowedUserTypes.includes(userType)) {
-      // Check Registration model (for general event registrations)
-      const registration = await Registration.findOne({ 
-        event: id, 
-        user: userId,
-        status: { $in: ['approved', 'pending'] }
-      });
-
-      // Check StudentRegistration model (for workshop/trip registrations)
-      let studentRegistration = null;
-      if (userEmail) {
-        studentRegistration = await StudentRegistration.findOne({
-          event: id,
-          studentEmail: userEmail.toLowerCase(),
-          status: { $in: ['approved', 'pending'] }
-        });
-      }
-
-      // User must be registered in at least one of the registration systems
-      if (!registration && !studentRegistration) {
-        return res.status(403).json({
-          success: false,
-          msg: "You can only comment on events you have attended/registered for"
-        });
-      }
-    }
-
-    // Add comment to event
-    event.comments.push({
-      user: userId,
-      text: text.trim(),
-      createdAt: new Date()
-    });
-
-    await event.save();
-
-    // Populate user info for response
-    await event.populate('comments.user', 'firstName lastName email userType');
-    const newComment = event.comments[event.comments.length - 1];
-
-    res.status(201).json({
-      success: true,
-      message: "Comment submitted successfully",
-      comment: {
-        _id: newComment._id,
-        text: newComment.text,
-        user: {
-          _id: newComment.user._id,
-          firstName: newComment.user.firstName,
-          lastName: newComment.user.lastName,
-          email: newComment.user.email,
-          userType: newComment.user.userType
-        },
-        createdAt: newComment.createdAt
-      }
-    });
-  } catch (err) {
-    console.error("❌ Error submitting comment:", err);
-    res.status(500).json({
-      success: false,
-      msg: "Server error",
-      error: err.message
-    });
-  }
-};
-
-// 🗑️ Delete a comment (owner or admin)
-exports.deleteComment = async (req, res) => {
-  try {
-    const { id, commentId } = req.params;
-    const userId = req.user._id;
-    const userType = req.user.userType;
-    // Accept reason from body or query parameter
-    const reason = req.body?.reason || req.query?.reason;
-
-    // Verify event exists
-    const event = await Event.findById(id).populate('comments.user', 'firstName lastName email userType');
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        msg: "Event not found"
-      });
-    }
-
-    // Find the comment
-    const comment = event.comments.id(commentId);
-    if (!comment) {
-      return res.status(404).json({
-        success: false,
-        msg: "Comment not found"
-      });
-    }
-
-    // Check permissions: owner or admin/event_office
-    const commentUserId = comment.user._id ? comment.user._id.toString() : comment.user.toString();
-    const isOwner = commentUserId === userId.toString();
-    // Check for admin (case-insensitive) - also check req.user.role from JWT token
-    const userTypeLower = (userType || '').toLowerCase();
-    const roleLower = (req.user.role || '').toLowerCase();
-    const isAdmin = userTypeLower === 'admin' || 
-                   roleLower === 'admin' ||
-                   userType === 'event_office' || 
-                   userType === 'Event Office' || 
-                   userType === 'Events Office' ||
-                   roleLower === 'event_office';
-
-    if (!isOwner && !isAdmin) {
-      return res.status(403).json({
-        success: false,
-        msg: "You can only delete your own comments or be an admin/event office to delete any comment"
-      });
-    }
-
-    // Store comment info before deletion for email
-    let commentUser = null;
-    if (comment.user && typeof comment.user === 'object' && comment.user.email) {
-      commentUser = comment.user;
-    } else if (comment.user) {
-      commentUser = await User.findById(comment.user).select('firstName lastName email userType');
-    }
-    
-    const commentText = comment.text;
-    const eventTitle = event.title;
-    const isInappropriate = reason === 'inappropriate' || reason === 'Inappropriate';
-
-    // Delete the comment
-    event.comments.pull(commentId);
-    await event.save();
-
-    // Send warning email if deleted for being inappropriate and user is not the owner
-    if (isInappropriate && !isOwner && commentUser && commentUser.email) {
-      try {
-        const userName = commentUser.firstName 
-          ? `${commentUser.firstName} ${commentUser.lastName || ''}`.trim() 
-          : commentUser.email;
-        
-        // Only send email to Student, Staff, Events Office, TA, or Professor
-        const allowedUserTypes = ['Student', 'Staff', 'event_office', 'Event Office', 'Events Office', 'TA', 'Professor'];
-        if (allowedUserTypes.includes(commentUser.userType)) {
-          const emailResult = await sendCommentWarningEmail(
-            commentUser.email,
-            userName,
-            eventTitle,
-            commentText
-          );
-          
-          if (emailResult.sent) {
-            console.log('✅ Comment warning email sent successfully to:', commentUser.email);
-          } else {
-            console.error('❌ Comment warning email not sent:', emailResult.error || emailResult.reason);
-          }
-        }
-      } catch (emailError) {
-        console.error('❌ Exception while sending comment warning email:', emailError);
-        // Don't fail the deletion if email fails
-      }
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Comment deleted successfully",
-      deletedCommentId: commentId
-    });
-  } catch (err) {
-    console.error("❌ Error deleting comment:", err);
-    res.status(500).json({
-      success: false,
-      msg: "Server error",
-      error: err.message
     });
   }
 };
