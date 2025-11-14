@@ -27,10 +27,12 @@
     "multer": "^1.4.5-lts.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^6.9.13",
+    "qrcode": "^1.5.4",
     "stripe": "^19.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",
+    "concurrently": "^9.2.1",
     "eslint": "^9.37.0",
     "globals": "^16.4.0",
     "nodemon": "^3.1.10",
