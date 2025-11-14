@@ -13,19 +13,10 @@ const {
   getMyEvents,
   getMyWorkshops,
   getEventRegistrations,
-  getWorkshopParticipants,
   createConference,
-  addToFavorites,
-  removeFromFavorites,
-  getFavoriteEvents,
-  payForEvent,
-  cancelRegistration,
-  getWalletTransactions,
-  getEventRatingsAndComments,
-  submitComment,
-  deleteComment,
-  cleanupInvalidEvents,
-  getSalesReport
+  getSalesReport,
+  generateQRCode,
+  exportRegistrations
 } = require("../controllers/eventController");
 const { verifyPayment } = require("../controllers/paymentVerificationController");
 const { sendWorkshopCompletionEmails } = require("../controllers/workshopCompletionController");
@@ -77,38 +68,38 @@ router.get("/my/events", protect, permit("Professor"), getMyEvents);
 router.get("/my/workshops", protect, permit("Professor"), getMyWorkshops);
 
 // 🎓 Get participants for a specific workshop (for professors who created it)
-router.get("/workshops/:workshopId/participants", protect, permit("Professor"), getWorkshopParticipants);
+// router.get("/workshops/:workshopId/participants", protect, permit("Professor"), getWorkshopParticipants);
 
 // ⭐ Get user's favorite events (must be before /:id routes)
-router.get(
-  "/favorites",
-  protect,
-  permit("Student", "Staff", "TA", "Professor"),
-  getFavoriteEvents
-);
+// router.get(
+//   "/favorites",
+//   protect,
+//   permit("Student", "Staff", "TA", "Professor"),
+//   getFavoriteEvents
+// );
 
 // 👥 Get registrations for a specific event (for event creators)
 router.get("/:id/registrations", protect, getEventRegistrations);
 
 // 📊 Get ratings and comments for an event (all authenticated users can view)
-router.get("/:id/ratings", protect, getEventRatingsAndComments);
-router.get("/:id/comments", protect, getEventRatingsAndComments);
-router.get("/:id/feedback", protect, getEventRatingsAndComments);
+// router.get("/:id/ratings", protect, getEventRatingsAndComments);
+// router.get("/:id/comments", protect, getEventRatingsAndComments);
+// router.get("/:id/feedback", protect, getEventRatingsAndComments);
 
 // 💬 Submit a comment (Student, Staff, TA, Professor)
-router.post(
-  "/:id/comments",
-  protect,
-  permit("Student", "Staff", "TA", "Professor"),
-  submitComment
-);
+// router.post(
+//   "/:id/comments",
+//   protect,
+//   permit("Student", "Staff", "TA", "Professor"),
+//   submitComment
+// );
 
 // 🗑️ Delete a comment (owner or admin)
-router.delete(
-  "/:id/comments/:commentId",
-  protect,
-  deleteComment
-);
+// router.delete(
+//   "/:id/comments/:commentId",
+//   protect,
+//   deleteComment
+// );
 
 // 🔍 Get a specific event by its ID
 router.get("/:id", protect, getEventById);
@@ -138,12 +129,12 @@ router.post(
 );
 
 // 💳 Pay for an event (Student, Staff, TA, or Professor)
-router.post(
-  "/:id/pay",
-  protect,
-  permit("Student", "Staff", "TA", "Professor"),
-  payForEvent
-);
+// router.post(
+//   "/:id/pay",
+//   protect,
+//   permit("Student", "Staff", "TA", "Professor"),
+//   payForEvent
+// );
 
 // ✅ Confirm Stripe payment success (callback after redirect - public route)
 router.get(
@@ -160,20 +151,20 @@ router.get(
 );
 
 // 🚫 Cancel event registration and get refund
-router.post(
-  "/:id/cancel",
-  protect,
-  permit("Student", "Staff", "TA", "Professor"),
-  cancelRegistration
-);
+// router.post(
+//   "/:id/cancel",
+//   protect,
+//   permit("Student", "Staff", "TA", "Professor"),
+//   cancelRegistration
+// );
 
 // 💰 Get wallet transactions
-router.get(
-  "/wallet/transactions",
-  protect,
-  permit("Student", "Staff", "TA", "Professor"),
-  getWalletTransactions
-);
+// router.get(
+//   "/wallet/transactions",
+//   protect,
+//   permit("Student", "Staff", "TA", "Professor"),
+//   getWalletTransactions
+// );
 
 // Route to create a conference (protected, e.g. admin/event office only)
 router.post(
@@ -184,27 +175,33 @@ router.post(
 );
 
 // 🗑️ Cleanup invalid/empty events (Admin only)
-router.delete(
-  "/cleanup",
-  protect,
-  permit("admin", "event_office"),
-  cleanupInvalidEvents
-);
+// router.delete(
+//   "/cleanup",
+//   protect,
+//   permit("admin", "event_office"),
+//   cleanupInvalidEvents
+// );
 
 // ⭐ Add event to favorites
-router.post(
-  "/:id/favorite",
-  protect,
-  permit("Student", "Staff", "TA", "Professor"),
-  addToFavorites
-);
+// router.post(
+//   "/:id/favorite",
+//   protect,
+//   permit("Student", "Staff", "TA", "Professor"),
+//   addToFavorites
+// );
 
 // Remove event from favorites
-router.delete(
-  "/:id/favorite",
-  protect,
-  permit("Student", "Staff", "TA", "Professor"),
-  removeFromFavorites
-);
+// router.delete(
+//   "/:id/favorite",
+//   protect,
+//   permit("Student", "Staff", "TA", "Professor"),
+//   removeFromFavorites
+// );
+
+// 📱 Generate QR code for bazaars (Admin or Event Office only)
+router.get("/:id/generate-qr", protect, permit("admin", "event_office"), generateQRCode);
+
+// 📊 Export registrations to .xlsx (Admin or Event Office only)
+router.get("/:id/export-registrations", protect, permit("admin", "event_office"), exportRegistrations);
 
 module.exports = router;
