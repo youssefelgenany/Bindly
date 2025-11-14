@@ -228,6 +228,41 @@ exports.getAllEvents = async (req, res) => {
         { location: { $ne: '' } }
       ]
     };
+    
+    // For non-admin/event-office users, only show approved events
+    // Check if user is admin or event office
+    const isAdminOrEventOffice = req.user && (
+      req.user.userType === 'admin' || 
+      req.user.userType === 'Event Office' || 
+      req.user.userType === 'Events Office' || 
+      req.user.userType === 'event_office' ||
+      req.user.role === 'admin' ||
+      req.user.role === 'event_office' ||
+      req.user.role === 'Event Office'
+    );
+    
+    console.log('🔍 getAllEvents - User type check:', {
+      userType: req.user?.userType,
+      role: req.user?.role,
+      isAdminOrEventOffice: isAdminOrEventOffice,
+      statusQuery: status
+    });
+    
+    // If status is not explicitly requested and user is not admin/event office, default to approved
+    if (!status || status === 'all') {
+      if (!isAdminOrEventOffice) {
+        baseMatch.status = 'approved';
+        console.log('🔍 Filtering to approved events only (non-admin user)');
+      } else {
+        console.log('🔍 Showing all statuses (admin/event office user)');
+      }
+    } else if (status !== 'all') {
+      baseMatch.status = status;
+      console.log('🔍 Filtering by status:', status);
+    }
+    
+    console.log('🔍 Final baseMatch filter:', JSON.stringify(baseMatch, null, 2));
+    
     if (type) {
       const typeMap = {
         workshops: 'workshop',
@@ -238,9 +273,6 @@ exports.getAllEvents = async (req, res) => {
         conference: 'conference'
       };
       baseMatch.type = typeMap[type] || type;
-    }
-    if (status && status !== 'all') {
-      baseMatch.status = status;
     }
 
     const pipeline = [
@@ -303,6 +335,21 @@ exports.getAllEvents = async (req, res) => {
     );
 
     const events = await Event.aggregate(pipeline);
+    
+    const workshopEvents = events.filter(e => e.type === 'workshop');
+    console.log('🔍 getAllEvents - Query results:', {
+      totalEvents: events.length,
+      workshopEvents: workshopEvents.length,
+      approvedWorkshops: events.filter(e => e.type === 'workshop' && e.status === 'approved').length,
+      eventTitles: events.slice(0, 5).map(e => ({ title: e.title, type: e.type, status: e.status })),
+      workshopDetails: workshopEvents.slice(0, 3).map(e => ({
+        title: e.title,
+        status: e.status,
+        startDate: e.startDate,
+        endDate: e.endDate,
+        endDateIsFuture: e.endDate ? new Date(e.endDate) > new Date() : 'no endDate'
+      }))
+    });
     
     // For bazaars and booths, get vendor information
     const eventsWithVendors = await Promise.all(events.map(async (e) => {
@@ -410,8 +457,14 @@ exports.getAllEventsForStudents = async (req, res) => {
     
     // Build filter - Event Office users can see all events, others only see approved
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+    const now = new Date();
     const filter = { 
-      startDate: { $gt: new Date() }, // Only events that start in the future
+      // Show events that haven't ended yet (endDate is in the future or null)
+      $or: [
+        { endDate: { $gt: now } },
+        { endDate: { $exists: false } },
+        { endDate: null }
+      ],
       type: { $in: validTypes }, // Only valid event types
       $and: [
         { title: { $exists: true } },

@@ -230,6 +230,7 @@ const AdminEventsView = () => {
   }, [filter, loadEvents]);
 
   // Filter events based on type
+  // Admin should see all events (including past ones), but we can filter by type
   const filteredEvents = events.filter(event => {
     // Skip invalid/empty events
     const title = (event.title || event.name || '').trim();
@@ -240,15 +241,24 @@ const AdminEventsView = () => {
     const startDate = new Date(event.startDate);
     if (isNaN(startDate.getTime())) return false;
     
-    // Filter out past events
-    const now = new Date();
-    const eventEndDate = event.endDate ? new Date(event.endDate) : startDate;
-    if (isNaN(eventEndDate.getTime()) || eventEndDate < now) return false;
+    // Admin can see all events (past and future), so don't filter by date
+    // Only filter out events with invalid end dates
+    if (event.endDate) {
+      const eventEndDate = new Date(event.endDate);
+      if (isNaN(eventEndDate.getTime())) return false;
+    }
     
     if (event.type === 'other') return false;
     
     const typeMatch = filter === 'all' || (event.type && event.type === filter);
     return typeMatch;
+  });
+  
+  console.log('🔍 AdminEventsView - Filtered events:', {
+    totalEvents: events.length,
+    filteredCount: filteredEvents.length,
+    workshopEvents: filteredEvents.filter(e => e.type === 'workshop').length,
+    workshopTitles: filteredEvents.filter(e => e.type === 'workshop').map(e => e.title)
   });
 
   const handleSearch = () => {

@@ -77,6 +77,13 @@ const StudentEventsView = () => {
                  ev.title && ev.title.trim() !== '' && 
                  ev.location && ev.location.trim() !== '';
         });
+        
+        console.log('🔍 StudentEventsView - Events loaded:', {
+          totalEvents: mapped.length,
+          workshopEvents: mapped.filter(e => e.type === 'workshop').length,
+          workshopTitles: mapped.filter(e => e.type === 'workshop').map(e => e.title)
+        });
+        
         setEvents(mapped);
       } else {
         setEvents([]);
