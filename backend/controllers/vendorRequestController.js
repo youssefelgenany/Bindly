@@ -5,6 +5,7 @@ const fs = require('fs').promises;
 const VendorRequest = require('../models/vendorRequest');
 const Event = require('../models/eventModel');
 const VendorVote = require('../models/vendorVoteModel');
+const BoothPoll = require('../models/boothPollModel');
 const Payment = require('../models/paymentModel');
 const User = require('../models/userModel');
 const { sendVendorRequestStatusEmail } = require('../utils/sendVendorRequestStatusEmail');
@@ -1284,6 +1285,259 @@ const cancelVendorRequest = async (req, res) => {
   }
 };
 
+// @desc Create a booth poll for conflicting vendor requests
+// @route POST /api/vendor-requests/polls
+// @access Events Office / Admin
+const createBoothPoll = async (req, res) => {
+  try {
+    const { title, description, vendorRequestIds } = req.body;
+
+    if (!title || !description || !Array.isArray(vendorRequestIds) || vendorRequestIds.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title, description, and at least 2 vendor request IDs are required'
+      });
+    }
+
+    // Verify all vendor requests exist and are pending
+    const vendorRequests = await VendorRequest.find({
+      _id: { $in: vendorRequestIds },
+      status: 'pending'
+    }).populate('vendor', 'companyName firstName lastName');
+
+    if (vendorRequests.length !== vendorRequestIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Some vendor requests not found or not in pending status'
+      });
+    }
+
+    // Create poll options
+    const options = vendorRequests.map(vr => ({
+      vendorRequest: vr._id,
+      description: `${vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`} - ${vr.boothSize || 'N/A'} booth, ${vr.durationWeeks || 'N/A'} weeks`
+    }));
+
+    const poll = new BoothPoll({
+      title,
+      description,
+      options,
+      createdBy: req.user._id
+    });
+
+    await poll.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Booth poll created successfully',
+      poll
+    });
+
+  } catch (error) {
+    console.error('Error creating booth poll:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating booth poll',
+      error: error.message
+    });
+  }
+};
+
+// @desc Get all booth polls
+// @route GET /api/vendor-requests/polls
+// @access Events Office / Admin
+const getBoothPolls = async (req, res) => {
+  try {
+    const polls = await BoothPoll.find()
+      .populate('createdBy', 'firstName lastName email')
+      .populate('options.vendorRequest', 'vendor boothSize durationWeeks boothLocation')
+      .populate('options.vendorRequest.vendor', 'companyName firstName lastName')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      polls
+    });
+  } catch (error) {
+    console.error('Error fetching booth polls:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching booth polls',
+      error: error.message
+    });
+  }
+};
+
+// @desc Vote in a booth poll
+// @route POST /api/vendor-requests/polls/:pollId/vote
+// @access Vendors
+const voteInBoothPoll = async (req, res) => {
+  try {
+    const { pollId } = req.params;
+    const { optionIndex } = req.body;
+
+    if (typeof optionIndex !== 'number' || optionIndex < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid option index is required'
+      });
+    }
+
+    const poll = await BoothPoll.findById(pollId);
+    if (!poll) {
+      return res.status(404).json({
+        success: false,
+        message: 'Poll not found'
+      });
+    }
+
+    if (poll.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Poll is not active'
+      });
+    }
+
+    if (optionIndex >= poll.options.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid option index'
+      });
+    }
+
+    // Check if user already voted
+    const existingVote = poll.votes.find(vote => vote.user.toString() === req.user._id.toString());
+    if (existingVote) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have already voted in this poll'
+      });
+    }
+
+    // Add vote
+    poll.votes.push({
+      user: req.user._id,
+      optionIndex
+    });
+
+    await poll.save();
+
+    res.json({
+      success: true,
+      message: 'Vote recorded successfully'
+    });
+
+  } catch (error) {
+    console.error('Error voting in booth poll:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error recording vote',
+      error: error.message
+    });
+  }
+};
+
+// @desc Close a booth poll
+// @route PATCH /api/vendor-requests/polls/:pollId/close
+// @access Events Office / Admin
+const closeBoothPoll = async (req, res) => {
+  try {
+    const { pollId } = req.params;
+
+    const poll = await BoothPoll.findById(pollId);
+    if (!poll) {
+      return res.status(404).json({
+        success: false,
+        message: 'Poll not found'
+      });
+    }
+
+    if (poll.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Poll is already closed'
+      });
+    }
+
+    poll.status = 'closed';
+    poll.closedAt = new Date();
+    await poll.save();
+
+    res.json({
+      success: true,
+      message: 'Poll closed successfully',
+      poll
+    });
+
+  } catch (error) {
+    console.error('Error closing booth poll:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error closing poll',
+      error: error.message
+    });
+  }
+};
+
+// @desc Get booth poll results
+// @route GET /api/vendor-requests/polls/:pollId/results
+// @access Events Office / Admin
+const getBoothPollResults = async (req, res) => {
+  try {
+    const { pollId } = req.params;
+
+    const poll = await BoothPoll.findById(pollId)
+      .populate('options.vendorRequest', 'vendor boothSize durationWeeks boothLocation')
+      .populate('options.vendorRequest.vendor', 'companyName firstName lastName')
+      .populate('votes.user', 'companyName firstName lastName');
+
+    if (!poll) {
+      return res.status(404).json({
+        success: false,
+        message: 'Poll not found'
+      });
+    }
+
+    // Calculate vote counts
+    const voteCounts = {};
+    poll.options.forEach((option, index) => {
+      voteCounts[index] = 0;
+    });
+
+    poll.votes.forEach(vote => {
+      voteCounts[vote.optionIndex]++;
+    });
+
+    // Sort options by vote count descending
+    const results = poll.options.map((option, index) => ({
+      optionIndex: index,
+      vendorRequest: option.vendorRequest,
+      description: option.description,
+      voteCount: voteCounts[index]
+    })).sort((a, b) => b.voteCount - a.voteCount);
+
+    res.json({
+      success: true,
+      poll: {
+        _id: poll._id,
+        title: poll.title,
+        description: poll.description,
+        status: poll.status,
+        totalVotes: poll.votes.length,
+        results
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching booth poll results:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching poll results',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getPendingVendorRequestNotifications,
   getAllVendorRequests,
@@ -1297,4 +1551,9 @@ module.exports = {
   getVendorRequestPayment,
   payVendorRequestFee,
   cancelVendorRequest,
+  createBoothPoll,
+  getBoothPolls,
+  voteInBoothPoll,
+  closeBoothPoll,
+  getBoothPollResults,
 };

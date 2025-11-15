@@ -9,7 +9,12 @@ const {
   voteForVendorRequest,
   removeVote,
   getVendorRequestVotes,
-  cancelVendorRequest
+  cancelVendorRequest,
+  createBoothPoll,
+  getBoothPolls,
+  voteInBoothPoll,
+  closeBoothPoll,
+  getBoothPollResults
 } = require('../controllers/vendorRequestController');
 const { protect, permit } = require('../middleware/authMiddleware');
 
@@ -54,6 +59,22 @@ router.get('/:id/votes', protect, getVendorRequestVotes);
 
 // Route to cancel vendor request - Vendor (only if not paid yet)
 router.delete('/:requestId/cancel', protect, permit('vendor'), cancelVendorRequest);
+
+// Booth Poll Routes
+// Create booth poll - Events Office / Admin
+router.post('/polls', protect, permit('event_office', 'admin'), createBoothPoll);
+
+// Get all booth polls - Events Office / Admin
+router.get('/polls', protect, permit('event_office', 'admin'), getBoothPolls);
+
+// Vote in booth poll - Vendors
+router.post('/polls/:pollId/vote', protect, permit('vendor'), voteInBoothPoll);
+
+// Close booth poll - Events Office / Admin
+router.patch('/polls/:pollId/close', protect, permit('event_office', 'admin'), closeBoothPoll);
+
+// Get booth poll results - Events Office / Admin
+router.get('/polls/:pollId/results', protect, permit('event_office', 'admin'), getBoothPollResults);
 
 module.exports = router;
 
