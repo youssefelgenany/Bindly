@@ -263,3 +263,77 @@ exports.getUserNotifications = async (userId, options = {}) => {
   
   return { notifications, total, unreadCount, limit, skip };
 };
+
+// Notify all eligible users when a new event is created
+exports.notifyNewEventCreated = async (event) => {
+  try {
+    // Find all users (Students, Staff, TAs, Professors, Events Office)
+    const allUsers = await User.find({
+      userType: { $in: ['Student', 'Staff', 'TA', 'Professor', 'event_office'] }
+    });
+    
+    for (const user of allUsers) {
+      // Check if notification already exists for this user and event
+      const existingNotification = await Notification.findOne({
+        recipient: user._id,
+        type: 'event_announcement',
+        'metadata.eventId': event._id.toString()
+      });
+      
+      if (!existingNotification) {
+        await Notification.create({
+          recipient: user._id,
+          type: 'event_announcement',
+          title: `New Event: ${event.title}`,
+          message: `A new event "${event.title}" has been added on ${new Date(event.startDate).toLocaleDateString()} at ${event.location}`,
+          relatedEvent: event._id,
+          priority: 'medium',
+          metadata: {
+            eventTitle: event.title,
+            eventDate: event.startDate,
+            eventType: event.type,
+            location: event.location,
+            description: event.description,
+            eventId: event._id.toString(),
+            createdBy: event.createdBy?.toString(),
+            createdAt: new Date()
+          }
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error notifying new event created:', error);
+  }
+};
+
+exports.notifyWorkshopSubmitted = async (event, submitter) => {
+  try {
+    // Find all events office users
+    const eventsOfficeUsers = await User.find({ userType: 'event_office' });
+    
+    for (const user of eventsOfficeUsers) {
+      await Notification.create({
+        recipient: user._id,
+        type: 'workshop_submission',
+        title: `New Workshop Request: ${event.title}`,
+        message: `Dr. ${submitter.firstName} ${submitter.lastName} has submitted a workshop request: "${event.title}" scheduled for ${new Date(event.startDate).toLocaleDateString()}`,
+        relatedEvent: event._id,
+        priority: 'high',
+        metadata: {
+          eventTitle: event.title,
+          eventDate: event.startDate,
+          eventType: event.type,
+          location: event.location,
+          description: event.description,
+          eventId: event._id.toString(),
+          submittedBy: submitter._id.toString(),
+          submitterName: `${submitter.firstName} ${submitter.lastName}`,
+          submitterEmail: submitter.email,
+          createdAt: new Date()
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error notifying workshop submission:', error);
+  }
+};

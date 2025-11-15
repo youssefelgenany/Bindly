@@ -64,16 +64,52 @@ exports.createGymSession = async (req, res) => {
   }
 };
 
-// Get all gym sessions
+// Get all gym sessions with filtering options
 exports.getAllGymSessions = async (req, res) => {
   try {
-    const gymSessions = await GymSession.find()
-      .populate('createdBy', 'name email')
-      .sort({ date: 1, time: 1 });
+    const {
+      status,
+      type,
+      startDate,
+      endDate,
+      instructor,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    // Build filter object
+    const filter = {};
+
+    if (status) filter.status = status;
+    if (type) filter.type = type;
+    if (instructor) filter.instructor = new RegExp(instructor, 'i');
+
+    // Date range filtering
+    if (startDate || endDate) {
+      filter.date = {};
+      if (startDate) filter.date.$gte = new Date(startDate);
+      if (endDate) filter.date.$lte = new Date(endDate);
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const gymSessions = await GymSession.find(filter)
+      .populate('createdBy', 'firstName lastName email')
+      .sort({ date: 1, time: 1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await GymSession.countDocuments(filter);
 
     res.json({
       success: true,
-      data: gymSessions
+      data: gymSessions,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
     });
   } catch (error) {
     console.error('Error fetching gym sessions:', error);
@@ -127,12 +163,70 @@ exports.updateGymSession = async (req, res) => {
     }
 
     // Check if user can update (created by them or admin/event office)
-    if (gymSession.createdBy.toString() !== req.user._id.toString() && 
+    if (gymSession.createdBy.toString() !== req.user._id.toString() &&
         !['admin', 'event_office'].includes(req.user.userType)) {
       return res.status(403).json({
         success: false,
         message: 'You can only update gym sessions you created'
       });
+    }
+
+    // Prevent updates to completed sessions (except status changes by admin/event office)
+    if (gymSession.status === 'completed' && !['admin', 'event_office'].includes(req.user.userType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot update completed sessions'
+      });
+    }
+
+    // Validate status transitions
+    if (updates.status) {
+      const allowedStatuses = ['active', 'cancelled', 'completed'];
+      if (!allowedStatuses.includes(updates.status)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid status. Allowed: ${allowedStatuses.join(', ')}`
+        });
+      }
+
+      // Prevent reactivating cancelled sessions
+      if (gymSession.status === 'cancelled' && updates.status === 'active') {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot reactivate cancelled sessions'
+        });
+      }
+
+      // Only allow completion if session date has passed
+      if (updates.status === 'completed' && new Date(gymSession.date) > new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot mark future sessions as completed'
+        });
+      }
+    }
+
+    // Validate capacity changes
+    if (updates.maxParticipants !== undefined) {
+      if (updates.maxParticipants <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Max participants must be greater than 0'
+        });
+      }
+
+      // Check current registrations
+      const currentRegistrations = await GymRegistration.countDocuments({
+        gymSession: id,
+        status: 'registered'
+      });
+
+      if (updates.maxParticipants < currentRegistrations) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot reduce capacity below current registrations (${currentRegistrations})`
+        });
+      }
     }
 
     // Check if status is being changed to 'cancelled'
@@ -158,8 +252,8 @@ exports.updateGymSession = async (req, res) => {
 
         for (const registration of registrations) {
           if (registration.user && registration.user.email) {
-            const userName = registration.user.firstName 
-              ? `${registration.user.firstName} ${registration.user.lastName || ''}`.trim() 
+            const userName = registration.user.firstName
+              ? `${registration.user.firstName} ${registration.user.lastName || ''}`.trim()
               : registration.user.email;
 
             try {
@@ -175,11 +269,11 @@ exports.updateGymSession = async (req, res) => {
               if (emailResult.sent) {
                 console.log(`✅ Cancellation email sent to ${registration.user.email}`);
               } else {
-                console.error(`❌ Failed to send cancellation email to ${registration.user.email}:`, 
+                console.error(`❌ Failed to send cancellation email to ${registration.user.email}:`,
                   emailResult.reason || emailResult.error);
               }
             } catch (emailError) {
-              console.error(`❌ Exception sending cancellation email to ${registration.user.email}:`, 
+              console.error(`❌ Exception sending cancellation email to ${registration.user.email}:`,
                 emailError.message);
               // Continue with other users even if one fails
             }
@@ -290,6 +384,186 @@ exports.deleteGymSession = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error deleting gym session',
+      error: error.message
+    });
+  }
+};
+
+// Bulk update gym sessions (Events Office/Admin only)
+exports.bulkUpdateGymSessions = async (req, res) => {
+  try {
+    const { sessionIds, updates } = req.body;
+
+    if (!Array.isArray(sessionIds) || sessionIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'sessionIds must be a non-empty array'
+      });
+    }
+
+    if (!updates || Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'updates object is required'
+      });
+    }
+
+    // Validate status if being updated
+    if (updates.status) {
+      const allowedStatuses = ['active', 'cancelled', 'completed'];
+      if (!allowedStatuses.includes(updates.status)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid status. Allowed: ${allowedStatuses.join(', ')}`
+        });
+      }
+    }
+
+    // Find sessions and check permissions
+    const sessions = await GymSession.find({ _id: { $in: sessionIds } });
+
+    if (sessions.length !== sessionIds.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Some gym sessions not found'
+      });
+    }
+
+    // Check permissions for each session
+    for (const session of sessions) {
+      if (session.createdBy.toString() !== req.user._id.toString() &&
+          !['admin', 'event_office'].includes(req.user.userType)) {
+        return res.status(403).json({
+          success: false,
+          message: `You can only update gym sessions you created. Session ${session._id} was created by someone else.`
+        });
+      }
+    }
+
+    // Perform bulk update
+    const result = await GymSession.updateMany(
+      { _id: { $in: sessionIds } },
+      { $set: updates },
+      { runValidators: false }
+    );
+
+    // If cancelling sessions, send notification emails
+    if (updates.status === 'cancelled') {
+      for (const session of sessions) {
+        if (session.status === 'active') {
+          try {
+            const registrations = await GymRegistration.find({
+              gymSession: session._id,
+              status: 'registered'
+            }).populate('user', 'email firstName lastName');
+
+            if (registrations.length > 0) {
+              console.log(`📧 Sending cancellation emails for session ${session._id} to ${registrations.length} users...`);
+
+              for (const registration of registrations) {
+                if (registration.user && registration.user.email) {
+                  const userName = registration.user.firstName
+                    ? `${registration.user.firstName} ${registration.user.lastName || ''}`.trim()
+                    : registration.user.email;
+
+                  try {
+                    const emailResult = await sendGymCancellationEmail(
+                      registration.user.email,
+                      userName,
+                      session.type,
+                      session.date,
+                      session.time,
+                      session.location
+                    );
+
+                    if (emailResult.sent) {
+                      console.log(`✅ Cancellation email sent to ${registration.user.email}`);
+                    }
+                  } catch (emailError) {
+                    console.error(`❌ Exception sending cancellation email:`, emailError.message);
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error sending cancellation emails for session:', session._id, error);
+          }
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully updated ${result.modifiedCount} gym sessions`,
+      updatedCount: result.modifiedCount
+    });
+
+  } catch (error) {
+    console.error('Error bulk updating gym sessions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error bulk updating gym sessions',
+      error: error.message
+    });
+  }
+};
+
+// Get gym session statistics (Events Office/Admin only)
+exports.getGymSessionStats = async (req, res) => {
+  try {
+    // Check if user has permission
+    if (!['admin', 'event_office'].includes(req.user.userType)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to view statistics'
+      });
+    }
+
+    const stats = await GymSession.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalCapacity: { $sum: '$maxParticipants' }
+        }
+      }
+    ]);
+
+    const totalSessions = await GymSession.countDocuments();
+    const activeSessions = await GymSession.countDocuments({ status: 'active' });
+    const cancelledSessions = await GymSession.countDocuments({ status: 'cancelled' });
+    const completedSessions = await GymSession.countDocuments({ status: 'completed' });
+
+    // Get upcoming sessions (next 30 days)
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+    const upcomingSessions = await GymSession.countDocuments({
+      date: { $gte: new Date(), $lte: thirtyDaysFromNow },
+      status: 'active'
+    });
+
+    // Get total registrations
+    const totalRegistrations = await GymRegistration.countDocuments({ status: 'registered' });
+
+    res.json({
+      success: true,
+      data: {
+        totalSessions,
+        activeSessions,
+        cancelledSessions,
+        completedSessions,
+        upcomingSessions,
+        totalRegistrations,
+        statusBreakdown: stats
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching gym session statistics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching statistics',
       error: error.message
     });
   }
@@ -533,4 +807,18 @@ exports.getGymSessionRegistrations = async (req, res) => {
       error: error.message
     });
   }
+};
+
+module.exports = {
+  createGymSession: exports.createGymSession,
+  getAllGymSessions: exports.getAllGymSessions,
+  getGymSessionById: exports.getGymSessionById,
+  updateGymSession: exports.updateGymSession,
+  deleteGymSession: exports.deleteGymSession,
+  bulkUpdateGymSessions: exports.bulkUpdateGymSessions,
+  getGymSessionStats: exports.getGymSessionStats,
+  registerForGymSession: exports.registerForGymSession,
+  getMyGymRegistrations: exports.getMyGymRegistrations,
+  cancelGymRegistration: exports.cancelGymRegistration,
+  getGymSessionRegistrations: exports.getGymSessionRegistrations
 };

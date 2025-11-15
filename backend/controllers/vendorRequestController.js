@@ -1,8 +1,16 @@
 // controllers/vendorRequestController.js
 const mongoose = require('mongoose');
+const path = require('path');
+const fs = require('fs').promises;
 const VendorRequest = require('../models/vendorRequest');
 const Event = require('../models/eventModel');
 const VendorVote = require('../models/vendorVoteModel');
+const BoothPoll = require('../models/boothPollModel');
+const Payment = require('../models/paymentModel');
+const User = require('../models/userModel');
+const { sendVendorRequestStatusEmail } = require('../utils/sendVendorRequestStatusEmail');
+const { sendReceiptEmail } = require('../utils/sendReceiptEmail');
+const { calculateVendorParticipationFee } = require('../utils/calculateVendorFee');
 
 const getPendingVendorRequestNotifications = async (req, res) => {
   try {
@@ -28,12 +36,12 @@ const getPendingVendorRequestNotifications = async (req, res) => {
         eventType: request.eventType || (request.bazaar ? 'bazaar' : request.booth ? 'booth' : null),
         event: eventInfo
           ? {
-              id: eventInfo._id,
-              name: eventInfo.name || eventInfo.title || request.eventName || 'Untitled Event',
-              location: eventInfo.location || null,
-              startDate: eventInfo.startDate || null,
-              endDate: eventInfo.endDate || null
-            }
+            id: eventInfo._id,
+            name: eventInfo.name || eventInfo.title || request.eventName || 'Untitled Event',
+            location: eventInfo.location || null,
+            startDate: eventInfo.startDate || null,
+            endDate: eventInfo.endDate || null
+          }
           : null,
         vendor: {
           id: vendorInfo._id || null,
@@ -182,6 +190,7 @@ const getVendorRequestById = async (req, res) => {
 const createVendorRequest = async (req, res) => {
   try {
     const {
+      eventId,
       eventType,
       attendees,
       boothSize,
@@ -193,6 +202,7 @@ const createVendorRequest = async (req, res) => {
     } = req.body;
 
     console.log('🔍 createVendorRequest - Received data:', {
+      eventId,
       eventType,
       attendeesCount: attendees?.length,
       boothSize,
@@ -207,9 +217,9 @@ const createVendorRequest = async (req, res) => {
     const vendorId = req.user._id || req.user.id;
     console.log('🔍 createVendorRequest - Vendor ID:', vendorId);
     console.log('🔍 createVendorRequest - req.user:', req.user);
-    
+
     if (!vendorId) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         message: 'User ID not found in authentication token',
         error: 'Missing vendor ID'
       });
@@ -217,14 +227,14 @@ const createVendorRequest = async (req, res) => {
 
     // Validate required fields
     if (!eventType) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Event type is required',
         error: 'Missing eventType field'
       });
     }
 
     if (!attendees || !Array.isArray(attendees) || attendees.length === 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'At least one attendee is required',
         error: 'Missing or empty attendees array'
       });
@@ -232,7 +242,7 @@ const createVendorRequest = async (req, res) => {
 
     // Validate attendees structure
     if (!Array.isArray(attendees)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Attendees must be an array',
         error: 'Invalid attendees format'
       });
@@ -241,19 +251,19 @@ const createVendorRequest = async (req, res) => {
     for (let i = 0; i < attendees.length; i++) {
       const attendee = attendees[i];
       if (!attendee || typeof attendee !== 'object') {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: `Attendee at index ${i} is invalid`,
           error: 'Invalid attendee structure'
         });
       }
       if (!attendee.name || typeof attendee.name !== 'string' || attendee.name.trim() === '') {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: `Attendee at index ${i} must have a valid name`,
           error: 'Missing or invalid attendee name'
         });
       }
       if (!attendee.email || typeof attendee.email !== 'string' || attendee.email.trim() === '') {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: `Attendee at index ${i} must have a valid email`,
           error: 'Missing or invalid attendee email'
         });
@@ -268,7 +278,7 @@ const createVendorRequest = async (req, res) => {
     // Validate eventType enum
     const validEventTypes = ['bazaar', 'booth', 'standaloneBooth', 'platformBooth'];
     if (!validEventTypes.includes(eventType)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: `Invalid event type. Must be one of: ${validEventTypes.join(', ')}`,
         error: `Invalid eventType: ${eventType}`
       });
@@ -276,7 +286,7 @@ const createVendorRequest = async (req, res) => {
 
     // Validate boothSize if provided
     if (boothSize && !['2x2', '4x4'].includes(boothSize)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Booth size must be either "2x2" or "4x4"',
         error: `Invalid boothSize: ${boothSize}`
       });
@@ -286,7 +296,7 @@ const createVendorRequest = async (req, res) => {
     if (durationWeeks !== undefined && durationWeeks !== null) {
       const duration = parseInt(durationWeeks);
       if (isNaN(duration) || duration < 1 || duration > 4) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: 'Duration must be a number between 1 and 4 weeks',
           error: `Invalid durationWeeks: ${durationWeeks}`
         });
@@ -301,7 +311,7 @@ const createVendorRequest = async (req, res) => {
         'auditorium-hall', 'cafeteria-area'
       ];
       if (!validLocations.includes(boothLocation)) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: `Invalid booth location. Must be one of: ${validLocations.join(', ')}`,
           error: `Invalid boothLocation: ${boothLocation}`
         });
@@ -315,6 +325,19 @@ const createVendorRequest = async (req, res) => {
       attendees,
       status: 'pending'
     };
+
+    // Link event based on type
+    if (eventId) {
+      if (eventType === 'bazaar') {
+        requestData.bazaar = eventId;
+      } else if (eventType === 'booth') {
+        requestData.booth = eventId;
+      } else if (eventType === 'standaloneBooth') {
+        requestData.standaloneBooth = eventId;
+      } else if (eventType === 'platformBooth') {
+        requestData.booth = eventId;
+      }
+    }
 
     // Only add optional fields if they have valid values
     if (boothSize && (boothSize === '2x2' || boothSize === '4x4')) {
@@ -364,7 +387,7 @@ const createVendorRequest = async (req, res) => {
   } catch (error) {
     console.error('❌ Error creating vendor request:', error);
     console.error('❌ Error stack:', error.stack);
-    
+
     // Handle Mongoose validation errors
     if (error.name === 'ValidationError') {
       const validationErrors = {};
@@ -372,7 +395,7 @@ const createVendorRequest = async (req, res) => {
         validationErrors[key] = error.errors[key].message;
       });
       console.error('❌ Mongoose Validation Errors:', validationErrors);
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Validation error',
         error: error.message,
         validationErrors: Object.values(validationErrors),
@@ -382,14 +405,14 @@ const createVendorRequest = async (req, res) => {
 
     // Handle duplicate key errors
     if (error.code === 11000) {
-      return res.status(409).json({ 
+      return res.status(409).json({
         message: 'A vendor request with these details already exists',
         error: error.message
       });
     }
 
-    res.status(500).json({ 
-      message: 'Error creating vendor request', 
+    res.status(500).json({
+      message: 'Error creating vendor request',
       error: error.message,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
@@ -410,14 +433,63 @@ const updateVendorRequestStatus = async (req, res) => {
   try {
     // Find the request first to check if it's a platform booth request
     const request = await VendorRequest.findById(id).populate('vendor', 'companyName firstName lastName email');
-    
+
     if (!request) {
       return res.status(404).json({ message: "Vendor request not found" });
     }
 
     // Update the request status
     request.status = status;
+
+    // If accepting, calculate fee and set payment deadline
+    if (status === 'accepted') {
+      try {
+        // Calculate participation fee
+        const fee = calculateVendorParticipationFee(request);
+        request.participationFee = fee;
+        request.paymentStatus = 'pending';
+
+        // Set payment deadline: 3 days from now
+        const deadline = new Date();
+        deadline.setDate(deadline.getDate() + 3);
+        request.paymentDeadline = deadline;
+
+        console.log(`💰 Calculated participation fee: ${fee} EGP`);
+        console.log(`📅 Payment deadline: ${deadline.toISOString()}`);
+      } catch (error) {
+        console.error('❌ Error calculating participation fee:', error);
+        // Continue with acceptance even if fee calculation fails
+        // Admin can manually set fee later if needed
+      }
+    } else if (status === 'rejected') {
+      // Clear payment info if rejected
+      request.participationFee = null;
+      request.paymentStatus = null;
+      request.paymentDeadline = null;
+      request.paidAt = null;
+    }
+
     await request.save();
+
+    // Send email notification to vendor (don't wait for it to complete)
+    if (request.vendor && request.vendor.email) {
+      sendVendorRequestStatusEmail(request.vendor, request, status)
+        .then(result => {
+          if (result.sent) {
+            console.log(`✅ Email notification sent to vendor: ${request.vendor.email}`);
+          } else if (result.stored) {
+            console.log(`✅ Email notification stored in database for vendor: ${request.vendor.email}`);
+          } else {
+            console.log(`⚠️ Email notification could not be sent/stored for vendor: ${request.vendor.email}`);
+          }
+        })
+        .catch(error => {
+          console.error('❌ Error sending vendor request status email:', error);
+          // Don't throw - email failure shouldn't break the status update
+        });
+    } else {
+      console.log('⚠️ Vendor email not found, skipping email notification');
+    }
 
     // If accepting a platform booth request, create an event
     if (status === 'accepted' && request.eventType === 'platformBooth') {
@@ -433,13 +505,13 @@ const updateVendorRequestStatus = async (req, res) => {
           endDate.setDate(endDate.getDate() + (durationWeeks * 7));
 
           // Format location name
-          const locationName = request.boothLocation 
+          const locationName = request.boothLocation
             ? request.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
             : 'Platform';
 
           // Create event title
-          const vendorName = request.vendor?.companyName || 
-            `${request.vendor?.firstName || ''} ${request.vendor?.lastName || ''}`.trim() || 
+          const vendorName = request.vendor?.companyName ||
+            `${request.vendor?.firstName || ''} ${request.vendor?.lastName || ''}`.trim() ||
             'Vendor';
           const eventTitle = `Platform Booth - ${vendorName} - ${locationName}`;
 
@@ -447,7 +519,7 @@ const updateVendorRequestStatus = async (req, res) => {
           const newEvent = new Event({
             title: eventTitle,
             description: request.message || `Platform booth reservation by ${vendorName} at ${locationName}`,
-            type: 'standaloneBooth',
+            type: 'booth',  // Use 'booth' instead of 'standaloneBooth' as Event model enum doesn't include 'standaloneBooth'
             startDate: startDate,
             endDate: endDate,
             location: locationName,
@@ -550,7 +622,7 @@ const voteForVendorRequest = async (req, res) => {
     });
   } catch (error) {
     console.error('Error voting for vendor request:', error);
-    
+
     // Handle duplicate key error
     if (error.code === 11000) {
       return res.status(400).json({
@@ -669,6 +741,803 @@ const getVendorRequestVotes = async (req, res) => {
   }
 };
 
+// @desc Upload individual IDs for a vendor request
+// @route POST /api/vendor-requests/:requestId/individual-ids
+// @access Vendor (owner of the request)
+const uploadIndividualIds = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const vendorId = req.user._id || req.user.id;
+
+    console.log('🔍 uploadIndividualIds - Request ID:', requestId);
+    console.log('🔍 uploadIndividualIds - Vendor ID:', vendorId);
+
+    // Validate MongoDB ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(requestId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request ID format. Please provide a valid vendor request ID.'
+      });
+    }
+
+    // Find the vendor request
+    const vendorRequest = await VendorRequest.findById(requestId);
+    if (!vendorRequest) {
+      console.log('❌ Vendor request not found with ID:', requestId);
+
+      // Check if there are any vendor requests for this vendor
+      const vendorRequests = await VendorRequest.find({ vendor: vendorId }).select('_id eventName eventType status').limit(5);
+      console.log('📋 Available vendor requests for this vendor:', vendorRequests.length);
+
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor request not found',
+        hint: vendorRequests.length > 0
+          ? `Available request IDs: ${vendorRequests.map(r => r._id).join(', ')}`
+          : 'You may not have any vendor requests yet. Create one first.'
+      });
+    }
+
+    // Verify the vendor owns this request
+    const requestVendorId = vendorRequest.vendor.toString();
+    if (requestVendorId !== vendorId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only upload IDs for your own vendor requests'
+      });
+    }
+
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an individual IDs file (PDF or image)'
+      });
+    }
+
+    // Validate file type
+    const fileExt = path.extname(req.file.originalname).toLowerCase();
+    const validExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.jfif', '.jpe', '.jif', '.webp', '.gif', '.bmp'];
+
+    if (!validExtensions.includes(fileExt)) {
+      // Delete the uploaded file if invalid
+      try {
+        await fs.unlink(req.file.path);
+      } catch (error) {
+        console.log('Error deleting invalid file:', error.message);
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: `Invalid file type. Allowed types: ${validExtensions.join(', ')}`
+      });
+    }
+
+    // Delete old file if exists
+    if (vendorRequest.individualIdsPath) {
+      const oldFilePath = path.join(__dirname, '..', vendorRequest.individualIdsPath);
+      try {
+        await fs.unlink(oldFilePath);
+        console.log('Deleted old individual IDs file:', oldFilePath);
+      } catch (error) {
+        // File might not exist, continue
+        console.log('Note: Could not delete old file:', error.message);
+      }
+    }
+
+    // Update vendor request with new file path
+    vendorRequest.individualIdsPath = '/uploads/' + req.file.filename;
+    await vendorRequest.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Individual IDs uploaded successfully',
+      vendorRequest: {
+        id: vendorRequest._id,
+        eventType: vendorRequest.eventType,
+        eventName: vendorRequest.eventName,
+        hasIndividualIds: !!vendorRequest.individualIdsPath,
+        individualIdsPath: vendorRequest.individualIdsPath
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading individual IDs:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error uploading individual IDs',
+      error: error.message
+    });
+  }
+};
+
+// @desc Get payment details for a vendor request
+// @route GET /api/vendor-requests/:requestId/payment
+// @access Vendor (owner of the request)
+const getVendorRequestPayment = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const vendorId = req.user._id || req.user.id;
+
+    // Find the vendor request
+    const vendorRequest = await VendorRequest.findById(requestId);
+    if (!vendorRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor request not found'
+      });
+    }
+
+    // Verify the vendor owns this request
+    const requestVendorId = vendorRequest.vendor.toString();
+    if (requestVendorId !== vendorId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only view payment details for your own vendor requests'
+      });
+    }
+
+    // Check if request is accepted
+    if (vendorRequest.status !== 'accepted') {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment is only required for accepted requests'
+      });
+    }
+
+    // Check if payment is required
+    if (!vendorRequest.participationFee || vendorRequest.participationFee <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No payment required for this request'
+      });
+    }
+
+    // Check if already paid
+    const existingPayment = await Payment.findOne({
+      vendorRequest: requestId,
+      user: vendorId,
+      status: 'success'
+    });
+
+    // Calculate days until deadline
+    let daysUntilDeadline = null;
+    let isOverdue = false;
+    if (vendorRequest.paymentDeadline) {
+      const now = new Date();
+      const deadline = new Date(vendorRequest.paymentDeadline);
+      const diffTime = deadline - now;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      daysUntilDeadline = diffDays;
+      isOverdue = diffTime < 0;
+    }
+
+    return res.status(200).json({
+      success: true,
+      payment: {
+        requestId: vendorRequest._id,
+        eventName: vendorRequest.eventName,
+        eventType: vendorRequest.eventType,
+        amount: vendorRequest.participationFee,
+        paymentStatus: vendorRequest.paymentStatus,
+        paymentDeadline: vendorRequest.paymentDeadline,
+        paidAt: vendorRequest.paidAt,
+        daysUntilDeadline: daysUntilDeadline,
+        isOverdue: isOverdue,
+        isPaid: existingPayment !== null || vendorRequest.paymentStatus === 'paid'
+      }
+    });
+  } catch (error) {
+    console.error('Error getting vendor request payment:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error getting payment details',
+      error: error.message
+    });
+  }
+};
+
+// @desc Pay participation fee for a vendor request
+// @route POST /api/vendor-requests/:requestId/payment
+// @access Vendor (owner of the request)
+const payVendorRequestFee = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { paymentMethod } = req.body;
+    const vendorId = req.user._id || req.user.id;
+
+    if (!paymentMethod || !['wallet', 'card'].includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment method must be 'wallet' or 'card'"
+      });
+    }
+
+    // Find the vendor request
+    const vendorRequest = await VendorRequest.findById(requestId).populate('vendor');
+    if (!vendorRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor request not found'
+      });
+    }
+
+    // Verify the vendor owns this request
+    const requestVendorId = vendorRequest.vendor._id.toString();
+    if (requestVendorId !== vendorId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only pay for your own vendor requests'
+      });
+    }
+
+    // Check if request is accepted
+    if (vendorRequest.status !== 'accepted') {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment is only required for accepted requests'
+      });
+    }
+
+    // Check if payment is required
+    if (!vendorRequest.participationFee || vendorRequest.participationFee <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No payment required for this request'
+      });
+    }
+
+    // Check if already paid
+    if (vendorRequest.paymentStatus === 'paid') {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment already completed for this request'
+      });
+    }
+
+    // Check if payment deadline has passed
+    if (vendorRequest.paymentDeadline && new Date() > new Date(vendorRequest.paymentDeadline)) {
+      vendorRequest.paymentStatus = 'overdue';
+      await vendorRequest.save();
+      return res.status(400).json({
+        success: false,
+        message: 'Payment deadline has passed. Please contact the Events Office.'
+      });
+    }
+
+    // Handle wallet payment
+    if (paymentMethod === 'wallet') {
+      const vendor = await User.findById(vendorId);
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: 'Vendor not found'
+        });
+      }
+
+      if (!vendor.walletBalance || vendor.walletBalance < vendorRequest.participationFee) {
+        return res.status(400).json({
+          success: false,
+          message: 'Insufficient wallet balance',
+          required: vendorRequest.participationFee,
+          available: vendor.walletBalance || 0
+        });
+      }
+
+      // Deduct from wallet
+      vendor.walletBalance -= vendorRequest.participationFee;
+      vendor.walletTransactions.push({
+        amount: -vendorRequest.participationFee,
+        type: 'payment',
+        description: `Participation fee for ${vendorRequest.eventName}`,
+        balanceAfter: vendor.walletBalance,
+        reference: vendorRequest._id.toString()
+      });
+      await vendor.save();
+
+      // Create payment record
+      const payment = new Payment({
+        user: vendorId,
+        vendorRequest: requestId,
+        amount: vendorRequest.participationFee,
+        paymentMethod: 'wallet',
+        status: 'success'
+      });
+      await payment.save();
+
+      // Update vendor request
+      vendorRequest.paymentStatus = 'paid';
+      vendorRequest.paidAt = new Date();
+      await vendorRequest.save();
+
+      // Send payment receipt email (don't wait for it to complete)
+      // Get vendor's personal name for greeting
+      const vendorPersonalName = `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || vendor.companyName || 'Vendor';
+      const vendorCompanyName = vendor.companyName || 'Your Company';
+
+      // Build event title with more details
+      let eventTitle = vendorRequest.eventName || 'Vendor Request';
+      if (vendorRequest.eventType) {
+        const eventTypeDisplay = {
+          'bazaar': 'Bazaar',
+          'booth': 'Booth',
+          'standaloneBooth': 'Standalone Booth',
+          'platformBooth': 'Platform Booth'
+        }[vendorRequest.eventType] || vendorRequest.eventType;
+
+        if (vendorRequest.eventName) {
+          eventTitle = `${eventTypeDisplay} - ${vendorRequest.eventName}`;
+        } else {
+          eventTitle = `${eventTypeDisplay} Participation`;
+        }
+      }
+
+      // Build additional details for receipt
+      const receiptDetails = {
+        eventType: vendorRequest.eventType,
+        boothSize: vendorRequest.boothSize,
+        durationWeeks: vendorRequest.durationWeeks,
+        boothLocation: vendorRequest.boothLocation
+      };
+
+      sendReceiptEmail(
+        vendor.email,
+        vendorPersonalName,
+        eventTitle,
+        vendorRequest.participationFee,
+        'wallet',
+        vendorRequest.paidAt,
+        receiptDetails
+      )
+        .then(result => {
+          if (result.sent) {
+            console.log(`✅ Payment receipt email sent to vendor: ${vendor.email}`);
+          } else if (result.reason === 'SMTP not configured') {
+            console.log(`📧 Payment receipt email stored in database for vendor: ${vendor.email}`);
+            console.log('📧 View emails at: http://localhost:5000/api/dev/emails');
+          } else {
+            console.log(`⚠️ Payment receipt email could not be sent for vendor: ${vendor.email}`);
+          }
+        })
+        .catch(error => {
+          console.error('❌ Error sending payment receipt email:', error);
+          // Don't throw - email failure shouldn't break the payment
+        });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Payment completed successfully',
+        payment: {
+          id: payment._id,
+          amount: payment.amount,
+          method: payment.paymentMethod,
+          status: payment.status,
+          paidAt: vendorRequest.paidAt
+        }
+      });
+    }
+
+    // Handle card payment (Stripe)
+    if (paymentMethod === 'card') {
+      const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
+
+      if (!stripe) {
+        return res.status(500).json({
+          success: false,
+          message: 'Card payments are not available. Stripe is not configured.'
+        });
+      }
+
+      // Get vendor details
+      const vendor = await User.findById(vendorId);
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: 'Vendor not found'
+        });
+      }
+
+      const vendorName = vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Vendor';
+
+      // Create payment record first
+      const payment = new Payment({
+        user: vendorId,
+        vendorRequest: requestId,
+        amount: vendorRequest.participationFee,
+        paymentMethod: 'card',
+        status: 'pending'
+      });
+      await payment.save();
+
+      // Create Stripe checkout session
+      const clientUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'egp',
+              product_data: {
+                name: `Participation Fee - ${vendorRequest.eventName}`,
+                description: `${vendorRequest.eventType} participation fee for ${vendorName}`
+              },
+              unit_amount: vendorRequest.participationFee * 100 // Convert to piastres (EGP * 100)
+            },
+            quantity: 1
+          }
+        ],
+        mode: 'payment',
+        success_url: `${clientUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}&type=vendor-request&requestId=${requestId}`,
+        cancel_url: `${clientUrl}/payment-cancel?type=vendor-request&requestId=${requestId}`,
+        metadata: {
+          paymentId: payment._id.toString(),
+          vendorRequestId: requestId,
+          userId: vendorId.toString(),
+          type: 'vendor-request'
+        }
+      });
+
+      // Update payment with session ID
+      payment.stripeSessionId = session.id;
+      await payment.save();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Stripe checkout session created',
+        checkoutUrl: session.url,
+        sessionId: session.id
+      });
+    }
+  } catch (error) {
+    console.error('Error processing vendor request payment:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error processing payment',
+      error: error.message
+    });
+  }
+};
+
+// @desc Cancel a vendor request (vendor can only cancel if payment hasn't been made)
+// @route DELETE /api/vendor-requests/:requestId
+// @access Vendor (owner only)
+const cancelVendorRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const vendorId = req.user._id || req.user.id;
+
+    console.log('🔍 cancelVendorRequest - Request ID:', requestId);
+    console.log('🔍 cancelVendorRequest - Vendor ID:', vendorId);
+
+    // Validate request ID format
+    if (!mongoose.Types.ObjectId.isValid(requestId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request ID format'
+      });
+    }
+
+    // Find the vendor request
+    const vendorRequest = await VendorRequest.findById(requestId);
+    if (!vendorRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor request not found'
+      });
+    }
+
+    // Check if vendor owns this request
+    const requestVendorId = vendorRequest.vendor.toString();
+    if (requestVendorId !== vendorId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only cancel your own vendor requests'
+      });
+    }
+
+    // Check if request is already cancelled
+    if (vendorRequest.status === 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: 'This vendor request has already been cancelled'
+      });
+    }
+
+    // Check if payment has been made
+    if (vendorRequest.paymentStatus === 'paid' || vendorRequest.paidAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot cancel vendor request. Payment has already been made. Please contact the Events Office for assistance.',
+        paymentStatus: vendorRequest.paymentStatus,
+        paidAt: vendorRequest.paidAt
+      });
+    }
+
+    // Cancel the request
+    vendorRequest.status = 'cancelled';
+
+    // Clear payment-related fields if they exist (since request is cancelled before payment)
+    if (vendorRequest.paymentStatus === 'pending') {
+      vendorRequest.paymentStatus = null;
+      vendorRequest.paymentDeadline = null;
+    }
+
+    await vendorRequest.save();
+
+    console.log('✅ Vendor request cancelled successfully:', requestId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vendor request cancelled successfully',
+      vendorRequest: {
+        id: vendorRequest._id,
+        status: vendorRequest.status,
+        eventType: vendorRequest.eventType,
+        eventName: vendorRequest.eventName
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error cancelling vendor request:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error cancelling vendor request',
+      error: error.message
+    });
+  }
+};
+
+// @desc Create a booth poll for conflicting vendor requests
+// @route POST /api/vendor-requests/polls
+// @access Events Office / Admin
+const createBoothPoll = async (req, res) => {
+  try {
+    const { title, description, vendorRequestIds } = req.body;
+
+    if (!title || !description || !Array.isArray(vendorRequestIds) || vendorRequestIds.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title, description, and at least 2 vendor request IDs are required'
+      });
+    }
+
+    // Verify all vendor requests exist and are pending
+    const vendorRequests = await VendorRequest.find({
+      _id: { $in: vendorRequestIds },
+      status: 'pending'
+    }).populate('vendor', 'companyName firstName lastName');
+
+    if (vendorRequests.length !== vendorRequestIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Some vendor requests not found or not in pending status'
+      });
+    }
+
+    // Create poll options
+    const options = vendorRequests.map(vr => ({
+      vendorRequest: vr._id,
+      description: `${vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`} - ${vr.boothSize || 'N/A'} booth, ${vr.durationWeeks || 'N/A'} weeks`
+    }));
+
+    const poll = new BoothPoll({
+      title,
+      description,
+      options,
+      createdBy: req.user._id
+    });
+
+    await poll.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Booth poll created successfully',
+      poll
+    });
+
+  } catch (error) {
+    console.error('Error creating booth poll:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating booth poll',
+      error: error.message
+    });
+  }
+};
+
+// @desc Get all booth polls
+// @route GET /api/vendor-requests/polls
+// @access Events Office / Admin
+const getBoothPolls = async (req, res) => {
+  try {
+    const polls = await BoothPoll.find()
+      .populate('createdBy', 'firstName lastName email')
+      .populate('options.vendorRequest', 'vendor boothSize durationWeeks boothLocation')
+      .populate('options.vendorRequest.vendor', 'companyName firstName lastName')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      polls
+    });
+  } catch (error) {
+    console.error('Error fetching booth polls:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching booth polls',
+      error: error.message
+    });
+  }
+};
+
+// @desc Vote in a booth poll
+// @route POST /api/vendor-requests/polls/:pollId/vote
+// @access Vendors
+const voteInBoothPoll = async (req, res) => {
+  try {
+    const { pollId } = req.params;
+    const { optionIndex } = req.body;
+
+    if (typeof optionIndex !== 'number' || optionIndex < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid option index is required'
+      });
+    }
+
+    const poll = await BoothPoll.findById(pollId);
+    if (!poll) {
+      return res.status(404).json({
+        success: false,
+        message: 'Poll not found'
+      });
+    }
+
+    if (poll.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Poll is not active'
+      });
+    }
+
+    if (optionIndex >= poll.options.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid option index'
+      });
+    }
+
+    // Check if user already voted
+    const existingVote = poll.votes.find(vote => vote.user.toString() === req.user._id.toString());
+    if (existingVote) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have already voted in this poll'
+      });
+    }
+
+    // Add vote
+    poll.votes.push({
+      user: req.user._id,
+      optionIndex
+    });
+
+    await poll.save();
+
+    res.json({
+      success: true,
+      message: 'Vote recorded successfully'
+    });
+
+  } catch (error) {
+    console.error('Error voting in booth poll:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error recording vote',
+      error: error.message
+    });
+  }
+};
+
+// @desc Close a booth poll
+// @route PATCH /api/vendor-requests/polls/:pollId/close
+// @access Events Office / Admin
+const closeBoothPoll = async (req, res) => {
+  try {
+    const { pollId } = req.params;
+
+    const poll = await BoothPoll.findById(pollId);
+    if (!poll) {
+      return res.status(404).json({
+        success: false,
+        message: 'Poll not found'
+      });
+    }
+
+    if (poll.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Poll is already closed'
+      });
+    }
+
+    poll.status = 'closed';
+    poll.closedAt = new Date();
+    await poll.save();
+
+    res.json({
+      success: true,
+      message: 'Poll closed successfully',
+      poll
+    });
+
+  } catch (error) {
+    console.error('Error closing booth poll:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error closing poll',
+      error: error.message
+    });
+  }
+};
+
+// @desc Get booth poll results
+// @route GET /api/vendor-requests/polls/:pollId/results
+// @access Events Office / Admin
+const getBoothPollResults = async (req, res) => {
+  try {
+    const { pollId } = req.params;
+
+    const poll = await BoothPoll.findById(pollId)
+      .populate('options.vendorRequest', 'vendor boothSize durationWeeks boothLocation')
+      .populate('options.vendorRequest.vendor', 'companyName firstName lastName')
+      .populate('votes.user', 'companyName firstName lastName');
+
+    if (!poll) {
+      return res.status(404).json({
+        success: false,
+        message: 'Poll not found'
+      });
+    }
+
+    // Calculate vote counts
+    const voteCounts = {};
+    poll.options.forEach((option, index) => {
+      voteCounts[index] = 0;
+    });
+
+    poll.votes.forEach(vote => {
+      voteCounts[vote.optionIndex]++;
+    });
+
+    // Sort options by vote count descending
+    const results = poll.options.map((option, index) => ({
+      optionIndex: index,
+      vendorRequest: option.vendorRequest,
+      description: option.description,
+      voteCount: voteCounts[index]
+    })).sort((a, b) => b.voteCount - a.voteCount);
+
+    res.json({
+      success: true,
+      poll: {
+        _id: poll._id,
+        title: poll.title,
+        description: poll.description,
+        status: poll.status,
+        totalVotes: poll.votes.length,
+        results
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching booth poll results:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching poll results',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getPendingVendorRequestNotifications,
   getAllVendorRequests,
@@ -678,4 +1547,13 @@ module.exports = {
   voteForVendorRequest,
   removeVote,
   getVendorRequestVotes,
+  uploadIndividualIds,
+  getVendorRequestPayment,
+  payVendorRequestFee,
+  cancelVendorRequest,
+  createBoothPoll,
+  getBoothPolls,
+  voteInBoothPoll,
+  closeBoothPoll,
+  getBoothPollResults,
 };

@@ -65,10 +65,34 @@ const vendorRequestSchema = new mongoose.Schema({
   message: {
     type: String,
   },
-  // Status for the Events Office/Admin to update
+  // Path to uploaded individual IDs document (PDF or image)
+  individualIdsPath: {
+    type: String,
+    default: null
+  },
+  // Payment information
+  participationFee: {
+    type: Number,
+    default: null,
+    min: 0
+  },
+  paymentStatus: {
+    type: String,
+    enum: ["pending", "paid", "overdue", "cancelled"],
+    default: null
+  },
+  paymentDeadline: {
+    type: Date,
+    default: null
+  },
+  paidAt: {
+    type: Date,
+    default: null
+  },
+  // Status for the Events Office/Admin to update, or vendor can cancel if not paid
   status: {
     type: String,
-    enum: ["pending", "accepted", "rejected"],
+    enum: ["pending", "accepted", "rejected", "cancelled"],
     default: "pending",
   },
   // Automatically track when the request was submitted

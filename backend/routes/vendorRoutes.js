@@ -6,7 +6,11 @@ const {
   getMyAcceptedUpcoming,
   getMyRequests,
   getLoyaltyProgramVendors,
-  getAllVendors
+  getAllVendors,
+  applyToLoyaltyProgram,
+  getMyLoyaltyApplication,
+  updateLoyaltyApplication,
+  cancelLoyaltyProgram
 } = require('../controllers/vendorController.js');
 const {
   downloadVendorDocument,
@@ -34,6 +38,38 @@ router.get(
     'Events Office'
   ),
   getLoyaltyProgramVendors
+);
+
+// Apply to Vendor Loyalty Program (Vendor only)
+router.post(
+  '/loyalty-program/apply',
+  protect,
+  permit('Vendor'),
+  applyToLoyaltyProgram
+);
+
+// Get My Loyalty Program Application (Vendor only)
+router.get(
+  '/loyalty-program/my-application',
+  protect,
+  permit('Vendor'),
+  getMyLoyaltyApplication
+);
+
+// Update My Loyalty Program Application (Vendor only)
+router.patch(
+  '/loyalty-program/my-application',
+  protect,
+  permit('Vendor'),
+  updateLoyaltyApplication
+);
+
+// Cancel My Loyalty Program Application (Vendor only)
+router.delete(
+  '/loyalty-program/my-application',
+  protect,
+  permit('Vendor'),
+  cancelLoyaltyProgram
 );
 
 // List all available documents for a vendor (Events Office / Admin only)

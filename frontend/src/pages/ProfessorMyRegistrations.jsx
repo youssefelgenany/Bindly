@@ -8,7 +8,8 @@ const ProfessorMyRegistrations = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedRows, setExpandedRows] = useState(new Set());
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -163,6 +164,28 @@ const ProfessorMyRegistrations = () => {
     return `In ${diffDays} days`;
   };
 
+  const formatTableDate = (dateString) => {
+    if (!dateString) return 'TBD';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const toggleRowExpansion = (registrationId) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(registrationId)) {
+        newSet.delete(registrationId);
+      } else {
+        newSet.add(registrationId);
+      }
+      return newSet;
+    });
+  };
+
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
     : user?.name || 'Professor';
@@ -174,7 +197,7 @@ const ProfessorMyRegistrations = () => {
         justifyContent: 'center',
         alignItems: 'center',
         height: '100vh',
-        backgroundColor: '#f8f6f6'
+        backgroundColor: '#f6f7f8'
       }}>
         <div style={{
           width: '2.5rem',
@@ -193,7 +216,7 @@ const ProfessorMyRegistrations = () => {
       display: 'flex',
       height: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
+      backgroundColor: '#f6f7f8'
     }}>
       {/* Left Sidebar */}
       <aside style={{
@@ -211,7 +234,7 @@ const ProfessorMyRegistrations = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           {/* Logo and Branding */}
           {sidebarOpen && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div style={{
                 width: '2.5rem',
                 height: '2.5rem',
@@ -222,9 +245,7 @@ const ProfessorMyRegistrations = () => {
                 justifyContent: 'center',
                 color: '#FFFFFF'
               }}>
-                <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
-                </svg>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <h1 style={{
@@ -260,8 +281,9 @@ const ProfessorMyRegistrations = () => {
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
+                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                  textDecoration: 'none',
+                  color: '#FFFFFF'
                 }}
                 onMouseEnter={(e) => {
                   if (!isActiveRoute('/dashboard')) {
@@ -274,16 +296,13 @@ const ProfessorMyRegistrations = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
-                }}>
+                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.25rem' }}>
                   dashboard
                 </span>
                 <p style={{
-                  color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: '#FFFFFF',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/dashboard') ? '700' : '500',
+                  fontWeight: '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
@@ -313,9 +332,9 @@ const ProfessorMyRegistrations = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
                   explore
                 </span>
@@ -352,11 +371,11 @@ const ProfessorMyRegistrations = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
-                  event
+                  event_note
                 </span>
                 <p style={{
                   color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
@@ -391,21 +410,23 @@ const ProfessorMyRegistrations = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
                   work
                 </span>
-                <p style={{
-                  color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/professor/my-workshops') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  My Workshops
-                </p>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/professor/my-workshops') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    My Workshops
+                  </p>
+                )}
               </Link>
 
               <Link
@@ -430,21 +451,23 @@ const ProfessorMyRegistrations = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
                   calendar_month
                 </span>
-                <p style={{
-                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  View Gym Sessions
-                </p>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    View Gym Sessions
+                  </p>
+                )}
               </Link>
 
               <Link
@@ -469,21 +492,23 @@ const ProfessorMyRegistrations = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
                   add_circle
                 </span>
-                <p style={{
-                  color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/professor/create-workshop') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Create Workshop
-                </p>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/professor/create-workshop') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    Create Workshop
+                  </p>
+                )}
               </Link>
             </nav>
           )}
@@ -572,7 +597,7 @@ const ProfessorMyRegistrations = () => {
               lineHeight: '1.25',
               margin: 0
             }}>
-              My Events
+              Bindly
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -627,8 +652,35 @@ const ProfessorMyRegistrations = () => {
           flex: 1,
           padding: '2rem',
           overflowY: 'auto',
-          backgroundColor: '#f8f6f6'
+          backgroundColor: '#f6f7f8'
         }}>
+          {/* Page Title Box */}
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            padding: '1rem 1.5rem',
+            borderRadius: '0.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            marginBottom: '1.5rem',
+            borderLeft: '4px solid #1D3557'
+          }}>
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              My Events
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '1rem',
+              fontWeight: '400',
+              margin: '0.25rem 0 0 0'
+            }}>
+              View and manage your event registrations.
+            </p>
+          </div>
+
           {error && (
             <div style={{
               padding: '0.75rem 1rem',
@@ -699,188 +751,252 @@ const ProfessorMyRegistrations = () => {
               </button>
             </div>
           ) : (
-            <>
-              <div style={{
-                marginBottom: '1.5rem',
-                color: '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: '500'
-              }}>
-                Found {registrations.length} registration{registrations.length !== 1 ? 's' : ''}
-              </div>
-              
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-                gap: '1.5rem'
-              }}>
-                {registrations.map(registration => (
-                  <div
-                    key={registration.id}
-                    onClick={() => setSelectedRegistration(registration)}
-                    style={{
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '0.75rem',
-                      padding: '1.5rem',
-                      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      border: '1px solid #e5e7eb',
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
-                      e.currentTarget.style.borderColor = '#1e40af';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
-                      e.currentTarget.style.borderColor = '#e5e7eb';
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                      <div style={{
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: getEventTypeColor(registration.eventType),
-                        color: '#FFFFFF',
-                        fontSize: '0.6875rem',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}>
-                        {registration.eventType}
-                      </div>
-                      <div style={{
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: getStatusColor(registration.status),
-                        color: '#FFFFFF',
-                        fontSize: '0.6875rem',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}>
-                        {getDisplayStatus(registration.status)}
-                      </div>
-                    </div>
-
-                    <h3 style={{
-                      color: '#1D3557',
-                      fontSize: '1.125rem',
+            <div style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+              overflowX: 'auto'
+            }}>
+              <table style={{ width: '100%', textAlign: 'left' }}>
+                <thead style={{ borderBottom: '1px solid #e5e7eb' }}>
+                  <tr>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
                       fontWeight: '600',
-                      marginBottom: '1rem',
-                      marginTop: 0,
-                      lineHeight: '1.4'
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>
-                      {registration.eventTitle}
-                    </h3>
-                    
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.625rem',
-                      marginBottom: '1rem',
-                      flex: 1
+                      Event Name
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
-                      }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
-                        }}>
-                          calendar_today
-                        </span>
-                        <span>{formatDate(registration.eventDate)}</span>
-                        {getDaysUntilEvent(registration.eventDate) && (
-                          <span style={{
-                            fontSize: '0.75rem',
-                            color: '#1e40af',
-                            fontWeight: '600',
-                            backgroundColor: '#eff6ff',
-                            padding: '0.25rem 0.625rem',
-                            borderRadius: '0.375rem',
-                            marginLeft: 'auto'
-                          }}>
-                            {getDaysUntilEvent(registration.eventDate)}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
-                      }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
-                        }}>
-                          location_on
-                        </span>
-                        <span>{registration.eventLocation}</span>
-                      </div>
-                      {registration.capacity && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
-                          color: '#6b7280'
-                        }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            people
-                          </span>
-                          <span>{registration.registeredCount || 0}/{registration.capacity} registered</span>
-                        </div>
-                      )}
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
-                      }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
-                        }}>
-                          schedule
-                        </span>
-                        <span>Registered: {formatDate(registration.registeredAt)}</span>
-                      </div>
-                    </div>
+                      Type
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Date
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Location
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      textAlign: 'center'
+                    }}>
+                      Status
+                    </th>
+                    <th style={{ padding: '1rem 1.5rem', width: '48px' }}></th>
+                  </tr>
+                </thead>
+                <tbody style={{ borderTop: '1px solid #e5e7eb' }}>
+                  {registrations.map(registration => {
+                    const isExpanded = expandedRows.has(registration.id);
+                    const statusColors = {
+                      approved: { bg: '#d1fae5', text: '#065f46' },
+                      registered: { bg: '#d1fae5', text: '#065f46' },
+                      pending: { bg: '#fef3c7', text: '#92400e' },
+                      rejected: { bg: '#fee2e2', text: '#991b1b' }
+                    };
+                    const statusStyle = statusColors[registration.status?.toLowerCase()] || statusColors.pending;
 
-                    {registration.eventDescription && (
-                      <p style={{
-                        color: '#6b7280',
-                        fontSize: '0.8125rem',
-                        marginBottom: '1rem',
-                        marginTop: 0,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        lineHeight: '1.5'
-                      }}>
-                        {registration.eventDescription}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
+                    return (
+                      <React.Fragment key={registration.id}>
+                        <tr style={{
+                          borderBottom: '1px solid #e5e7eb',
+                          transition: 'background-color 0.2s',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        onClick={() => toggleRowExpansion(registration.id)}
+                        >
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            color: '#111827'
+                          }}>
+                            {registration.eventTitle}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}>
+                            {registration.eventType ? registration.eventType.charAt(0).toUpperCase() + registration.eventType.slice(1) : 'Event'}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}>
+                            {formatTableDate(registration.eventDate)}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}>
+                            {registration.eventLocation}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'center'
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              backgroundColor: statusStyle.bg,
+                              color: statusStyle.text
+                            }}>
+                              {getDisplayStatus(registration.status)}
+                            </span>
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'center'
+                          }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleRowExpansion(registration.id);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '0.25rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#6b7280',
+                                transition: 'transform 0.2s'
+                              }}
+                            >
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.25rem',
+                                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.2s'
+                              }}>
+                                expand_more
+                              </span>
+                            </button>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr style={{ backgroundColor: '#f9fafb' }}>
+                            <td colSpan="6" style={{ padding: '1.5rem' }}>
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                gap: '1.5rem'
+                              }}>
+                                <div>
+                                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.5rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</div>
+                                  <div style={{ color: '#374151', fontSize: '0.875rem', lineHeight: '1.5' }}>
+                                    {registration.eventDescription || 'No description available.'}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.5rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Event Details</div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    <div style={{ color: '#374151', fontSize: '0.875rem' }}>
+                                      <strong>Start:</strong> {formatDate(registration.eventDate)}
+                                    </div>
+                                    {registration.eventEndDate && (
+                                      <div style={{ color: '#374151', fontSize: '0.875rem' }}>
+                                        <strong>End:</strong> {formatDate(registration.eventEndDate)}
+                                      </div>
+                                    )}
+                                    {registration.capacity && (
+                                      <div style={{ color: '#374151', fontSize: '0.875rem' }}>
+                                        <strong>Capacity:</strong> {registration.registeredCount || 0}/{registration.capacity}
+                                      </div>
+                                    )}
+                                    <div style={{ color: '#374151', fontSize: '0.875rem' }}>
+                                      <strong>Registered:</strong> {formatDate(registration.registeredAt)}
+                                    </div>
+                                    {getDaysUntilEvent(registration.eventDate) && (
+                                      <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        padding: '0.25rem 0.625rem',
+                                        borderRadius: '0.375rem',
+                                        backgroundColor: '#eff6ff',
+                                        color: '#1e40af',
+                                        fontSize: '0.75rem',
+                                        fontWeight: '600',
+                                        marginTop: '0.25rem',
+                                        width: 'fit-content'
+                                      }}>
+                                        {getDaysUntilEvent(registration.eventDate)}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem' }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedRegistration(registration);
+                                  }}
+                                  style={{
+                                    padding: '0.5rem 1rem',
+                                    borderRadius: '0.5rem',
+                                    backgroundColor: '#1e40af',
+                                    color: '#FFFFFF',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '0.875rem',
+                                    fontWeight: '500',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => e.target.style.backgroundColor = '#1e3a8a'}
+                                  onMouseLeave={(e) => e.target.style.backgroundColor = '#1e40af'}
+                                >
+                                  View Details
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </main>

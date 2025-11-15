@@ -130,7 +130,7 @@ const StudentCourtsView = () => {
       display: 'flex',
       height: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
+      backgroundColor: '#f6f7f8'
     }}>
       {/* Left Sidebar */}
       <aside style={{
@@ -169,7 +169,7 @@ const StudentCourtsView = () => {
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  Student Events
+                  Student Portal
                 </h1>
                 <p style={{
                   color: 'rgba(241, 250, 238, 0.7)',
@@ -431,15 +431,14 @@ const StudentCourtsView = () => {
       }}>
         {/* Header */}
         <header style={{
-          backgroundColor: '#FFFFFF',
-          padding: '1.5rem 2rem',
-          borderBottom: '1px solid #e5e7eb',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '1rem'
+          borderBottom: '1px solid #e2e8f0',
+          padding: '1rem 2.5rem',
+          backgroundColor: '#FFFFFF'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               style={{
@@ -447,41 +446,71 @@ const StudentCourtsView = () => {
                 border: 'none',
                 cursor: 'pointer',
                 padding: '0.5rem',
-                borderRadius: '0.375rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#1D3557'
               }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f3f4f6';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'transparent';
-              }}
+              aria-label="Toggle sidebar"
             >
               <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
                 menu
               </span>
             </button>
-            <div>
-              <h1 style={{
-                color: '#1D3557',
-                fontSize: '1.5rem',
+            <h2 style={{
+              color: '#1D3557',
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              lineHeight: '1.25',
+              margin: 0
+            }}>
+              Bindly
+            </h2>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
                 fontWeight: '600',
+                color: '#1D3557',
                 margin: 0
               }}>
-                Campus Courts
-              </h1>
+                {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.name || 'Student'}
+              </p>
               <p style={{
+                fontSize: '0.75rem',
                 color: '#6b7280',
-                fontSize: '0.875rem',
-                margin: 0,
-                marginTop: '0.25rem'
+                margin: 0
               }}>
-                View all courts and their availability
+                Student
               </p>
             </div>
+            {user?.profilePicturePath ? (
+              <img
+                src={`http://localhost:5000${user.profilePicturePath}`}
+                alt="User profile"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                borderRadius: '50%',
+                backgroundColor: '#1D3557',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF',
+                fontWeight: '600'
+              }}>
+                {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
+              </div>
+            )}
           </div>
         </header>
 
@@ -489,8 +518,35 @@ const StudentCourtsView = () => {
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '2rem'
+          padding: '2rem',
+          backgroundColor: '#f6f7f8'
         }}>
+          {/* Page Title Box */}
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            padding: '1rem 1.5rem',
+            borderRadius: '0.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            marginBottom: '1.5rem',
+            borderLeft: '4px solid #1D3557'
+          }}>
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              Campus Courts
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '1rem',
+              fontWeight: '400',
+              margin: '0.25rem 0 0 0'
+            }}>
+              View all courts and their availability.
+            </p>
+          </div>
 
           {/* Courts Grid */}
           {loading ? (

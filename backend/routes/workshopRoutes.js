@@ -37,10 +37,10 @@ router.post('/', protect, permit('Professor'), createWorkshop);
 router.put('/:id', protect, permit('Professor'), updateWorkshop);
 router.delete('/:id', protect, permit('Professor'), deleteWorkshop);
 
-// Events Office routes (no professor-id needed)
-router.get('/', getAllWorkshops);
-router.put('/:id/approve', approveWorkshop);
-router.put('/:id/reject', rejectWorkshop);
-router.put('/:id/request-edits', requestEdits);
+// Events Office routes (require authentication and Events Office role)
+router.get('/', protect, permit('Event Office', 'Events Office', 'event_office', 'admin'), getAllWorkshops);
+router.put('/:id/approve', protect, permit('Event Office', 'Events Office', 'event_office', 'admin'), approveWorkshop);
+router.put('/:id/reject', protect, permit('Event Office', 'Events Office', 'event_office', 'admin'), rejectWorkshop);
+router.put('/:id/request-edits', protect, permit('Event Office', 'Events Office', 'event_office', 'admin'), requestEdits);
 
 module.exports = router;
