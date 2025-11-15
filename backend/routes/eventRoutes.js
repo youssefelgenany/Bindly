@@ -16,7 +16,10 @@ const {
   createConference,
   getSalesReport,
   generateQRCode,
-  exportRegistrations
+  exportRegistrations,
+  getPastEventsForArchiving,
+  archiveSelectedEvents,
+  getArchivedEvents
 } = require("../controllers/eventController");
 const { verifyPayment } = require("../controllers/paymentVerificationController");
 const { sendWorkshopCompletionEmails } = require("../controllers/workshopCompletionController");
@@ -100,6 +103,15 @@ router.get("/:id/registrations", protect, getEventRegistrations);
 //   protect,
 //   deleteComment
 // );
+
+// 🗂️ Get past events available for archiving (Admin or Event Office only)
+router.get("/past-for-archiving", protect, permit("admin", "event_office"), getPastEventsForArchiving);
+
+// 🗂️ Archive selected events (Admin or Event Office only)
+router.post("/archive-selected", protect, permit("admin", "event_office"), archiveSelectedEvents);
+
+// 📁 Get archived events (Admin or Event Office only)
+router.get("/archived", protect, permit("admin", "event_office"), getArchivedEvents);
 
 // 🔍 Get a specific event by its ID
 router.get("/:id", protect, getEventById);

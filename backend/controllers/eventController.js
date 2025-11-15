@@ -9,7 +9,7 @@ const { sendReceiptEmail } = require("../utils/sendReceiptEmail");
 const { sendRefundEmail } = require("../utils/sendRefundEmail");
 const { sendCommentWarningEmail } = require("../utils/sendCommentWarningEmail");
 const { salesReport } = require("../scripts/test-sales-report");
-const { notifyNewEventCreated } = require("../services/notificationService");
+const { notifyNewEventCreated, notifyWorkshopSubmitted } = require("../services/notificationService");
 // Initialize Stripe if secret key is available
 let stripe = null;
 if (process.env.STRIPE_SECRET_KEY) {
@@ -77,6 +77,12 @@ exports.createEvent = async (req, res) => {
 
     // Send notifications to all eligible users about the new event
     await notifyNewEventCreated(newEvent);
+
+    // Notify events office if a workshop is submitted by a doctor (Professor)
+    if (type === 'workshop' && req.user.userType === 'Professor') {
+      console.log('Workshop submitted by Professor, notifying events office');
+      await notifyWorkshopSubmitted(newEvent, req.user);
+    }
 
     res.status(201).json({ msg: "Event created successfully", event: newEvent });
   } catch (err) {
@@ -219,6 +225,7 @@ exports.getAllEvents = async (req, res) => {
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     const baseMatch = {
       type: { $in: validTypes }, // Only include valid event types
+      archived: false, // Exclude archived events by default
       $and: [
         { title: { $exists: true } },
         { title: { $ne: null } },
@@ -1734,6 +1741,132 @@ exports.cleanupInvalidEvents = async (req, res) => {
       success: false,
       msg: "Server error during cleanup",
       error: err.message
+    });
+  }
+};
+
+// Get past events that can be archived (Events Office/Admin only)
+exports.getPastEventsForArchiving = async (req, res) => {
+  try {
+    const now = new Date();
+    
+    // Find all events that have ended (including already archived ones)
+    const pastEvents = await Event.find({
+      endDate: { $lt: now, $exists: true, $ne: null }
+    }).sort({ endDate: -1 });
+    
+    res.status(200).json({
+      success: true,
+      data: pastEvents,
+      count: pastEvents.length,
+      message: `${pastEvents.length} past events found`
+    });
+  } catch (err) {
+    console.error("❌ Error fetching past events for archiving:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+// Archive specific events by IDs (Events Office/Admin only)
+exports.archiveSelectedEvents = async (req, res) => {
+  try {
+    const { eventIds } = req.body;
+    
+    if (!eventIds || !Array.isArray(eventIds) || eventIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "eventIds array is required and cannot be empty"
+      });
+    }
+    
+    // Validate that all provided IDs are valid ObjectIds
+    const validIds = eventIds.filter(id => {
+      return require('mongoose').Types.ObjectId.isValid(id);
+    });
+    
+    if (validIds.length !== eventIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: "All eventIds must be valid ObjectIds"
+      });
+    }
+    
+    const now = new Date();
+    
+    // First, identify which events are eligible for archiving (not already archived)
+    const eligibleEvents = await Event.find({
+      _id: { $in: validIds },
+      endDate: { $lt: now, $exists: true, $ne: null },
+      $or: [
+        { archived: false },
+        { archived: { $exists: false } }
+      ]
+    }).select('title type endDate');
+    
+    // Archive the eligible events
+    const result = await Event.updateMany(
+      {
+        _id: { $in: eligibleEvents.map(e => e._id) },
+        endDate: { $lt: now, $exists: true, $ne: null },
+        $or: [
+          { archived: false },
+          { archived: { $exists: false } }
+        ]
+      },
+      { archived: true }
+    );
+    
+    res.status(200).json({
+      success: true,
+      message: `Successfully archived ${result.modifiedCount} events`,
+      archivedCount: result.modifiedCount,
+      archivedEvents: eligibleEvents
+    });
+  } catch (err) {
+    console.error("❌ Error archiving selected events:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+// Get archived events (Events Office/Admin only)
+exports.getArchivedEvents = async (req, res) => {
+  try {
+    const { page = 1, limit = 50, type } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const query = { archived: true };
+    if (type) {
+      query.type = type;
+    }
+    
+    const archivedEvents = await Event.find(query)
+      .sort({ endDate: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    const total = await Event.countDocuments(query);
+    
+    res.status(200).json({
+      success: true,
+      data: archivedEvents,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (err) {
+    console.error("❌ Error fetching archived events:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
     });
   }
 };

@@ -48,6 +48,10 @@ const eventSchema = new mongoose.Schema({
     enum: ['pending', 'approved', 'rejected', 'cancelled'],
     default: 'approved',
   },
+  archived: {
+    type: Boolean,
+    default: false,
+  },
   isRestricted: {
     type: Boolean,
     default: false,
@@ -76,7 +80,7 @@ const eventSchema = new mongoose.Schema({
     required: false, // Faculty responsible for workshop
   },
   professors: {
-    type: String,
+    type: [String],
     required: false, // Professor(s) conducting workshop
   },
   bannerFile: {
