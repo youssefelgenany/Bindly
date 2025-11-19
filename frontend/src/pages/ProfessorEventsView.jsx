@@ -248,16 +248,21 @@ const ProfessorEventsView = () => {
     const startDate = new Date(event.startDate);
     if (isNaN(startDate.getTime())) return false;
     
-    // Filter out past events - use endDate to allow events that haven't ended yet
+    // Filter out past events - only filter if the event has completely ended
     const now = new Date();
-    const eventEndDate = event.endDate ? new Date(event.endDate) : startDate;
-    // Only filter out if endDate is valid and has passed
-    if (event.endDate && !isNaN(eventEndDate.getTime()) && eventEndDate < now) {
-      return false;
-    }
-    // If no endDate, use startDate (for backward compatibility)
-    if (!event.endDate && startDate < now) {
-      return false;
+    if (event.endDate) {
+      const eventEndDate = new Date(event.endDate);
+      // Only filter out if endDate is valid and has passed
+      if (!isNaN(eventEndDate.getTime()) && eventEndDate < now) {
+        return false;
+      }
+    } else {
+      // If no endDate, use startDate (for backward compatibility)
+      // But be lenient - only filter if startDate is clearly in the past (more than 1 day ago)
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      if (startDate < oneDayAgo) {
+        return false;
+      }
     }
     
     const typeMatch = filter === 'all' || (event.type && event.type === filter);
