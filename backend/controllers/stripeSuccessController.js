@@ -2,6 +2,7 @@ const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STR
 const Payment = require('../models/paymentModel');
 const Registration = require('../models/registrationModel');
 const StudentRegistration = require('../models/studentRegistrationModel');
+const VendorRequest = require('../models/vendorRequest');
 const User = require('../models/userModel');
 const { sendReceiptEmail } = require('../utils/sendReceiptEmail');
 
@@ -57,55 +58,105 @@ module.exports = async (req, res) => {
     await payment.save();
     console.log('✅ Payment status updated');
 
-    // Mark registration as paid
-    console.log('🔍 Looking for registration...');
-    let registration = await Registration.findOne({
-      event: payment.event,
-      user: payment.user
-    });
-
-    if (!registration) {
-      console.log('🔍 Registration not found in Registration model, checking StudentRegistration...');
-      const user = await User.findById(payment.user);
-      if (user && user.email) {
-        registration = await StudentRegistration.findOne({
-          event: payment.event,
-          studentEmail: user.email.toLowerCase()
-        });
+    // Check if this is a vendor request payment
+    if (payment.vendorRequest) {
+      console.log('🔍 Processing vendor request payment...');
+      const vendorRequest = await VendorRequest.findById(payment.vendorRequest);
+      if (vendorRequest) {
+        vendorRequest.paymentStatus = 'paid';
+        vendorRequest.paidAt = new Date();
+        await vendorRequest.save();
+        console.log('✅ Vendor request marked as paid');
+      } else {
+        console.error('❌ Vendor request not found for payment:', payment.vendorRequest);
       }
-    }
-
-    if (registration) {
-      console.log('✅ Found registration, marking as paid...');
-      registration.paid = true;
-      await registration.save();
-      console.log('✅ Registration marked as paid');
     } else {
-      console.error('❌ Registration not found for payment:', payment._id);
+      // Handle event registration payment
+      console.log('🔍 Looking for registration...');
+      let registration = await Registration.findOne({
+        event: payment.event,
+        user: payment.user
+      });
+
+      if (!registration) {
+        console.log('🔍 Registration not found in Registration model, checking StudentRegistration...');
+        const user = await User.findById(payment.user);
+        if (user && user.email) {
+          registration = await StudentRegistration.findOne({
+            event: payment.event,
+            studentEmail: user.email.toLowerCase()
+          });
+        }
+      }
+
+      if (registration) {
+        console.log('✅ Found registration, marking as paid...');
+        registration.paid = true;
+        await registration.save();
+        console.log('✅ Registration marked as paid');
+      } else {
+        console.error('❌ Registration not found for payment:', payment._id);
+      }
     }
 
-    // Send receipt email
-    console.log('📧 Sending receipt email...');
-    const user = await User.findById(payment.user);
-    if (user) {
-      const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
-      const Event = require('../models/eventModel');
-      const Trip = require('../models/tripModel');
-      let event = await Event.findById(payment.event);
-      if (!event) {
-        event = await Trip.findById(payment.event);
-      }
-      const eventTitle = event ? (event.title || event.name || 'Event') : 'Event';
-      
-      try {
-        const emailResult = await sendReceiptEmail(
-          user.email,
-          userName,
-          eventTitle,
-          payment.amount,
-          'card',
-          new Date()
-        );
+      // Send receipt email
+      console.log('📧 Sending receipt email...');
+      const user = await User.findById(payment.user);
+      if (user) {
+        // Get vendor's personal name for greeting
+        const vendorPersonalName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.companyName || user.email;
+        let eventTitle = 'Event';
+        let receiptDetails = {};
+        
+        if (payment.vendorRequest) {
+          const vendorRequest = await VendorRequest.findById(payment.vendorRequest);
+          if (vendorRequest) {
+            // Build event title with more details
+            if (vendorRequest.eventType) {
+              const eventTypeDisplay = {
+                'bazaar': 'Bazaar',
+                'booth': 'Booth',
+                'standaloneBooth': 'Standalone Booth',
+                'platformBooth': 'Platform Booth'
+              }[vendorRequest.eventType] || vendorRequest.eventType;
+              
+              if (vendorRequest.eventName) {
+                eventTitle = `${eventTypeDisplay} - ${vendorRequest.eventName}`;
+              } else {
+                eventTitle = `${eventTypeDisplay} Participation`;
+              }
+            } else {
+              eventTitle = vendorRequest.eventName || 'Vendor Request';
+            }
+            
+            // Build additional details for receipt
+            receiptDetails = {
+              eventType: vendorRequest.eventType,
+              boothSize: vendorRequest.boothSize,
+              durationWeeks: vendorRequest.durationWeeks,
+              boothLocation: vendorRequest.boothLocation
+            };
+          }
+        } else {
+          const Event = require('../models/eventModel');
+          const Trip = require('../models/tripModel');
+          let event = await Event.findById(payment.event);
+          if (!event) {
+            event = await Trip.findById(payment.event);
+          }
+          eventTitle = event ? (event.title || event.name || 'Event') : 'Event';
+        }
+        
+        try {
+          const emailResult = await sendReceiptEmail(
+            user.email,
+            vendorPersonalName,
+            eventTitle,
+            payment.amount,
+            'card',
+            new Date(),
+            receiptDetails
+          );
         if (emailResult.sent) {
           console.log('✅ Receipt email sent successfully');
         } else {

@@ -131,6 +131,62 @@ export const eventsApiService = {
         error: error.response?.data || error.message,
       };
     }
+  },
+  
+  // 💬 Get comments for an event
+  getComments: async (eventId) => {
+    try {
+      const response = await eventsApi.get(`/${eventId}/comments`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch comments',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+  
+  // 💬 Submit a comment on an event
+  submitComment: async (eventId, text) => {
+    try {
+      const response = await eventsApi.post(`/${eventId}/comments`, { text });
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to submit comment',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+  
+  // 🗑️ Delete a comment (owner or admin)
+  deleteComment: async (eventId, commentId, reason = null) => {
+    try {
+      // For DELETE with body, we need to use axios directly with config
+      const token = localStorage.getItem('token');
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      };
+      
+      // Add body if reason is provided
+      if (reason) {
+        config.data = { reason };
+      }
+      
+      const response = await eventsApi.delete(`/${eventId}/comments/${commentId}`, config);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to delete comment',
+        error: error.response?.data || error.message,
+      };
+    }
   }
 };
 

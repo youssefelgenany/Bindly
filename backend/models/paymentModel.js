@@ -9,7 +9,12 @@ const paymentSchema = new mongoose.Schema({
   event: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Event',
-    required: true
+    required: false // Not required for vendor request payments
+  },
+  vendorRequest: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'VendorRequest',
+    required: false // For vendor participation fee payments
   },
   amount: {
     type: Number,

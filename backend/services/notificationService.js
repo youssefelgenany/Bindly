@@ -269,7 +269,7 @@ exports.notifyNewEventCreated = async (event) => {
   try {
     // Find all users (Students, Staff, TAs, Professors, Events Office)
     const allUsers = await User.find({
-      userType: { $in: ['Student', 'Staff', 'TA', 'Professor', 'Events Office'] }
+      userType: { $in: ['Student', 'Staff', 'TA', 'Professor', 'event_office'] }
     });
     
     for (const user of allUsers) {
@@ -303,5 +303,37 @@ exports.notifyNewEventCreated = async (event) => {
     }
   } catch (error) {
     console.error('Error notifying new event created:', error);
+  }
+};
+
+exports.notifyWorkshopSubmitted = async (event, submitter) => {
+  try {
+    // Find all events office users
+    const eventsOfficeUsers = await User.find({ userType: 'event_office' });
+    
+    for (const user of eventsOfficeUsers) {
+      await Notification.create({
+        recipient: user._id,
+        type: 'workshop_submission',
+        title: `New Workshop Request: ${event.title}`,
+        message: `Dr. ${submitter.firstName} ${submitter.lastName} has submitted a workshop request: "${event.title}" scheduled for ${new Date(event.startDate).toLocaleDateString()}`,
+        relatedEvent: event._id,
+        priority: 'high',
+        metadata: {
+          eventTitle: event.title,
+          eventDate: event.startDate,
+          eventType: event.type,
+          location: event.location,
+          description: event.description,
+          eventId: event._id.toString(),
+          submittedBy: submitter._id.toString(),
+          submitterName: `${submitter.firstName} ${submitter.lastName}`,
+          submitterEmail: submitter.email,
+          createdAt: new Date()
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error notifying workshop submission:', error);
   }
 };

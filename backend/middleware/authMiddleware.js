@@ -17,13 +17,22 @@ const protect = async (req, res, next) => {
     // decoded.userId must match what you sign in your login
     // Try to find user in User model first
     let user = await User.findById(decoded.userId).select('-password');
-    
+
     // If not found in User model, try Admin model
     if (!user) {
       user = await Admin.findById(decoded.userId).select('-password');
     }
-    
+
     if (!user) return res.status(401).json({ msg: 'User not found' });
+
+    // Check if user is blocked
+    if (user.status === 'blocked') {
+      return res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_BLOCKED',
+        message: 'Your account has been blocked. Please contact an administrator.'
+      });
+    }
 
     // normalize the shape used everywhere
     req.user = {
@@ -58,8 +67,31 @@ const permit = (...roles) => {
     }
 
     const userRole = normalizeRole(req.user.userType);
+
+    // Debug logging (can be removed in production)
+    console.log('🔍 Permission check:', {
+      userRole: userRole,
+      allowedRoles: allowed,
+      userType: req.user.userType,
+      role: req.user.role,
+      userId: req.user._id
+    });
+
     if (!allowed.includes(userRole)) {
-      return res.status(403).json({ success: false, message: 'Insufficient permissions' });
+      console.log('❌ Permission denied:', {
+        userRole,
+        allowedRoles: allowed,
+        userType: req.user.userType
+      });
+      return res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions',
+        debug: process.env.NODE_ENV === 'development' ? {
+          userRole,
+          allowedRoles: allowed,
+          userType: req.user.userType
+        } : undefined
+      });
     }
 
     next();
