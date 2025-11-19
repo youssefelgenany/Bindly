@@ -8,7 +8,6 @@ const Payment = require("../models/paymentModel");
 const { sendReceiptEmail } = require("../utils/sendReceiptEmail");
 const { sendRefundEmail } = require("../utils/sendRefundEmail");
 const { salesReport } = require("../scripts/test-sales-report");
-const { notifyNewEventCreated } = require("../services/notificationService");
 
 // Initialize Stripe if secret key is available
 let stripe = null;
@@ -73,10 +72,6 @@ exports.createEvent = async (req, res) => {
     });
 
     await newEvent.save();
-    
-    // Send notifications to all eligible users about the new event
-    await notifyNewEventCreated(newEvent);
-    
     res.status(201).json({ msg: "Event created successfully", event: newEvent });
   } catch (err) {
     console.error("❌ Error creating event:", err);
@@ -506,6 +501,16 @@ exports.getAllEventsForStudents = async (req, res) => {
       }
     }
     console.log('🔍 Final filter:', filter);
+    
+    // Log workshop events found
+    const workshopTest = await Event.find({ type: 'workshop', status: 'approved' }).limit(3).select('title status startDate endDate');
+    console.log('🔍 getAllEventsForStudents - Sample approved workshops in DB:', workshopTest.map(w => ({
+      title: w.title,
+      status: w.status,
+      startDate: w.startDate,
+      endDate: w.endDate,
+      endDateIsFuture: w.endDate ? new Date(w.endDate) > new Date() : 'no endDate'
+    })));
 
     // Get events with creator information
     const pipeline = [
