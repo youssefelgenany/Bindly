@@ -466,45 +466,6 @@ const AdminDashboard = () => {
                   Platform Booths
                 </p>
               </Link>
-
-              <Link
-                to="/admin/manage"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/admin/manage') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/admin/manage')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/admin/manage')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/admin/manage') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  settings
-                </span>
-                <p style={{
-                  color: isActiveRoute('/admin/manage') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/admin/manage') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Management
-                </p>
-              </Link>
             </nav>
           )}
         </div>
@@ -643,7 +604,7 @@ const AdminDashboard = () => {
         {/* Content Area */}
         <div style={{
           flex: 1,
-          padding: '2.5rem',
+          padding: '2.5rem 6rem',
           overflowY: 'auto'
         }}>
           {loading ? (
@@ -652,23 +613,61 @@ const AdminDashboard = () => {
             </div>
           ) : (
             <>
-              {/* Page Name Box */}
+              {/* Dashboard Banner with Background Image */}
               <div style={{
-                backgroundColor: '#FFFFFF',
-                padding: '1rem 1.5rem',
-                borderRadius: '0.5rem',
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                marginBottom: '2rem',
-                borderLeft: '4px solid #1D3557'
+                position: 'relative',
+                height: '140px',
+                borderRadius: '0.75rem',
+                overflow: 'hidden',
+                marginBottom: '1.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
               }}>
-                <h3 style={{
-                  color: '#1D3557',
-                  fontSize: '1.25rem',
-                  fontWeight: '600',
-                  margin: 0
+                {/* Background Image */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: 'url(/assets/images/dashboardimage.jpg)',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: 'cover',
+                  filter: 'blur(2px)'
+                }}></div>
+                {/* Blue Overlay */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: 'rgba(29, 53, 87, 0.75)'
+                }}></div>
+                {/* Content */}
+                <div style={{
+                  position: 'relative',
+                  zIndex: 10,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'flex-start',
+                  padding: '2rem 2.5rem',
+                  color: '#FFFFFF'
                 }}>
-                  Dashboard
-                </h3>
+                  <h3 style={{
+                    color: '#FFFFFF',
+                    fontSize: '1.75rem',
+                    fontWeight: '700',
+                    margin: 0,
+                    marginBottom: '0.5rem'
+                  }}>
+                    Dashboard
+                  </h3>
+                  <p style={{
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    fontSize: '0.875rem',
+                    fontWeight: '400',
+                    margin: 0
+                  }}>
+                    Overview of your platform, users, events, and upcoming deadlines.
+                  </p>
+                </div>
               </div>
               
               <div style={{
@@ -678,7 +677,7 @@ const AdminDashboard = () => {
               }}>
                 {/* Left Column - Quick Stats and Recent Activity */}
                 <div style={{
-                  gridColumn: 'span 12',
+                  gridColumn: 'span 8',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '1.5rem'
@@ -849,12 +848,7 @@ const AdminDashboard = () => {
                   </div>
 
                   {/* Recent Activity */}
-                  <div style={{
-                    backgroundColor: '#FFFFFF',
-                    padding: '1.5rem',
-                    borderRadius: '0.5rem',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                  }}>
+                  <div>
                     <h3 style={{
                       fontSize: '1.125rem',
                       fontWeight: '600',
@@ -863,77 +857,84 @@ const AdminDashboard = () => {
                     }}>
                       Recent Activity
                     </h3>
-                    <ul style={{
-                      listStyle: 'none',
-                      padding: 0,
-                      margin: 0,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '1rem'
+                    <div style={{
+                      backgroundColor: '#FFFFFF',
+                      padding: '1.5rem',
+                      borderRadius: '0.5rem',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                      maxHeight: '400px',
+                      overflowY: 'auto'
                     }}>
-                      {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
-                        <li key={`${activity.type}-${activity.id}-${index}`} style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: '1rem'
-                        }}>
-                          <div style={{
-                            backgroundColor: '#e5e7eb',
+                      <ul style={{
+                        listStyle: 'none',
+                        padding: 0,
+                        margin: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem'
+                      }}>
+                        {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
+                          <li key={`${activity.type}-${activity.id}-${index}`} style={{
                             display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '2.5rem',
-                            height: '2.5rem',
-                            borderRadius: '50%',
-                            flexShrink: 0
+                            alignItems: 'flex-start',
+                            gap: '1rem'
                           }}>
-                            <span className="material-symbols-outlined" style={{ color: '#6b7280', fontSize: '1.25rem' }}>
-                              {activity.icon}
-                            </span>
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <p style={{
-                              fontSize: '0.875rem',
-                              color: '#1D3557',
-                              margin: 0
+                            <div style={{
+                              backgroundColor: '#e5e7eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              borderRadius: '50%',
+                              flexShrink: 0
                             }}>
-                              {activity.user ? (
-                                <>
-                                  <span style={{ fontWeight: '600' }}>{activity.user}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
-                                </>
-                              ) : (
-                                <>
-                                  {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
-                                </>
-                              )}
-                            </p>
-                            <p style={{
-                              fontSize: '0.75rem',
-                              color: 'rgba(29, 53, 87, 0.6)',
-                              marginTop: '0.25rem',
-                              margin: 0
-                            }}>
-                              {formatTimeAgo(activity.timestamp)}
-                            </p>
-                          </div>
-                        </li>
-                      )) : (
-                        <li style={{ color: '#6b7280', fontSize: '0.875rem' }}>No recent activity</li>
-                      )}
-                    </ul>
+                              <span className="material-symbols-outlined" style={{ color: '#6b7280', fontSize: '1.25rem' }}>
+                                {activity.icon}
+                              </span>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <p style={{
+                                fontSize: '0.875rem',
+                                color: '#1D3557',
+                                margin: 0
+                              }}>
+                                {activity.user ? (
+                                  <>
+                                    <span style={{ fontWeight: '600' }}>{activity.user}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
+                                  </>
+                                ) : (
+                                  <>
+                                    {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
+                                  </>
+                                )}
+                              </p>
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: 'rgba(29, 53, 87, 0.6)',
+                                marginTop: '0.25rem',
+                                margin: 0
+                              }}>
+                                {formatTimeAgo(activity.timestamp)}
+                              </p>
+                            </div>
+                          </li>
+                        )) : (
+                          <li style={{ color: '#6b7280', fontSize: '0.875rem' }}>No recent activity</li>
+                        )}
+                      </ul>
+                    </div>
                   </div>
                 </div>
 
                 {/* Right Column - Upcoming Deadlines */}
                 <div style={{
-                  gridColumn: 'span 12'
+                  gridColumn: 'span 4',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1.5rem'
                 }}>
-                  <div style={{
-                    backgroundColor: '#FFFFFF',
-                    padding: '1.5rem',
-                    borderRadius: '0.5rem',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                  }}>
+                  <div>
                     <h3 style={{
                       fontSize: '1.125rem',
                       fontWeight: '600',
@@ -942,47 +943,60 @@ const AdminDashboard = () => {
                     }}>
                       Upcoming Deadlines
                     </h3>
-                    {upcomingDeadlines.length > 0 ? (
-                      <ul style={{
-                        listStyle: 'none',
-                        padding: 0,
-                        margin: 0,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.75rem'
-                      }}>
-                        {upcomingDeadlines.map((deadline) => (
-                          <li key={deadline.id} style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0.75rem',
-                            backgroundColor: '#f9fafb',
-                            borderRadius: '0.375rem',
-                            borderLeft: `4px solid ${deadline.color}`
-                          }}>
-                            <p style={{
-                              fontSize: '0.875rem',
-                              color: '#1D3557',
-                              margin: 0,
-                              flex: 1
+                    <div style={{
+                      backgroundColor: '#FFFFFF',
+                      padding: '1.5rem',
+                      borderRadius: '0.5rem',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                      minHeight: '600px'
+                    }}>
+                      {upcomingDeadlines.length > 0 ? (
+                        <ul style={{
+                          listStyle: 'none',
+                          padding: 0,
+                          margin: 0,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '1rem'
+                        }}>
+                          {upcomingDeadlines.map((deadline) => (
+                            <li key={deadline.id} style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '0.75rem'
                             }}>
-                              {deadline.task}
-                            </p>
-                            <span style={{
-                              fontSize: '0.75rem',
-                              fontWeight: '600',
-                              color: deadline.color,
-                              marginLeft: '1rem'
-                            }}>
-                              {deadline.due}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>No upcoming deadlines</p>
-                    )}
+                              <div style={{
+                                marginTop: '0.25rem',
+                                width: '0.5rem',
+                                height: '0.5rem',
+                                borderRadius: '50%',
+                                backgroundColor: deadline.color,
+                                flexShrink: 0
+                              }}></div>
+                              <div>
+                                <p style={{
+                                  fontWeight: '500',
+                                  fontSize: '0.875rem',
+                                  color: '#1D3557',
+                                  margin: 0
+                                }}>
+                                  {deadline.task}
+                                </p>
+                                <p style={{
+                                  fontSize: '0.75rem',
+                                  color: 'rgba(29, 53, 87, 0.6)',
+                                  margin: 0
+                                }}>
+                                  Due: {deadline.due}
+                                </p>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>No upcoming deadlines</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
