@@ -211,7 +211,7 @@ const GymSchedule = () => {
       {/* Header/Navbar */}
       <aside style={{
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: 'column',
         justifyContent: 'space-between',
         overflow: 'hidden',
         transition: 'width 0.3s ease, padding 0.3s ease'
@@ -501,12 +501,14 @@ const GymSchedule = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main style={{
-        flex: 1,
+      {/* Header */}
+      <header style={{
         display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '1rem 2rem',
+        backgroundColor: '#FFFFFF',
+        borderBottom: '1px solid #e2e8f0'
       }}>
         <header style={{
           display: 'flex',
@@ -624,7 +626,7 @@ const GymSchedule = () => {
             )}
           </div>
         </div>
-      </header>
+        </header>
 
       {/* Horizontal Menu Bar - Only show for Students */}
       {user?.userType === 'Student' && (
