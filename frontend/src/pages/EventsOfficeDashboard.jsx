@@ -579,47 +579,6 @@ const EventsOfficeDashboard = () => {
             </Link>
 
             <Link
-              to="/create-gym-session"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/create-gym-session') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/create-gym-session')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/create-gym-session')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                fitness_center
-              </span>
-              {sidebarOpen && (
-                <p style={{
-                  color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/create-gym-session') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Create Gym Session
-                </p>
-              )}
-            </Link>
-
-            <Link
               to="/gym-schedule"
               style={{
                 display: 'flex',
@@ -1040,7 +999,7 @@ const EventsOfficeDashboard = () => {
         {/* Content Area */}
         <div style={{
           flex: 1,
-          padding: '2.5rem',
+          padding: '2.5rem 6rem',
           overflowY: 'auto'
         }}>
           {loading ? (
@@ -1209,12 +1168,7 @@ const EventsOfficeDashboard = () => {
                 </div>
 
                 {/* Recent Activity */}
-                <div style={{
-                  backgroundColor: '#FFFFFF',
-                  padding: '1.5rem',
-                  borderRadius: '0.5rem',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                }}>
+                <div>
                   <h3 style={{
                     fontSize: '1.125rem',
                     fontWeight: '600',
@@ -1223,6 +1177,14 @@ const EventsOfficeDashboard = () => {
                   }}>
                     Recent Activity
                   </h3>
+                  <div style={{
+                    backgroundColor: '#FFFFFF',
+                    padding: '1.5rem',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    maxHeight: '400px',
+                    overflowY: 'auto'
+                  }}>
                   <ul style={{
                     listStyle: 'none',
                     padding: 0,
@@ -1320,33 +1282,41 @@ const EventsOfficeDashboard = () => {
                       </li>
                     )}
                   </ul>
+                  </div>
                 </div>
               </div>
 
               {/* Right Column - Upcoming Deadlines */}
               <div style={{
                 gridColumn: 'span 12',
-                backgroundColor: '#FFFFFF',
-                padding: '1.5rem',
-                borderRadius: '0.5rem',
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.5rem'
               }} className="events-office-right-column">
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: '600',
-                  color: '#1D3557',
-                  marginBottom: '1rem'
-                }}>
-                  Upcoming Deadlines
-                </h3>
-                <ul style={{
-                  listStyle: 'none',
-                  padding: 0,
-                  margin: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem'
-                }}>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    marginBottom: '1rem'
+                  }}>
+                    Upcoming Deadlines
+                  </h3>
+                  <div style={{
+                    backgroundColor: '#FFFFFF',
+                    padding: '1.5rem',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    minHeight: '577px'
+                  }}>
+                    <ul style={{
+                      listStyle: 'none',
+                      padding: 0,
+                      margin: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem'
+                    }}>
                   {upcomingDeadlines.map((deadline) => (
                     <li key={deadline.id} style={{
                       display: 'flex',
@@ -1380,7 +1350,9 @@ const EventsOfficeDashboard = () => {
                       </div>
                     </li>
                   ))}
-                </ul>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
             </>
