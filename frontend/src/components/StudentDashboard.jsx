@@ -443,13 +443,13 @@ const StudentDashboard = () => {
                     }}>
                         {/* Dashboard Banner with Background Image */}
                         <div style={{
-                        position: 'relative',
-                        height: '140px',
-                        borderRadius: '0.75rem',
-                        overflow: 'hidden',
-                        marginBottom: '1.5rem',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-                    }}>
+                            position: 'relative',
+                            height: '140px',
+                            borderRadius: '0.75rem',
+                            overflow: 'hidden',
+                            marginBottom: '1.5rem',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                        }}>
                         {/* Background Image */}
                         <div style={{
                             position: 'absolute',
@@ -503,8 +503,8 @@ const StudentDashboard = () => {
                             padding: '0 0 2rem 0'
                         }}>
 
-                    {/* Quick Stats */}
-                    <div style={{ marginBottom: '1.5rem' }}>
+                        {/* Quick Stats */}
+                        <div style={{ marginBottom: '1.5rem' }}>
                         <h3 style={{
                             color: '#1D3557',
                             fontSize: '1.125rem',
@@ -659,12 +659,12 @@ const StudentDashboard = () => {
                         )}
                     </div>
 
-                    {/* Recent Activity and Upcoming Deadlines */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-                        gap: '1.5rem'
-                    }}>
+                        {/* Recent Activity and Upcoming Deadlines */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                            gap: '1.5rem'
+                        }}>
                         {/* Recent Activity */}
                         <div style={{
                             backgroundColor: '#FFFFFF',
@@ -820,7 +820,7 @@ const StudentDashboard = () => {
                                 </div>
                             )}
                         </div>
-                    </div>
+                        </div>
                         </div>
                     </div>
                 </div>
