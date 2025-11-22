@@ -14,6 +14,7 @@ const StudentCourtsView = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [availabilityData, setAvailabilityData] = useState(null);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -24,10 +25,24 @@ const StudentCourtsView = () => {
     return currentPath.startsWith(path);
   };
 
-  const handleLogout = () => {
+  const handleLogout = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     logout();
     navigate('/login');
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
+        setShowLogoutDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLogoutDropdown]);
 
   const loadCourts = useCallback(async () => {
     try {
@@ -160,7 +175,7 @@ const StudentCourtsView = () => {
             </h2>
           </Link>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
           <div style={{ textAlign: 'right' }}>
             <p style={{
               fontSize: '0.875rem',
@@ -178,32 +193,80 @@ const StudentCourtsView = () => {
               Student
             </p>
           </div>
-          {user?.profilePicturePath ? (
-            <img
-              src={`http://localhost:5000${user.profilePicturePath}`}
-              alt="User profile"
-              style={{
+          <div 
+            data-profile-dropdown
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+          >
+            {user?.profilePicturePath ? (
+              <img
+                src={`http://localhost:5000${user.profilePicturePath}`}
+                alt="User profile"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              <div style={{
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                objectFit: 'cover'
-              }}
-            />
-          ) : (
-            <div style={{
-              width: '2.5rem',
-              height: '2.5rem',
-              borderRadius: '50%',
-              backgroundColor: '#1D3557',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#FFFFFF',
-              fontWeight: '600'
-            }}>
-              {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
-            </div>
-          )}
+                backgroundColor: '#1D3557',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF',
+                fontWeight: '600'
+              }}>
+                {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
+              </div>
+            )}
+            {showLogoutDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                zIndex: 1000,
+                minWidth: '150px'
+              }}>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    logout
+                  </span>
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -297,9 +360,14 @@ const StudentCourtsView = () => {
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '2rem',
+          padding: '2rem 0',
           backgroundColor: '#f6f7f8'
         }}>
+          {/* Content Wrapper with Margins */}
+          <div style={{
+            marginLeft: '4rem',
+            marginRight: '4rem'
+          }}>
           {/* Page Title Box */}
           <div style={{
             backgroundColor: '#FFFFFF',
@@ -577,6 +645,7 @@ const StudentCourtsView = () => {
               ))}
             </div>
           )}
+          </div>
         </div>
       </main>
 
