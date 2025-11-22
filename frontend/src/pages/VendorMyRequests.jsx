@@ -7,7 +7,7 @@ const VendorMyRequests = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -15,13 +15,34 @@ const VendorMyRequests = () => {
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'pending', 'rejected'
 
   const isActiveRoute = (path) => {
-    return location.pathname === path;
+    const currentPath = location.pathname;
+    if (currentPath === path) return true;
+    if (path === '/vendor') {
+      return currentPath === '/vendor';
+    }
+    return currentPath.startsWith(path);
   };
 
-  const handleLogout = () => {
+  const handleLogout = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     logout();
     navigate('/login');
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showLogoutDropdown && event.target instanceof Element && !event.target.closest('[data-profile-dropdown]')) {
+        setShowLogoutDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showLogoutDropdown]);
 
   const loadMyRequests = async () => {
     try {
@@ -90,6 +111,63 @@ const VendorMyRequests = () => {
     }
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return 'TBD';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getDaysUntilEvent = (dateString) => {
+    if (!dateString) return null;
+    const eventDate = new Date(dateString);
+    const today = new Date();
+    const diffTime = eventDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return null;
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    return `In ${diffDays} days`;
+  };
+
+  const getEventTypeColor = (type) => {
+    const colors = {
+      bazaar: '#F48FB1', // Light pink
+      trip: '#2196F3',
+      seminar: '#9C27B0',
+      workshop: '#607D8B',
+      conference: '#795548',
+      booth: '#3F51B5',
+      platformBooth: '#3F51B5',
+      standaloneBooth: '#3F51B5',
+      other: '#757575'
+    };
+    return colors[type] || colors.other;
+  };
+
+  const getEventTypeImage = (type) => {
+    const imageMap = {
+      conference: '/assets/images/conference-background.jpg',
+      workshop: '/assets/images/workshop-background.jpg',
+      bazaar: '/assets/images/bazaar-background.jpg',
+      trip: '/assets/images/trip-background.png',
+      booth: '/assets/images/booth-background.jpg',
+      platformBooth: '/assets/images/booth-background.jpg',
+      standaloneBooth: '/assets/images/booth-background.jpg'
+    };
+    return imageMap[type] || null;
+  };
+
+  const getEventTypeFallbackText = (type) => {
+    return type ? type.toUpperCase() : 'EVENT';
+  };
+
   const getEventTypeLabel = (type) => {
     const typeMap = {
       'bazaar': 'Bazaar',
@@ -126,370 +204,60 @@ const VendorMyRequests = () => {
 
   const displayName = user?.companyName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Vendor';
 
-  // Sidebar component (same as VendorDashboard)
-  const renderSidebar = () => (
-    <aside style={{
-      width: sidebarOpen ? '16rem' : '0',
-      flexShrink: 0,
-      backgroundColor: '#1D3557',
-      padding: sidebarOpen ? '1.5rem' : '0',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'space-between',
-      overflow: 'hidden',
-      transition: 'width 0.3s ease, padding 0.3s ease'
-    }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        {sidebarOpen && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{
-              width: '2.5rem',
-              height: '2.5rem',
-              borderRadius: '50%',
-              backgroundColor: '#457B9D',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#FFFFFF'
-            }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                storefront
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <h1 style={{
-                color: '#FFFFFF',
-                fontSize: '1rem',
-                fontWeight: '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Vendor Portal
-              </h1>
-              <p style={{
-                color: 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: '400',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                {user?.companyName || 'Company'}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {sidebarOpen && (
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <Link
-              to="/vendor"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/vendor') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/vendor')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/vendor')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/vendor') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                dashboard
-              </span>
-              <p style={{
-                color: isActiveRoute('/vendor') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/vendor') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Dashboard
-              </p>
-            </Link>
-
-            <Link
-              to="/vendor/bazaars"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/vendor/bazaars') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/vendor/bazaars')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/vendor/bazaars')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/vendor/bazaars') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                explore
-              </span>
-              <p style={{
-                color: isActiveRoute('/vendor/bazaars') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/vendor/bazaars') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Discover Bazaars
-              </p>
-            </Link>
-
-            <Link
-              to="/vendor/platform-booths"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/vendor/platform-booths') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/vendor/platform-booths')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/vendor/platform-booths')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/vendor/platform-booths') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                location_on
-              </span>
-              <p style={{
-                color: isActiveRoute('/vendor/platform-booths') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/vendor/platform-booths') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Platform Booths
-              </p>
-            </Link>
-
-            <Link
-              to="/vendor/accepted-events"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/vendor/accepted-events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/vendor/accepted-events')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/vendor/accepted-events')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/vendor/accepted-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                check_circle
-              </span>
-              <p style={{
-                color: isActiveRoute('/vendor/accepted-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/vendor/accepted-events') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                My Participations
-              </p>
-            </Link>
-
-            <Link
-              to="/vendor/my-requests"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/vendor/my-requests') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/vendor/my-requests')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/vendor/my-requests')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/vendor/my-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                assignment
-              </span>
-              <p style={{
-                color: isActiveRoute('/vendor/my-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/vendor/my-requests') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                My Applications
-              </p>
-            </Link>
-          </nav>
-        )}
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <button
-          onClick={handleLogout}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            padding: '0.5rem 0.75rem',
-            borderRadius: '0.5rem',
-            backgroundColor: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            textAlign: 'left',
-            width: '100%'
-          }}
-          onMouseEnter={(e) => {
-            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.backgroundColor = 'transparent';
-          }}
-        >
-          <span className="material-symbols-outlined" style={{ color: 'rgba(241, 250, 238, 0.7)', fontSize: '1.25rem' }}>
-            logout
-          </span>
-          {sidebarOpen && (
-            <p style={{
-              color: 'rgba(241, 250, 238, 0.7)',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              lineHeight: 'normal',
-              margin: 0
-            }}>
-              Logout
-            </p>
-          )}
-        </button>
-      </div>
-    </aside>
-  );
-
   return (
     <div style={{
       display: 'flex',
-      height: '100vh',
+      flexDirection: 'column',
+      minHeight: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
+      backgroundColor: '#f6f7f8'
     }}>
-      {renderSidebar()}
-
-      <main style={{
-        flex: 1,
+      {/* Header/Navbar */}
+      <header style={{
         display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottom: '1px solid #e2e8f0',
+        padding: '1rem 2.5rem',
+        backgroundColor: '#FFFFFF'
       }}>
-        <header style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
-          padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1D3557'
-              }}
-              aria-label="Toggle sidebar"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                menu
-              </span>
-            </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+          <Link to="/vendor" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
-              margin: 0
+              margin: 0,
+              cursor: 'pointer'
             }}>
               Bindly
             </h2>
+          </Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#1D3557',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              Vendor
+            </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#1D3557',
-                margin: 0
-              }}>
-                {displayName}
-              </p>
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                margin: 0
-              }}>
-                Vendor
-              </p>
-            </div>
+          <div 
+            data-profile-dropdown
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+          >
             {user?.profilePicturePath ? (
               <img
                 src={`http://localhost:5000${user.profilePicturePath}`}
@@ -511,64 +279,230 @@ const VendorMyRequests = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#FFFFFF',
+                fontSize: '0.875rem',
                 fontWeight: '600'
               }}>
-                {(user?.companyName?.[0] || user?.firstName?.[0] || 'V').toUpperCase()}
+                {(user?.companyName?.[0] || user?.firstName?.[0] || user?.name?.[0] || 'V').toUpperCase()}
+              </div>
+            )}
+            {showLogoutDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                zIndex: 1000,
+                minWidth: '150px'
+              }}>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    logout
+                  </span>
+                  Logout
+                </button>
               </div>
             )}
           </div>
-        </header>
+        </div>
+      </header>
+
+      {/* Horizontal Menu Bar */}
+      <nav style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '1rem 2rem',
+        backgroundColor: '#FFFFFF',
+        borderBottom: '1px solid #e2e8f0'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+          <Link
+            to="/vendor"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Dashboard
+          </Link>
+          <Link
+            to="/vendor/bazaars"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/bazaars') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/bazaars') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/bazaars') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Discover Bazaars
+          </Link>
+          <Link
+            to="/vendor/accepted-events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/accepted-events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/accepted-events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/accepted-events') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Participations
+          </Link>
+          <Link
+            to="/vendor/my-requests"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/my-requests') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/my-requests') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/my-requests') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Applications
+          </Link>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
 
         <div style={{
           flex: 1,
-          padding: '2rem',
+          padding: '2rem 0',
           overflowY: 'auto',
           backgroundColor: '#f6f7f8'
         }}>
+          {/* Content Wrapper with Margins */}
           <div style={{
-            backgroundColor: '#FFFFFF',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-            marginBottom: '1.5rem',
-            borderLeft: '4px solid #1D3557'
+            marginLeft: '4rem',
+            marginRight: '4rem'
           }}>
-            <h3 style={{
-              color: '#1D3557',
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              margin: 0
+          {/* Page Title Banner */}
+          <div style={{
+            position: 'relative',
+            height: '140px',
+            borderRadius: '0.75rem',
+            overflow: 'hidden',
+            marginBottom: '1.5rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+          }}>
+            {/* Background Image */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(/assets/images/bazaar-background.jpg)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
+            }}></div>
+            {/* Blue Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Content */}
+            <div style={{
+              position: 'relative',
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '2rem 2.5rem',
+              color: '#FFFFFF'
             }}>
-              My Applications
-            </h3>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '1rem',
-              fontWeight: '400',
-              margin: '0.25rem 0 0 0'
-            }}>
-              View all requests for upcoming bazaars or booth setups you want to participate in (pending or rejected).
-            </p>
+              <h3 style={{
+                color: '#FFFFFF',
+                fontSize: '1.75rem',
+                fontWeight: '700',
+                margin: 0,
+                marginBottom: '0.5rem'
+              }}>
+                My Applications
+              </h3>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '0.875rem',
+                fontWeight: '400',
+                margin: 0
+              }}>
+                View all requests for upcoming bazaars or booth setups you want to participate in (pending or rejected).
+              </p>
+            </div>
           </div>
 
           {/* Filter Buttons */}
           <div style={{
             display: 'flex',
-            gap: '0.75rem',
-            marginBottom: '1.5rem'
+            gap: '0.5rem',
+            marginBottom: '1.5rem',
+            flexWrap: 'wrap'
           }}>
             <button
               onClick={() => setFilterStatus('all')}
               style={{
-                padding: '0.5rem 1rem',
+                padding: '0.625rem 1.25rem',
                 borderRadius: '0.5rem',
-                border: 'none',
-                backgroundColor: filterStatus === 'all' ? '#1D3557' : '#FFFFFF',
+                border: filterStatus === 'all' ? 'none' : '1px solid #e5e7eb',
+                backgroundColor: filterStatus === 'all' ? '#1e40af' : '#f9fafb',
                 color: filterStatus === 'all' ? '#FFFFFF' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: '500',
+                fontSize: '0.8125rem',
+                fontWeight: filterStatus === 'all' ? '600' : '500',
                 cursor: 'pointer',
+                transition: 'all 0.2s',
                 boxShadow: filterStatus === 'all' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (filterStatus !== 'all') {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.borderColor = '#d1d5db';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (filterStatus !== 'all') {
+                  e.target.style.backgroundColor = '#f9fafb';
+                  e.target.style.borderColor = '#e5e7eb';
+                }
               }}
             >
               All ({requests.length})
@@ -576,15 +510,28 @@ const VendorMyRequests = () => {
             <button
               onClick={() => setFilterStatus('pending')}
               style={{
-                padding: '0.5rem 1rem',
+                padding: '0.625rem 1.25rem',
                 borderRadius: '0.5rem',
-                border: 'none',
-                backgroundColor: filterStatus === 'pending' ? '#1D3557' : '#FFFFFF',
+                border: filterStatus === 'pending' ? 'none' : '1px solid #e5e7eb',
+                backgroundColor: filterStatus === 'pending' ? '#1e40af' : '#f9fafb',
                 color: filterStatus === 'pending' ? '#FFFFFF' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: '500',
+                fontSize: '0.8125rem',
+                fontWeight: filterStatus === 'pending' ? '600' : '500',
                 cursor: 'pointer',
+                transition: 'all 0.2s',
                 boxShadow: filterStatus === 'pending' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (filterStatus !== 'pending') {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.borderColor = '#d1d5db';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (filterStatus !== 'pending') {
+                  e.target.style.backgroundColor = '#f9fafb';
+                  e.target.style.borderColor = '#e5e7eb';
+                }
               }}
             >
               Pending ({requests.filter(r => r.status === 'pending').length})
@@ -592,15 +539,28 @@ const VendorMyRequests = () => {
             <button
               onClick={() => setFilterStatus('rejected')}
               style={{
-                padding: '0.5rem 1rem',
+                padding: '0.625rem 1.25rem',
                 borderRadius: '0.5rem',
-                border: 'none',
-                backgroundColor: filterStatus === 'rejected' ? '#1D3557' : '#FFFFFF',
+                border: filterStatus === 'rejected' ? 'none' : '1px solid #e5e7eb',
+                backgroundColor: filterStatus === 'rejected' ? '#1e40af' : '#f9fafb',
                 color: filterStatus === 'rejected' ? '#FFFFFF' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: '500',
+                fontSize: '0.8125rem',
+                fontWeight: filterStatus === 'rejected' ? '600' : '500',
                 cursor: 'pointer',
+                transition: 'all 0.2s',
                 boxShadow: filterStatus === 'rejected' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (filterStatus !== 'rejected') {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.borderColor = '#d1d5db';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (filterStatus !== 'rejected') {
+                  e.target.style.backgroundColor = '#f9fafb';
+                  e.target.style.borderColor = '#e5e7eb';
+                }
               }}
             >
               Rejected ({requests.filter(r => r.status === 'rejected').length})
@@ -608,32 +568,62 @@ const VendorMyRequests = () => {
           </div>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-              Loading requests...
+            <div style={{
+              textAlign: 'center',
+              padding: '4rem 2rem',
+              color: '#6b7280',
+              fontSize: '0.875rem'
+            }}>
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                border: '3px solid #e5e7eb',
+                borderTop: '3px solid #1e40af',
+                borderRadius: '50%',
+                margin: '0 auto 1rem',
+                display: 'inline-block'
+              }} className="spinner"></div>
+              <p style={{ margin: 0, color: '#6b7280' }}>Loading requests...</p>
             </div>
           ) : error ? (
             <div style={{
+              padding: '0.75rem 1rem',
+              marginBottom: '1.5rem',
+              borderRadius: '0.375rem',
               backgroundColor: '#fee2e2',
               color: '#991b1b',
-              padding: '1rem',
-              borderRadius: '0.5rem',
-              marginBottom: '1.5rem'
+              fontSize: '0.875rem'
             }}>
               {error}
             </div>
           ) : filteredRequests.length === 0 ? (
             <div style={{
               backgroundColor: '#FFFFFF',
-              padding: '3rem',
               borderRadius: '0.75rem',
+              padding: '4rem 2rem',
               textAlign: 'center',
-              color: '#6b7280'
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
             }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '3rem', marginBottom: '1rem', display: 'block' }}>
-                assignment
-              </span>
-              <p style={{ fontSize: '1rem', margin: 0 }}>No {filterStatus === 'all' ? '' : filterStatus} requests found.</p>
-              <p style={{ fontSize: '0.875rem', margin: '0.5rem 0 0 0' }}>
+              <div style={{
+                fontSize: '3rem',
+                marginBottom: '1rem',
+                opacity: 0.5
+              }}>📋</div>
+              <p style={{
+                color: '#374151',
+                fontSize: '1.125rem',
+                fontWeight: '500',
+                marginBottom: '0.5rem',
+                marginTop: 0
+              }}>
+                No {filterStatus === 'all' ? '' : filterStatus} requests found
+              </p>
+              <p style={{
+                color: '#6b7280',
+                fontSize: '0.875rem',
+                marginBottom: '1.5rem',
+                marginTop: 0
+              }}>
                 {filterStatus === 'all' 
                   ? "You haven't submitted any requests yet."
                   : filterStatus === 'pending'
@@ -642,157 +632,206 @@ const VendorMyRequests = () => {
               </p>
             </div>
           ) : (
-            <div style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '0.75rem',
-              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-              overflow: 'hidden'
-            }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#f9fafb' }}>
-                    <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Event Name</th>
-                    <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Type</th>
-                    <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Date Applied</th>
-                    <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Status</th>
-                    <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRequests.map((request) => {
-                    const requestId = request._id || request.id;
-                    const isExpanded = expandedRows.has(requestId);
-                    
-                    return (
-                      <React.Fragment key={requestId}>
-                        <tr style={{ 
-                          borderBottom: '1px solid #e2e8f0',
-                          cursor: 'pointer',
-                          backgroundColor: isExpanded ? '#f9fafb' : '#FFFFFF'
-                        }}
-                        onClick={() => toggleRowExpansion(requestId)}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f9fafb';
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isExpanded) {
-                            e.currentTarget.style.backgroundColor = '#FFFFFF';
-                          }
-                        }}
-                        >
-                          <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem', color: '#111827', fontWeight: '500' }}>
-                            {request.name || request.title || request.eventName || 'Untitled Event'}
-                          </td>
-                          <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
-                            {getEventTypeLabel(request.type || request.eventType)}
-                          </td>
-                          <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
-                            {formatTableDate(request.createdAt || request.dateApplied)}
-                          </td>
-                          <td style={{ padding: '1rem 1.5rem' }}>
-                            {getStatusBadge(request.status)}
-                          </td>
-                          <td style={{ padding: '1rem 1.5rem' }}>
-                            <span className="material-symbols-outlined" style={{
-                              fontSize: '1.25rem',
-                              color: '#6b7280',
-                              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                              transition: 'transform 0.2s'
+            <>
+              <div style={{
+                marginBottom: '1.5rem',
+                color: '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}>
+                Found {filteredRequests.length} application{filteredRequests.length !== 1 ? 's' : ''}
+                {filterStatus !== 'all' && ` (${filterStatus})`}
+              </div>
+              
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                {filteredRequests.map((request) => {
+                  const requestId = request._id || request.id;
+                  const eventType = request.type || request.eventType || 'bazaar';
+                  const eventName = request.name || request.title || request.eventName || 'Untitled Event';
+                  const startDate = request.startDate || request.date;
+                  const appliedDate = request.createdAt || request.dateApplied;
+
+                  return (
+                    <div
+                      key={requestId}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '0.75rem',
+                        padding: 0,
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        border: '1px solid #e5e7eb',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-4px)';
+                        e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                        e.currentTarget.style.borderColor = '#1e40af';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                      }}
+                    >
+                      {/* Event Type Image - Top Half */}
+                      {getEventTypeImage(eventType) && (
+                        <div style={{
+                          width: '100%',
+                          height: '180px',
+                          overflow: 'hidden',
+                          position: 'relative',
+                          backgroundColor: '#f3f4f6',
+                          flexShrink: 0
+                        }}>
+                          <img
+                            src={getEventTypeImage(eventType)}
+                            alt={getEventTypeLabel(eventType)}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              objectPosition: 'center'
+                            }}
+                            onError={(e) => {
+                              // Fallback if image doesn't exist
+                              e.target.style.display = 'none';
+                              e.target.parentElement.style.backgroundColor = getEventTypeColor(eventType);
+                              e.target.parentElement.style.display = 'flex';
+                              e.target.parentElement.style.alignItems = 'center';
+                              e.target.parentElement.style.justifyContent = 'center';
+                              if (!e.target.parentElement.querySelector('.fallback-text')) {
+                                const fallback = document.createElement('div');
+                                fallback.className = 'fallback-text';
+                                fallback.textContent = getEventTypeFallbackText(eventType);
+                                fallback.style.color = '#FFFFFF';
+                                fallback.style.fontSize = '1.5rem';
+                                fallback.style.fontWeight = '700';
+                                e.target.parentElement.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+                      
+                      <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                          <div style={{
+                            padding: '0.375rem 0.875rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: getEventTypeColor(eventType),
+                            color: '#FFFFFF',
+                            fontSize: '0.6875rem',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                          }}>
+                            {getEventTypeLabel(eventType)}
+                          </div>
+                          {getStatusBadge(request.status)}
+                        </div>
+                        
+                        <h3 style={{
+                          color: '#1D3557',
+                          fontSize: '1.125rem',
+                          fontWeight: '600',
+                          marginBottom: '0.75rem',
+                          marginTop: 0,
+                          lineHeight: '1.4'
+                        }}>
+                          {eventName}
+                        </h3>
+                        
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem',
+                          flex: 1
+                        }}>
+                          {appliedDate && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.625rem',
+                              fontSize: '0.8125rem',
+                              color: '#6b7280'
                             }}>
-                              expand_more
-                            </span>
-                          </td>
-                        </tr>
-                        {isExpanded && (
-                          <tr>
-                            <td colSpan="5" style={{ padding: '1.5rem', backgroundColor: '#f9fafb' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                                  {request.location && (
-                                    <div>
-                                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.25rem 0' }}>Location</p>
-                                      <p style={{ fontSize: '0.875rem', color: '#111827', margin: 0 }}>
-                                        {request.location}
-                                      </p>
-                                    </div>
-                                  )}
-                                  {request.startDate && (
-                                    <div>
-                                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.25rem 0' }}>Event Start Date</p>
-                                      <p style={{ fontSize: '0.875rem', color: '#111827', margin: 0 }}>
-                                        {formatTableDate(request.startDate)}
-                                      </p>
-                                    </div>
-                                  )}
-                                  {request.boothSize && (
-                                    <div>
-                                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.25rem 0' }}>Booth Size</p>
-                                      <p style={{ fontSize: '0.875rem', color: '#111827', margin: 0 }}>
-                                        {request.boothSize}
-                                      </p>
-                                    </div>
-                                  )}
-                                  {request.durationWeeks && (
-                                    <div>
-                                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.25rem 0' }}>Duration</p>
-                                      <p style={{ fontSize: '0.875rem', color: '#111827', margin: 0 }}>
-                                        {request.durationWeeks} week{request.durationWeeks > 1 ? 's' : ''}
-                                      </p>
-                                    </div>
-                                  )}
-                                  {request.boothLocation && (
-                                    <div>
-                                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.25rem 0' }}>Booth Location</p>
-                                      <p style={{ fontSize: '0.875rem', color: '#111827', margin: 0 }}>
-                                        {request.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-                                {request.description && (
-                                  <div>
-                                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.25rem 0' }}>Description</p>
-                                    <p style={{ fontSize: '0.875rem', color: '#111827', margin: 0 }}>
-                                      {request.description}
-                                    </p>
-                                  </div>
-                                )}
-                                {request.attendees && request.attendees.length > 0 && (
-                                  <div>
-                                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.5rem 0' }}>Attendees</p>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                      {request.attendees.map((attendee, idx) => (
-                                        <div key={idx} style={{
-                                          padding: '0.5rem',
-                                          backgroundColor: '#FFFFFF',
-                                          borderRadius: '0.25rem',
-                                          fontSize: '0.875rem'
-                                        }}>
-                                          <strong>{attendee.name}</strong> - {attendee.email}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                                {request.message && (
-                                  <div>
-                                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.25rem 0' }}>Message</p>
-                                    <p style={{ fontSize: '0.875rem', color: '#111827', margin: 0 }}>
-                                      {request.message}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.125rem',
+                                color: '#9ca3af'
+                              }}>
+                                schedule
+                              </span>
+                              <span>Applied: {formatDate(appliedDate)}</span>
+                            </div>
+                          )}
+                          {startDate && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.625rem',
+                              fontSize: '0.8125rem',
+                              color: '#6b7280'
+                            }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.125rem',
+                                color: '#9ca3af'
+                              }}>
+                                calendar_today
+                              </span>
+                              <span>Event: {formatDate(startDate)}</span>
+                            </div>
+                          )}
+                          {request.location && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.625rem',
+                              fontSize: '0.8125rem',
+                              color: '#6b7280'
+                            }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.125rem',
+                                color: '#9ca3af'
+                              }}>
+                                location_on
+                              </span>
+                              <span>{request.location}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {request.description && (
+                          <p style={{
+                            color: '#6b7280',
+                            fontSize: '0.8125rem',
+                            marginBottom: '0.75rem',
+                            marginTop: 0,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            lineHeight: '1.5'
+                          }}>
+                            {request.description}
+                          </p>
                         )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
+          </div>
         </div>
       </main>
     </div>
