@@ -15,10 +15,21 @@ const StudentDashboard = () => {
     const [recentActivity, setRecentActivity] = useState([]);
     const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
 
     useEffect(() => {
         loadDashboardData();
     }, [user]);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
+                setShowLogoutDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showLogoutDropdown]);
 
     const loadDashboardData = async () => {
         try {
@@ -238,7 +249,7 @@ const StudentDashboard = () => {
                         </h2>
                     </Link>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
                     <div style={{ textAlign: 'right' }}>
                         <p style={{
                             fontSize: '0.875rem',
@@ -256,32 +267,80 @@ const StudentDashboard = () => {
                             Student
                         </p>
                     </div>
-                    {user?.profilePicturePath ? (
-                        <img
-                            src={`http://localhost:5000${user.profilePicturePath}`}
-                            alt="User profile"
-                            style={{
+                    <div 
+                        data-profile-dropdown
+                        style={{ position: 'relative', cursor: 'pointer' }}
+                        onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+                    >
+                        {user?.profilePicturePath ? (
+                            <img
+                                src={`http://localhost:5000${user.profilePicturePath}`}
+                                alt="User profile"
+                                style={{
+                                    width: '2.5rem',
+                                    height: '2.5rem',
+                                    borderRadius: '50%',
+                                    objectFit: 'cover'
+                                }}
+                            />
+                        ) : (
+                            <div style={{
                                 width: '2.5rem',
                                 height: '2.5rem',
                                 borderRadius: '50%',
-                                objectFit: 'cover'
-                            }}
-                        />
-                    ) : (
-                        <div style={{
-                            width: '2.5rem',
-                            height: '2.5rem',
-                            borderRadius: '50%',
-                            backgroundColor: '#1D3557',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#FFFFFF',
-                            fontWeight: '600'
-                        }}>
-                            {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
-                        </div>
-                    )}
+                                backgroundColor: '#1D3557',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#FFFFFF',
+                                fontWeight: '600'
+                            }}>
+                                {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
+                            </div>
+                        )}
+                        {showLogoutDropdown && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: '0.5rem',
+                                backgroundColor: '#FFFFFF',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '0.5rem',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                zIndex: 1000,
+                                minWidth: '150px'
+                            }}>
+                                <button
+                                    onClick={handleLogout}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        textAlign: 'left',
+                                        backgroundColor: 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        fontSize: '0.875rem',
+                                        color: '#1D3557',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.backgroundColor = '#f3f4f6';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.backgroundColor = 'transparent';
+                                    }}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                        logout
+                                    </span>
+                                    Logout
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </header>
 
@@ -368,48 +427,61 @@ const StudentDashboard = () => {
                 display: 'flex',
                 flexDirection: 'column'
             }}>
-                {/* Dashboard Banner with Background Image */}
+                {/* Content Wrapper with Margins */}
                 <div style={{
-                    position: 'relative',
-                    width: '100%',
-                    height: '200px',
-                    backgroundImage: 'url(frontend/public/assets/images/dashboard-image.jpg)',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                    marginBottom: '2rem'
+                    marginLeft: '4rem',
+                    marginRight: '4rem'
                 }}>
+                    {/* Dashboard Banner with Background Image */}
                     <div style={{
-                        position: 'absolute',
-                        bottom: '0',
-                        left: '0',
-                        padding: '2rem',
-                        color: '#FFFFFF'
+                        position: 'relative',
+                        width: '100%',
+                        height: '200px',
+                        backgroundImage: 'url(/assets/images/dashboard-image.jpg)',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                        marginBottom: '2rem',
+                        borderRadius: '1rem',
+                        overflow: 'hidden'
                     }}>
-                        <h1 style={{
-                            fontSize: '2rem',
-                            fontWeight: '700',
-                            margin: 0,
-                            marginBottom: '0.5rem',
-                            textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                        {/* Blue Blur Overlay */}
+                        <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(37, 99, 235, 0.6)',
+                            backdropFilter: 'blur(4px)',
+                            WebkitBackdropFilter: 'blur(4px)'
+                        }}></div>
+                        {/* Centered Dashboard Text */}
+                        <div style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            textAlign: 'center',
+                            color: '#FFFFFF',
+                            zIndex: 1
                         }}>
-                            Dashboard
-                        </h1>
-                        <p style={{
-                            fontSize: '1rem',
-                            fontWeight: '400',
-                            margin: 0,
-                            textShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                        }}>
-                            Overview of your events, registrations, and upcoming deadlines.
-                        </p>
+                            <h1 style={{
+                                fontSize: '1.75rem',
+                                fontWeight: '500',
+                                margin: 0,
+                                textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                letterSpacing: '0.5px'
+                            }}>
+                                Dashboard
+                            </h1>
+                        </div>
                     </div>
-                </div>
 
-                {/* Content */}
-                <div style={{
-                    padding: '0 2rem 2rem 2rem'
-                }}>
+                    {/* Content */}
+                    <div style={{
+                        padding: '0 0 2rem 0'
+                    }}>
 
                     {/* Quick Stats */}
                     <div style={{ marginBottom: '1.5rem' }}>
@@ -729,6 +801,7 @@ const StudentDashboard = () => {
                             )}
                         </div>
                     </div>
+                </div>
                 </div>
             </main>
         </div>
