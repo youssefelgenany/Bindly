@@ -403,6 +403,7 @@ const StudentMyRegistrations = () => {
           overflowY: 'auto',
           backgroundColor: '#f6f7f8'
         }}>
+          {/* Page Title Banner */}
           {/* Content Wrapper with Margins */}
           <div style={{
             marginLeft: '4rem',
@@ -410,29 +411,59 @@ const StudentMyRegistrations = () => {
           }}>
           {/* Page Title Box */}
           <div style={{
-            backgroundColor: '#FFFFFF',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            position: 'relative',
+            height: '140px',
+            borderRadius: '0.75rem',
+            overflow: 'hidden',
             marginBottom: '1.5rem',
-            borderLeft: '4px solid #1D3557'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
           }}>
-            <h3 style={{
-              color: '#1D3557',
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              margin: 0
+            {/* Background Image */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(/assets/images/events-banner.jpeg)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
+            }}></div>
+            {/* Blue Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Content */}
+            <div style={{
+              position: 'relative',
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '2rem 2.5rem',
+              color: '#FFFFFF'
             }}>
-              My Events
-            </h3>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '1rem',
-              fontWeight: '400',
-              margin: '0.25rem 0 0 0'
-            }}>
-              View and manage your event registrations.
-            </p>
+              <h3 style={{
+                color: '#FFFFFF',
+                fontSize: '1.75rem',
+                fontWeight: '700',
+                margin: 0,
+                marginBottom: '0.5rem'
+              }}>
+                My Events
+              </h3>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '0.875rem',
+                fontWeight: '400',
+                margin: 0
+              }}>
+                View and manage your event registrations.
+              </p>
+            </div>
           </div>
 
           {error && (

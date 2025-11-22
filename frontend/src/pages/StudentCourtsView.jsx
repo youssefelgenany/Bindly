@@ -117,6 +117,21 @@ const StudentCourtsView = () => {
     return colors[type?.toLowerCase()] || colors.other;
   };
 
+  const getCourtTypeImage = (type) => {
+    const imageMap = {
+      basketball: '/assets/images/basketball.webp',
+      tennis: '/assets/images/tennis.jpg',
+      football: '/assets/images/football.jpg',
+      soccer: '/assets/images/football.jpg' // Alias for football
+    };
+    const normalizedType = (type || '').toString().trim().toLowerCase();
+    return imageMap[normalizedType] || '/assets/images/campus-courts.png'; // Fallback to campus-courts.png
+  };
+
+  const getCourtTypeFallbackText = (type) => {
+    return type ? type.toUpperCase() : 'COURT';
+  };
+
   const getCourtTypeIcon = (type) => {
     const icons = {
       basketball: 'sports_basketball',
@@ -363,6 +378,7 @@ const StudentCourtsView = () => {
           padding: '2rem 0',
           backgroundColor: '#f6f7f8'
         }}>
+          {/* Page Title Banner */}
           {/* Content Wrapper with Margins */}
           <div style={{
             marginLeft: '4rem',
@@ -370,29 +386,59 @@ const StudentCourtsView = () => {
           }}>
           {/* Page Title Box */}
           <div style={{
-            backgroundColor: '#FFFFFF',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            position: 'relative',
+            height: '140px',
+            borderRadius: '0.75rem',
+            overflow: 'hidden',
             marginBottom: '1.5rem',
-            borderLeft: '4px solid #1D3557'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
           }}>
-            <h3 style={{
-              color: '#1D3557',
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              margin: 0
+            {/* Background Image */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(/assets/images/campus-courts.png)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
+            }}></div>
+            {/* Blue Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(10, 20, 40, 0.85)'
+            }}></div>
+            {/* Content */}
+            <div style={{
+              position: 'relative',
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '2rem 2.5rem',
+              color: '#FFFFFF'
             }}>
-              Campus Courts
-            </h3>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '1rem',
-              fontWeight: '400',
-              margin: '0.25rem 0 0 0'
-            }}>
-              View all courts and their availability.
-            </p>
+              <h3 style={{
+                color: '#FFFFFF',
+                fontSize: '1.75rem',
+                fontWeight: '700',
+                margin: 0,
+                marginBottom: '0.5rem'
+              }}>
+                Campus Courts
+              </h3>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '0.875rem',
+                fontWeight: '400',
+                margin: 0
+              }}>
+                View all courts and their availability.
+              </p>
+            </div>
           </div>
 
           {/* Courts Grid */}
@@ -506,23 +552,66 @@ const StudentCourtsView = () => {
                   style={{
                     backgroundColor: '#FFFFFF',
                     borderRadius: '0.75rem',
-                    padding: '1.5rem',
+                    padding: 0,
                     border: '1px solid #e5e7eb',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '1rem'
+                    overflow: 'hidden',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-                    e.target.style.borderColor = '#1e40af';
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                    e.currentTarget.style.borderColor = '#1e40af';
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.boxShadow = 'none';
-                    e.target.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                    e.currentTarget.style.borderColor = '#e5e7eb';
                   }}
                 >
+                  {/* Court Type Image - Top Half */}
+                  {getCourtTypeImage(court.type) && (
+                    <div style={{
+                      width: '100%',
+                      height: '180px',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      backgroundColor: '#f3f4f6',
+                      flexShrink: 0
+                    }}>
+                      <img
+                        src={getCourtTypeImage(court.type)}
+                        alt={court.type ? court.type.charAt(0).toUpperCase() + court.type.slice(1) : 'Court'}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          objectPosition: 'center'
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.parentElement.style.backgroundColor = getCourtTypeColor(court.type);
+                          e.target.parentElement.style.display = 'flex';
+                          e.target.parentElement.style.alignItems = 'center';
+                          e.target.parentElement.style.justifyContent = 'center';
+                          if (!e.target.parentElement.querySelector('.fallback-text')) {
+                            const fallback = document.createElement('div');
+                            fallback.className = 'fallback-text';
+                            fallback.textContent = getCourtTypeFallbackText(court.type);
+                            fallback.style.color = '#FFFFFF';
+                            fallback.style.fontSize = '1.5rem';
+                            fallback.style.fontWeight = '700';
+                            e.target.parentElement.appendChild(fallback);
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                  
+                  <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {/* Court Header */}
                   <div style={{
                     display: 'flex',
@@ -641,6 +730,7 @@ const StudentCourtsView = () => {
                   >
                     View Availability
                   </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -675,18 +765,97 @@ const StudentCourtsView = () => {
               width: '100%',
               maxWidth: '42rem',
               maxHeight: '90vh',
-              overflowY: 'auto',
+              overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+              position: 'relative'
             }}
           >
+            {/* Court Image at Top */}
+            {getCourtTypeImage(selectedCourt.type) && (
+              <div style={{
+                width: '100%',
+                height: '200px',
+                overflow: 'hidden',
+                position: 'relative',
+                backgroundColor: '#f3f4f6',
+                flexShrink: 0
+              }}>
+                <img
+                  src={getCourtTypeImage(selectedCourt.type)}
+                  alt={selectedCourt.type ? selectedCourt.type.charAt(0).toUpperCase() + selectedCourt.type.slice(1) : 'Court'}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center'
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.style.backgroundColor = getCourtTypeColor(selectedCourt.type);
+                    e.target.parentElement.style.display = 'flex';
+                    e.target.parentElement.style.alignItems = 'center';
+                    e.target.parentElement.style.justifyContent = 'center';
+                    if (!e.target.parentElement.querySelector('.fallback-text')) {
+                      const fallback = document.createElement('div');
+                      fallback.className = 'fallback-text';
+                      fallback.textContent = getCourtTypeFallbackText(selectedCourt.type);
+                      fallback.style.color = '#FFFFFF';
+                      fallback.style.fontSize = '1.5rem';
+                      fallback.style.fontWeight = '700';
+                      e.target.parentElement.appendChild(fallback);
+                    }
+                  }}
+                />
+              </div>
+            )}
+            
+            {/* Close Button - Upper Right Corner */}
+            <button
+              onClick={() => {
+                setSelectedCourt(null);
+                setAvailabilityData(null);
+              }}
+              style={{
+                position: 'absolute',
+                top: '0.75rem',
+                right: '0.75rem',
+                background: 'rgba(255, 255, 255, 0.9)',
+                border: 'none',
+                fontSize: '1.5rem',
+                cursor: 'pointer',
+                color: '#6b7280',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '0.375rem',
+                transition: 'all 0.2s',
+                lineHeight: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '2rem',
+                height: '2rem',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                zIndex: 10
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#ffffff';
+                e.target.style.color = '#1D3557';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                e.target.style.color = '#6b7280';
+              }}
+            >
+              ×
+            </button>
+            
             {/* Modal Header */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '1.5rem',
+              padding: '1rem 1.5rem',
               borderBottom: '1px solid #e5e7eb'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -723,34 +892,18 @@ const StudentCourtsView = () => {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  setSelectedCourt(null);
-                  setAvailabilityData(null);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: '#6b7280',
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: '0.25rem',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'transparent';
-                }}
-              >
-                ×
-              </button>
             </div>
 
             {/* Modal Body */}
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ 
+              padding: '1rem 1.5rem 1.5rem 1.5rem', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '1.5rem',
+              overflowY: 'auto',
+              flex: 1,
+              minHeight: 0
+            }}>
               {/* Court Info */}
               <div style={{
                 display: 'grid',
