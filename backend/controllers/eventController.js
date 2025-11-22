@@ -488,17 +488,42 @@ exports.getAllEventsForStudents = async (req, res) => {
     console.log('🔍 User ID:', req.user._id);
     console.log('🔍 Event type filter:', type);
     console.log('🔍 Status filter:', status);
-
+    
+    // Get user's registered event IDs (from both Registration and StudentRegistration)
+    const userId = req.user._id;
+    const userEmail = req.user.email;
+    
+    // Get registrations from Registration model
+    const registrations = await Registration.find({ user: userId })
+      .select('event')
+      .lean();
+    const registeredEventIds1 = registrations
+      .map(r => r.event)
+      .filter(id => id != null);
+    
+    // Get registrations from StudentRegistration model (by email)
+    const studentRegistrations = await StudentRegistration.find({ 
+      studentEmail: userEmail 
+    })
+      .select('event')
+      .lean();
+    const registeredEventIds2 = studentRegistrations
+      .map(r => r.event)
+      .filter(id => id != null);
+    
+    // Combine both sets of registered event IDs (keep as ObjectIds for MongoDB query)
+    const registeredEventIds = [...new Set([
+      ...registeredEventIds1.map(id => id.toString()),
+      ...registeredEventIds2.map(id => id.toString())
+    ])].filter(id => id);
+    
+    console.log('🔍 User registered event IDs:', registeredEventIds);
+    
     // Build filter - Event Office users can see all events, others only see approved
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
-    const now = new Date();
-    const filter = {
-      // Show events that haven't ended yet (endDate is in the future or null)
-      $or: [
-        { endDate: { $gt: now } },
-        { endDate: { $exists: false } },
-        { endDate: null }
-      ],
+    
+    // Base filter conditions
+    const baseFilter = {
       type: { $in: validTypes }, // Only valid event types
       $and: [
         { title: { $exists: true } },
@@ -509,7 +534,34 @@ exports.getAllEventsForStudents = async (req, res) => {
         { location: { $ne: '' } }
       ]
     };
-
+    
+    // Build date filter: include future events OR past events where user is registered
+    // For aggregation pipeline, we need to convert string IDs back to ObjectIds
+    const mongoose = require('mongoose');
+    const dateFilterConditions = [
+      { startDate: { $gt: new Date() } } // Future events
+    ];
+    
+    if (registeredEventIds.length > 0) {
+      // Convert string IDs to ObjectIds for the $in query
+      const objectIds = registeredEventIds
+        .filter(id => mongoose.Types.ObjectId.isValid(id))
+        .map(id => new mongoose.Types.ObjectId(id));
+      
+      if (objectIds.length > 0) {
+        dateFilterConditions.push({ _id: { $in: objectIds } }); // Past registered events
+      }
+    }
+    
+    const dateFilter = {
+      $or: dateFilterConditions
+    };
+    
+    const filter = {
+      ...baseFilter,
+      ...dateFilter
+    };
+    
     // Only filter by status for non-Event Office users
     const isEventOffice = req.user.userType === 'Event Office' ||
       req.user.userType === 'Events Office' ||
@@ -535,12 +587,18 @@ exports.getAllEventsForStudents = async (req, res) => {
         confrence: 'conference',
         conference: 'conference'
       };
-      const mappedType = typeMap[type] || type;
+      const mappedType = typeMap[type.toLowerCase()] || type.toLowerCase();
+      console.log('🔍 Type filter received:', type, '-> mapped to:', mappedType);
       if (validTypes.includes(mappedType)) {
         filter.type = mappedType;
+        console.log('🔍 Type filter applied:', filter.type);
+      } else {
+        console.log('🔍 Invalid type filter, ignoring:', mappedType);
       }
+    } else {
+      console.log('🔍 No type filter or type is "all", showing all valid types');
     }
-    console.log('🔍 Final filter:', filter);
+    console.log('🔍 Final filter:', JSON.stringify(filter, null, 2));
     
     // Log workshop events found
     const workshopTest = await Event.find({ type: 'workshop', status: 'approved' }).limit(3).select('title status startDate endDate');
@@ -1438,6 +1496,327 @@ exports.registerForEvent = async (req, res) => {
   }
 };
 
+// 💳 Pay for an event (Student, Staff, TA, or Professor)
+exports.payForEvent = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const userId = req.user._id;
+    const { paymentMethod } = req.body; // 'wallet' or 'card'
+
+    // Find event
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        msg: "Event not found"
+      });
+    }
+
+    // Check if event has a price
+    const eventPrice = event.price || 0;
+    if (eventPrice <= 0) {
+      return res.status(400).json({
+        success: false,
+        msg: "This event is free and does not require payment"
+      });
+    }
+
+    // Find registration
+    let registration = await Registration.findOne({
+      user: userId,
+      event: eventId
+    });
+
+    if (!registration) {
+      // Check StudentRegistration
+      const user = await User.findById(userId);
+      if (user && user.email) {
+        registration = await StudentRegistration.findOne({
+          event: eventId,
+          studentEmail: user.email.toLowerCase()
+        });
+      }
+    }
+
+    if (!registration) {
+      return res.status(404).json({
+        success: false,
+        msg: "Registration not found. Please register for the event first."
+      });
+    }
+
+    if (registration.paid) {
+      return res.status(400).json({
+        success: false,
+        msg: "Payment already completed for this event"
+      });
+    }
+
+    // Handle wallet payment
+    if (paymentMethod === 'wallet') {
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          msg: "User not found"
+        });
+      }
+
+      if (!user.walletBalance || user.walletBalance < eventPrice) {
+        return res.status(400).json({
+          success: false,
+          msg: "Insufficient wallet balance",
+          required: eventPrice,
+          available: user.walletBalance || 0
+        });
+      }
+
+      // Deduct from wallet
+      user.walletBalance -= eventPrice;
+      if (!user.walletTransactions) {
+        user.walletTransactions = [];
+      }
+      user.walletTransactions.push({
+        amount: -eventPrice,
+        type: 'payment',
+        description: `Payment for ${event.title}`,
+        balanceAfter: user.walletBalance,
+        reference: eventId.toString(),
+        createdAt: new Date()
+      });
+      await user.save();
+
+      // Create payment record
+      const payment = new Payment({
+        user: userId,
+        event: eventId,
+        amount: eventPrice,
+        paymentMethod: 'wallet',
+        status: 'success'
+      });
+      await payment.save();
+
+      // Mark registration as paid
+      registration.paid = true;
+      await registration.save();
+
+      // Send receipt email
+      try {
+        const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
+        await sendReceiptEmail(
+          user.email,
+          userName,
+          event.title,
+          eventPrice,
+          'wallet',
+          new Date()
+        );
+      } catch (emailError) {
+        console.error('❌ Failed to send receipt email:', emailError);
+      }
+
+      return res.status(200).json({
+        success: true,
+        msg: "Payment successful",
+        paymentId: payment._id,
+        walletBalance: user.walletBalance
+      });
+    }
+
+    // Handle card payment (Stripe)
+    if (paymentMethod === 'card') {
+      if (!stripe) {
+        return res.status(500).json({
+          success: false,
+          msg: "Card payments are not available. Please use wallet payment."
+        });
+      }
+
+      // Create payment record
+      const payment = new Payment({
+        user: userId,
+        event: eventId,
+        amount: eventPrice,
+        paymentMethod: 'card',
+        status: 'pending'
+      });
+      await payment.save();
+
+      // Create Stripe checkout session
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'egp',
+              product_data: {
+                name: event.title,
+                description: `Registration fee for ${event.title}`
+              },
+              unit_amount: Math.round(eventPrice * 100) // Convert to cents
+            },
+            quantity: 1
+          }
+        ],
+        mode: 'payment',
+        success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/events/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/events/${eventId}`,
+        metadata: {
+          paymentId: payment._id.toString(),
+          userId: userId.toString(),
+          eventId: eventId.toString()
+        }
+      });
+
+      // Update payment with session ID
+      payment.stripeSessionId = session.id;
+      await payment.save();
+
+      return res.status(200).json({
+        success: true,
+        msg: "Redirect to payment",
+        sessionId: session.id,
+        url: session.url
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      msg: "Invalid payment method. Use 'wallet' or 'card'"
+    });
+
+  } catch (err) {
+    console.error("❌ Error processing payment:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
+// 🚫 Cancel event registration and get refund
+exports.cancelRegistration = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const userId = req.user._id;
+
+    // Find event
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        msg: "Event not found"
+      });
+    }
+
+    // Find registration
+    let registration = await Registration.findOne({
+      user: userId,
+      event: eventId
+    });
+
+    if (!registration) {
+      const user = await User.findById(userId);
+      if (user && user.email) {
+        registration = await StudentRegistration.findOne({
+          event: eventId,
+          studentEmail: user.email.toLowerCase()
+        });
+      }
+    }
+
+    if (!registration) {
+      return res.status(404).json({
+        success: false,
+        msg: "Registration not found"
+      });
+    }
+
+    // Check if event has already started
+    if (event.startDate && new Date(event.startDate) < new Date()) {
+      return res.status(400).json({
+        success: false,
+        msg: "Cannot cancel registration for an event that has already started"
+      });
+    }
+
+    // Find payment if exists
+    const payment = await Payment.findOne({
+      user: userId,
+      event: eventId,
+      status: 'success'
+    });
+
+    // Process refund if payment was made
+    if (payment && payment.paid) {
+      const eventPrice = event.price || 0;
+      
+      if (payment.paymentMethod === 'wallet' && eventPrice > 0) {
+        // Refund to wallet
+        const user = await User.findById(userId);
+        if (user) {
+          user.walletBalance = (user.walletBalance || 0) + eventPrice;
+          if (!user.walletTransactions) {
+            user.walletTransactions = [];
+          }
+          user.walletTransactions.push({
+            amount: eventPrice,
+            type: 'refund',
+            description: `Refund for cancelled registration: ${event.title}`,
+            balanceAfter: user.walletBalance,
+            reference: eventId.toString(),
+            createdAt: new Date()
+          });
+          await user.save();
+
+          // Send refund email
+          try {
+            const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
+            await sendRefundEmail(
+              user.email,
+              userName,
+              event.title,
+              eventPrice,
+              new Date()
+            );
+          } catch (emailError) {
+            console.error('❌ Failed to send refund email:', emailError);
+          }
+        }
+      } else if (payment.paymentMethod === 'card' && eventPrice > 0) {
+        // For card payments, mark for manual refund or process via Stripe
+        // For now, just log it - manual refund may be required
+        console.log(`⚠️ Card payment refund needed for payment: ${payment._id}, amount: ${eventPrice}`);
+      }
+    }
+
+    // Delete registration
+    if (registration.constructor.modelName === 'Registration') {
+      await Registration.findByIdAndDelete(registration._id);
+    } else {
+      await StudentRegistration.findByIdAndDelete(registration._id);
+    }
+
+    // Update event registered count
+    await Event.findByIdAndUpdate(eventId, { $inc: { registeredCount: -1 } });
+
+    res.status(200).json({
+      success: true,
+      msg: "Registration cancelled successfully",
+      refunded: payment && payment.paid && (payment.paymentMethod === 'wallet')
+    });
+
+  } catch (err) {
+    console.error("❌ Error cancelling registration:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
 // 💰 Get wallet transactions for the logged-in user
 exports.getWalletTransactions = async (req, res) => {
   try {
@@ -1924,6 +2303,126 @@ exports.getArchivedEvents = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error fetching archived events:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+// ⭐ Get user's favorite events
+exports.getFavoriteEvents = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate('favoriteEvents');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Favorite events fetched successfully',
+      events: user.favoriteEvents || []
+    });
+  } catch (err) {
+    console.error("❌ Error fetching favorite events:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+// ⭐ Add event to favorites
+exports.addToFavorites = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const userId = req.user._id;
+
+    // Verify event exists
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found"
+      });
+    }
+
+    // Get user and check if event is already in favorites
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Check if already in favorites
+    if (user.favoriteEvents && user.favoriteEvents.includes(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Event is already in favorites"
+      });
+    }
+
+    // Add to favorites
+    if (!user.favoriteEvents) {
+      user.favoriteEvents = [];
+    }
+    user.favoriteEvents.push(eventId);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Event added to favorites successfully'
+    });
+  } catch (err) {
+    console.error("❌ Error adding event to favorites:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+// ⭐ Remove event from favorites
+exports.removeFromFavorites = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const userId = req.user._id;
+
+    // Get user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Check if event is in favorites
+    if (!user.favoriteEvents || !user.favoriteEvents.includes(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Event is not in favorites"
+      });
+    }
+
+    // Remove from favorites
+    user.favoriteEvents = user.favoriteEvents.filter(
+      favId => favId.toString() !== eventId.toString()
+    );
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Event removed from favorites successfully'
+    });
+  } catch (err) {
+    console.error("❌ Error removing event from favorites:", err);
     res.status(500).json({
       success: false,
       message: "Server error"
