@@ -39,6 +39,9 @@ const AdminEventsView = () => {
   const [eventToDelete, setEventToDelete] = useState(null);
   const [vendorRequests, setVendorRequests] = useState({}); // eventId -> array of requests
   const [loadingVendorRequests, setLoadingVendorRequests] = useState({}); // eventId -> boolean
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [activeCreateTab, setActiveCreateTab] = useState('bazaar');
+  const [creating, setCreating] = useState(false);
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -483,6 +486,65 @@ const AdminEventsView = () => {
       console.error('Failed to update trip:', e);
     } finally {
       setTripSaving(false);
+    }
+  };
+
+  // Create handlers
+  const handleBazaarCreate = async (formData) => {
+    try {
+      setCreating(true);
+      await bazaarApi.create(formData);
+      await loadEvents();
+      setIsCreateModalOpen(false);
+      setActiveCreateTab('bazaar');
+    } catch (e) {
+      console.error('Failed to create bazaar:', e);
+      alert('Failed to create bazaar. Please try again.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleTripCreate = async (formData) => {
+    try {
+      setCreating(true);
+      await tripApi.create(formData);
+      await loadEvents();
+      setIsCreateModalOpen(false);
+      setActiveCreateTab('trip');
+    } catch (e) {
+      console.error('Failed to create trip:', e);
+      alert('Failed to create trip. Please try again.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleConferenceCreate = async (formData) => {
+    try {
+      setCreating(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/events/conference', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(formData),
+      });
+      const result = await response.json();
+      if (response.ok) {
+        await loadEvents();
+        setIsCreateModalOpen(false);
+        setActiveCreateTab('conference');
+      } else {
+        alert(result.msg || 'Failed to create conference. Please try again.');
+      }
+    } catch (e) {
+      console.error('Failed to create conference:', e);
+      alert('Failed to create conference. Please try again.');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -964,6 +1026,8 @@ const AdminEventsView = () => {
         <div style={{
           flex: 1,
           padding: '2rem',
+          paddingLeft: '6rem',
+          paddingRight: '6rem',
           overflowY: 'auto',
           backgroundColor: '#f6f7f8'
         }}>
@@ -1002,77 +1066,80 @@ const AdminEventsView = () => {
             marginBottom: '1.5rem',
             boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
-            {/* Search Bar */}
-            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', alignItems: 'center' }}>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <span className="material-symbols-outlined" style={{
-                  position: 'absolute',
-                  left: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#9ca3af',
-                  fontSize: '1.25rem',
-                  pointerEvents: 'none'
-                }}>
-                  search
-                </span>
-                <input
-                  type="text"
-                  placeholder="Search by event name, professor name, location, or description..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+            {/* Search Bar and Filters Row */}
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', width: '100%', justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+              {/* Search Bar */}
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
+                <div style={{ position: 'relative', width: '400px' }}>
+                  <span className="material-symbols-outlined" style={{
+                    position: 'absolute',
+                    left: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#9ca3af',
+                    fontSize: '1.25rem',
+                    pointerEvents: 'none'
+                  }}>
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search by event name, professor name, location, or description..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: '#FFFFFF',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'all 0.2s',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#1e40af';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e5e7eb';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={handleSearch}
                   style={{
-                    width: '100%',
-                    padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                    padding: '0.875rem 1.75rem',
                     borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb',
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: '#1e40af',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    cursor: 'pointer',
                     fontSize: '0.875rem',
-                    outline: 'none',
+                    fontWeight: '600',
                     transition: 'all 0.2s',
-                    boxSizing: 'border-box'
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    flexShrink: 0
                   }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#1e40af';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#1e3a8a';
+                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
                   }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.boxShadow = 'none';
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#1e40af';
+                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
                   }}
-                />
+                >
+                  Search
+                </button>
               </div>
-              <button
-                onClick={handleSearch}
-                style={{
-                  padding: '0.875rem 1.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#1e40af',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#1e3a8a';
-                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#1e40af';
-                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                }}
-              >
-                Search
-              </button>
-            </div>
-            
-            {/* Filter Buttons */}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              
+              {/* Filter Buttons */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', flexShrink: 0 }}>
               {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
                 <button
                   key={type}
@@ -1109,6 +1176,7 @@ const AdminEventsView = () => {
                   {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
                 </button>
               ))}
+              </div>
             </div>
           </div>
 
@@ -2387,6 +2455,162 @@ const AdminEventsView = () => {
         </div>
       )}
 
+      {/* Create Event Modal */}
+      {isCreateModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000
+        }}
+        onClick={() => {
+          setIsCreateModalOpen(false);
+          setActiveCreateTab('bazaar');
+        }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              width: '90%',
+              maxWidth: '800px',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              margin: '0 1rem'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <h2 style={{
+                fontSize: '1.25rem',
+                fontWeight: '700',
+                color: '#1D3557',
+                margin: 0
+              }}>
+                Create New Event
+              </h2>
+              <button
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setActiveCreateTab('bazaar');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6b7280',
+                  transition: 'color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.color = '#6b7280';
+                }}
+                aria-label="Close modal"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  close
+                </span>
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div style={{
+              display: 'flex',
+              borderBottom: '1px solid #e5e7eb',
+              backgroundColor: '#f9fafb'
+            }}>
+              {[
+                { id: 'bazaar', label: 'Bazaar' },
+                { id: 'trip', label: 'Trip' },
+                { id: 'conference', label: 'Conference' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveCreateTab(tab.id)}
+                  style={{
+                    flex: 1,
+                    padding: '1rem',
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: activeCreateTab === tab.id ? '600' : '400',
+                    color: activeCreateTab === tab.id ? '#1D3557' : '#6b7280',
+                    borderBottom: activeCreateTab === tab.id ? '3px solid #1D3557' : '3px solid transparent',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeCreateTab !== tab.id) {
+                      e.target.style.color = '#1D3557';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeCreateTab !== tab.id) {
+                      e.target.style.color = '#6b7280';
+                    }
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Modal Content */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.5rem'
+            }}>
+              {activeCreateTab === 'bazaar' && (
+                <BazaarForm
+                  onSubmit={handleBazaarCreate}
+                  loading={creating}
+                  submitLabel="Create Bazaar"
+                  loadingLabel="Creating..."
+                />
+              )}
+              {activeCreateTab === 'trip' && (
+                <TripForm
+                  onSubmit={handleTripCreate}
+                  loading={creating}
+                  submitLabel="Create Trip"
+                  loadingLabel="Creating..."
+                />
+              )}
+              {activeCreateTab === 'conference' && (
+                <ConferenceForm
+                  onSubmit={handleConferenceCreate}
+                  loading={creating}
+                  submitLabel="Create Conference"
+                  loadingLabel="Creating..."
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

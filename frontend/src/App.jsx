@@ -21,11 +21,8 @@ import GymSchedule from './pages/GymSchedule';
 import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
 import VendorDashboard from './pages/VendorDashboard';
-import CreateConference from './pages/CreateConfrence';
 import EditConfrences from './pages/EditConfrences';
 import EventsList from './pages/EventsList';
-import CreateBazaar from "./pages/CreateBazaar";
-import CreateTrip from './pages/CreateTrip';
 import CreateBooth from './pages/CreateBooth';
 import CreateGymSession from './pages/CreateGymSession';
 import EditBazaar from './pages/EditBazaar';
@@ -584,15 +581,6 @@ const AppContent = () => {
               }
             />
             <Route
-              path="/create-conference"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <CreateConference />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>}
-            />
-            <Route
               path="/edit-conference/:id"
               element={
                 <ProtectedRoute>
@@ -600,26 +588,6 @@ const AppContent = () => {
                 </ProtectedRoute>
               } />
             {/* ✅ ADD YOUR EVENT MANAGEMENT ROUTES HERE */}
-            <Route
-              path="/create-bazaar"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <CreateBazaar />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/create-trip"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <CreateTrip />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
             <Route
               path="/create-booth"
               element={
