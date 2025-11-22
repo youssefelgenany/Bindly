@@ -402,10 +402,41 @@ exports.getAllEventsForStudents = async (req, res) => {
     console.log('🔍 Event type filter:', type);
     console.log('🔍 Status filter:', status);
     
+    // Get user's registered event IDs (from both Registration and StudentRegistration)
+    const userId = req.user._id;
+    const userEmail = req.user.email;
+    
+    // Get registrations from Registration model
+    const registrations = await Registration.find({ user: userId })
+      .select('event')
+      .lean();
+    const registeredEventIds1 = registrations
+      .map(r => r.event)
+      .filter(id => id != null);
+    
+    // Get registrations from StudentRegistration model (by email)
+    const studentRegistrations = await StudentRegistration.find({ 
+      studentEmail: userEmail 
+    })
+      .select('event')
+      .lean();
+    const registeredEventIds2 = studentRegistrations
+      .map(r => r.event)
+      .filter(id => id != null);
+    
+    // Combine both sets of registered event IDs (keep as ObjectIds for MongoDB query)
+    const registeredEventIds = [...new Set([
+      ...registeredEventIds1.map(id => id.toString()),
+      ...registeredEventIds2.map(id => id.toString())
+    ])].filter(id => id);
+    
+    console.log('🔍 User registered event IDs:', registeredEventIds);
+    
     // Build filter - Event Office users can see all events, others only see approved
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
-    const filter = { 
-      startDate: { $gt: new Date() }, // Only events that start in the future
+    
+    // Base filter conditions
+    const baseFilter = {
       type: { $in: validTypes }, // Only valid event types
       $and: [
         { title: { $exists: true } },
@@ -415,6 +446,33 @@ exports.getAllEventsForStudents = async (req, res) => {
         { location: { $ne: null } },
         { location: { $ne: '' } }
       ]
+    };
+    
+    // Build date filter: include future events OR past events where user is registered
+    // For aggregation pipeline, we need to convert string IDs back to ObjectIds
+    const mongoose = require('mongoose');
+    const dateFilterConditions = [
+      { startDate: { $gt: new Date() } } // Future events
+    ];
+    
+    if (registeredEventIds.length > 0) {
+      // Convert string IDs to ObjectIds for the $in query
+      const objectIds = registeredEventIds
+        .filter(id => mongoose.Types.ObjectId.isValid(id))
+        .map(id => new mongoose.Types.ObjectId(id));
+      
+      if (objectIds.length > 0) {
+        dateFilterConditions.push({ _id: { $in: objectIds } }); // Past registered events
+      }
+    }
+    
+    const dateFilter = {
+      $or: dateFilterConditions
+    };
+    
+    const filter = {
+      ...baseFilter,
+      ...dateFilter
     };
     
     // Only filter by status for non-Event Office users

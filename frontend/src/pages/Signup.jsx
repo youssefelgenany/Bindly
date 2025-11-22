@@ -250,7 +250,7 @@ const Signup = () => {
     <div style={{
       position: 'relative',
       display: 'flex',
-      minHeight: '100vh',
+      height: '100vh',
       width: '100%',
       flexDirection: 'column',
       overflow: 'hidden',
@@ -259,10 +259,10 @@ const Signup = () => {
     }}>
       <div className="signup-container" style={{
         display: 'flex',
-        height: '100%',
-        minHeight: '100vh',
+        height: '100vh',
         width: '100%',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        overflow: 'hidden'
       }}>
         {/* Left Panel - Signup Form */}
         <div style={{
@@ -272,7 +272,9 @@ const Signup = () => {
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: '#FFFFFF',
-          padding: '1.5rem'
+          padding: '1.5rem',
+          overflowY: 'auto',
+          overflowX: 'hidden'
         }}>
           <div style={{
             display: 'flex',
@@ -1023,7 +1025,10 @@ const Signup = () => {
           position: 'relative',
           display: 'none',
           width: '100%',
-          flex: 1
+          flex: 1,
+          height: '100vh',
+          overflow: 'hidden',
+          flexShrink: 0
         }}>
           <div style={{
             position: 'absolute',
@@ -1078,9 +1083,19 @@ const Signup = () => {
         @media (min-width: 1024px) {
           .signup-container {
             flex-direction: row !important;
+            height: 100vh !important;
+            overflow: hidden !important;
           }
           .signup-right-panel {
             display: flex !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+            flex-shrink: 0 !important;
+          }
+          .signup-container > div:first-child {
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            flex: 1 !important;
           }
         }
       `}</style>
