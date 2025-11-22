@@ -500,17 +500,6 @@ exports.getAllEventsForStudents = async (req, res) => {
     
     // Base filter conditions
     const baseFilter = {
-
-    // Build filter - Event Office users can see all events, others only see approved
-   
-    const now = new Date();
-    const filter = {
-      // Show events that haven't ended yet (endDate is in the future or null)
-      $or: [
-        { endDate: { $gt: now } },
-        { endDate: { $exists: false } },
-        { endDate: null }
-      ],
       type: { $in: validTypes }, // Only valid event types
       $and: [
         { title: { $exists: true } },
