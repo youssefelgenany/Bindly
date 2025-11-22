@@ -846,45 +846,6 @@ const AdminEventsView = () => {
                   Platform Booths
                 </p>
               </Link>
-
-              <Link
-                to="/admin/manage"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/admin/manage') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/admin/manage')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/admin/manage')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/admin/manage') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  settings
-                </span>
-                <p style={{
-                  color: isActiveRoute('/admin/manage') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/admin/manage') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Management
-                </p>
-              </Link>
             </nav>
           )}
         </div>
@@ -1025,37 +986,65 @@ const AdminEventsView = () => {
         {/* Content */}
         <div style={{
           flex: 1,
-          padding: '2rem',
-          paddingLeft: '6rem',
-          paddingRight: '6rem',
+          padding: '2rem 6rem',
           overflowY: 'auto',
           backgroundColor: '#f6f7f8'
         }}>
-          {/* Page Title Box */}
+          {/* Page Title Banner */}
           <div style={{
-            backgroundColor: '#FFFFFF',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            position: 'relative',
+            height: '140px',
+            borderRadius: '0.75rem',
+            overflow: 'hidden',
             marginBottom: '1.5rem',
-            borderLeft: '4px solid #1D3557'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
           }}>
-            <h3 style={{
-              color: '#1D3557',
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              margin: 0
+            {/* Background Image */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(/assets/images/events-banner.jpeg)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
+            }}></div>
+            {/* Blue Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Content */}
+            <div style={{
+              position: 'relative',
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '2rem 2.5rem',
+              color: '#FFFFFF'
             }}>
-              All Events
-            </h3>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '1rem',
-              fontWeight: '400',
-              margin: '0.25rem 0 0 0'
-            }}>
-              View, manage, and track all scheduled university events.
-            </p>
+              <h3 style={{
+                color: '#FFFFFF',
+                fontSize: '1.75rem',
+                fontWeight: '700',
+                margin: 0,
+                marginBottom: '0.5rem'
+              }}>
+                All Events
+              </h3>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '0.875rem',
+                fontWeight: '400',
+                margin: 0
+              }}>
+                View, manage, and track all scheduled university events.
+              </p>
+            </div>
           </div>
 
           {/* Search and Filters */}

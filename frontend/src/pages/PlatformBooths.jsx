@@ -628,7 +628,7 @@ const PlatformBooths = () => {
         {/* Content */}
         <div style={{
           flex: 1,
-          padding: '2rem',
+          padding: '2rem 6rem',
           overflowY: 'auto',
           backgroundColor: '#f8f6f6'
         }}>
