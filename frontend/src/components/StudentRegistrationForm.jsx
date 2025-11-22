@@ -17,17 +17,53 @@ const StudentRegistrationForm = ({ event, onClose, onSuccess }) => {
 
   // Auto-fill form with user data when component mounts or user changes
   useEffect(() => {
-    if (user) {
-      const fullName = user.firstName && user.lastName 
-        ? `${user.firstName} ${user.lastName}`.trim()
-        : user.name || '';
-      
-      setFormData({
-        studentName: fullName,
-        studentId: user.gucId || '',
-        studentEmail: user.email || ''
-      });
-    }
+    const fetchUserData = async () => {
+      if (user) {
+        try {
+          // Fetch current user data from API to ensure we have the latest gucId
+          const token = localStorage.getItem('token');
+          if (token) {
+            const response = await fetch('http://localhost:5000/api/auth/me', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              const currentUser = data.user || data;
+              
+              const fullName = currentUser.firstName && currentUser.lastName 
+                ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
+                : currentUser.name || user.name || '';
+              
+              setFormData({
+                studentName: fullName,
+                studentId: currentUser.gucId || user.gucId || '',
+                studentEmail: currentUser.email || user.email || ''
+              });
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+        
+        // Fallback to user from context if API call fails
+        const fullName = user.firstName && user.lastName 
+          ? `${user.firstName} ${user.lastName}`.trim()
+          : user.name || '';
+        
+        setFormData({
+          studentName: fullName,
+          studentId: user.gucId || '',
+          studentEmail: user.email || ''
+        });
+      }
+    };
+    
+    fetchUserData();
   }, [user]);
 
   const handleInputChange = (e) => {

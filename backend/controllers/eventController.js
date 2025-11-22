@@ -498,9 +498,28 @@ exports.getAllEventsForStudents = async (req, res) => {
     // Build filter - Event Office users can see all events, others only see approved
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     
+    // Build date filter: only include future events (not past events)
+    // Show events that haven't ended yet (endDate is in the future or doesn't exist)
+    const now = new Date();
+    const dateFilter = {
+      $or: [
+        { endDate: { $gt: now } }, // Events with endDate in the future
+        { 
+          $and: [
+            { 
+              $or: [
+                { endDate: { $exists: false } },
+                { endDate: null }
+              ]
+            },
+            { startDate: { $gt: now } } // Events without endDate but with future startDate
+          ]
+        }
+      ]
+    };
+    
     // Base filter conditions
     const baseFilter = {
-      type: { $in: validTypes }, // Only valid event types
       $and: [
         { title: { $exists: true } },
         { title: { $ne: null } },
@@ -511,30 +530,43 @@ exports.getAllEventsForStudents = async (req, res) => {
       ]
     };
     
-    // Build date filter: include future events OR past events where user is registered
-    // For aggregation pipeline, we need to convert string IDs back to ObjectIds
-    const mongoose = require('mongoose');
-    const dateFilterConditions = [
-      { startDate: { $gt: new Date() } } // Future events
-    ];
+    // Handle type filter - apply before combining with baseFilter
+    let typeFilter = { type: { $in: validTypes } }; // Default: all valid types
     
-    if (registeredEventIds.length > 0) {
-      // Convert string IDs to ObjectIds for the $in query
-      const objectIds = registeredEventIds
-        .filter(id => mongoose.Types.ObjectId.isValid(id))
-        .map(id => new mongoose.Types.ObjectId(id));
+    if (type && type !== 'all' && type.trim() !== '') {
+      const typeMap = {
+        workshops: 'workshop',
+        trips: 'trip',
+        bazaars: 'bazaar',
+        bazaar: 'bazaar', // Handle singular form
+        booths: 'booth',
+        booth: 'booth', // Handle singular form
+        confrence: 'conference',
+        conference: 'conference',
+        workshop: 'workshop', // Handle singular form
+        trip: 'trip' // Handle singular form
+      };
+      const normalizedType = (type || '').toString().trim().toLowerCase();
+      const mappedType = typeMap[normalizedType] || normalizedType;
+      console.log('🔍 Type filter received:', type, '-> normalized:', normalizedType, '-> mapped to:', mappedType);
       
-      if (objectIds.length > 0) {
-        dateFilterConditions.push({ _id: { $in: objectIds } }); // Past registered events
+      // Strictly check if mapped type is in valid types
+      if (validTypes.includes(mappedType)) {
+        // Use exact match for the specific type - ensure it's a string, not object
+        typeFilter = { type: mappedType };
+        console.log('🔍 Type filter applied (exact match):', mappedType, 'filter object:', JSON.stringify(typeFilter));
+      } else {
+        console.log('🔍 Invalid type filter, ignoring:', mappedType, '(valid types:', validTypes, ')');
+        // If invalid type, return empty results by using impossible filter
+        typeFilter = { _id: { $in: [] } }; // This will return no results
       }
+    } else {
+      console.log('🔍 No type filter or type is "all", showing all valid types');
     }
-    
-    const dateFilter = {
-      $or: dateFilterConditions
-    };
     
     const filter = {
       ...baseFilter,
+      ...typeFilter,
       ...dateFilter
     };
     
@@ -552,27 +584,6 @@ exports.getAllEventsForStudents = async (req, res) => {
       console.log('🔍 Non-Event Office user - filtering to approved only');
     } else {
       console.log('🔍 Event Office user - showing all statuses');
-    }
-
-    if (type && type !== 'all') {
-      const typeMap = {
-        workshops: 'workshop',
-        trips: 'trip',
-        bazaars: 'bazaar',
-        booths: 'booth',
-        confrence: 'conference',
-        conference: 'conference'
-      };
-      const mappedType = typeMap[type.toLowerCase()] || type.toLowerCase();
-      console.log('🔍 Type filter received:', type, '-> mapped to:', mappedType);
-      if (validTypes.includes(mappedType)) {
-        filter.type = mappedType;
-        console.log('🔍 Type filter applied:', filter.type);
-      } else {
-        console.log('🔍 Invalid type filter, ignoring:', mappedType);
-      }
-    } else {
-      console.log('🔍 No type filter or type is "all", showing all valid types');
     }
     console.log('🔍 Final filter:', JSON.stringify(filter, null, 2));
     
