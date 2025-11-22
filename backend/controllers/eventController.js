@@ -38,7 +38,8 @@ exports.createEvent = async (req, res) => {
       faculty,
       professors,
       extraResources,
-      bannerFile
+      bannerFile,
+      allowedUserTypes
     } = req.body;
 
     if (!title || !type || !startDate || !endDate || !location) {
@@ -71,7 +72,10 @@ exports.createEvent = async (req, res) => {
       faculty,
       professors,
       extraResources,
-      bannerFile
+      bannerFile,
+      // User type restrictions
+      isRestricted: allowedUserTypes && allowedUserTypes.length > 0,
+      allowedUserTypes: allowedUserTypes && allowedUserTypes.length > 0 ? allowedUserTypes : []
     });
 
     await newEvent.save();
@@ -103,11 +107,15 @@ exports.createConference = async (req, res) => {
       return res.status(400).json({ msg: "Missing required conference fields" });
     }
 
+    const { allowedUserTypes, ...otherFields } = req.body;
     const newConference = new Event({
-      ...req.body,
+      ...otherFields,
       type: "conference",
       createdBy: req.user ? req.user._id : undefined,
-      status: "approved"
+      status: "approved",
+      // User type restrictions
+      isRestricted: allowedUserTypes && allowedUserTypes.length > 0,
+      allowedUserTypes: allowedUserTypes && allowedUserTypes.length > 0 ? allowedUserTypes : []
     });
 
     await newConference.save();
@@ -333,6 +341,8 @@ exports.getAllEvents = async (req, res) => {
           faculty: 1,
           professors: 1,
           bannerFile: 1,
+          isRestricted: 1,
+          allowedUserTypes: 1,
           createdBy: {
             _id: '$creator._id',
             firstName: '$creator.firstName',
@@ -344,7 +354,21 @@ exports.getAllEvents = async (req, res) => {
       }
     );
 
-    const events = await Event.aggregate(pipeline);
+    let events = await Event.aggregate(pipeline);
+
+    // Filter by user type restrictions
+    if (req.user && req.user.userType) {
+      const userType = req.user.userType;
+      events = events.filter(event => {
+        // If event has restrictions and allowedUserTypes array
+        if (event.isRestricted && event.allowedUserTypes && event.allowedUserTypes.length > 0) {
+          // Check if user's type is in the allowed list
+          return event.allowedUserTypes.includes(userType);
+        }
+        // If no restrictions, show to all
+        return true;
+      });
+    }
 
     const workshopEvents = events.filter(e => e.type === 'workshop');
     console.log('🔍 getAllEvents - Query results:', {
@@ -590,6 +614,8 @@ exports.getAllEventsForStudents = async (req, res) => {
           faculty: 1,
           professors: 1,
           bannerFile: 1,
+          isRestricted: 1,
+          allowedUserTypes: 1,
           createdBy: {
             _id: '$creator._id',
             firstName: '$creator.firstName',
@@ -601,7 +627,21 @@ exports.getAllEventsForStudents = async (req, res) => {
       }
     ];
 
-    const events = await Event.aggregate(pipeline);
+    let events = await Event.aggregate(pipeline);
+
+    // Filter by user type restrictions
+    if (req.user && req.user.userType) {
+      const userType = req.user.userType;
+      events = events.filter(event => {
+        // If event has restrictions and allowedUserTypes array
+        if (event.isRestricted && event.allowedUserTypes && event.allowedUserTypes.length > 0) {
+          // Check if user's type is in the allowed list
+          return event.allowedUserTypes.includes(userType);
+        }
+        // If no restrictions, show to all
+        return true;
+      });
+    }
 
     console.log('🔍 Found events:', events.length);
     if (q) {
@@ -1355,9 +1395,18 @@ exports.registerForEvent = async (req, res) => {
       return res.status(400).json({ msg: 'Event is not available for registration' });
     }
 
-    // Check if event is restricted
-    if (event.isRestricted && !event.allowedUsers.includes(userId)) {
-      return res.status(403).json({ msg: 'You are not allowed to register for this event' });
+    // Check user type restrictions
+    if (event.isRestricted && event.allowedUserTypes && event.allowedUserTypes.length > 0) {
+      const userType = req.user.userType;
+      if (!event.allowedUserTypes.includes(userType)) {
+        return res.status(403).json({ msg: 'You are not allowed to register for this event' });
+      }
+    }
+    // Check specific user restrictions (legacy)
+    if (event.isRestricted && event.allowedUsers && event.allowedUsers.length > 0 && (!event.allowedUserTypes || event.allowedUserTypes.length === 0)) {
+      if (!event.allowedUsers.includes(userId)) {
+        return res.status(403).json({ msg: 'You are not allowed to register for this event' });
+      }
     }
 
     // Check if already registered

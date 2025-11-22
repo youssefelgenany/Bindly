@@ -140,6 +140,7 @@ exports.createBazaar = async (req, res) => {
   try {
     const { name, startDate, endDate, location, description, registrationDeadline } = req.body;
 
+    const { allowedUserTypes } = req.body;
     const newBazaar = new Event({
       title: name, // Map name to title for Event model
       type: 'bazaar', // Set type as bazaar
@@ -149,7 +150,10 @@ exports.createBazaar = async (req, res) => {
       location,
       description,
       createdBy: req.user._id, // Track who created it
-      status: 'approved' // Event office creates approved events
+      status: 'approved', // Event office creates approved events
+      // User type restrictions
+      isRestricted: allowedUserTypes && allowedUserTypes.length > 0,
+      allowedUserTypes: allowedUserTypes && allowedUserTypes.length > 0 ? allowedUserTypes : []
     });
 
     await newBazaar.save();

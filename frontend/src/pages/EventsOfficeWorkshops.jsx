@@ -17,7 +17,11 @@ const EventsOfficeWorkshops = () => {
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState(null); // 'approve', 'reject', 'request-edits'
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
-  const [actionData, setActionData] = useState({ rejectionReason: '', editRequests: '' });
+  const [actionData, setActionData] = useState({ 
+    rejectionReason: '', 
+    editRequests: '', 
+    allowedUserTypes: [] 
+  });
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -69,18 +73,21 @@ const EventsOfficeWorkshops = () => {
     });
   };
 
-  const handleApprove = async (workshopId) => {
+  const handleApprove = async (workshopId, allowedUserTypes = []) => {
     try {
       setProcessingIds(prev => ({ ...prev, [workshopId]: true }));
       const token = localStorage.getItem('token');
       const response = await axios.put(
         `http://localhost:5000/api/workshops/${workshopId}/approve`,
-        {},
+        { allowedUserTypes },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
       if (response.data) {
         await loadWorkshops();
+        setShowActionModal(false);
+        setSelectedWorkshop(null);
+        setActionData({ rejectionReason: '', editRequests: '', allowedUserTypes: [] });
       }
     } catch (err) {
       console.error('Error approving workshop:', err);
@@ -101,6 +108,9 @@ const EventsOfficeWorkshops = () => {
       
       if (response.data) {
         await loadWorkshops();
+        setShowActionModal(false);
+        setSelectedWorkshop(null);
+        setActionData({ rejectionReason: '', editRequests: '', allowedUserTypes: [] });
       }
     } catch (err) {
       console.error('Error rejecting workshop:', err);
@@ -123,7 +133,7 @@ const EventsOfficeWorkshops = () => {
         await loadWorkshops();
         setShowActionModal(false);
         setSelectedWorkshop(null);
-        setActionData({ rejectionReason: '', editRequests: '' });
+        setActionData({ rejectionReason: '', editRequests: '', allowedUserTypes: [] });
       }
     } catch (err) {
       console.error('Error requesting edits:', err);
@@ -136,19 +146,34 @@ const EventsOfficeWorkshops = () => {
     setSelectedWorkshop(workshop);
     setActionType(type);
     setShowActionModal(true);
-    setActionData({ rejectionReason: '', editRequests: '' });
+    setActionData({ rejectionReason: '', editRequests: '', allowedUserTypes: [] });
   };
 
   const submitAction = () => {
     if (!selectedWorkshop) return;
     
-    if (actionType === 'request-edits') {
+    if (actionType === 'approve') {
+      handleApprove(selectedWorkshop._id, actionData.allowedUserTypes);
+    } else if (actionType === 'reject') {
+      handleReject(selectedWorkshop._id, actionData.rejectionReason);
+    } else if (actionType === 'request-edits') {
       if (!actionData.editRequests.trim()) {
         alert('Please provide edit requests');
         return;
       }
       handleRequestEdits(selectedWorkshop._id, actionData.editRequests);
     }
+  };
+
+  const toggleUserType = (userType) => {
+    setActionData(prev => {
+      const currentTypes = prev.allowedUserTypes || [];
+      if (currentTypes.includes(userType)) {
+        return { ...prev, allowedUserTypes: currentTypes.filter(t => t !== userType) };
+      } else {
+        return { ...prev, allowedUserTypes: [...currentTypes, userType] };
+      }
+    });
   };
 
   const getStatusColor = (status) => {
@@ -1045,7 +1070,7 @@ const EventsOfficeWorkshops = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleApprove(workshop._id);
+                                openActionModal(workshop, 'approve');
                               }}
                               disabled={isProcessing}
                               style={{
@@ -1067,7 +1092,7 @@ const EventsOfficeWorkshops = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleReject(workshop._id);
+                                openActionModal(workshop, 'reject');
                               }}
                               disabled={isProcessing}
                               style={{
@@ -1135,7 +1160,7 @@ const EventsOfficeWorkshops = () => {
         onClick={() => {
           setShowActionModal(false);
           setSelectedWorkshop(null);
-          setActionData({ rejectionReason: '', editRequests: '' });
+          setActionData({ rejectionReason: '', editRequests: '', allowedUserTypes: [] });
         }}
         >
           <div
@@ -1156,39 +1181,111 @@ const EventsOfficeWorkshops = () => {
               color: '#1D3557',
               margin: '0 0 1rem 0'
             }}>
-              Request Edits
+              {actionType === 'approve' ? 'Approve Workshop' : 
+               actionType === 'reject' ? 'Reject Workshop' : 
+               'Request Edits'}
             </h2>
-            <p style={{
-              fontSize: '0.875rem',
-              color: '#6B7280',
-              margin: '0 0 1.5rem 0'
-            }}>
-              Please specify what edits are needed:
-            </p>
-            <textarea
-              value={actionData.editRequests}
-              onChange={(e) => {
-                setActionData({ ...actionData, editRequests: e.target.value });
-              }}
-              placeholder="Enter edit requests..."
-              style={{
-                width: '100%',
-                minHeight: '150px',
-                padding: '0.75rem',
-                borderRadius: '0.5rem',
-                border: '1px solid #E5E7EB',
-                fontSize: '0.875rem',
-                fontFamily: 'inherit',
-                resize: 'vertical',
-                marginBottom: '1.5rem'
-              }}
-            />
+            
+            {actionType === 'approve' && (
+              <>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#6B7280',
+                  margin: '0 0 1rem 0'
+                }}>
+                  Select which user types can access this workshop (leave empty for all users):
+                </p>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  {['Student', 'Professor', 'Staff', 'TA'].map(userType => (
+                    <label key={userType} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      marginBottom: '0.75rem',
+                      cursor: 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={actionData.allowedUserTypes?.includes(userType) || false}
+                        onChange={() => toggleUserType(userType)}
+                        style={{
+                          width: '1.25rem',
+                          height: '1.25rem',
+                          marginRight: '0.75rem',
+                          cursor: 'pointer'
+                        }}
+                      />
+                      <span style={{ fontSize: '0.875rem', color: '#374151' }}>{userType}</span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {actionType === 'reject' && (
+              <>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#6B7280',
+                  margin: '0 0 1.5rem 0'
+                }}>
+                  Please provide a reason for rejection:
+                </p>
+                <textarea
+                  value={actionData.rejectionReason}
+                  onChange={(e) => {
+                    setActionData({ ...actionData, rejectionReason: e.target.value });
+                  }}
+                  placeholder="Enter rejection reason..."
+                  style={{
+                    width: '100%',
+                    minHeight: '150px',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #E5E7EB',
+                    fontSize: '0.875rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    marginBottom: '1.5rem'
+                  }}
+                />
+              </>
+            )}
+
+            {actionType === 'request-edits' && (
+              <>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#6B7280',
+                  margin: '0 0 1.5rem 0'
+                }}>
+                  Please specify what edits are needed:
+                </p>
+                <textarea
+                  value={actionData.editRequests}
+                  onChange={(e) => {
+                    setActionData({ ...actionData, editRequests: e.target.value });
+                  }}
+                  placeholder="Enter edit requests..."
+                  style={{
+                    width: '100%',
+                    minHeight: '150px',
+                    padding: '0.75rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #E5E7EB',
+                    fontSize: '0.875rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    marginBottom: '1.5rem'
+                  }}
+                />
+              </>
+            )}
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => {
                   setShowActionModal(false);
                   setSelectedWorkshop(null);
-                  setActionData({ rejectionReason: '', editRequests: '' });
+                  setActionData({ rejectionReason: '', editRequests: '', allowedUserTypes: [] });
                 }}
                 style={{
                   padding: '0.5rem 1rem',
@@ -1218,7 +1315,13 @@ const EventsOfficeWorkshops = () => {
                   opacity: processingIds[selectedWorkshop?._id] ? 0.6 : 1
                 }}
               >
-                {processingIds[selectedWorkshop?._id] ? 'Processing...' : 'Send Request'}
+                {processingIds[selectedWorkshop?._id] 
+                  ? 'Processing...' 
+                  : actionType === 'approve' 
+                    ? 'Approve' 
+                    : actionType === 'reject' 
+                      ? 'Reject' 
+                      : 'Send Request'}
               </button>
             </div>
           </div>
