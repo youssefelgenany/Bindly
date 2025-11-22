@@ -720,14 +720,10 @@ const GymSchedule = () => {
           paddingRight: '6rem',
           backgroundColor: '#f6f7f8'
         }}>
-          {/* Content Wrapper with Margins */}
+          {/* Page Title Banner */}
           <div style={{
-            marginLeft: '4rem',
-            marginRight: '4rem'
-          }}>
-          {/* Page Title Box */}
-          <div style={{
-            backgroundColor: '#FFFFFF',
+            position: 'relative',
+            height: '140px',
             borderRadius: '0.75rem',
             padding: '0.75rem 1rem',
             marginBottom: '1rem',
@@ -747,10 +743,10 @@ const GymSchedule = () => {
                 Gym Schedule
               </h3>
               <p style={{
-                color: '#6b7280',
+                color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '0.875rem',
                 fontWeight: '400',
-                margin: '0.125rem 0 0 0'
+                margin: 0
               }}>
                 View sessions for the selected month
               </p>
