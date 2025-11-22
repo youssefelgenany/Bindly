@@ -22,6 +22,7 @@ const StudentEventsView = () => {
   const [showWorkshopEditModal, setShowWorkshopEditModal] = useState(false);
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
   const [registeredEventIds, setRegisteredEventIds] = useState(new Set());
+  const [expandedRows, setExpandedRows] = useState(new Set());
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -76,6 +77,13 @@ const StudentEventsView = () => {
                  ev.title && ev.title.trim() !== '' && 
                  ev.location && ev.location.trim() !== '';
         });
+        
+        console.log('🔍 StudentEventsView - Events loaded:', {
+          totalEvents: mapped.length,
+          workshopEvents: mapped.filter(e => e.type === 'workshop').length,
+          workshopTitles: mapped.filter(e => e.type === 'workshop').map(e => e.title)
+        });
+        
         setEvents(mapped);
       } else {
         setEvents([]);
@@ -199,6 +207,39 @@ const StudentEventsView = () => {
     return colors[type] || colors.other;
   };
 
+  const getEventStatus = (event) => {
+    const now = new Date();
+    const startDate = new Date(event.startDate);
+    const endDate = event.endDate ? new Date(event.endDate) : null;
+    
+    if (event.capacity && event.registeredCount >= event.capacity) {
+      return { label: 'Full', color: 'red' };
+    }
+    if (endDate && now >= startDate && now <= endDate) {
+      return { label: 'Active', color: 'green' };
+    }
+    if (now < startDate) {
+      return { label: 'Upcoming', color: 'blue' };
+    }
+    return { label: 'Past', color: 'gray' };
+  };
+
+  const formatTableDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const toggleRowExpansion = (eventId) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(eventId)) {
+      newExpanded.delete(eventId);
+    } else {
+      newExpanded.add(eventId);
+    }
+    setExpandedRows(newExpanded);
+  };
+
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
     : user?.name || 'Student';
@@ -208,7 +249,7 @@ const StudentEventsView = () => {
       display: 'flex',
       height: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
+      backgroundColor: '#f6f7f8'
     }}>
       {/* Left Sidebar */}
       <aside style={{
@@ -237,9 +278,7 @@ const StudentEventsView = () => {
                 justifyContent: 'center',
                 color: '#FFFFFF'
               }}>
-                <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
-                </svg>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <h1 style={{
@@ -249,7 +288,7 @@ const StudentEventsView = () => {
                   lineHeight: 'normal',
                   margin: 0
                 }}>
-                  Student Events
+                  Student Portal
                 </h1>
                 <p style={{
                   color: 'rgba(241, 250, 238, 0.7)',
@@ -546,7 +585,7 @@ const StudentEventsView = () => {
               lineHeight: '1.25',
               margin: 0
             }}>
-              Discover Events
+              Bindly
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -601,15 +640,42 @@ const StudentEventsView = () => {
           flex: 1,
           padding: '2rem',
           overflowY: 'auto',
-          backgroundColor: '#f8f6f6'
+          backgroundColor: '#f6f7f8'
         }}>
+          {/* Page Title Box */}
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            padding: '1rem 1.5rem',
+            borderRadius: '0.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            marginBottom: '1.5rem',
+            borderLeft: '4px solid #1D3557'
+          }}>
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              Discover Events
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '1rem',
+              fontWeight: '400',
+              margin: '0.25rem 0 0 0'
+            }}>
+              Browse and register for upcoming events.
+            </p>
+          </div>
+
           {/* Search and Filters */}
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '0.75rem',
             padding: '1.5rem',
-            marginBottom: '2rem',
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+            marginBottom: '1.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', alignItems: 'center' }}>
               <div style={{ position: 'relative', flex: 1 }}>
@@ -838,255 +904,310 @@ const StudentEventsView = () => {
               </button>
             </div>
           ) : (
-            <>
-              <div style={{
-                marginBottom: '1.5rem',
-                color: '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: '500'
-              }}>
-                Found {events.length} upcoming event{events.length !== 1 ? 's' : ''}
-                {searchQuery && ` matching "${searchQuery}"`}
-                {filter !== 'all' && ` in ${filter} category`}
-              </div>
-              
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-                gap: '1.5rem'
-              }}>
-                {events.map(event => (
-                  <div
-                    key={event.id}
-                    onClick={() => setSelectedEvent(event)}
-                    style={{
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '0.75rem',
-                      padding: '1.5rem',
-                      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      border: '1px solid #e5e7eb',
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
-                      e.currentTarget.style.borderColor = '#1e40af';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
-                      e.currentTarget.style.borderColor = '#e5e7eb';
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                      <div style={{
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: getEventTypeColor(event.type),
-                        color: '#FFFFFF',
-                        fontSize: '0.6875rem',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}>
-                        {event.type}
-                      </div>
-                      {getDaysUntilEvent(event.startDate) && (
-                        <div style={{
-                          fontSize: '0.75rem',
-                          color: '#1e40af',
-                          fontWeight: '600',
-                          backgroundColor: '#eff6ff',
-                          padding: '0.25rem 0.625rem',
-                          borderRadius: '0.375rem'
-                        }}>
-                          {getDaysUntilEvent(event.startDate)}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <h3 style={{
-                      color: '#1D3557',
-                      fontSize: '1.125rem',
+            <div style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+              overflowX: 'auto'
+            }}>
+              <table style={{ width: '100%', textAlign: 'left' }}>
+                <thead style={{ borderBottom: '1px solid #e5e7eb' }}>
+                  <tr>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
                       fontWeight: '600',
-                      marginBottom: '1rem',
-                      marginTop: 0,
-                      lineHeight: '1.4'
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>
-                      {event.title}
-                    </h3>
-                    
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.625rem',
-                      marginBottom: '1rem',
-                      flex: 1
+                      Event Name
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
-                      }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
-                        }}>
-                          calendar_today
-                        </span>
-                        <span>{formatDate(event.startDate)}</span>
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
-                      }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
-                        }}>
-                          location_on
-                        </span>
-                        <span>{event.location}</span>
-                      </div>
-                      {event.price && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
-                          color: '#6b7280'
-                        }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            attach_money
-                          </span>
-                          <span style={{ fontWeight: '500', color: '#059669' }}>${event.price}</span>
-                        </div>
-                      )}
-                      {event.capacity && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
-                          color: '#6b7280'
-                        }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            people
-                          </span>
-                          <span>{event.registeredCount || 0}/{event.capacity} registered</span>
-                        </div>
-                      )}
-                      {(event.type === 'bazaar' || event.type === 'booth') && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
-                          color: '#6b7280'
-                        }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            storefront
-                          </span>
-                          <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
-                        </div>
-                      )}
-                    </div>
+                      Type
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Date
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Location
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      textAlign: 'center'
+                    }}>
+                      Status
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      textAlign: 'right'
+                    }}>
+                      Actions
+                    </th>
+                    <th style={{ padding: '1rem 1.5rem', width: '48px' }}></th>
+                  </tr>
+                </thead>
+                <tbody style={{ borderTop: '1px solid #e5e7eb' }}>
+                  {events.map(event => {
+                    const statusInfo = getEventStatus(event);
+                    const isExpanded = expandedRows.has(event.id);
+                    const isRegistered = registeredEventIds.has(String(event.id));
+                    const statusColors = {
+                      blue: { bg: '#dbeafe', text: '#1e40af' },
+                      green: { bg: '#d1fae5', text: '#065f46' },
+                      red: { bg: '#fee2e2', text: '#991b1b' },
+                      gray: { bg: '#f3f4f6', text: '#4b5563' }
+                    };
+                    const statusStyle = statusColors[statusInfo.color] || statusColors.gray;
 
-                    {event.description && (
-                      <p style={{
-                        color: '#6b7280',
-                        fontSize: '0.8125rem',
-                        marginBottom: '1rem',
-                        marginTop: 0,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        lineHeight: '1.5'
-                      }}>
-                        {event.description}
-                      </p>
-                    )}
+                    return (
+                      <React.Fragment key={event.id}>
+                        <tr style={{
+                          borderBottom: '1px solid #e5e7eb',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            color: '#111827'
+                          }}>
+                            {event.title}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}>
+                            {event.type ? event.type.charAt(0).toUpperCase() + event.type.slice(1) : 'Event'}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}>
+                            {formatTableDate(event.startDate)}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}>
+                            {event.location}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'center'
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              backgroundColor: statusStyle.bg,
+                              color: statusStyle.text
+                            }}>
+                              {statusInfo.label}
+                            </span>
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'right'
+                          }}>
+                            {isRegistered ? (
+                              <span style={{
+                                padding: '0.5rem 1rem',
+                                borderRadius: '0.5rem',
+                                backgroundColor: '#d1fae5',
+                                color: '#065f46',
+                                fontSize: '0.875rem',
+                                fontWeight: '500'
+                              }}>
+                                Registered
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleRegisterClick(event)}
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  borderRadius: '0.5rem',
+                                  backgroundColor: '#1e40af',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '500',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.target.style.backgroundColor = '#1e3a8a';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.backgroundColor = '#1e40af';
+                                }}
+                              >
+                                Register
+                              </button>
+                            )}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'right'
+                          }}>
+                            <button
+                              onClick={() => toggleRowExpansion(event.id)}
+                              style={{
+                                padding: '0.5rem',
+                                borderRadius: '0.5rem',
+                                border: 'none',
+                                backgroundColor: 'transparent',
+                                color: '#6b7280',
+                                cursor: 'pointer',
+                                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = '#f3f4f6';
+                                e.target.style.color = '#137fec';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'transparent';
+                                e.target.style.color = '#6b7280';
+                              }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                expand_more
+                              </span>
+                            </button>
+                          </td>
+                        </tr>
+                        {/* Expanded Details Row */}
+                        {isExpanded && (
+                          <tr style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
+                            <td colSpan="7" style={{ padding: '1.5rem' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                {/* Event Description */}
+                                {event.description && (
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
+                                      Description
+                                    </h4>
+                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                      {event.description}
+                                    </p>
+                                  </div>
+                                )}
 
-                    {(event.type === 'workshop' || event.type === 'trip') && (
-                      registeredEventIds.has(String(event.id)) ? (
-                        <button
-                          disabled
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem 1rem',
-                            borderRadius: '0.5rem',
-                            backgroundColor: '#10b981',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            cursor: 'not-allowed',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            marginTop: 'auto',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                          }}
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
-                          Registered
-                        </button>
-                      ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRegisterClick(event);
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem 1rem',
-                            borderRadius: '0.5rem',
-                            backgroundColor: '#1e40af',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            transition: 'all 0.2s',
-                            marginTop: 'auto',
-                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = '#1e3a8a';
-                            e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = '#1e40af';
-                            e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                          }}
-                        >
-                          Register for {event.type === 'workshop' ? 'Workshop' : 'Trip'}
-                        </button>
-                      )
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
+                                {/* Event Details Grid */}
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                  gap: '1rem'
+                                }}>
+                                  {/* Start Date */}
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                      Start Date & Time
+                                    </h4>
+                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                      {event.startDate ? new Date(event.startDate).toLocaleString() : 'N/A'}
+                                    </p>
+                                  </div>
+
+                                  {/* End Date */}
+                                  {event.endDate && (
+                                    <div>
+                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                        End Date & Time
+                                      </h4>
+                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                        {new Date(event.endDate).toLocaleString()}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Registration Deadline */}
+                                  {event.registrationDeadline && (
+                                    <div>
+                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                        Registration Deadline
+                                      </h4>
+                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                        {new Date(event.registrationDeadline).toLocaleString()}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Capacity */}
+                                  {event.capacity && (
+                                    <div>
+                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                        Capacity
+                                      </h4>
+                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                        {event.registeredCount || 0} / {event.capacity} registered
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Price */}
+                                  {event.price && (
+                                    <div>
+                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                        Price
+                                      </h4>
+                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                        ${event.price}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </main>

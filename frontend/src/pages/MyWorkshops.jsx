@@ -7,7 +7,7 @@ const MyWorkshops = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [workshops, setWorkshops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -15,6 +15,7 @@ const MyWorkshops = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [saving, setSaving] = useState(false);
+  const [expandedRows, setExpandedRows] = useState(new Set());
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -100,6 +101,28 @@ const MyWorkshops = () => {
       needs_edits: 'Needs Edits'
     };
     return labels[status?.toLowerCase()] || status;
+  };
+
+  const formatTableDate = (dateString) => {
+    if (!dateString) return 'TBD';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const toggleRowExpansion = (workshopId) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(workshopId)) {
+        newSet.delete(workshopId);
+      } else {
+        newSet.add(workshopId);
+      }
+      return newSet;
+    });
   };
 
   const handleEditClick = (workshop) => {
@@ -279,7 +302,7 @@ const MyWorkshops = () => {
       display: 'flex',
       height: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
+      backgroundColor: '#f6f7f8'
     }}>
       {/* Left Sidebar */}
       <aside style={{
@@ -344,8 +367,9 @@ const MyWorkshops = () => {
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
+                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                  textDecoration: 'none',
+                  color: '#FFFFFF'
                 }}
                 onMouseEnter={(e) => {
                   if (!isActiveRoute('/dashboard')) {
@@ -358,16 +382,13 @@ const MyWorkshops = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
-                }}>
+                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.25rem' }}>
                   dashboard
                 </span>
                 <p style={{
-                  color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: '#FFFFFF',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/dashboard') ? '700' : '500',
+                  fontWeight: '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
@@ -397,9 +418,9 @@ const MyWorkshops = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
                   explore
                 </span>
@@ -436,9 +457,9 @@ const MyWorkshops = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
                   event_note
                 </span>
@@ -475,21 +496,23 @@ const MyWorkshops = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
                   work
                 </span>
-                <p style={{
-                  color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/professor/my-workshops') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  My Workshops
-                </p>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/professor/my-workshops') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    My Workshops
+                  </p>
+                )}
               </Link>
 
               <Link
@@ -514,21 +537,23 @@ const MyWorkshops = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
                   calendar_month
                 </span>
-                <p style={{
-                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  View Gym Sessions
-                </p>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    View Gym Sessions
+                  </p>
+                )}
               </Link>
 
               <Link
@@ -553,21 +578,23 @@ const MyWorkshops = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
                 }}>
                   add_circle
                 </span>
-                <p style={{
-                  color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/professor/create-workshop') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Create Workshop
-                </p>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/professor/create-workshop') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    Create Workshop
+                  </p>
+                )}
               </Link>
             </nav>
           )}
@@ -656,7 +683,7 @@ const MyWorkshops = () => {
               lineHeight: '1.25',
               margin: 0
             }}>
-              My Workshops
+              Bindly
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -711,8 +738,35 @@ const MyWorkshops = () => {
           flex: 1,
           padding: '2rem',
           overflowY: 'auto',
-          backgroundColor: '#f8f6f6'
+          backgroundColor: '#f6f7f8'
         }}>
+          {/* Page Title Box */}
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            padding: '1rem 1.5rem',
+            borderRadius: '0.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            marginBottom: '1.5rem',
+            borderLeft: '4px solid #1D3557'
+          }}>
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              My Workshops
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '1rem',
+              fontWeight: '400',
+              margin: '0.25rem 0 0 0'
+            }}>
+              View and manage your workshop submissions.
+            </p>
+          </div>
+
           {error && (
             <div style={{
               padding: '0.75rem 1rem',
@@ -777,161 +831,251 @@ const MyWorkshops = () => {
             </div>
           ) : (
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-              gap: '1.5rem'
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+              overflowX: 'auto'
             }}>
-              {workshops.map((workshop) => (
-                <div
-                  key={workshop._id}
-                  style={{
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem',
-                    transition: 'all 0.2s',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
-                  }}
-                >
-                  {/* Header with Status and Edit Button */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{
-                        color: '#1D3557',
-                        fontSize: '1.125rem',
-                        fontWeight: '700',
-                        margin: 0,
-                        marginBottom: '0.5rem'
-                      }}>
-                        {workshop.workshopName}
-                      </h3>
-                      <div style={{
-                        display: 'inline-block',
-                        padding: '0.25rem 0.75rem',
-                        borderRadius: '9999px',
-                        backgroundColor: getStatusColor(workshop.status) + '20',
-                        color: getStatusColor(workshop.status),
-                        fontSize: '0.75rem',
-                        fontWeight: '600'
-                      }}>
-                        {getStatusLabel(workshop.status)}
-                      </div>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditClick(workshop);
-                      }}
-                      style={{
-                        padding: '0.5rem',
-                        borderRadius: '0.375rem',
-                        backgroundColor: 'transparent',
-                        border: '1px solid #d1d5db',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.backgroundColor = '#f3f4f6';
-                        e.target.style.borderColor = '#9ca3af';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.backgroundColor = 'transparent';
-                        e.target.style.borderColor = '#d1d5db';
-                      }}
-                      title="Edit Workshop"
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: '1.25rem', color: '#374151' }}>
-                        edit
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Details */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6b7280', fontSize: '0.875rem' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>location_on</span>
-                      <span>{workshop.location}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6b7280', fontSize: '0.875rem' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>calendar_today</span>
-                      <span>{formatDateOnly(workshop.startDate)} - {formatDateOnly(workshop.endDate)}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6b7280', fontSize: '0.875rem' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>access_time</span>
-                      <span>{workshop.startTime} - {workshop.endTime}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6b7280', fontSize: '0.875rem' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>school</span>
-                      <span>{workshop.facultyResponsible}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6b7280', fontSize: '0.875rem' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>people</span>
-                      <span>Capacity: {workshop.capacity}</span>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  {workshop.shortDescription && (
-                    <p style={{
-                      color: '#374151',
-                      fontSize: '0.875rem',
-                      lineHeight: '1.5',
-                      margin: 0,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden'
+              <table style={{ width: '100%', textAlign: 'left' }}>
+                <thead style={{ borderBottom: '1px solid #e5e7eb' }}>
+                  <tr>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>
-                      {workshop.shortDescription}
-                    </p>
-                  )}
-
-                  {/* Rejection Reason or Edit Requests */}
-                  {workshop.status === 'rejected' && workshop.rejectionReason && (
-                    <div style={{
-                      padding: '0.75rem',
-                      borderRadius: '0.375rem',
-                      backgroundColor: '#fee2e2',
-                      border: '1px solid #fecaca'
+                      Workshop Name
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>
-                      <p style={{ color: '#991b1b', fontSize: '0.875rem', fontWeight: '600', margin: 0, marginBottom: '0.25rem' }}>
-                        Rejection Reason:
-                      </p>
-                      <p style={{ color: '#991b1b', fontSize: '0.875rem', margin: 0 }}>
-                        {workshop.rejectionReason}
-                      </p>
-                    </div>
-                  )}
-
-                  {workshop.status === 'needs_edits' && workshop.editRequests && (
-                    <div style={{
-                      padding: '0.75rem',
-                      borderRadius: '0.375rem',
-                      backgroundColor: '#fef3c7',
-                      border: '1px solid #fde68a'
+                      Date
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>
-                      <p style={{ color: '#92400e', fontSize: '0.875rem', fontWeight: '600', margin: 0, marginBottom: '0.25rem' }}>
-                        Edit Requests:
-                      </p>
-                      <p style={{ color: '#92400e', fontSize: '0.875rem', margin: 0 }}>
-                        {workshop.editRequests}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
+                      Location
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      textAlign: 'center'
+                    }}>
+                      Status
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      textAlign: 'right'
+                    }}>
+                      Actions
+                    </th>
+                    <th style={{ padding: '1rem 1.5rem', width: '48px' }}></th>
+                  </tr>
+                </thead>
+                <tbody style={{ borderTop: '1px solid #e5e7eb' }}>
+                  {workshops.map((workshop) => {
+                    const isExpanded = expandedRows.has(workshop._id);
+                    const statusColors = {
+                      pending: { bg: '#fef3c7', text: '#92400e' },
+                      approved: { bg: '#d1fae5', text: '#065f46' },
+                      rejected: { bg: '#fee2e2', text: '#991b1b' },
+                      needs_edits: { bg: '#fed7aa', text: '#ea580c' }
+                    };
+                    const statusStyle = statusColors[workshop.status?.toLowerCase()] || statusColors.pending;
+
+                    return (
+                      <React.Fragment key={workshop._id}>
+                        <tr style={{
+                          borderBottom: '1px solid #e5e7eb',
+                          transition: 'background-color 0.2s',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        onClick={() => toggleRowExpansion(workshop._id)}
+                        >
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            color: '#111827'
+                          }}>
+                            {workshop.workshopName}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}>
+                            {formatTableDate(workshop.startDate)}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}>
+                            {workshop.location}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'center'
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              backgroundColor: statusStyle.bg,
+                              color: statusStyle.text
+                            }}>
+                              {getStatusLabel(workshop.status)}
+                            </span>
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'right'
+                          }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditClick(workshop);
+                              }}
+                              style={{
+                                padding: '0.5rem',
+                                borderRadius: '0.375rem',
+                                backgroundColor: 'transparent',
+                                border: '1px solid #d1d5db',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = '#f3f4f6';
+                                e.target.style.borderColor = '#9ca3af';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'transparent';
+                                e.target.style.borderColor = '#d1d5db';
+                              }}
+                              title="Edit Workshop"
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem', color: '#374151' }}>
+                                edit
+                              </span>
+                            </button>
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'center'
+                          }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleRowExpansion(workshop._id);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '0.25rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#6b7280',
+                                transition: 'transform 0.2s'
+                              }}
+                            >
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.25rem',
+                                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.2s'
+                              }}>
+                                expand_more
+                              </span>
+                            </button>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr style={{ backgroundColor: '#f9fafb' }}>
+                            <td colSpan="6" style={{ padding: '1.5rem' }}>
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                gap: '1.5rem'
+                              }}>
+                                <div>
+                                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.5rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</div>
+                                  <div style={{ color: '#374151', fontSize: '0.875rem', lineHeight: '1.5' }}>
+                                    {workshop.shortDescription || 'No description available.'}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.5rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Workshop Details</div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    <div style={{ color: '#374151', fontSize: '0.875rem' }}>
+                                      <strong>Start:</strong> {formatDateOnly(workshop.startDate)} {workshop.startTime}
+                                    </div>
+                                    <div style={{ color: '#374151', fontSize: '0.875rem' }}>
+                                      <strong>End:</strong> {formatDateOnly(workshop.endDate)} {workshop.endTime}
+                                    </div>
+                                    <div style={{ color: '#374151', fontSize: '0.875rem' }}>
+                                      <strong>Faculty:</strong> {workshop.facultyResponsible}
+                                    </div>
+                                    <div style={{ color: '#374151', fontSize: '0.875rem' }}>
+                                      <strong>Capacity:</strong> {workshop.capacity}
+                                    </div>
+                                    {workshop.registrationDeadline && (
+                                      <div style={{ color: '#374151', fontSize: '0.875rem' }}>
+                                        <strong>Registration Deadline:</strong> {formatDate(workshop.registrationDeadline)}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              {(workshop.status === 'rejected' && workshop.rejectionReason) || (workshop.status === 'needs_edits' && workshop.editRequests) ? (
+                                <div style={{ marginTop: '1.5rem', padding: '1rem', borderRadius: '0.5rem', backgroundColor: workshop.status === 'rejected' ? '#fee2e2' : '#fef3c7', border: `1px solid ${workshop.status === 'rejected' ? '#fecaca' : '#fde68a'}` }}>
+                                  <div style={{ fontSize: '0.75rem', color: workshop.status === 'rejected' ? '#991b1b' : '#92400e', marginBottom: '0.5rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    {workshop.status === 'rejected' ? 'Rejection Reason' : 'Edit Requests'}
+                                  </div>
+                                  <div style={{ color: workshop.status === 'rejected' ? '#991b1b' : '#92400e', fontSize: '0.875rem', lineHeight: '1.5' }}>
+                                    {workshop.status === 'rejected' ? workshop.rejectionReason : workshop.editRequests}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const Workshop = require('../models/Workshop');
 const Notification = require('../models/notificationModel');
+const Event = require('../models/eventModel');
 
 // Events Office: list all workshops
 const getAllWorkshops = async (req, res) => {
@@ -229,13 +230,320 @@ const approveWorkshop = async (req, res) => {
       });
     }
     
-    // Update the workshop
-    workshop.status = 'approved';
-    workshop.rejectionReason = '';
-    workshop.editRequests = '';
-    await workshop.save();
+    // Update the workshop status without re-validating other fields
+    await Workshop.findByIdAndUpdate(
+      workshopId,
+      {
+        status: 'approved',
+        rejectionReason: '',
+        editRequests: '',
+        updatedAt: new Date()
+      },
+      { runValidators: false, new: true }
+    );
+    
+    // Reload the workshop for response
+    workshop = await Workshop.findById(workshopId);
     
     console.log('✅ Workshop approved:', workshop._id, 'Title:', workshop.workshopName || workshop.title);
+    console.log('📅 Workshop dates:', {
+      startDate: workshop.startDate,
+      endDate: workshop.endDate,
+      registrationDeadline: workshop.registrationDeadline
+    });
+    
+    // Create an Event in the Event model so it appears in the all events page
+    // This is CRITICAL - the event MUST be created for the workshop to appear in discover events
+    console.log('🚨 CRITICAL: Creating event from approved workshop');
+    console.log('🔍 Workshop details:', {
+      id: workshop._id,
+      title: workshop.workshopName,
+      startDate: workshop.startDate,
+      endDate: workshop.endDate,
+      location: workshop.location,
+      professorId: workshop.professorId
+    });
+    
+    try {
+      // Check if event already exists for this workshop
+      let existingEvent = await Event.findOne({ 
+        type: 'workshop',
+        title: workshop.workshopName,
+        createdBy: workshop.professorId
+      }).sort({ createdAt: -1 });
+      
+      console.log('🔍 Existing event search result:', existingEvent ? `Found event ${existingEvent._id} with status ${existingEvent.status}` : 'No event found');
+      
+      if (!existingEvent) {
+        console.log('🆕 Creating NEW event from workshop...');
+        
+        // Parse dates
+        const startDate = new Date(workshop.startDate);
+        const endDate = new Date(workshop.endDate);
+        const registrationDeadline = workshop.registrationDeadline 
+          ? new Date(workshop.registrationDeadline) 
+          : new Date(workshop.endDate);
+        
+        // Validate dates
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+          console.error('❌ Invalid dates, using fallback creation');
+          throw new Error('Invalid workshop dates');
+        }
+        
+        // Create event object
+        const eventData = {
+          title: workshop.workshopName || 'Workshop',
+          description: workshop.shortDescription || '',
+          type: 'workshop',
+          startDate: startDate,
+          endDate: endDate,
+          registrationDeadline: registrationDeadline,
+          location: workshop.location || 'GUC Cairo',
+          capacity: workshop.capacity || 100,
+          status: 'approved', // CRITICAL: Must be 'approved'
+          createdBy: workshop.professorId,
+          agenda: workshop.fullAgenda || '',
+          faculty: workshop.facultyResponsible || '',
+          professors: Array.isArray(workshop.professorsParticipating) 
+            ? workshop.professorsParticipating.join(', ')
+            : (workshop.professorsParticipating || ''),
+          extraResources: workshop.extraRequiredResources || '',
+          fundingSource: workshop.fundingSource || 'GUC'
+        };
+        
+        console.log('📝 Event data prepared:', {
+          title: eventData.title,
+          type: eventData.type,
+          status: eventData.status,
+          startDate: eventData.startDate,
+          endDate: eventData.endDate
+        });
+        
+        // Try to create using Mongoose first (with validation)
+        let newEvent;
+        try {
+          newEvent = new Event(eventData);
+          const validationError = newEvent.validateSync();
+          if (validationError) {
+            console.warn('⚠️ Validation error, will use direct insert:', validationError.message);
+            throw validationError;
+          }
+          await newEvent.save();
+          console.log('✅ Event created via Mongoose:', newEvent._id);
+        } catch (mongooseError) {
+          console.warn('⚠️ Mongoose save failed, using direct insert:', mongooseError.message);
+          // Fallback: Insert directly to bypass validation
+          const result = await Event.collection.insertOne(eventData);
+          newEvent = await Event.findById(result.insertedId);
+          console.log('✅ Event created via direct insert:', result.insertedId);
+        }
+        
+        if (!newEvent) {
+          throw new Error('Failed to create event - both methods failed');
+        }
+        
+        console.log('✅✅✅ EVENT CREATED SUCCESSFULLY:', {
+          id: newEvent._id,
+          title: newEvent.title,
+          status: newEvent.status,
+          type: newEvent.type
+        });
+        
+        // Immediate verification
+        const immediateCheck = await Event.findById(newEvent._id);
+        if (immediateCheck) {
+          console.log('✅ Immediate verification: Event exists with status:', immediateCheck.status);
+        } else {
+          console.error('❌❌❌ CRITICAL: Event not found immediately after creation!');
+        }
+      } else {
+        console.log('🔄 Updating existing event to approved status...');
+        // Update existing event status to approved and ensure all fields are up to date
+        // Use findByIdAndUpdate to ensure the update happens
+        const updateData = {
+          status: 'approved',
+          title: workshop.workshopName || existingEvent.title,
+          description: workshop.shortDescription || existingEvent.description,
+          startDate: new Date(workshop.startDate),
+          endDate: new Date(workshop.endDate),
+          registrationDeadline: workshop.registrationDeadline 
+            ? new Date(workshop.registrationDeadline) 
+            : existingEvent.registrationDeadline,
+          location: workshop.location || existingEvent.location,
+          capacity: workshop.capacity || existingEvent.capacity,
+          agenda: workshop.fullAgenda || existingEvent.agenda,
+          faculty: workshop.facultyResponsible || existingEvent.faculty,
+          professors: Array.isArray(workshop.professorsParticipating) 
+            ? workshop.professorsParticipating.join(', ')
+            : (workshop.professorsParticipating || existingEvent.professors),
+          extraResources: workshop.extraRequiredResources || existingEvent.extraResources,
+          fundingSource: workshop.fundingSource || existingEvent.fundingSource
+        };
+        
+        console.log('📝 Update data:', {
+          status: updateData.status,
+          title: updateData.title,
+          startDate: updateData.startDate
+        });
+        
+        // Try Mongoose update first
+        try {
+          await Event.findByIdAndUpdate(existingEvent._id, updateData, { runValidators: false, new: true });
+          console.log('✅ Event updated via findByIdAndUpdate');
+        } catch (updateError) {
+          console.warn('⚠️ Mongoose update failed, using direct update:', updateError.message);
+          // Fallback: Direct collection update
+          await Event.collection.updateOne(
+            { _id: existingEvent._id },
+            { $set: updateData }
+          );
+          console.log('✅ Event updated via direct collection update');
+        }
+        
+        // Reload to verify
+        const updatedEvent = await Event.findById(existingEvent._id);
+        if (updatedEvent) {
+          console.log('✅✅✅ EXISTING EVENT UPDATED SUCCESSFULLY:', {
+            id: updatedEvent._id,
+            title: updatedEvent.title,
+            status: updatedEvent.status,
+            type: updatedEvent.type
+          });
+          
+          if (updatedEvent.status === 'approved') {
+            console.log('✅ Status is correctly set to approved');
+          } else {
+            console.error('❌❌❌ CRITICAL: Status is NOT approved! Current status:', updatedEvent.status);
+            // Force update status directly
+            await Event.collection.updateOne(
+              { _id: existingEvent._id },
+              { $set: { status: 'approved' } }
+            );
+            console.log('🔧 Force-updated status to approved');
+          }
+        } else {
+          console.error('❌❌❌ CRITICAL: Event not found after update!');
+        }
+      }
+    } catch (eventError) {
+      console.error('❌ Error creating event from workshop:', eventError);
+      console.error('❌ Event error details:', {
+        message: eventError.message,
+        stack: eventError.stack,
+        workshopId: workshop._id,
+        workshopName: workshop.workshopName,
+        workshopDates: {
+          startDate: workshop.startDate,
+          endDate: workshop.endDate,
+          registrationDeadline: workshop.registrationDeadline
+        }
+      });
+      
+      // Try to create a minimal event even if validation fails
+      try {
+        console.log('🔄 Attempting to create minimal event as fallback...');
+        const eventData = {
+          title: workshop.workshopName || 'Workshop',
+          description: workshop.shortDescription || '',
+          type: 'workshop',
+          startDate: new Date(workshop.startDate),
+          endDate: new Date(workshop.endDate),
+          registrationDeadline: workshop.registrationDeadline ? new Date(workshop.registrationDeadline) : new Date(workshop.endDate),
+          location: workshop.location || 'GUC Cairo',
+          capacity: workshop.capacity || 100,
+          status: 'approved',
+          createdBy: workshop.professorId,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        
+        // Save directly to collection to bypass validation
+        const result = await Event.collection.insertOne(eventData);
+        console.log('✅ Minimal event created as fallback:', result.insertedId);
+        console.log('✅ Fallback event data:', eventData);
+      } catch (fallbackError) {
+        console.error('❌ Fallback event creation also failed:', fallbackError);
+        console.error('❌ Fallback error details:', {
+          message: fallbackError.message,
+          stack: fallbackError.stack
+        });
+      }
+      
+      // Don't fail the approval if event creation fails, but log it clearly
+      // The workshop is still approved, but the event might need manual creation
+    }
+    
+    // Final verification: Check if an event exists for this workshop
+    // If no event exists, CREATE IT NOW (this is a safety net)
+    try {
+      const finalCheck = await Event.findOne({
+        type: 'workshop',
+        title: workshop.workshopName,
+        createdBy: workshop.professorId
+      }).sort({ createdAt: -1 });
+      
+      if (finalCheck) {
+        console.log('✅ Final verification: Event exists for workshop:', {
+          eventId: finalCheck._id,
+          eventTitle: finalCheck.title,
+          eventStatus: finalCheck.status,
+          eventStartDate: finalCheck.startDate
+        });
+        
+        // Ensure status is approved
+        if (finalCheck.status !== 'approved') {
+          console.warn('⚠️ Event exists but status is not approved! Force-updating...');
+          await Event.collection.updateOne(
+            { _id: finalCheck._id },
+            { $set: { status: 'approved' } }
+          );
+          console.log('✅ Force-updated event status to approved');
+        }
+      } else {
+        console.error('❌❌❌ FINAL VERIFICATION FAILED: No event found for approved workshop!');
+        console.error('❌ Workshop details:', {
+          id: workshop._id,
+          title: workshop.workshopName,
+          status: workshop.status
+        });
+        
+        // LAST RESORT: Create event directly using collection.insertOne
+        console.log('🚨 LAST RESORT: Creating event directly via collection.insertOne...');
+        try {
+          const emergencyEventData = {
+            title: workshop.workshopName || 'Workshop',
+            description: workshop.shortDescription || '',
+            type: 'workshop',
+            startDate: new Date(workshop.startDate),
+            endDate: new Date(workshop.endDate),
+            registrationDeadline: workshop.registrationDeadline ? new Date(workshop.registrationDeadline) : new Date(workshop.endDate),
+            location: workshop.location || 'GUC Cairo',
+            capacity: workshop.capacity || 100,
+            status: 'approved',
+            createdBy: workshop.professorId,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          
+          const emergencyResult = await Event.collection.insertOne(emergencyEventData);
+          console.log('✅✅✅ EMERGENCY EVENT CREATED:', emergencyResult.insertedId);
+          
+          // Verify it was created
+          const emergencyCheck = await Event.findById(emergencyResult.insertedId);
+          if (emergencyCheck) {
+            console.log('✅ Emergency event verified:', {
+              id: emergencyCheck._id,
+              title: emergencyCheck.title,
+              status: emergencyCheck.status
+            });
+          }
+        } catch (emergencyError) {
+          console.error('❌❌❌ EMERGENCY EVENT CREATION FAILED:', emergencyError);
+        }
+      }
+    } catch (verifyError) {
+      console.error('❌ Error during final verification:', verifyError);
+    }
     
     // Create notification for the professor
     try {
@@ -299,12 +607,21 @@ const rejectWorkshop = async (req, res) => {
       });
     }
     
-    // Update the workshop
+    // Update the workshop status without re-validating other fields
     const rejectionReason = req.body.rejectionReason || '';
-    workshop.status = 'rejected';
-    workshop.rejectionReason = rejectionReason;
-    workshop.editRequests = '';
-    await workshop.save();
+    await Workshop.findByIdAndUpdate(
+      workshopId,
+      {
+        status: 'rejected',
+        rejectionReason: rejectionReason,
+        editRequests: '',
+        updatedAt: new Date()
+      },
+      { runValidators: false, new: true }
+    );
+    
+    // Reload the workshop for response
+    workshop = await Workshop.findById(workshopId);
     
     console.log('✅ Workshop rejected:', workshop._id, 'Title:', workshop.workshopName || workshop.title);
     
@@ -371,12 +688,21 @@ const requestEdits = async (req, res) => {
       });
     }
     
-    // Update the workshop
+    // Update the workshop status without re-validating other fields
     const editRequests = req.body.editRequests || '';
-    workshop.status = 'needs_edits';
-    workshop.editRequests = editRequests;
-    workshop.rejectionReason = '';
-    await workshop.save();
+    await Workshop.findByIdAndUpdate(
+      workshopId,
+      {
+        status: 'needs_edits',
+        editRequests: editRequests,
+        rejectionReason: '',
+        updatedAt: new Date()
+      },
+      { runValidators: false, new: true }
+    );
+    
+    // Reload the workshop for response
+    workshop = await Workshop.findById(workshopId);
     
     console.log('✅ Workshop edit requested:', workshop._id, 'Title:', workshop.workshopName || workshop.title);
     

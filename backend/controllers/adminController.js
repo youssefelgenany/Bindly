@@ -24,15 +24,18 @@ exports.assignRoleAndSendVerification = async (req, res) => {
     if (!user) return res.status(404).json({ msg: "User not found" });
 
     // Ensure name exists
-if (!user.name || user.name.trim() === '') {
-  user.name = user.firstName
-    ? `${user.firstName} ${user.lastName || ''}`.trim()
-    : user.email.split('@')[0]; // fallback to email prefix
-}
+    if (!user.name || user.name.trim() === '') {
+      user.name = user.firstName
+        ? `${user.firstName} ${user.lastName || ''}`.trim()
+        : user.email.split('@')[0]; // fallback to email prefix
+    }
 
-    // Update userType + generate verification token
+    // Update userType + activate and verify account
+    // When admin assigns a role, it's considered approval, so verify immediately
     user.userType = role;
-    user.isVerified = false;
+    user.isVerified = true; // Verify immediately when admin assigns role
+    user.status = 'active'; // Activate the account when admin assigns role
+    // Still generate token for email confirmation (optional)
     user.verificationToken = crypto.randomBytes(24).toString("hex");
     user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await user.save();
@@ -41,7 +44,7 @@ if (!user.name || user.name.trim() === '') {
     const name = user.firstName ? `${user.firstName} ${user.lastName}` : user.name;
     await sendVerificationEmail(user.email, user.verificationToken, name);
 
-    res.json({ msg: "Role assigned and verification email sent successfully.",token:user.verificationToken });
+    res.json({ msg: "Role assigned and verification email sent successfully.", token: user.verificationToken });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Server error" });
@@ -103,13 +106,13 @@ exports.updateUserRole = async (req, res) => {
 
     // Update user type (role) within the allowed set
     user.userType = role;
-    
+
     // Generate verification token and set user as unverified
     // User must click verification link in email to verify their account
     user.verificationToken = crypto.randomBytes(32).toString('hex');
     user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     user.isVerified = false; // Keep user unverified until they click the email link
-    
+
     await user.save();
 
     // Send verification email
@@ -197,11 +200,11 @@ exports.updateUserStatus = async (req, res) => {
 
     // Update user status
     user.status = isActive ? 'active' : 'blocked';
-    
+
     console.log('📊 New status:', user.status);
-    
+
     await user.save();
-    
+
     console.log('✅ User status updated successfully');
 
     res.status(200).json({
@@ -354,7 +357,7 @@ exports.getAllVendors = async (req, res) => {
   try {
     const { q, status } = req.query;
     console.log('🔍 Admin requesting vendors with query:', { q, status });
-    
+
     const filter = { userType: 'Vendor' };
 
     if (q) {
@@ -365,7 +368,7 @@ exports.getAllVendors = async (req, res) => {
         { companyName: new RegExp(q, "i") },
       ];
     }
-    
+
     if (status && status !== 'all') {
       if (status === 'verified') {
         filter.isVerified = true;
@@ -406,7 +409,7 @@ exports.updateVendorVerification = async (req, res) => {
   try {
     const { vendorId } = req.params;
     const { isVerified } = req.body;
-    
+
     console.log('🔍 Updating vendor verification:', vendorId);
     console.log('🔍 Is Verified:', isVerified);
 
@@ -460,7 +463,7 @@ exports.updateVendorStatus = async (req, res) => {
   try {
     const { vendorId } = req.params;
     const { status } = req.body;
-    
+
     console.log('🔍 Updating vendor status:', vendorId);
     console.log('🔍 New Status:', status);
 
@@ -513,7 +516,7 @@ exports.updateVendorStatus = async (req, res) => {
 // This endpoint is kept for backward compatibility but should not be used
 exports.updateUserVerification = async (req, res) => {
   return res.status(403).json({
-        success: false,
+    success: false,
     message: "Direct user verification is disabled. Users must verify via email verification link.",
   });
 };
@@ -593,22 +596,22 @@ exports.getAttendeesReport = async (req, res) => {
 
     // Extract filter parameters from query string
     const { eventName, eventType, startDate, endDate } = req.query;
-    
+
     console.log('🔍 Filters applied:', { eventName, eventType, startDate, endDate });
 
     // Build event filter object
     const eventFilter = {};
-    
+
     // Filter by event name (case-insensitive partial match)
     if (eventName) {
       eventFilter.title = { $regex: eventName, $options: 'i' };
     }
-    
+
     // Filter by event type
     if (eventType) {
       eventFilter.type = eventType;
     }
-    
+
     // Filter by date range
     if (startDate || endDate) {
       // Match events that overlap with the date range
@@ -630,14 +633,14 @@ exports.getAttendeesReport = async (req, res) => {
     // Get filtered events
     const allEvents = await Event.find(eventFilter).lean();
     console.log(`📅 Found ${allEvents.length} events matching filters`);
-    
+
     // Get event IDs for filtering registrations
     const eventIds = allEvents.map(e => e._id);
-    
+
     // Initialize empty arrays for registrations
     let studentRegistrations = [];
     let regularRegistrations = [];
-    
+
     // Only query registrations if there are events matching the filter
     if (eventIds.length > 0) {
       // Get student registrations for filtered events (for workshops and trips)
@@ -645,7 +648,7 @@ exports.getAttendeesReport = async (req, res) => {
         event: { $in: eventIds },
         status: { $in: ['approved', 'pending'] } // Only count approved/pending registrations
       }).lean();
-      
+
       // Get regular registrations for filtered events (for other event types)
       regularRegistrations = await Registration.find({
         event: { $in: eventIds },
@@ -689,7 +692,7 @@ exports.getAttendeesReport = async (req, res) => {
     allEvents.forEach(event => {
       const eventId = event._id.toString();
       const eventType = event.type || 'other';
-      
+
       // Count attendees for this event
       const studentRegCount = studentRegByEvent[eventId] || 0;
       const regularRegCount = regularRegByEvent[eventId] || 0;
@@ -757,6 +760,112 @@ exports.getAttendeesReport = async (req, res) => {
       success: false,
       message: 'Failed to generate attendees report',
       error: error.message
+    });
+  }
+};
+
+// Block a user account
+exports.blockUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { reason } = req.body; // Optional: reason for blocking
+
+    console.log('🔍 Blocking user:', userId);
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if already blocked
+    if (user.status === 'blocked') {
+      return res.status(400).json({
+        success: false,
+        message: 'User is already blocked'
+      });
+    }
+
+    user.status = 'blocked';
+    await user.save();
+
+    console.log('✅ User blocked successfully:', {
+      id: user._id,
+      email: user.email,
+      reason: reason || 'No reason provided'
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User blocked successfully',
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        userType: user.userType,
+        status: user.status
+      }
+    });
+  } catch (err) {
+    console.error('❌ Error blocking user:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+// Unblock a user account
+exports.unblockUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    console.log('🔍 Unblocking user:', userId);
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if already active
+    if (user.status === 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'User is already active'
+      });
+    }
+
+    user.status = 'active';
+    await user.save();
+
+    console.log('✅ User unblocked successfully:', {
+      id: user._id,
+      email: user.email
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User unblocked successfully',
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        userType: user.userType,
+        status: user.status
+      }
+    });
+  } catch (err) {
+    console.error('❌ Error unblocking user:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
     });
   }
 };

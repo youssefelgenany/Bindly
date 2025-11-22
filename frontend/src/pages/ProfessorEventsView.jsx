@@ -22,6 +22,7 @@ const ProfessorEventsView = () => {
   const [showWorkshopEditModal, setShowWorkshopEditModal] = useState(false);
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
   const [registeredEventIds, setRegisteredEventIds] = useState(new Set());
+  const [expandedRows, setExpandedRows] = useState(new Set());
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -202,6 +203,85 @@ const ProfessorEventsView = () => {
     };
     return colors[type] || colors.other;
   };
+
+  const getEventStatus = (event) => {
+    const now = new Date();
+    const startDate = new Date(event.startDate);
+    const endDate = new Date(event.endDate);
+    
+    if (event.capacity && event.registeredCount >= event.capacity) {
+      return { label: 'Full', color: 'red' };
+    }
+    if (now >= startDate && now <= endDate) {
+      return { label: 'Active', color: 'green' };
+    }
+    if (now < startDate) {
+      return { label: 'Upcoming', color: 'blue' };
+    }
+    return { label: 'Past', color: 'gray' };
+  };
+
+  const formatTableDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const toggleRowExpansion = (eventId) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(eventId)) {
+        newSet.delete(eventId);
+      } else {
+        newSet.add(eventId);
+      }
+      return newSet;
+    });
+  };
+
+  // Filter events based on type
+  const filteredEvents = events.filter(event => {
+    const title = (event.title || '').trim();
+    if (!title) return false;
+    if (!event.startDate) return false;
+    
+    const startDate = new Date(event.startDate);
+    if (isNaN(startDate.getTime())) return false;
+    
+    // Filter out past events - only filter if the event has completely ended
+    const now = new Date();
+    if (event.endDate) {
+      const eventEndDate = new Date(event.endDate);
+      // Only filter out if endDate is valid and has passed
+      if (!isNaN(eventEndDate.getTime()) && eventEndDate < now) {
+        return false;
+      }
+    } else {
+      // If no endDate, use startDate (for backward compatibility)
+      // But be lenient - only filter if startDate is clearly in the past (more than 1 day ago)
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      if (startDate < oneDayAgo) {
+        return false;
+      }
+    }
+    
+    const typeMatch = filter === 'all' || (event.type && event.type === filter);
+    return typeMatch;
+  });
+  
+  console.log('🔍 ProfessorEventsView - Filtered events:', {
+    totalEvents: events.length,
+    filteredCount: filteredEvents.length,
+    workshopEvents: filteredEvents.filter(e => e.type === 'workshop').length,
+    workshopTitles: filteredEvents.filter(e => e.type === 'workshop').map(e => e.title),
+    allWorkshops: events.filter(e => e.type === 'workshop').map(e => ({
+      title: e.title,
+      status: e.status,
+      startDate: e.startDate,
+      endDate: e.endDate,
+      filtered: filteredEvents.some(f => f.id === e.id)
+    }))
+  });
 
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
@@ -591,7 +671,7 @@ const ProfessorEventsView = () => {
               lineHeight: '1.25',
               margin: 0
             }}>
-              Discover Events
+              Bindly
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -646,16 +726,44 @@ const ProfessorEventsView = () => {
           flex: 1,
           padding: '2rem',
           overflowY: 'auto',
-          backgroundColor: '#f8f6f6'
+          backgroundColor: '#f6f7f8'
         }}>
+          {/* Page Title Box */}
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            padding: '1rem 1.5rem',
+            borderRadius: '0.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            marginBottom: '1.5rem',
+            borderLeft: '4px solid #1D3557'
+          }}>
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              Discover Events
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '1rem',
+              fontWeight: '400',
+              margin: '0.25rem 0 0 0'
+            }}>
+              Browse and register for upcoming university events.
+            </p>
+          </div>
+
           {/* Search and Filters */}
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '0.75rem',
             padding: '1.5rem',
-            marginBottom: '2rem',
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+            marginBottom: '1.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
+            {/* Search Bar */}
             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', alignItems: 'center' }}>
               <div style={{ position: 'relative', flex: 1 }}>
                 <span className="material-symbols-outlined" style={{
@@ -680,7 +788,7 @@ const ProfessorEventsView = () => {
                     padding: '0.875rem 0.875rem 0.875rem 2.75rem',
                     borderRadius: '0.5rem',
                     border: '1px solid #e5e7eb',
-                    backgroundColor: '#f9fafb',
+                    backgroundColor: '#FFFFFF',
                     fontSize: '0.875rem',
                     outline: 'none',
                     transition: 'all 0.2s',
@@ -688,12 +796,10 @@ const ProfessorEventsView = () => {
                   }}
                   onFocus={(e) => {
                     e.target.style.borderColor = '#1e40af';
-                    e.target.style.backgroundColor = '#ffffff';
                     e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.backgroundColor = '#f9fafb';
                     e.target.style.boxShadow = 'none';
                   }}
                 />
@@ -724,41 +830,17 @@ const ProfessorEventsView = () => {
               >
                 Search
               </button>
-              {searchQuery && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    loadEvents();
-                  }}
-                  style={{
-                    padding: '0.875rem 1rem',
-                    borderRadius: '0.5rem',
-                    backgroundColor: '#f3f4f6',
-                    color: '#6b7280',
-                    border: '1px solid #e5e7eb',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#e5e7eb';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }}
-                >
-                  Clear
-                </button>
-              )}
             </div>
             
+            {/* Filter Buttons */}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
                 <button
                   key={type}
-                  onClick={() => setFilter(type)}
+                  onClick={() => {
+                    setFilter(type);
+                    handleSearch();
+                  }}
                   style={{
                     padding: '0.625rem 1.25rem',
                     borderRadius: '0.5rem',
@@ -822,316 +904,407 @@ const ProfessorEventsView = () => {
               }} className="spinner"></div>
               <p style={{ margin: 0, color: '#6b7280' }}>Loading events...</p>
             </div>
-          ) : events.length === 0 ? (
+          ) : filteredEvents.length === 0 ? (
             <div style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '0.75rem',
               padding: '4rem 2rem',
               textAlign: 'center',
-              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
             }}>
-              <div style={{
-                fontSize: '3rem',
-                marginBottom: '1rem',
-                opacity: 0.5
-              }}>📅</div>
-              <p style={{
-                color: '#374151',
-                fontSize: '1.125rem',
-                fontWeight: '500',
-                marginBottom: '0.5rem',
-                marginTop: 0
-              }}>
-                No upcoming events found
-              </p>
-              <p style={{
-                color: '#6b7280',
-                fontSize: '0.875rem',
-                marginBottom: '1.5rem',
-                marginTop: 0
-              }}>
-                Only events that haven't started yet are shown.
-              </p>
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setFilter('all');
-                  loadEvents();
-                }}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#1e40af',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#1e3a8a';
-                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#1e40af';
-                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                }}
-              >
-                Show All Upcoming Events
-              </button>
+              <p style={{ color: '#6b7280' }}>No events found.</p>
             </div>
           ) : (
-            <>
-              <div style={{
-                marginBottom: '1.5rem',
-                color: '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: '500'
-              }}>
-                Found {events.length} upcoming event{events.length !== 1 ? 's' : ''}
-                {searchQuery && ` matching "${searchQuery}"`}
-                {filter !== 'all' && ` in ${filter} category`}
-              </div>
-              
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-                gap: '1.5rem'
-              }}>
-                {events.map(event => (
-                  <div
-                    key={event.id}
-                    onClick={() => setSelectedEvent(event)}
-                    style={{
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '0.75rem',
-                      padding: '1.5rem',
-                      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      border: '1px solid #e5e7eb',
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
-                      e.currentTarget.style.borderColor = '#1e40af';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
-                      e.currentTarget.style.borderColor = '#e5e7eb';
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                      <div style={{
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: getEventTypeColor(event.type),
-                        color: '#FFFFFF',
-                        fontSize: '0.6875rem',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}>
-                        {event.type}
-                      </div>
-                      {getDaysUntilEvent(event.startDate) && (
-                        <div style={{
-                          fontSize: '0.75rem',
-                          color: '#1e40af',
-                          fontWeight: '600',
-                          backgroundColor: '#eff6ff',
-                          padding: '0.25rem 0.625rem',
-                          borderRadius: '0.375rem'
-                        }}>
-                          {getDaysUntilEvent(event.startDate)}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <h3 style={{
-                      color: '#1D3557',
-                      fontSize: '1.125rem',
+            <div style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+              overflowX: 'auto'
+            }}>
+              <table style={{ width: '100%', textAlign: 'left' }}>
+                <thead style={{ borderBottom: '1px solid #e5e7eb' }}>
+                  <tr>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
                       fontWeight: '600',
-                      marginBottom: '1rem',
-                      marginTop: 0,
-                      lineHeight: '1.4'
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>
-                      {event.title}
-                    </h3>
-                    
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.625rem',
-                      marginBottom: '1rem',
-                      flex: 1
+                      Event Name
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
-                      }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
-                        }}>
-                          calendar_today
-                        </span>
-                        <span>{formatDate(event.startDate)}</span>
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
-                      }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
-                        }}>
-                          location_on
-                        </span>
-                        <span>{event.location}</span>
-                      </div>
-                      {event.price && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
-                          color: '#6b7280'
-                        }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            attach_money
-                          </span>
-                          <span style={{ fontWeight: '500', color: '#059669' }}>${event.price}</span>
-                        </div>
-                      )}
-                      {event.capacity && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
-                          color: '#6b7280'
-                        }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            people
-                          </span>
-                          <span>{event.registeredCount || 0}/{event.capacity} registered</span>
-                        </div>
-                      )}
-                      {(event.type === 'bazaar' || event.type === 'booth') && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
-                          color: '#6b7280'
-                        }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            storefront
-                          </span>
-                          <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
-                        </div>
-                      )}
-                    </div>
+                      Type
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Date
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Location
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      textAlign: 'center'
+                    }}>
+                      Status
+                    </th>
+                    <th style={{
+                      padding: '1rem 1.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      textAlign: 'right'
+                    }}>
+                      Actions
+                    </th>
+                    <th style={{ padding: '1rem 1.5rem', width: '48px' }}></th>
+                  </tr>
+                </thead>
+                <tbody style={{ borderTop: '1px solid #e5e7eb' }}>
+                  {filteredEvents.map(event => {
+                    const statusInfo = getEventStatus(event);
+                    const isExpanded = expandedRows.has(event.id);
+                    const statusColors = {
+                      blue: { bg: '#dbeafe', text: '#1e40af' },
+                      green: { bg: '#d1fae5', text: '#065f46' },
+                      red: { bg: '#fee2e2', text: '#991b1b' },
+                      gray: { bg: '#f3f4f6', text: '#4b5563' }
+                    };
+                    const statusStyle = statusColors[statusInfo.color] || statusColors.gray;
+                    const isRegistered = registeredEventIds.has(String(event.id));
 
-                    {event.description && (
-                      <p style={{
-                        color: '#6b7280',
-                        fontSize: '0.8125rem',
-                        marginBottom: '1rem',
-                        marginTop: 0,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        lineHeight: '1.5'
-                      }}>
-                        {event.description}
-                      </p>
-                    )}
+                    return (
+                      <React.Fragment key={event.id}>
+                        <tr style={{
+                          borderBottom: '1px solid #e5e7eb',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            color: '#111827'
+                          }}>
+                            {event.title}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}>
+                            {event.type ? event.type.charAt(0).toUpperCase() + event.type.slice(1) : 'Event'}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}>
+                            {formatTableDate(event.startDate)}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}>
+                            {event.location}
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'center'
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              backgroundColor: statusStyle.bg,
+                              color: statusStyle.text
+                            }}>
+                              {statusInfo.label}
+                            </span>
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'right'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                              {(event.type === 'workshop' || event.type === 'trip') && (
+                                isRegistered ? (
+                                  <button
+                                    disabled
+                                    style={{
+                                      padding: '0.5rem 1rem',
+                                      borderRadius: '0.5rem',
+                                      backgroundColor: '#10b981',
+                                      color: '#FFFFFF',
+                                      border: 'none',
+                                      cursor: 'not-allowed',
+                                      fontSize: '0.875rem',
+                                      fontWeight: '600',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.5rem'
+                                    }}
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
+                                    Registered
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRegisterClick(event);
+                                    }}
+                                    style={{
+                                      padding: '0.5rem 1rem',
+                                      borderRadius: '0.5rem',
+                                      backgroundColor: '#137fec',
+                                      color: '#FFFFFF',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      fontSize: '0.875rem',
+                                      fontWeight: '600',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.5rem'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#0f6fd6'}
+                                    onMouseLeave={(e) => e.target.style.backgroundColor = '#137fec'}
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>how_to_reg</span>
+                                    Register
+                                  </button>
+                                )
+                              )}
+                            </div>
+                          </td>
+                          <td style={{
+                            padding: '1rem 1.5rem',
+                            textAlign: 'right'
+                          }}>
+                            <button
+                              onClick={() => toggleRowExpansion(event.id)}
+                              style={{
+                                padding: '0.5rem',
+                                borderRadius: '0.5rem',
+                                border: 'none',
+                                backgroundColor: 'transparent',
+                                color: '#6b7280',
+                                cursor: 'pointer',
+                                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = '#f3f4f6';
+                                e.target.style.color = '#137fec';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'transparent';
+                                e.target.style.color = '#6b7280';
+                              }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                expand_more
+                              </span>
+                            </button>
+                          </td>
+                        </tr>
+                        {/* Expanded Details Row */}
+                        {isExpanded && (
+                          <tr style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
+                            <td colSpan="7" style={{ padding: '1.5rem' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                {/* Event Description */}
+                                {event.description && (
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
+                                      Description
+                                    </h4>
+                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                      {event.description}
+                                    </p>
+                                  </div>
+                                )}
 
-                    {(event.type === 'workshop' || event.type === 'trip') && (
-                      registeredEventIds.has(String(event.id)) ? (
-                        <button
-                          disabled
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem 1rem',
-                            borderRadius: '0.5rem',
-                            backgroundColor: '#10b981',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            cursor: 'not-allowed',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            marginTop: 'auto',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                          }}
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
-                          Registered
-                        </button>
-                      ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRegisterClick(event);
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem 1rem',
-                            borderRadius: '0.5rem',
-                            backgroundColor: '#1e40af',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            transition: 'all 0.2s',
-                            marginTop: 'auto',
-                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = '#1e3a8a';
-                            e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = '#1e40af';
-                            e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                          }}
-                        >
-                          Register for {event.type === 'workshop' ? 'Workshop' : 'Trip'}
-                        </button>
-                      )
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
+                                {/* Event Details Grid */}
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                  gap: '1rem'
+                                }}>
+                                  {/* Start Date */}
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                      Start Date & Time
+                                    </h4>
+                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                      {event.startDate ? new Date(event.startDate).toLocaleString() : 'N/A'}
+                                    </p>
+                                  </div>
+
+                                  {/* End Date */}
+                                  <div>
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                      End Date & Time
+                                    </h4>
+                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                      {event.endDate ? new Date(event.endDate).toLocaleString() : 'N/A'}
+                                    </p>
+                                  </div>
+
+                                  {/* Registration Deadline */}
+                                  {event.registrationDeadline && (
+                                    <div>
+                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                        Registration Deadline
+                                      </h4>
+                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                        {new Date(event.registrationDeadline).toLocaleString()}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Capacity */}
+                                  {event.capacity && (
+                                    <div>
+                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                        Capacity
+                                      </h4>
+                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                        {event.registeredCount || 0} / {event.capacity} registered
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Price (for trips) */}
+                                  {event.type === 'trip' && event.price && (
+                                    <div>
+                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                        Price
+                                      </h4>
+                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                        {event.price} EGP
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Professor (for workshops) */}
+                                  {event.type === 'workshop' && (event.creatorName || event.professors) && (
+                                    <div>
+                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                        Professor
+                                      </h4>
+                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                        {event.creatorName || event.professors}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Faculty (for workshops) */}
+                                  {event.type === 'workshop' && event.faculty && (
+                                    <div>
+                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                        Faculty
+                                      </h4>
+                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                        {event.faculty}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Register Button for Workshops/Trips */}
+                                {(event.type === 'workshop' || event.type === 'trip') && (
+                                  <div style={{ marginTop: '0.5rem' }}>
+                                    {isRegistered ? (
+                                      <button
+                                        disabled
+                                        style={{
+                                          padding: '0.75rem 1.5rem',
+                                          borderRadius: '0.5rem',
+                                          backgroundColor: '#10b981',
+                                          color: '#FFFFFF',
+                                          border: 'none',
+                                          cursor: 'not-allowed',
+                                          fontSize: '0.875rem',
+                                          fontWeight: '600',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '0.5rem'
+                                        }}
+                                      >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
+                                        Registered
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleRegisterClick(event)}
+                                        style={{
+                                          padding: '0.75rem 1.5rem',
+                                          borderRadius: '0.5rem',
+                                          backgroundColor: '#137fec',
+                                          color: '#FFFFFF',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                          fontSize: '0.875rem',
+                                          fontWeight: '600',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '0.5rem'
+                                        }}
+                                        onMouseEnter={(e) => e.target.style.backgroundColor = '#0f6fd6'}
+                                        onMouseLeave={(e) => e.target.style.backgroundColor = '#137fec'}
+                                      >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>how_to_reg</span>
+                                        Register for {event.type === 'workshop' ? 'Workshop' : 'Trip'}
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </main>

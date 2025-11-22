@@ -7,12 +7,12 @@ const ProfessorDashboard = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [stats, setStats] = useState({
-        totalEventsCreated: 0,
+        totalWorkshopsCreated: 0,
         upcomingEvents: 0,
         eventsParticipatingIn: 0,
-        pendingApprovals: 0
+        workshopsPendingApproval: 0
     });
     const [notifications, setNotifications] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
@@ -36,10 +36,10 @@ const ProfessorDashboard = () => {
 
             if (statsResult.success) {
                 setStats(statsResult.data.stats || {
-                    totalEventsCreated: 0,
+                    totalWorkshopsCreated: 0,
                     upcomingEvents: 0,
                     eventsParticipatingIn: 0,
-                    pendingApprovals: 0
+                    workshopsPendingApproval: 0
                 });
             } else {
                 console.error('Failed to fetch stats:', statsResult.message);
@@ -486,7 +486,7 @@ const ProfessorDashboard = () => {
                             lineHeight: '1.25',
                             margin: 0
                         }}>
-                            Dashboard
+                            Bindly
                         </h2>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -536,162 +536,299 @@ const ProfessorDashboard = () => {
                     </div>
                 </header>
 
-                {/* Content */}
+                {/* Content Area */}
                 <div style={{
                     flex: 1,
-                    padding: '2rem',
+                    padding: '2.5rem',
                     overflowY: 'auto',
-                    backgroundColor: '#f8f6f6'
+                    backgroundColor: '#f6f7f8'
                 }}>
-                    {error && (
-                        <div style={{
-                            padding: '0.75rem 1rem',
-                            marginBottom: '1.5rem',
-                            borderRadius: '0.375rem',
-                            backgroundColor: '#fee2e2',
-                            color: '#991b1b',
-                            fontSize: '0.875rem'
-                        }}>
-                            {error}
+                    {loading ? (
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                            <div className="spinner"></div>
                         </div>
-                    )}
+                    ) : (
+                        <>
+                            {error && (
+                                <div style={{
+                                    padding: '0.75rem 1rem',
+                                    marginBottom: '1.5rem',
+                                    borderRadius: '0.375rem',
+                                    backgroundColor: '#fee2e2',
+                                    color: '#991b1b',
+                                    fontSize: '0.875rem'
+                                }}>
+                                    {error}
+                                </div>
+                            )}
 
-                    <div>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem', color: '#1D3557' }}>Event Overview</h2>
-                        {loading ? (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
-                                <div style={{ backgroundColor: '#FFFFFF', padding: '1.5rem', borderRadius: '0.5rem' }}>Loading...</div>
+                            {/* Page Name Box */}
+                            <div style={{
+                                backgroundColor: '#FFFFFF',
+                                padding: '1rem 1.5rem',
+                                borderRadius: '0.5rem',
+                                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                marginBottom: '2rem',
+                                borderLeft: '4px solid #1D3557'
+                            }}>
+                                <h3 style={{
+                                    color: '#1D3557',
+                                    fontSize: '1.25rem',
+                                    fontWeight: '600',
+                                    margin: 0
+                                }}>
+                                    Dashboard
+                                </h3>
                             </div>
-                        ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
-                                <div style={{ backgroundColor: '#FFFFFF', padding: '1.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-                                    <div style={{ padding: '1rem', backgroundColor: '#dbeafe', borderRadius: '50%' }}>
-                                        <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: '2rem' }}>event_available</span>
-                                    </div>
+                            
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(12, 1fr)',
+                                gap: '1.5rem'
+                            }}>
+                                {/* Left Column - Quick Stats and Recent Activity */}
+                                <div style={{
+                                    gridColumn: 'span 12',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '1.5rem'
+                                }}>
+                                    {/* Quick Stats */}
                                     <div>
-                                        <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0, marginBottom: '0.25rem' }}>Total Events Created</p>
-                                        <p style={{ fontSize: '1.875rem', fontWeight: '700', color: '#1D3557', margin: 0 }}>{stats.totalEventsCreated}</p>
-                                    </div>
-                                </div>
-                                <div style={{ backgroundColor: '#FFFFFF', padding: '1.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-                                    <div style={{ padding: '1rem', backgroundColor: '#d1fae5', borderRadius: '50%' }}>
-                                        <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: '2rem' }}>event_upcoming</span>
-                                    </div>
-                                    <div>
-                                        <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0, marginBottom: '0.25rem' }}>Upcoming Events</p>
-                                        <p style={{ fontSize: '1.875rem', fontWeight: '700', color: '#1D3557', margin: 0 }}>{stats.upcomingEvents}</p>
-                                    </div>
-                                </div>
-                                <div style={{ backgroundColor: '#FFFFFF', padding: '1.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-                                    <div style={{ padding: '1rem', backgroundColor: '#e0e7ff', borderRadius: '50%' }}>
-                                        <span className="material-symbols-outlined" style={{ color: '#6366f1', fontSize: '2rem' }}>people</span>
-                                    </div>
-                                    <div>
-                                        <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0, marginBottom: '0.25rem' }}>Events Participating In</p>
-                                        <p style={{ fontSize: '1.875rem', fontWeight: '700', color: '#1D3557', margin: 0 }}>{stats.eventsParticipatingIn}</p>
-                                    </div>
-                                </div>
-                                <div style={{ backgroundColor: '#FFFFFF', padding: '1.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-                                    <div style={{ padding: '1rem', backgroundColor: '#fed7aa', borderRadius: '50%' }}>
-                                        <span className="material-symbols-outlined" style={{ color: '#ea580c', fontSize: '2rem' }}>pending_actions</span>
-                                    </div>
-                                    <div>
-                                        <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0, marginBottom: '0.25rem' }}>Pending Approvals</p>
-                                        <p style={{ fontSize: '1.875rem', fontWeight: '700', color: '#1D3557', margin: 0 }}>{stats.pendingApprovals}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
-                        <div style={{ gridColumn: 'span 2', backgroundColor: '#FFFFFF', padding: '1.5rem', borderRadius: '0.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', margin: 0, color: '#1D3557' }}>Notifications</h3>
-                                <div style={{ fontSize: '0.875rem', color: '#6b7280', backgroundColor: '#f3f4f6', padding: '0.25rem 0.75rem', borderRadius: '0.75rem' }}>
-                                    {notifications.filter(n => !n.isRead).length} unread
-                                </div>
-                            </div>
-                            {loading ? (
-                                <div style={{ textAlign: 'center', padding: '2rem' }}>Loading...</div>
-                            ) : notifications.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                                    No notifications right now.
-                                </div>
-                            ) : (
-                                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    {notifications.map((notif) => (
-                                        <li key={notif.id || notif._id} style={{ 
-                                            display: 'flex', 
-                                            alignItems: 'flex-start', 
-                                            gap: '1rem',
-                                            padding: '1rem',
-                                            backgroundColor: notif.isRead ? '#FFFFFF' : '#f8f9ff',
-                                            borderRadius: '0.5rem',
-                                            border: `1px solid ${notif.isRead ? '#e5e7eb' : '#3b82f6'}`,
-                                            opacity: notif.isRead ? 0.85 : 1
+                                        <h3 style={{
+                                            fontSize: '1.125rem',
+                                            fontWeight: '600',
+                                            color: '#1D3557',
+                                            marginBottom: '1rem'
                                         }}>
-                                            <div style={{ padding: '0.5rem', backgroundColor: notif.priority === 'warning' ? '#fed7aa' : notif.priority === 'success' ? '#d1fae5' : '#dbeafe', borderRadius: '50%' }}>
-                                                <span className="material-symbols-outlined" style={{ 
-                                                    color: notif.priority === 'warning' ? '#ea580c' : notif.priority === 'success' ? '#059669' : '#2563eb', 
-                                                    fontSize: '1.25rem' 
-                                                }}>
-                                                    {notif.priority === 'warning' ? 'error' : notif.priority === 'success' ? 'check_circle' : 'info'}
-                                                </span>
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
-                                                    <p style={{ color: '#1D3557', margin: 0, fontWeight: notif.isRead ? '500' : '600' }}>
-                                                        {notif.title || notif.message}
-                                                    </p>
-                                                    <span style={{ fontSize: '0.75rem', color: '#6b7280', marginLeft: '1rem', whiteSpace: 'nowrap' }}>
-                                                        {formatTimeAgo(notif.timestamp || notif.createdAt)}
-                                                    </span>
+                                            Quick Stats
+                                        </h3>
+                                        <div style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(4, 1fr)',
+                                            gap: '1.5rem'
+                                        }}>
+                                            {/* Total Workshops Created Card */}
+                                            <div style={{
+                                                backgroundColor: '#FFFFFF',
+                                                padding: '1.5rem',
+                                                borderRadius: '0.5rem',
+                                                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                    <div style={{
+                                                        backgroundColor: '#dbeafe',
+                                                        padding: '0.75rem',
+                                                        borderRadius: '50%'
+                                                    }}>
+                                                        <span className="material-symbols-outlined" style={{ color: '#1D3557', fontSize: '1.5rem' }}>
+                                                            work
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <p style={{
+                                                            color: 'rgba(29, 53, 87, 0.6)',
+                                                            fontSize: '0.875rem',
+                                                            margin: 0
+                                                        }}>
+                                                            Total Workshops Created
+                                                        </p>
+                                                        <p style={{
+                                                            color: '#1D3557',
+                                                            fontSize: '1.5rem',
+                                                            fontWeight: '700',
+                                                            margin: 0
+                                                        }}>
+                                                            {stats.totalWorkshopsCreated}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                {notif.message && notif.title && (
-                                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                                        {notif.message}
-                                                    </p>
-                                                )}
                                             </div>
-                                            {!notif.isRead && (
-                                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3b82f6', marginTop: '0.5rem' }}></div>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
 
-                        <div style={{ backgroundColor: '#FFFFFF', padding: '1.5rem', borderRadius: '0.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-                            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#1D3557' }}>Recent Activity</h3>
-                            {loading ? (
-                                <div style={{ textAlign: 'center', padding: '2rem' }}>Loading...</div>
-                            ) : recentActivity.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                                    No recent activity.
+                                            {/* Upcoming Events Card */}
+                                            <div style={{
+                                                backgroundColor: '#FFFFFF',
+                                                padding: '1.5rem',
+                                                borderRadius: '0.5rem',
+                                                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                    <div style={{
+                                                        backgroundColor: '#d1fae5',
+                                                        padding: '0.75rem',
+                                                        borderRadius: '50%'
+                                                    }}>
+                                                        <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: '1.5rem' }}>
+                                                            event_upcoming
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <p style={{
+                                                            color: 'rgba(29, 53, 87, 0.6)',
+                                                            fontSize: '0.875rem',
+                                                            margin: 0
+                                                        }}>
+                                                            Upcoming Events
+                                                        </p>
+                                                        <p style={{
+                                                            color: '#1D3557',
+                                                            fontSize: '1.5rem',
+                                                            fontWeight: '700',
+                                                            margin: 0
+                                                        }}>
+                                                            {stats.upcomingEvents}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Events Participating In Card */}
+                                            <div style={{
+                                                backgroundColor: '#FFFFFF',
+                                                padding: '1.5rem',
+                                                borderRadius: '0.5rem',
+                                                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                    <div style={{
+                                                        backgroundColor: '#e0e7ff',
+                                                        padding: '0.75rem',
+                                                        borderRadius: '50%'
+                                                    }}>
+                                                        <span className="material-symbols-outlined" style={{ color: '#6366f1', fontSize: '1.5rem' }}>
+                                                            people
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <p style={{
+                                                            color: 'rgba(29, 53, 87, 0.6)',
+                                                            fontSize: '0.875rem',
+                                                            margin: 0
+                                                        }}>
+                                                            Events Participating In
+                                                        </p>
+                                                        <p style={{
+                                                            color: '#1D3557',
+                                                            fontSize: '1.5rem',
+                                                            fontWeight: '700',
+                                                            margin: 0
+                                                        }}>
+                                                            {stats.eventsParticipatingIn}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Workshops Pending Approval Card */}
+                                            <div style={{
+                                                backgroundColor: '#FFFFFF',
+                                                padding: '1.5rem',
+                                                borderRadius: '0.5rem',
+                                                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                    <div style={{
+                                                        backgroundColor: '#fee2e2',
+                                                        padding: '0.75rem',
+                                                        borderRadius: '50%'
+                                                    }}>
+                                                        <span className="material-symbols-outlined" style={{ color: '#dc2626', fontSize: '1.5rem' }}>
+                                                            pending_actions
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <p style={{
+                                                            color: 'rgba(29, 53, 87, 0.6)',
+                                                            fontSize: '0.875rem',
+                                                            margin: 0
+                                                        }}>
+                                                            Workshops Pending Approval
+                                                        </p>
+                                                        <p style={{
+                                                            color: '#1D3557',
+                                                            fontSize: '1.5rem',
+                                                            fontWeight: '700',
+                                                            margin: 0
+                                                        }}>
+                                                            {stats.workshopsPendingApproval}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Recent Activity */}
+                                    <div style={{
+                                        backgroundColor: '#FFFFFF',
+                                        padding: '1.5rem',
+                                        borderRadius: '0.5rem',
+                                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                    }}>
+                                        <h3 style={{
+                                            fontSize: '1.125rem',
+                                            fontWeight: '600',
+                                            color: '#1D3557',
+                                            marginBottom: '1rem'
+                                        }}>
+                                            Recent Activity
+                                        </h3>
+                                        <ul style={{
+                                            listStyle: 'none',
+                                            padding: 0,
+                                            margin: 0,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '1rem'
+                                        }}>
+                                            {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
+                                                <li key={`${activity.type}-${activity.id}-${index}`} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'flex-start',
+                                                    gap: '1rem'
+                                                }}>
+                                                    <div style={{
+                                                        backgroundColor: '#e5e7eb',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        width: '2.5rem',
+                                                        height: '2.5rem',
+                                                        borderRadius: '50%',
+                                                        flexShrink: 0
+                                                    }}>
+                                                        <span className="material-symbols-outlined" style={{ color: '#6b7280', fontSize: '1.25rem' }}>
+                                                            {activity.icon}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <p style={{
+                                                            fontSize: '0.875rem',
+                                                            color: '#1D3557',
+                                                            margin: 0
+                                                        }}>
+                                                            {activity.message}
+                                                        </p>
+                                                        <p style={{
+                                                            fontSize: '0.75rem',
+                                                            color: '#6b7280',
+                                                            margin: '0.25rem 0 0 0'
+                                                        }}>
+                                                            {activity.time}
+                                                        </p>
+                                                    </div>
+                                                </li>
+                                            )) : (
+                                                <li style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                                    No recent activity.
+                                                </li>
+                                            )}
+                                        </ul>
+                                    </div>
                                 </div>
-                            ) : (
-                                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    {recentActivity.map((activity) => (
-                                        <li key={activity.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-                                            <div style={{ padding: '0.5rem', backgroundColor: activity.iconBg, borderRadius: '50%' }}>
-                                                <span className="material-symbols-outlined" style={{ color: activity.iconColor, fontSize: '1.25rem' }}>
-                                                    {activity.icon}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <p style={{ color: '#1D3557', margin: 0, marginBottom: '0.25rem' }}>
-                                                    {activity.message}
-                                                </p>
-                                                <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>{activity.time}</p>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             </main>
         </div>

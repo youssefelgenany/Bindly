@@ -61,7 +61,7 @@ async function sendVerificationEmail(toEmail, token) {
   `;
 
   console.log('[Bindly] Verification link for', toEmail, '=>', verifyUrl);
-  
+
   if (!process.env.SMTP_HOST || !process.env.SMTP_PORT) {
     console.warn('[Bindly] SMTP not configured; email not sent.');
     return { sent: false, verifyUrl };
@@ -139,17 +139,17 @@ const signup = async (req, res) => {
 
     // Basic validation
     if (!email || !password || !userType) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Missing required fields: email, password, userType' 
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: email, password, userType'
       });
     }
 
     // First name and last name are only required for non-vendors
     if (userType !== 'Vendor' && (!firstName || !lastName)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'First name and last name are required for non-vendor users' 
+      return res.status(400).json({
+        success: false,
+        message: 'First name and last name are required for non-vendor users'
       });
     }
 
@@ -162,16 +162,16 @@ const signup = async (req, res) => {
     if (['Student', 'Staff', 'TA', 'Professor'].includes(userType)) {
       const gucEmailRegex = /^[a-z0-9._%+-]+@student\.guc\.edu\.eg$|^[a-z0-9._%+-]+@guc\.edu\.eg$/;
       if (!gucEmailRegex.test(String(email).toLowerCase())) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'GUC users must use a valid GUC email address (@student.guc.edu.eg or @guc.edu.eg)' 
+        return res.status(400).json({
+          success: false,
+          message: 'GUC users must use a valid GUC email address (@student.guc.edu.eg or @guc.edu.eg)'
         });
       }
     }
 
-    const userData = { 
-      email, 
-      password, 
+    const userData = {
+      email,
+      password,
       userType,
       isVerified: false, // All users need admin verification by default
       status: 'blocked' // All users start as blocked until verified
@@ -187,9 +187,9 @@ const signup = async (req, res) => {
     // Add GUC ID for academic users
     if (['Student', 'Staff', 'TA', 'Professor'].includes(userType)) {
       if (!gucId) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'GUC ID is required for academic users' 
+        return res.status(400).json({
+          success: false,
+          message: 'GUC ID is required for academic users'
         });
       }
       userData.gucId = gucId;
@@ -198,18 +198,18 @@ const signup = async (req, res) => {
     // Add company name for vendors
     if (userType === 'Vendor') {
       if (!companyName) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Company name is required for vendors' 
+        return res.status(400).json({
+          success: false,
+          message: 'Company name is required for vendors'
         });
       }
       userData.companyName = companyName;
-      
+
       // Handle file uploads for vendors (simplified)
       const files = req.files || {};
       const logo = files.vendorLogo && files.vendorLogo[0];
       const tax = files.vendorTaxCard && files.vendorTaxCard[0];
-      
+
       if (logo) {
         userData.vendorLogoPath = '/uploads/' + logo.filename;
       }
@@ -245,10 +245,10 @@ const signup = async (req, res) => {
     // Generate JWT token for immediate login
     // Generate JWT token (will be returned only if user is verified and active)
     const token = jwt.sign(
-      { 
-        userId: newUser._id, 
-        email: newUser.email, 
-        userType: newUser.userType 
+      {
+        userId: newUser._id,
+        email: newUser.email,
+        userType: newUser.userType
       },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
@@ -278,14 +278,14 @@ const signup = async (req, res) => {
       code: error.code,
       name: error.name
     });
-    
+
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'User with this email already exists' });
     }
-    
-    res.status(500).json({ 
-      success: false, 
-      message: 'Internal server error', 
+
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
       error: error.message
     });
   }
@@ -294,27 +294,27 @@ const signup = async (req, res) => {
 // ==================== LOGIN ====================
 const login = async (req, res) => {
   console.log("🟢 Login route hit");
-  
+
 
   try {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
-    
+
     console.log("Login attempt for email:", email);
-    
+
     // Try to find user in User model first
     let user = await User.findOne({ email });
     console.log("User found in User model:", user ? 'Yes' : 'No');
-    
+
     // If not found in User model, try Admin model
     if (!user) {
       user = await Admin.findOne({ email });
       console.log("User found in Admin model:", user ? 'Yes' : 'No');
     }
-    
+
     if (!user) {
       console.log("No user found with email:", email);
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
@@ -355,14 +355,14 @@ const login = async (req, res) => {
     // Check verification status for ALL user types (including admin)
     if (user.isVerified === false || user.isVerified === undefined) {
       const userResponse = buildUserResponse(user);
-      
+
       // Different message for students (email verification) vs other users (admin verification)
-      const message = user.userType === 'Student' 
+      const message = user.userType === 'Student'
         ? 'Please verify your email address to login. Check your inbox for the verification link.'
         : 'Your account is pending admin verification. You will receive an email once verified.';
-      
-      return res.status(403).json({ 
-        success: false, 
+
+      return res.status(403).json({
+        success: false,
         code: 'AWAITING_VERIFICATION',
         message: message,
         user: userResponse
@@ -374,8 +374,8 @@ const login = async (req, res) => {
       const userResponse = buildUserResponse(user);
       return res.status(403).json({
         success: false,
-        code: 'AWAITING_VERIFICATION',
-        message: 'Your account is awaiting verification. Please wait for admin approval.',
+        code: 'ACCOUNT_BLOCKED',
+        message: `Your account is currently ${user.status}. Please contact an administrator for assistance.`,
         user: userResponse
       });
     }
@@ -387,7 +387,7 @@ const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user._id, email: user.email, role: user.role || user.userType  },
+      { userId: user._id, email: user.email, role: user.role || user.userType },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -399,9 +399,9 @@ const login = async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     console.error('Error stack:', error.stack);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Internal server error', 
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
       error: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred during login'
     });
   }
@@ -419,14 +419,14 @@ async function verifyEmail(req, res) {
     user.isVerified = true;
     user.verificationToken = null;
     user.verificationExpiresAt = null;
-    
+
     // Set status to active after verification for students and Staff/TA/Professor
     if (user.status === 'blocked') {
       if (user.userType === 'Student' || ['Staff', 'TA', 'Professor'].includes(user.userType)) {
         user.status = 'active';
       }
     }
-    
+
     await user.save();
 
     const loginUrl = (process.env.FRONTEND_URL || 'http://localhost:3000') + '/login';
@@ -535,23 +535,23 @@ const updateProfile = async (req, res) => {
     user.firstName = firstName;
     user.lastName = lastName;
     user.email = email;
-    
+
     // Update GUC ID if provided and user is a GUC user
     if (gucId && ['Student', 'Staff', 'TA', 'Professor'].includes(user.userType)) {
       user.gucId = gucId;
     }
-    
+
     // Update department if provided
     if (department) {
       user.department = department;
     }
-    
+
     // Handle profile picture upload
     if (req.file) {
       console.log('📸 Profile picture uploaded:', req.file.filename);
       user.profilePicturePath = '/uploads/' + req.file.filename;
     }
-    
+
     console.log('🔍 Before save - user department:', user.department);
     await user.save();
     console.log('🔍 After save - user department:', user.department);
@@ -644,7 +644,7 @@ const getCurrentUser = async (req, res) => {
   try {
     // User is already attached to req by the protect middleware
     const userId = req.user._id;
-    
+
     const user = await User.findById(userId).select('-password');
     if (!user) {
       return res.status(404).json({

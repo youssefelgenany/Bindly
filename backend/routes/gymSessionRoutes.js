@@ -6,6 +6,8 @@ const {
   getGymSessionById,
   updateGymSession,
   deleteGymSession,
+  bulkUpdateGymSessions,
+  getGymSessionStats,
   registerForGymSession,
   getMyGymRegistrations,
   cancelGymRegistration,
@@ -39,5 +41,11 @@ router.delete('/:id/register', protect, cancelGymRegistration);
 
 // Get all registrations for a gym session (Admin, Event Office)
 router.get('/:id/registrations', protect, getGymSessionRegistrations);
+
+// Bulk update gym sessions (Events Office, Admin)
+router.put('/bulk/update', protect, permit('event_office', 'admin'), bulkUpdateGymSessions);
+
+// Get gym session statistics (Events Office, Admin)
+router.get('/admin/stats', protect, permit('event_office', 'admin'), getGymSessionStats);
 
 module.exports = router;
