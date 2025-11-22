@@ -114,6 +114,118 @@ const createWorkshop = async (req, res) => {
       status: 'pending'
     });
     await workshop.save();
+    
+    // Create notifications for Events Office users
+    try {
+      const User = require('../models/userModel');
+      
+      // Fetch the full professor user to get firstName and lastName
+      const professorUser = await User.findById(req.user._id);
+      let professorFirstName = 'Professor';
+      let professorLastName = '';
+      let professorFullName = 'Professor';
+      
+      if (professorUser) {
+        professorFirstName = professorUser.firstName || professorUser.name?.split(' ')[0] || 'Professor';
+        professorLastName = professorUser.lastName || professorUser.name?.split(' ').slice(1).join(' ') || '';
+        professorFullName = professorFirstName && professorLastName 
+          ? `${professorFirstName} ${professorLastName}`.trim()
+          : professorUser.name || professorUser.email?.split('@')[0] || 'Professor';
+      } else {
+        console.warn('⚠️ Professor user not found in database, using fallback name');
+        professorFullName = req.user.email?.split('@')[0] || 'Professor';
+      }
+      
+      const eventsOfficeUsers = await User.find({ 
+        $or: [
+          { userType: 'Event Office' },
+          { userType: 'Events Office' },
+          { userType: 'event_office' },
+          { role: 'Event Office' },
+          { role: 'event_office' }
+        ]
+      });
+      
+      console.log(`🔔 Creating notifications for ${eventsOfficeUsers.length} Events Office users`);
+      console.log(`🔔 Professor: ${professorFullName} (ID: ${professorUser._id})`);
+      console.log(`🔔 Workshop: ${workshop.workshopName}`);
+      
+      for (const eventsOfficeUser of eventsOfficeUsers) {
+        try {
+          // Check if notification already exists for this workshop
+          const existingNotification = await Notification.findOne({
+            recipient: eventsOfficeUser._id,
+            type: 'workshop_submission',
+            relatedWorkshop: workshop._id
+          });
+          
+          if (existingNotification) {
+            // Update existing notification with professor name if missing
+            if (!existingNotification.metadata?.professorName) {
+              existingNotification.metadata = existingNotification.metadata || {};
+              existingNotification.metadata.professorName = professorFullName;
+              existingNotification.metadata.professorFirstName = professorFirstName;
+              existingNotification.metadata.professorLastName = professorLastName;
+              existingNotification.message = `Professor ${professorFullName} created a new workshop "${workshop.workshopName}"`;
+              await existingNotification.save();
+              console.log(`✅ Updated notification ${existingNotification._id} with professor name for ${eventsOfficeUser.email}`);
+            } else {
+              console.log(`⚠️ Notification already exists with professor name for ${eventsOfficeUser.email}, skipping`);
+            }
+            continue;
+          }
+          
+          const notification = await Notification.create({
+            recipient: eventsOfficeUser._id,
+            type: 'workshop_submission',
+            title: `New Workshop Request: ${workshop.workshopName}`,
+            message: `Professor ${professorFullName} created a new workshop "${workshop.workshopName}"`,
+            relatedWorkshop: workshop._id,
+            priority: 'high',
+            metadata: {
+              workshopName: workshop.workshopName,
+              workshopDate: workshop.startDate,
+              location: workshop.location,
+              professorFirstName: professorFirstName,
+              professorLastName: professorLastName,
+              professorName: professorFullName,
+              submittedBy: req.user._id.toString()
+            }
+          });
+          console.log(`✅ Created notification ${notification._id} for ${eventsOfficeUser.email}`);
+        } catch (notifCreateError) {
+          // Handle duplicate key error gracefully
+          if (notifCreateError.code === 11000) {
+            console.log(`⚠️ Duplicate key error for ${eventsOfficeUser.email}, trying to update existing...`);
+            // Try to find and update existing notification
+            try {
+              const existing = await Notification.findOne({
+                recipient: eventsOfficeUser._id,
+                type: 'workshop_submission',
+                relatedWorkshop: workshop._id
+              });
+              if (existing && !existing.metadata?.professorName) {
+                existing.metadata = existing.metadata || {};
+                existing.metadata.professorName = professorFullName;
+                existing.metadata.professorFirstName = professorFirstName;
+                existing.metadata.professorLastName = professorLastName;
+                existing.message = `Professor ${professorFullName} created a new workshop "${workshop.workshopName}"`;
+                await existing.save();
+                console.log(`✅ Updated existing notification with professor name for ${eventsOfficeUser.email}`);
+              }
+            } catch (updateError) {
+              console.error(`❌ Error updating notification for ${eventsOfficeUser.email}:`, updateError.message);
+            }
+          } else {
+            console.error(`❌ Error creating notification for ${eventsOfficeUser.email}:`, notifCreateError.message);
+          }
+        }
+      }
+    } catch (notifError) {
+      console.error('❌ Error in notification creation process:', notifError);
+      console.error('❌ Error details:', notifError.message);
+    }
+    
     res.status(201).json(workshop);
   } catch (e) {
     res.status(400).json({ error: 'Failed to create workshop', details: e.message });
@@ -217,7 +329,9 @@ const deleteWorkshop = async (req, res) => {
 const approveWorkshop = async (req, res) => {
   try {
     const workshopId = req.params.id;
+    const { allowedUserTypes } = req.body; // Get user type restrictions from request
     console.log('🔍 Approving workshop:', workshopId);
+    console.log('🔍 Allowed user types:', allowedUserTypes);
     
     // First check if it exists
     let workshop = await Workshop.findById(workshopId);
@@ -308,7 +422,10 @@ const approveWorkshop = async (req, res) => {
             ? workshop.professorsParticipating.join(', ')
             : (workshop.professorsParticipating || ''),
           extraResources: workshop.extraRequiredResources || '',
-          fundingSource: workshop.fundingSource || 'GUC'
+          fundingSource: workshop.fundingSource || 'GUC',
+          // Add user type restrictions
+          isRestricted: allowedUserTypes && allowedUserTypes.length > 0,
+          allowedUserTypes: allowedUserTypes && allowedUserTypes.length > 0 ? allowedUserTypes : []
         };
         
         console.log('📝 Event data prepared:', {
@@ -385,6 +502,10 @@ const approveWorkshop = async (req, res) => {
           title: updateData.title,
           startDate: updateData.startDate
         });
+        
+        // Add user type restrictions to update data
+        updateData.isRestricted = allowedUserTypes && allowedUserTypes.length > 0;
+        updateData.allowedUserTypes = allowedUserTypes && allowedUserTypes.length > 0 ? allowedUserTypes : [];
         
         // Try Mongoose update first
         try {

@@ -18,7 +18,8 @@ const CreateTrip = () => {
     startDate: '',
     endDate: '',
     capacity: '',
-    registrationDeadline: ''
+    registrationDeadline: '',
+    allowedUserTypes: []
   });
 
   const isActiveRoute = (path) => {
@@ -35,6 +36,17 @@ const CreateTrip = () => {
     setFormData({
       ...formData,
       [e.target.name]: value
+    });
+  };
+
+  const toggleUserType = (userType) => {
+    setFormData(prev => {
+      const currentTypes = prev.allowedUserTypes || [];
+      if (currentTypes.includes(userType)) {
+        return { ...prev, allowedUserTypes: currentTypes.filter(t => t !== userType) };
+      } else {
+        return { ...prev, allowedUserTypes: [...currentTypes, userType] };
+      }
     });
   };
 
@@ -1056,6 +1068,49 @@ const CreateTrip = () => {
                     }}>
                       calendar_today
                     </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* User Type Restrictions */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <h2 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: '600',
+                  color: '#1D3557',
+                  margin: 0
+                }}>
+                  Access Restrictions (Optional)
+                </h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    margin: 0
+                  }}>
+                    Select which user types can access this trip. Leave empty for all users.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                    {['Student', 'Professor', 'Staff', 'TA'].map(userType => (
+                      <label key={userType} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        cursor: 'pointer'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={formData.allowedUserTypes?.includes(userType) || false}
+                          onChange={() => toggleUserType(userType)}
+                          style={{
+                            width: '1.25rem',
+                            height: '1.25rem',
+                            marginRight: '0.75rem',
+                            cursor: 'pointer'
+                          }}
+                        />
+                        <span style={{ fontSize: '0.875rem', color: '#374151' }}>{userType}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
               </div>

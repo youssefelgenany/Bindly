@@ -60,6 +60,10 @@ const eventSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   }],
+  allowedUserTypes: [{
+    type: String,
+    enum: ['Student', 'Professor', 'Staff', 'TA', 'Admin', 'Event Office'],
+  }],
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
