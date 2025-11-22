@@ -24,7 +24,6 @@ import VendorDashboard from './pages/VendorDashboard';
 import EditConfrences from './pages/EditConfrences';
 import EventsList from './pages/EventsList';
 import CreateBooth from './pages/CreateBooth';
-import CreateGymSession from './pages/CreateGymSession';
 import EditBazaar from './pages/EditBazaar';
 import EditTrip from './pages/EditTrip';
 import VendorBazaars from './pages/VendorBazaars';
@@ -595,14 +594,6 @@ const AppContent = () => {
                   <EventsOfficeOnly>
                     <CreateBooth />
                   </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/create-gym-session"
-              element={
-                <ProtectedRoute>
-                  <CreateGymSession />
                 </ProtectedRoute>
               }
             />
