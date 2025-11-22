@@ -11,7 +11,7 @@ const GymSchedule = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
@@ -62,13 +62,32 @@ const GymSchedule = () => {
   const [creating, setCreating] = useState(false);
 
   const isActiveRoute = (path) => {
-    return location.pathname === path;
+    const currentPath = location.pathname;
+    if (currentPath === path) return true;
+    if (path === '/dashboard') {
+      return currentPath === '/dashboard';
+    }
+    return currentPath.startsWith(path);
   };
 
-  const handleLogout = () => {
+  const handleLogout = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     logout();
     navigate('/login');
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
+        setShowLogoutDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLogoutDropdown]);
 
   const load = async () => {
     setLoading(true);
@@ -183,18 +202,15 @@ const GymSchedule = () => {
   return (
     <div style={{
       display: 'flex',
-      height: '100vh',
+      flexDirection: 'column',
+      minHeight: '100vh',
       fontFamily: 'Inter, sans-serif',
       backgroundColor: '#f6f7f8'
     }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: sidebarOpen ? '16rem' : '0',
-        flexShrink: 0,
-        backgroundColor: '#1D3557',
-        padding: sidebarOpen ? '1.5rem' : '0',
+      {/* Header/Navbar */}
+      <header style={{
         display: 'flex',
-        flexDirection: 'column',
+        alignItems: 'center',
         justifyContent: 'space-between',
         overflow: 'hidden',
         transition: 'width 0.3s ease, padding 0.3s ease'
@@ -491,62 +507,43 @@ const GymSchedule = () => {
         flexDirection: 'column',
         overflow: 'hidden'
       }}>
-        {/* Header */}
-        <header style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
-          padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1D3557'
-              }}
-              aria-label="Toggle sidebar"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                menu
-              </span>
-            </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+          <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
-              margin: 0
+              margin: 0,
+              cursor: 'pointer'
             }}>
               Bindly
             </h2>
+          </Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#1D3557',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              {getUserRole()}
+            </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#1D3557',
-                margin: 0
-              }}>
-                {displayName}
-              </p>
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                margin: 0
-              }}>
-                {getUserRole()}
-              </p>
-            </div>
+          <div 
+            data-profile-dropdown
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+          >
             {user?.profilePicturePath ? (
               <img
                 src={`http://localhost:5000${user.profilePicturePath}`}
@@ -574,8 +571,138 @@ const GymSchedule = () => {
                 {displayName.charAt(0).toUpperCase()}
               </div>
             )}
+            {showLogoutDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                zIndex: 1000,
+                minWidth: '150px'
+              }}>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    logout
+                  </span>
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
-        </header>
+        </div>
+      </header>
+
+      {/* Horizontal Menu Bar - Only show for Students */}
+      {user?.userType === 'Student' && (
+        <nav style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '1rem 2rem',
+          backgroundColor: '#FFFFFF',
+          borderBottom: '1px solid #e2e8f0'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <Link
+              to="/dashboard"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              Dashboard
+            </Link>
+            <Link
+              to="/student/events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/student/events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              Discover Events
+            </Link>
+            <Link
+              to="/student/my-registrations"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              My Events
+            </Link>
+            <Link
+              to="/student/courts"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              Campus Courts
+            </Link>
+            <Link
+              to="/gym"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              Gym Sessions
+            </Link>
+          </div>
+        </nav>
+      )}
+
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
 
         {/* Content Area */}
         <div style={{
@@ -586,6 +713,11 @@ const GymSchedule = () => {
           paddingRight: '6rem',
           backgroundColor: '#f6f7f8'
         }}>
+          {/* Content Wrapper with Margins */}
+          <div style={{
+            marginLeft: '4rem',
+            marginRight: '4rem'
+          }}>
           {/* Page Title Box */}
           <div style={{
             backgroundColor: '#FFFFFF',
@@ -1041,6 +1173,7 @@ const GymSchedule = () => {
               </div>
             </div>
           )}
+          </div>
         </div>
       </main>
 
