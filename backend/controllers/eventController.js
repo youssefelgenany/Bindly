@@ -234,11 +234,19 @@ exports.getAllEvents = async (req, res) => {
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     const baseMatch = {
       type: { $in: validTypes }, // Only include valid event types
-      archived: false, // Exclude archived events by default
       $and: [
+        // Exclude archived events (include if archived is false or doesn't exist)
+        {
+          $or: [
+            { archived: false },
+            { archived: { $exists: false } } // Include events where archived field doesn't exist (defaults to false)
+          ]
+        },
+        // Require valid title
         { title: { $exists: true } },
         { title: { $ne: null } },
         { title: { $ne: '' } },
+        // Require valid location
         { location: { $exists: true } },
         { location: { $ne: null } },
         { location: { $ne: '' } }
@@ -277,7 +285,40 @@ exports.getAllEvents = async (req, res) => {
       console.log('🔍 Filtering by status:', status);
     }
 
-    console.log('🔍 Final baseMatch filter:', JSON.stringify(baseMatch, null, 2));
+    // Add date filter: ONLY include future events - EXCLUDE all past events
+    const now = new Date();
+    console.log('🔍 getAllEvents - Date filter - Current time:', now.toISOString());
+    
+    // SIMPLE AND DIRECT: Only show events where endDate > now OR (no endDate AND startDate > now)
+    const dateFilter = {
+      $or: [
+        // Case 1: Event has endDate and it's in the future
+        {
+          endDate: { $gt: now }
+        },
+        // Case 2: Event has no endDate but has startDate in the future
+        {
+          $and: [
+            {
+              $or: [
+                { endDate: { $exists: false } },
+                { endDate: null }
+              ]
+            },
+            { startDate: { $gt: now } }
+          ]
+        }
+      ]
+    };
+    
+    // Combine baseMatch with dateFilter
+    const finalMatch = {
+      ...baseMatch,
+      ...dateFilter
+    };
+    
+    console.log('🔍 Final baseMatch filter with date filter:', JSON.stringify(finalMatch, null, 2));
+    console.log('🔍 WILL EXCLUDE events where endDate <=', now.toISOString(), 'OR (no endDate AND startDate <=', now.toISOString(), ')');
 
     if (type) {
       const typeMap = {
@@ -288,11 +329,11 @@ exports.getAllEvents = async (req, res) => {
         confrence: 'conference',
         conference: 'conference'
       };
-      baseMatch.type = typeMap[type] || type;
+      finalMatch.type = typeMap[type] || type;
     }
 
     const pipeline = [
-      { $match: baseMatch },
+      { $match: finalMatch },
       { $lookup: { from: 'users', localField: 'createdBy', foreignField: '_id', as: 'creator' } },
       { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
     ];
@@ -354,7 +395,45 @@ exports.getAllEvents = async (req, res) => {
       }
     );
 
-    let events = await Event.aggregate(pipeline);
+    let events = [];
+    try {
+      events = await Event.aggregate(pipeline);
+      console.log('✅ Aggregation successful, found', events.length, 'events');
+    } catch (aggError) {
+      console.error('❌ Aggregation error:', aggError);
+      console.error('❌ Aggregation error stack:', aggError.stack);
+      console.error('❌ Pipeline:', JSON.stringify(pipeline, null, 2));
+      throw aggError; // Re-throw to be caught by outer catch
+    }
+
+    // POST-FILTER: Double-check and remove ANY past events that might have slipped through
+    const nowPostFilter = new Date();
+    const initialCount = events.length;
+    events = events.filter(event => {
+      // If event has endDate, check if it's in the future
+      if (event.endDate) {
+        const endDate = new Date(event.endDate);
+        if (endDate <= nowPostFilter) {
+          console.log('🚫 getAllEvents POST-FILTER: Removing past event:', event.title, 'endDate:', event.endDate, 'now:', nowPostFilter.toISOString());
+          return false;
+        }
+      } else if (event.startDate) {
+        // If no endDate, check startDate
+        const startDate = new Date(event.startDate);
+        if (startDate <= nowPostFilter) {
+          console.log('🚫 getAllEvents POST-FILTER: Removing past event (no endDate):', event.title, 'startDate:', event.startDate, 'now:', nowPostFilter.toISOString());
+          return false;
+        }
+      } else {
+        // No dates at all - exclude it
+        console.log('🚫 getAllEvents POST-FILTER: Removing event with no dates:', event.title);
+        return false;
+      }
+      return true;
+    });
+    if (events.length < initialCount) {
+      console.log('🚫 getAllEvents POST-FILTER: Removed', (initialCount - events.length), 'past events');
+    }
 
     // Filter by user type restrictions
     if (req.user && req.user.userType) {
@@ -473,7 +552,13 @@ exports.getAllEvents = async (req, res) => {
     res.json(eventsWithVendors);
   } catch (err) {
     console.error("❌ Error fetching events:", err);
-    res.status(500).json({ msg: "Server error" });
+    console.error("❌ Error stack:", err.stack);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message,
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 };
 
@@ -522,25 +607,35 @@ exports.getAllEventsForStudents = async (req, res) => {
     // Build filter - Event Office users can see all events, others only see approved
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     
-    // Build date filter: only include future events (not past events)
-    // Show events that haven't ended yet (endDate is in the future or doesn't exist)
+    // Build date filter: ONLY include future events - EXCLUDE all past events
     const now = new Date();
+    console.log('🔍 Date filter - Current time:', now.toISOString());
+    console.log('🔍 Date filter - Current timestamp:', now.getTime());
+    
+    // SIMPLE AND DIRECT: Only show events where endDate > now OR (no endDate AND startDate > now)
     const dateFilter = {
       $or: [
-        { endDate: { $gt: now } }, // Events with endDate in the future
-        { 
+        // Case 1: Event has endDate and it's in the future
+        {
+          endDate: { $gt: now }
+        },
+        // Case 2: Event has no endDate but has startDate in the future
+        {
           $and: [
-            { 
+            {
               $or: [
                 { endDate: { $exists: false } },
                 { endDate: null }
               ]
             },
-            { startDate: { $gt: now } } // Events without endDate but with future startDate
+            { startDate: { $gt: now } }
           ]
         }
       ]
     };
+    
+    console.log('🔍 Date filter applied:', JSON.stringify(dateFilter, null, 2));
+    console.log('🔍 WILL EXCLUDE events where endDate <=', now.toISOString(), 'OR (no endDate AND startDate <=', now.toISOString(), ')');
     
     // Base filter conditions
     const baseFilter = {
@@ -593,6 +688,24 @@ exports.getAllEventsForStudents = async (req, res) => {
       ...typeFilter,
       ...dateFilter
     };
+    
+    // Exclude events the user is already registered for from "Discover Events"
+    // Registered events should only appear in "My Events"
+    if (registeredEventIds.length > 0) {
+      const mongoose = require('mongoose');
+      const registeredObjectIds = registeredEventIds.map(id => {
+        try {
+          return mongoose.Types.ObjectId(id);
+        } catch (e) {
+          return null;
+        }
+      }).filter(id => id !== null);
+      
+      if (registeredObjectIds.length > 0) {
+        filter._id = { $nin: registeredObjectIds };
+        console.log('🔍 Excluding registered events from Discover Events:', registeredObjectIds.length, 'events');
+      }
+    }
     
     // Only filter by status for non-Event Office users
     const isEventOffice = req.user.userType === 'Event Office' ||
@@ -698,6 +811,35 @@ exports.getAllEventsForStudents = async (req, res) => {
 
     let events = await Event.aggregate(pipeline);
 
+    // POST-FILTER: Double-check and remove ANY past events that might have slipped through
+    const nowPostFilter = new Date();
+    const initialCount = events.length;
+    events = events.filter(event => {
+      // If event has endDate, check if it's in the future
+      if (event.endDate) {
+        const endDate = new Date(event.endDate);
+        if (endDate <= nowPostFilter) {
+          console.log('🚫 POST-FILTER: Removing past event:', event.title, 'endDate:', event.endDate, 'now:', nowPostFilter.toISOString());
+          return false;
+        }
+      } else if (event.startDate) {
+        // If no endDate, check startDate
+        const startDate = new Date(event.startDate);
+        if (startDate <= nowPostFilter) {
+          console.log('🚫 POST-FILTER: Removing past event (no endDate):', event.title, 'startDate:', event.startDate, 'now:', nowPostFilter.toISOString());
+          return false;
+        }
+      } else {
+        // No dates at all - exclude it
+        console.log('🚫 POST-FILTER: Removing event with no dates:', event.title);
+        return false;
+      }
+      return true;
+    });
+    if (events.length < initialCount) {
+      console.log('🚫 POST-FILTER: Removed', (initialCount - events.length), 'past events');
+    }
+
     // Filter by user type restrictions
     if (req.user && req.user.userType) {
       const userType = req.user.userType;
@@ -712,7 +854,7 @@ exports.getAllEventsForStudents = async (req, res) => {
       });
     }
 
-    console.log('🔍 Found events:', events.length);
+    console.log('🔍 Found events after all filters:', events.length);
     if (q) {
       console.log('🔍 Search results for query "' + q + '":', events.map(e => ({
         title: e.title,
