@@ -14,7 +14,7 @@ const PlatformBoothRequests = () => {
   const [error, setError] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [processingIds, setProcessingIds] = useState({});
-  const [statusFilter, setStatusFilter] = useState('pending'); // 'all', 'pending', 'accepted', 'rejected'
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'accepted', 'rejected'
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -205,361 +205,208 @@ const PlatformBoothRequests = () => {
           </div>
         )}
 
-        {sidebarOpen && (
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <Link
-              to="/event-office"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/event-office') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/event-office')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/event-office')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/event-office') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                dashboard
-              </span>
-              <p style={{
-                color: isActiveRoute('/event-office') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/event-office') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Dashboard
-              </p>
-            </Link>
+          {/* Navigation */}
+          {sidebarOpen && (
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <Link
+                to="/event-office"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                  textDecoration: 'none',
+                  color: '#FFFFFF'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.25rem' }}>
+                  dashboard
+                </span>
+                <p style={{
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Dashboard
+                </p>
+              </Link>
 
-            <Link
-              to="/event-office/events"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/event-office/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/event-office/events')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/event-office/events')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                explore
-              </span>
-              <p style={{
-                color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/event-office/events') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Discover Events
-              </p>
-            </Link>
+              <Link
+                to="/event-office/events"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/events')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/events')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  explore
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/events') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Discover Events
+                </p>
+              </Link>
 
-            <Link
-              to="/event-office/workshops"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/event-office/workshops') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/event-office/workshops')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/event-office/workshops')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/event-office/workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                school
-              </span>
-              <p style={{
-                color: isActiveRoute('/event-office/workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/event-office/workshops') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Professor Workshops
-              </p>
-            </Link>
+              <Link
+                to="/event-office/workshops"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/workshops') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/workshops')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/workshops')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  school
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/workshops') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Professor Workshops
+                </p>
+              </Link>
 
-            <Link
-              to="/event-office/platform-booth-requests"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/event-office/platform-booth-requests') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/event-office/platform-booth-requests')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/event-office/platform-booth-requests')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                location_on
-              </span>
-              <p style={{
-                color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/event-office/platform-booth-requests') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Platform Booths
-              </p>
-            </Link>
+              <Link
+                to="/event-office/platform-booth-requests"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/platform-booth-requests') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/platform-booth-requests')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/platform-booth-requests')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  location_on
+                </span>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/event-office/platform-booth-requests') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    Platform Booths
+                  </p>
+                )}
+              </Link>
 
-            <Link
-              to="/create-bazaar"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/create-bazaar') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/create-bazaar')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/create-bazaar')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/create-bazaar') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                storefront
-              </span>
-              <p style={{
-                color: isActiveRoute('/create-bazaar') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/create-bazaar') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Bazaars
-              </p>
-            </Link>
-
-            <Link
-              to="/create-trip"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/create-trip') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/create-trip')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/create-trip')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/create-trip') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                flight_takeoff
-              </span>
-              <p style={{
-                color: isActiveRoute('/create-trip') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/create-trip') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Trips
-              </p>
-            </Link>
-
-            <Link
-              to="/create-conference"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/create-conference') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/create-conference')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/create-conference')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/create-conference') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                groups
-              </span>
-              <p style={{
-                color: isActiveRoute('/create-conference') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/create-conference') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Conferences
-              </p>
-            </Link>
-
-            <Link
-              to="/create-gym-session"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/create-gym-session') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/create-gym-session')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/create-gym-session')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                fitness_center
-              </span>
-              <p style={{
-                color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/create-gym-session') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Gym Sessions
-              </p>
-            </Link>
-
-            <Link
-              to="/gym-schedule"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/gym-schedule')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/gym-schedule')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                calendar_month
-              </span>
-              <p style={{
-                color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                View Gym Sessions
-              </p>
-            </Link>
-          </nav>
-        )}
-      </div>
+              <Link
+                to="/gym-schedule"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/gym-schedule')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/gym-schedule')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  calendar_month
+                </span>
+                {sidebarOpen && (
+                  <p style={{
+                    color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
+                    lineHeight: 'normal',
+                    margin: 0
+                  }}>
+                    View Gym Sessions
+                  </p>
+                )}
+              </Link>
+            </nav>
+          )}
+        </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <button
@@ -704,6 +551,8 @@ const PlatformBoothRequests = () => {
         <div style={{
           flex: 1,
           padding: '2rem',
+          paddingLeft: '6rem',
+          paddingRight: '6rem',
           overflowY: 'auto',
           backgroundColor: '#f6f7f8'
         }}>
@@ -735,74 +584,64 @@ const PlatformBoothRequests = () => {
 
           {/* Filter Buttons */}
           <div style={{
-            display: 'flex',
-            gap: '0.75rem',
-            marginBottom: '1.5rem'
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
-            <button
-              onClick={() => setStatusFilter('all')}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                backgroundColor: statusFilter === 'all' ? '#1D3557' : '#FFFFFF',
-                color: statusFilter === 'all' ? '#FFFFFF' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                boxShadow: statusFilter === 'all' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
-              }}
-            >
-              All ({requests.length})
-            </button>
-            <button
-              onClick={() => setStatusFilter('pending')}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                backgroundColor: statusFilter === 'pending' ? '#1D3557' : '#FFFFFF',
-                color: statusFilter === 'pending' ? '#FFFFFF' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                boxShadow: statusFilter === 'pending' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
-              }}
-            >
-              Pending ({requests.filter(r => (r.status || 'pending') === 'pending').length})
-            </button>
-            <button
-              onClick={() => setStatusFilter('accepted')}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                backgroundColor: statusFilter === 'accepted' ? '#1D3557' : '#FFFFFF',
-                color: statusFilter === 'accepted' ? '#FFFFFF' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                boxShadow: statusFilter === 'accepted' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
-              }}
-            >
-              Accepted ({requests.filter(r => (r.status || 'pending') === 'accepted').length})
-            </button>
-            <button
-              onClick={() => setStatusFilter('rejected')}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                backgroundColor: statusFilter === 'rejected' ? '#1D3557' : '#FFFFFF',
-                color: statusFilter === 'rejected' ? '#FFFFFF' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                boxShadow: statusFilter === 'rejected' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
-              }}
-            >
-              Rejected ({requests.filter(r => (r.status || 'pending') === 'rejected').length})
-            </button>
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
+              flexWrap: 'nowrap',
+              alignItems: 'center'
+            }}>
+            {['all', 'pending', 'accepted', 'rejected'].map((status) => {
+              const getLabel = (s) => {
+                switch(s) {
+                  case 'all': return `All (${requests.length})`;
+                  case 'pending': return `Pending (${requests.filter(r => (r.status || 'pending') === 'pending').length})`;
+                  case 'accepted': return `Accepted (${requests.filter(r => (r.status || 'pending') === 'accepted').length})`;
+                  case 'rejected': return `Rejected (${requests.filter(r => (r.status || 'pending') === 'rejected').length})`;
+                  default: return s;
+                }
+              };
+              return (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  style={{
+                    padding: '0.625rem 1.25rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: statusFilter === status ? '#1e40af' : '#f9fafb',
+                    color: statusFilter === status ? '#FFFFFF' : '#6b7280',
+                    border: statusFilter === status ? 'none' : '1px solid #e5e7eb',
+                    cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: statusFilter === status ? '600' : '500',
+                    textTransform: 'capitalize',
+                    transition: 'all 0.2s',
+                    boxShadow: statusFilter === status ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (statusFilter !== status) {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                      e.target.style.borderColor = '#d1d5db';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (statusFilter !== status) {
+                      e.target.style.backgroundColor = '#f9fafb';
+                      e.target.style.borderColor = '#e5e7eb';
+                    }
+                  }}
+                >
+                  {getLabel(status)}
+                </button>
+              );
+            })}
+            </div>
           </div>
 
           {loading ? (
