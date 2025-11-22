@@ -3,17 +3,13 @@ import React, { useState } from 'react';
 const PlatformBoothMapSelector = ({ selectedLocation, onLocationSelect }) => {
     const [hoveredArea, setHoveredArea] = useState(null);
 
+    // Map locations to actual areas on the campus map
     const platformAreas = [
-        { id: 'main-entrance', name: 'Main Entrance', x: 5, y: 5, width: 35, height: 15 },
-        { id: 'garden-section', name: 'Garden Section', x: 45, y: 5, width: 25, height: 15 },
-        { id: 'central-plaza', name: 'Central Plaza', x: 75, y: 5, width: 20, height: 15 },
-        { id: 'food-court', name: 'Food Court', x: 5, y: 25, width: 30, height: 20 },
-        { id: 'student-center', name: 'Student Center', x: 40, y: 25, width: 25, height: 20 },
-        { id: 'library-area', name: 'Library Area', x: 70, y: 25, width: 25, height: 20 },
-        { id: 'cafeteria-area', name: 'Cafeteria Area', x: 5, y: 50, width: 30, height: 20 },
-        { id: 'auditorium-hall', name: 'Auditorium Hall', x: 40, y: 50, width: 25, height: 20 },
-        { id: 'gym-entrance', name: 'Gym Entrance', x: 70, y: 50, width: 25, height: 20 },
-        { id: 'parking-lot', name: 'Parking Lot', x: 5, y: 75, width: 90, height: 20 }
+        { id: 'sports-area', name: 'Sports Area', x: 50, y: 42 }, // Sports Area (above center circular area)
+        { id: 'parking', name: 'Parking', x: 15, y: 80 }, // Parking areas (marked with P on map)
+        { id: 'main-gate', name: 'Main Gate', x: 75, y: 85 }, // Main Gate (bottom-right)
+        { id: 'platform', name: 'Platform', x: 40, y: 15 }, // Platform area (center-top)
+        { id: 'exam-halls', name: 'Exam Halls', x: 5, y: 5 } // Admission & Exam Hall (top-left)
     ];
 
     const getAreaStyle = (area) => {
@@ -24,22 +20,28 @@ const PlatformBoothMapSelector = ({ selectedLocation, onLocationSelect }) => {
             position: 'absolute',
             left: `${area.x}%`,
             top: `${area.y}%`,
-            width: `${area.width}%`,
-            height: `${area.height}%`,
-            backgroundColor: isSelected ? '#1D3557' : isHovered ? '#457B9D' : 'rgba(29, 53, 87, 0.1)',
-            border: `2px solid ${isSelected ? '#1D3557' : isHovered ? '#457B9D' : '#1D3557'}`,
-            borderRadius: '8px',
+            transform: 'translate(-50%, -50%)',
+            width: 'auto',
+            minWidth: '80px',
+            height: 'auto',
+            backgroundColor: isSelected ? 'rgba(29, 53, 87, 0.9)' : isHovered ? 'rgba(69, 123, 157, 0.6)' : 'rgba(29, 53, 87, 0.4)',
+            border: '2px solid #FFFFFF',
+            borderRadius: '20px',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '0.875rem',
+            fontSize: '0.75rem',
             fontWeight: '600',
-            color: isSelected || isHovered ? 'white' : '#1D3557',
+            color: '#FFFFFF',
             textAlign: 'center',
-            padding: '0.5rem',
-            boxSizing: 'border-box'
+            padding: '0.375rem 0.75rem',
+            boxSizing: 'border-box',
+            zIndex: 1,
+            boxShadow: isSelected ? '0 4px 8px rgba(29, 53, 87, 0.4)' : isHovered ? '0 2px 4px rgba(29, 53, 87, 0.3)' : '0 2px 4px rgba(0, 0, 0, 0.2)',
+            textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
+            whiteSpace: 'nowrap'
         };
     };
 
@@ -59,18 +61,30 @@ const PlatformBoothMapSelector = ({ selectedLocation, onLocationSelect }) => {
                 position: 'relative',
                 width: '100%',
                 height: '400px',
-                backgroundColor: '#f8f9fa',
                 border: '2px solid #e5e7eb',
                 borderRadius: '0.75rem',
                 overflow: 'hidden',
                 marginBottom: '0.75rem',
-                backgroundImage: `
-                    linear-gradient(90deg, #e5e7eb 1px, transparent 1px),
-                    linear-gradient(180deg, #e5e7eb 1px, transparent 1px)
-                `,
-                backgroundSize: '25px 25px'
+                backgroundColor: '#f8f9fa'
             }}>
-                {/* Platform Areas */}
+                {/* Map Background Image */}
+                <img
+                    src="/assets/images/map.jpg"
+                    alt="Platform Map"
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        objectPosition: 'center',
+                        pointerEvents: 'none',
+                        zIndex: 0
+                    }}
+                />
+                
+                {/* Platform Areas - Clickable Boxes */}
                 {platformAreas.map(area => (
                     <div
                         key={area.id}
