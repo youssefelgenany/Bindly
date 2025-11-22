@@ -612,34 +612,6 @@ const StaffEventsView = () => {
               >
                 Search
               </button>
-              {searchQuery && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    loadEvents();
-                  }}
-                  style={{
-                    padding: '0.875rem 1rem',
-                    borderRadius: '0.5rem',
-                    backgroundColor: '#f3f4f6',
-                    color: '#6b7280',
-                    border: '1px solid #e5e7eb',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#e5e7eb';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }}
-                >
-                  Clear
-                </button>
-              )}
             </div>
             
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

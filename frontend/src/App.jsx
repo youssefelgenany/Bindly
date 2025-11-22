@@ -6,7 +6,6 @@ import AdminVendors from './pages/AdminVendors';
 import AdminEvents from './pages/AdminEvents';
 import AdminEventsView from './pages/AdminEventsView';
 import AdminPlatformBoothRequests from './pages/AdminPlatformBoothRequests';
-import AdminManagement from './pages/AdminManagement';
 import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -554,16 +553,6 @@ const AppContent = () => {
                 <ProtectedRoute>
                   <AdminOnly>
                     <AdminPlatformBoothRequests />
-                  </AdminOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/manage"
-              element={
-                <ProtectedRoute>
-                  <AdminOnly>
-                    <AdminManagement />
                   </AdminOnly>
                 </ProtectedRoute>
               }

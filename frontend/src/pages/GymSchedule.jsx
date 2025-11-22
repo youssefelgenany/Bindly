@@ -12,7 +12,6 @@ const GymSchedule = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
@@ -207,299 +206,6 @@ const GymSchedule = () => {
       fontFamily: 'Inter, sans-serif',
       backgroundColor: '#f8f6f6'
     }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        overflow: 'hidden',
-        transition: 'width 0.3s ease, padding 0.3s ease'
-      }}>
-        {/* Top Section - Logo and Navigation */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Logo and Branding */}
-          {sidebarOpen && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                borderRadius: '50%',
-                backgroundColor: '#457B9D',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF'
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <h1 style={{
-                  color: '#FFFFFF',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  {getPortalBranding()}
-                </h1>
-                <p style={{
-                  color: 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: '400',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  University Portal
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation */}
-          {sidebarOpen && (
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <Link
-                to="/event-office"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/event-office') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                  textDecoration: 'none',
-                  color: '#FFFFFF'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/event-office')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/event-office')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.25rem' }}>
-                  dashboard
-                </span>
-                <p style={{
-                  color: '#FFFFFF',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Dashboard
-                </p>
-              </Link>
-
-              <Link
-                to="/event-office/events"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/event-office/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/event-office/events')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/event-office/events')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  explore
-                </span>
-                <p style={{
-                  color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/event-office/events') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Discover Events
-                </p>
-              </Link>
-
-              <Link
-                to="/event-office/workshops"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/event-office/workshops') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/event-office/workshops')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/event-office/workshops')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/event-office/workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  school
-                </span>
-                <p style={{
-                  color: isActiveRoute('/event-office/workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/event-office/workshops') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Professor Workshops
-                </p>
-              </Link>
-
-              <Link
-                to="/event-office/platform-booth-requests"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/event-office/platform-booth-requests') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/event-office/platform-booth-requests')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/event-office/platform-booth-requests')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  location_on
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/event-office/platform-booth-requests') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    Platform Booths
-                  </p>
-                )}
-              </Link>
-
-              <Link
-                to="/gym-schedule"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/gym-schedule')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/gym-schedule')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  calendar_month
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    View Gym Sessions
-                  </p>
-                )}
-              </Link>
-            </nav>
-          )}
-        </div>
-
-
-        {/* Logout Button - Fixed at bottom */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <button
-            onClick={handleLogout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              width: '100%'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ color: 'rgba(241, 250, 238, 0.7)', fontSize: '1.25rem' }}>
-              logout
-            </span>
-            {sidebarOpen && (
-              <p style={{
-                color: 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Logout
-              </p>
-            )}
-          </button>
-        </div>
-      </aside>
-
       {/* Main Content */}
       <main style={{
         flex: 1,
@@ -517,33 +223,18 @@ const GymSchedule = () => {
           backgroundColor: '#FFFFFF'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1D3557'
-              }}
-              aria-label="Toggle sidebar"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                menu
-              </span>
-            </button>
-            <h2 style={{
-              color: '#1D3557',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              lineHeight: '1.25',
-              margin: 0
-            }}>
-              Bindly
-            </h2>
+            <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                lineHeight: '1.25',
+                margin: 0,
+                cursor: 'pointer'
+              }}>
+                Bindly
+              </h2>
+            </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
             <div style={{ textAlign: 'right' }}>
@@ -641,8 +332,8 @@ const GymSchedule = () => {
           </div>
         </header>
 
-        {/* Horizontal Menu Bar - Only show for Students */}
-        {user?.userType === 'Student' && (
+        {/* Horizontal Menu Bar - Show for Students and Professors */}
+        {(user?.userType === 'Student' || user?.userType === 'Professor') && (
           <nav style={{
             display: 'flex',
             alignItems: 'center',
@@ -664,47 +355,93 @@ const GymSchedule = () => {
             >
               Dashboard
             </Link>
+            {user?.userType === 'Student' ? (
+              <>
+                <Link
+                  to="/student/events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  Discover Events
+                </Link>
+                <Link
+                  to="/student/my-registrations"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Events
+                </Link>
+                <Link
+                  to="/student/courts"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  Campus Courts
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/professor/all-events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  Discover Events
+                </Link>
+                <Link
+                  to="/professor/events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Events
+                </Link>
+                <Link
+                  to="/professor/my-workshops"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Workshops
+                </Link>
+              </>
+            )}
             <Link
-              to="/student/events"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/student/events') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Discover Events
-            </Link>
-            <Link
-              to="/student/my-registrations"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              My Events
-            </Link>
-            <Link
-              to="/student/courts"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Campus Courts
-            </Link>
-            <Link
-              to="/gym"
+              to="/gym-schedule"
               style={{
                 textDecoration: 'none',
                 color: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
@@ -714,7 +451,7 @@ const GymSchedule = () => {
                 borderBottom: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
               }}
             >
-              Gym Sessions
+              View Gym Sessions
             </Link>
           </div>
         </nav>
