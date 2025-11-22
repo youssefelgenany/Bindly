@@ -203,12 +203,11 @@ const GymSchedule = () => {
   return (
     <div style={{
       display: 'flex',
-      flexDirection: 'column',
-      minHeight: '100vh',
+      height: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f6f7f8'
+      backgroundColor: '#f8f6f6'
     }}>
-      {/* Header/Navbar */}
+      {/* Left Sidebar */}
       <aside style={{
         display: 'flex',
         flexDirection: 'column',
@@ -501,15 +500,14 @@ const GymSchedule = () => {
         </div>
       </aside>
 
-      {/* Header */}
-      <header style={{
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '1rem 2rem',
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #e2e8f0'
+        flexDirection: 'column',
+        overflow: 'hidden'
       }}>
+        {/* Header */}
         <header style={{
           display: 'flex',
           alignItems: 'center',
@@ -519,124 +517,139 @@ const GymSchedule = () => {
           backgroundColor: '#FFFFFF'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-          <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#1D3557'
+              }}
+              aria-label="Toggle sidebar"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                menu
+              </span>
+            </button>
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
-              margin: 0,
-              cursor: 'pointer'
+              margin: 0
             }}>
               Bindly
             </h2>
-          </Link>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              color: '#1D3557',
-              margin: 0
-            }}>
-              {displayName}
-            </p>
-            <p style={{
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              margin: 0
-            }}>
-              {getUserRole()}
-            </p>
           </div>
-          <div 
-            data-profile-dropdown
-            style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
-          >
-            {user?.profilePicturePath ? (
-              <img
-                src={`http://localhost:5000${user.profilePicturePath}`}
-                alt="User profile"
-                style={{
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#1D3557',
+                margin: 0
+              }}>
+                {displayName}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                margin: 0
+              }}>
+                {getUserRole()}
+              </p>
+            </div>
+            <div 
+              data-profile-dropdown
+              style={{ position: 'relative', cursor: 'pointer' }}
+              onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            >
+              {user?.profilePicturePath ? (
+                <img
+                  src={`http://localhost:5000${user.profilePicturePath}`}
+                  alt="User profile"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: '50%',
+                    objectFit: 'cover'
+                  }}
+                />
+              ) : (
+                <div style={{
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: '50%',
-                  objectFit: 'cover'
-                }}
-              />
-            ) : (
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                borderRadius: '50%',
-                backgroundColor: '#1D3557',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF',
-                fontSize: '0.875rem',
-                fontWeight: '600'
-              }}>
-                {displayName.charAt(0).toUpperCase()}
-              </div>
-            )}
-            {showLogoutDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                right: 0,
-                marginTop: '0.5rem',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #e2e8f0',
-                borderRadius: '0.5rem',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                zIndex: 1000,
-                minWidth: '150px'
-              }}>
-                <button
-                  onClick={handleLogout}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    textAlign: 'left',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    color: '#1D3557',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                    logout
-                  </span>
-                  Logout
-                </button>
-              </div>
-            )}
+                  backgroundColor: '#1D3557',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}>
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              {showLogoutDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '0.5rem',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                  zIndex: 1000,
+                  minWidth: '150px'
+                }}>
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#1D3557',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      logout
+                    </span>
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
         </header>
 
-      {/* Horizontal Menu Bar - Only show for Students */}
-      {user?.userType === 'Student' && (
-        <nav style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '1rem 2rem',
-          backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid #e2e8f0'
-        }}>
+        {/* Horizontal Menu Bar - Only show for Students */}
+        {user?.userType === 'Student' && (
+          <nav style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '1rem 2rem',
+            backgroundColor: '#FFFFFF',
+            borderBottom: '1px solid #e2e8f0'
+          }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
             <Link
               to="/dashboard"
@@ -705,7 +718,7 @@ const GymSchedule = () => {
             </Link>
           </div>
         </nav>
-      )}
+        )}
 
         {/* Content Area */}
         <div style={{
@@ -721,63 +734,89 @@ const GymSchedule = () => {
             position: 'relative',
             height: '140px',
             borderRadius: '0.75rem',
-            padding: '0.75rem 1rem',
-            marginBottom: '1rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-            borderLeft: '4px solid #1D3557',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
+            overflow: 'hidden',
+            marginBottom: '1.5rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
           }}>
-            <div>
-              <h3 style={{
-                color: '#1D3557',
-                fontSize: '1rem',
-                fontWeight: '700',
-                margin: '0 0 0.125rem 0'
-              }}>
-                Gym Schedule
-              </h3>
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.9)',
-                fontSize: '0.875rem',
-                fontWeight: '400',
-                margin: 0
-              }}>
-                View sessions for the selected month
-              </p>
-            </div>
-            {isEventsOffice && (
-              <button
-                onClick={() => setIsCreateModalOpen(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.625rem 1rem',
-                  backgroundColor: '#1D3557',
+            {/* Background Image */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(/assets/images/gym.jpg)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
+            }}></div>
+            {/* Blue Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Content */}
+            <div style={{
+              position: 'relative',
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '2rem 2.5rem',
+              color: '#FFFFFF'
+            }}>
+              <div>
+                <h3 style={{
                   color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '0.5rem',
+                  fontSize: '1.75rem',
+                  fontWeight: '700',
+                  margin: 0,
+                  marginBottom: '0.5rem'
+                }}>
+                  Gym Schedule
+                </h3>
+                <p style={{
+                  color: 'rgba(255, 255, 255, 0.9)',
                   fontSize: '0.875rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                  height: 'fit-content'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#152843';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#1D3557';
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                  add
-                </span>
-                Create
-              </button>
-            )}
+                  fontWeight: '400',
+                  margin: 0
+                }}>
+                  View sessions for the selected month
+                </p>
+              </div>
+              {isEventsOffice && (
+                <button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#FFFFFF',
+                    color: '#1D3557',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                    height: 'fit-content'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#FFFFFF';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    add
+                  </span>
+                  Create
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Filter and Navigation Toolbar */}
@@ -853,70 +892,42 @@ const GymSchedule = () => {
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 
-              gap: '0.75rem',
-              flexWrap: 'wrap'
+              gap: '0.5rem',
+              flexWrap: 'nowrap',
+              flexShrink: 0
             }}>
-              <button
-                onClick={() => setTypeFilter('all')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.5rem',
-                  border: 'none',
-                  backgroundColor: typeFilter === 'all' ? '#e0e7ff' : '#FFFFFF',
-                  color: typeFilter === 'all' ? '#1e40af' : '#1D3557',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                }}
-                onMouseEnter={(e) => {
-                  if (typeFilter !== 'all') {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (typeFilter !== 'all') {
-                    e.target.style.backgroundColor = '#FFFFFF';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-                  filter_list
-                </span>
-                All
-              </button>
-              {TYPES.map(t => (
+              {['all', ...TYPES].map((t) => (
                 <button
                   key={t}
                   onClick={() => setTypeFilter(t)}
                   style={{
-                    padding: '0.5rem 1rem',
+                    padding: '0.625rem 1.25rem',
                     borderRadius: '0.5rem',
-                    border: 'none',
-                    backgroundColor: typeFilter === t ? '#e0e7ff' : '#FFFFFF',
-                    color: typeFilter === t ? '#1e40af' : '#1D3557',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
+                    backgroundColor: typeFilter === t ? '#1e40af' : '#f9fafb',
+                    color: typeFilter === t ? '#FFFFFF' : '#6b7280',
+                    border: typeFilter === t ? 'none' : '1px solid #e5e7eb',
                     cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: typeFilter === t ? '600' : '500',
+                    textTransform: 'capitalize',
                     transition: 'all 0.2s',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    boxShadow: typeFilter === t ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                    whiteSpace: 'nowrap'
                   }}
                   onMouseEnter={(e) => {
                     if (typeFilter !== t) {
                       e.target.style.backgroundColor = '#f3f4f6';
+                      e.target.style.borderColor = '#d1d5db';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (typeFilter !== t) {
-                      e.target.style.backgroundColor = '#FFFFFF';
+                      e.target.style.backgroundColor = '#f9fafb';
+                      e.target.style.borderColor = '#e5e7eb';
                     }
                   }}
                 >
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                  {t === 'all' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
                 </button>
               ))}
             </div>

@@ -1096,12 +1096,12 @@ const EventsOfficeEventsView = () => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  padding: '0.625rem 1rem',
+                  padding: '0.75rem 1.5rem',
                   backgroundColor: '#FFFFFF',
                   color: '#1D3557',
                   border: 'none',
                   borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
+                  fontSize: '1rem',
                   fontWeight: '600',
                   cursor: 'pointer',
                   transition: 'background-color 0.2s',
@@ -1114,7 +1114,7 @@ const EventsOfficeEventsView = () => {
                   e.target.style.backgroundColor = '#FFFFFF';
                 }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
                   add
                 </span>
                 Create
