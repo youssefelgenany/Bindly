@@ -1034,65 +1034,92 @@ const EventsOfficeEventsView = () => {
           overflowY: 'auto',
           backgroundColor: '#f6f7f8'
         }}>
-          {/* Page Title Box */}
+          {/* Page Title Banner */}
           <div style={{
-            backgroundColor: '#FFFFFF',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            position: 'relative',
+            height: '140px',
+            borderRadius: '0.75rem',
+            overflow: 'hidden',
             marginBottom: '1.5rem',
-            borderLeft: '4px solid #1D3557',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
           }}>
-            <div>
-              <h3 style={{
-                color: '#1D3557',
-                fontSize: '1.25rem',
-                fontWeight: '600',
-                margin: 0
-              }}>
-                All Upcoming Events
-              </h3>
-              <p style={{
-                color: '#6b7280',
-                fontSize: '1rem',
-                fontWeight: '400',
-                margin: '0.25rem 0 0 0'
-              }}>
-                Create, View, manage, and track all scheduled university events.
-              </p>
+            {/* Background Image */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(/assets/images/events-banner.jpeg)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
+            }}></div>
+            {/* Blue Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Content */}
+            <div style={{
+              position: 'relative',
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '2rem 2.5rem',
+              color: '#FFFFFF'
+            }}>
+              <div>
+                <h3 style={{
+                  color: '#FFFFFF',
+                  fontSize: '1.75rem',
+                  fontWeight: '700',
+                  margin: 0,
+                  marginBottom: '0.5rem'
+                }}>
+                  All Upcoming Events
+                </h3>
+                <p style={{
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: '0.875rem',
+                  fontWeight: '400',
+                  margin: 0
+                }}>
+                  Create, view, manage, and track all scheduled university events.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.625rem 1rem',
+                  backgroundColor: '#FFFFFF',
+                  color: '#1D3557',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  height: 'fit-content'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                  add
+                </span>
+                Create
+              </button>
             </div>
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.625rem 1rem',
-                backgroundColor: '#1D3557',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s',
-                height: 'fit-content'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#152843';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = '#1D3557';
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                add
-              </span>
-              Create
-            </button>
           </div>
 
           {/* Search and Filters */}
