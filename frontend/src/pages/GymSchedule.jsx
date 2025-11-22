@@ -12,6 +12,7 @@ const GymSchedule = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
@@ -207,10 +208,14 @@ const GymSchedule = () => {
       fontFamily: 'Inter, sans-serif',
       backgroundColor: '#f6f7f8'
     }}>
-      {/* Header/Navbar */}
-      <header style={{
+      {/* Sidebar */}
+      <aside style={{
+        width: sidebarOpen ? '16rem' : '0',
+        flexShrink: 0,
+        backgroundColor: '#1D3557',
+        padding: sidebarOpen ? '1.5rem' : '0',
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: 'column',
         justifyContent: 'space-between',
         overflow: 'hidden',
         transition: 'width 0.3s ease, padding 0.3s ease'
@@ -500,12 +505,14 @@ const GymSchedule = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main style={{
-        flex: 1,
+      {/* Header */}
+      <header style={{
         display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '1rem 2rem',
+        backgroundColor: '#FFFFFF',
+        borderBottom: '1px solid #e2e8f0'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -615,7 +622,7 @@ const GymSchedule = () => {
             )}
           </div>
         </div>
-      </header>
+        </header>
 
       {/* Horizontal Menu Bar - Only show for Students */}
       {user?.userType === 'Student' && (
