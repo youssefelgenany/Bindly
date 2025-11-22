@@ -1,6 +1,5 @@
 const Event = require('../models/eventModel');
 const Announcement = require('../models/announcementModel');
-const Workshop = require('../models/Workshop');
 const Registration = require('../models/registrationModel');
 
 // Get professor dashboard statistics
@@ -10,8 +9,11 @@ exports.getProfessorDashboardStats = async (req, res) => {
     
     console.log('📊 Fetching professor dashboard stats for user:', userId);
 
-    // Get total workshops created by this professor
-    const totalWorkshopsCreated = await Workshop.countDocuments({ professorId: userId });
+    // Get total workshops created by this professor (from Event model)
+    const totalWorkshopsCreated = await Event.countDocuments({ 
+      type: 'workshop',
+      createdBy: userId 
+    });
 
     // Get upcoming events (events with startDate in the future that professor is registered for)
     const registrations = await Registration.find({ user: userId, status: 'approved' }).select('event');
@@ -27,9 +29,10 @@ exports.getProfessorDashboardStats = async (req, res) => {
       status: 'approved'
     }) : 0;
 
-    // Get workshops pending approval
-    const workshopsPendingApproval = await Workshop.countDocuments({
-      professorId: userId,
+    // Get workshops pending approval (from Event model)
+    const workshopsPendingApproval = await Event.countDocuments({
+      type: 'workshop',
+      createdBy: userId,
       status: 'pending'
     });
 

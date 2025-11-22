@@ -7,7 +7,7 @@ const MyWorkshops = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   const [workshops, setWorkshops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,10 +16,48 @@ const MyWorkshops = () => {
   const [editFormData, setEditFormData] = useState({});
   const [saving, setSaving] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createFormData, setCreateFormData] = useState({
+    workshopName: '',
+    location: 'GUC Cairo',
+    startDate: '',
+    endDate: '',
+    startTime: '',
+    endTime: '',
+    registrationDeadline: '',
+    shortDescription: '',
+    fullAgenda: '',
+    facultyResponsible: 'MET',
+    professorsParticipating: '',
+    requiredBudget: '',
+    fundingSource: 'GUC',
+    extraRequiredResources: '',
+    capacity: ''
+  });
+  const [creating, setCreating] = useState(false);
+  const [createSuccess, setCreateSuccess] = useState(false);
 
   const isActiveRoute = (path) => {
-    return location.pathname === path;
+    const currentPath = location.pathname;
+    // Exact match
+    if (currentPath === path) return true;
+    // For dashboard, check if it's exactly /dashboard (not /dashboard/something)
+    if (path === '/dashboard') {
+      return currentPath === '/dashboard';
+    }
+    // For other routes, check if current path starts with the route path
+    return currentPath.startsWith(path);
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
+        setShowLogoutDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLogoutDropdown]);
 
   const handleLogout = () => {
     logout();
@@ -58,8 +96,15 @@ const MyWorkshops = () => {
   useEffect(() => {
     if (location.pathname === '/professor/my-workshops' && user) {
       loadWorkshops();
+      // Check if create=true is in URL params
+      const searchParams = new URLSearchParams(location.search);
+      if (searchParams.get('create') === 'true') {
+        setShowCreateForm(true);
+        // Clean up URL
+        window.history.replaceState({}, '', '/professor/my-workshops');
+      }
     }
-  }, [location.pathname, user, loadWorkshops]);
+  }, [location.pathname, location.search, user, loadWorkshops]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
@@ -297,358 +342,178 @@ const MyWorkshops = () => {
     ? `${user.firstName} ${user.lastName}`
     : user?.name || 'Professor';
 
+  const handleCreateChange = (e) => {
+    const { name, value } = e.target;
+    setCreateFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleCreateSubmit = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    setError('');
+    setCreateSuccess(false);
+
+    // Validate required fields
+    const requiredFields = [
+      'workshopName', 'location', 'startDate', 'endDate', 'startTime', 
+      'endTime', 'registrationDeadline', 'shortDescription', 'fullAgenda',
+      'facultyResponsible', 'professorsParticipating', 'requiredBudget',
+      'fundingSource', 'capacity'
+    ];
+
+    const missingFields = requiredFields.filter(field => !createFormData[field] || createFormData[field].toString().trim() === '');
+    
+    if (missingFields.length > 0) {
+      setError(`Please fill in all required fields: ${missingFields.join(', ')}`);
+      setCreating(false);
+      return;
+    }
+
+    // Validate short description length
+    if (createFormData.shortDescription.length > 200) {
+      setError('Short description must be 200 characters or less');
+      setCreating(false);
+      return;
+    }
+
+    // Validate dates
+    const startDate = new Date(`${createFormData.startDate}T${createFormData.startTime}`);
+    const endDate = new Date(`${createFormData.endDate}T${createFormData.endTime}`);
+    const registrationDeadline = new Date(createFormData.registrationDeadline);
+
+    if (endDate <= startDate) {
+      setError('End date and time must be after start date and time');
+      setCreating(false);
+      return;
+    }
+
+    if (registrationDeadline >= startDate) {
+      setError('Registration deadline must be before the workshop start date');
+      setCreating(false);
+      return;
+    }
+
+    // Validate capacity and budget
+    if (parseInt(createFormData.capacity) <= 0) {
+      setError('Capacity must be greater than 0');
+      setCreating(false);
+      return;
+    }
+
+    if (parseFloat(createFormData.requiredBudget) < 0) {
+      setError('Required budget cannot be negative');
+      setCreating(false);
+      return;
+    }
+
+    try {
+      // Format professors participating as array
+      const professorsArray = createFormData.professorsParticipating
+        .split(',')
+        .map(p => p.trim())
+        .filter(p => p.length > 0);
+
+      if (professorsArray.length === 0) {
+        setError('Please provide at least one participating professor');
+        setCreating(false);
+        return;
+      }
+
+      // Prepare data for submission
+      const submitData = {
+        workshopName: createFormData.workshopName.trim(),
+        location: createFormData.location,
+        startDate: new Date(`${createFormData.startDate}T${createFormData.startTime}`).toISOString(),
+        endDate: new Date(`${createFormData.endDate}T${createFormData.endTime}`).toISOString(),
+        startTime: createFormData.startTime,
+        endTime: createFormData.endTime,
+        registrationDeadline: new Date(createFormData.registrationDeadline).toISOString(),
+        shortDescription: createFormData.shortDescription.trim(),
+        fullAgenda: createFormData.fullAgenda.trim(),
+        facultyResponsible: createFormData.facultyResponsible,
+        professorsParticipating: professorsArray,
+        requiredBudget: parseFloat(createFormData.requiredBudget),
+        fundingSource: createFormData.fundingSource,
+        extraRequiredResources: createFormData.extraRequiredResources.trim() || undefined,
+        capacity: parseInt(createFormData.capacity)
+      };
+
+      console.log('Submitting workshop data:', submitData);
+      const result = await professorApiService.createWorkshop(submitData);
+      
+      if (result.success) {
+        setCreateSuccess(true);
+        setError('');
+        // Reset form
+        setCreateFormData({
+          workshopName: '',
+          location: 'GUC Cairo',
+          startDate: '',
+          endDate: '',
+          startTime: '',
+          endTime: '',
+          registrationDeadline: '',
+          shortDescription: '',
+          fullAgenda: '',
+          facultyResponsible: 'MET',
+          professorsParticipating: '',
+          requiredBudget: '',
+          fundingSource: 'GUC',
+          extraRequiredResources: '',
+          capacity: ''
+        });
+        // Reload workshops
+        await loadWorkshops();
+        // Hide form after 2 seconds
+        setTimeout(() => {
+          setShowCreateForm(false);
+          setCreateSuccess(false);
+        }, 2000);
+      } else {
+        setError(result.message || 'Failed to create workshop');
+      }
+    } catch (err) {
+      console.error('Error creating workshop:', err);
+      setError(err.message || 'An unexpected error occurred. Please try again.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const getEventTypeImage = (type) => {
+    const imageMap = {
+      workshop: '/assets/images/workshop.jpg',
+      conference: '/assets/images/conference.jpg',
+      bazaar: '/assets/images/bazaar.jpg',
+      trip: '/assets/images/trip.jpg',
+      booth: '/assets/images/booth.jpg'
+    };
+    return imageMap[type?.toLowerCase()] || null;
+  };
+
+  const getEventTypeColor = (type) => {
+    const colorMap = {
+      workshop: '#8b5cf6',
+      conference: '#3b82f6',
+      bazaar: '#f59e0b',
+      trip: '#10b981',
+      booth: '#ec4899'
+    };
+    return colorMap[type?.toLowerCase()] || '#6b7280';
+  };
+
   return (
     <div style={{
       display: 'flex',
-      height: '100vh',
+      flexDirection: 'column',
+      minHeight: '100vh',
       fontFamily: 'Inter, sans-serif',
       backgroundColor: '#f6f7f8'
     }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: sidebarOpen ? '16rem' : '0',
-        flexShrink: 0,
-        backgroundColor: '#1D3557',
-        padding: sidebarOpen ? '1.5rem' : '0',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        overflow: 'hidden',
-        transition: 'width 0.3s ease, padding 0.3s ease'
-      }}>
-        {/* Top Section - Logo and Navigation */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Logo and Branding */}
-          {sidebarOpen && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                borderRadius: '50%',
-                backgroundColor: '#457B9D',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF'
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <h1 style={{
-                  color: '#FFFFFF',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Professor Portal
-                </h1>
-                <p style={{
-                  color: 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: '400',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  University Portal
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation */}
-          {sidebarOpen && (
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <Link
-                to="/dashboard"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                  textDecoration: 'none',
-                  color: '#FFFFFF'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.25rem' }}>
-                  dashboard
-                </span>
-                <p style={{
-                  color: '#FFFFFF',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Dashboard
-                </p>
-              </Link>
-
-              <Link
-                to="/professor/all-events"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/professor/all-events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/professor/all-events')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/professor/all-events')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  explore
-                </span>
-                <p style={{
-                  color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/professor/all-events') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Discover Events
-                </p>
-              </Link>
-
-              <Link
-                to="/professor/events"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/professor/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/professor/events')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/professor/events')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  event_note
-                </span>
-                <p style={{
-                  color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/professor/events') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  My Events
-                </p>
-              </Link>
-
-              <Link
-                to="/professor/my-workshops"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/professor/my-workshops') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/professor/my-workshops')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/professor/my-workshops')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  work
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/professor/my-workshops') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    My Workshops
-                  </p>
-                )}
-              </Link>
-
-              <Link
-                to="/gym-schedule"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/gym-schedule')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/gym-schedule')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  calendar_month
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    View Gym Sessions
-                  </p>
-                )}
-              </Link>
-
-              <Link
-                to="/professor/create-workshop"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/professor/create-workshop') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/professor/create-workshop')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/professor/create-workshop')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  add_circle
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/professor/create-workshop') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    Create Workshop
-                  </p>
-                )}
-              </Link>
-            </nav>
-          )}
-        </div>
-
-        {/* Logout Button */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <button
-            onClick={handleLogout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              width: '100%'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ color: 'rgba(241, 250, 238, 0.7)', fontSize: '1.25rem' }}>
-              logout
-            </span>
-            {sidebarOpen && (
-              <p style={{
-                color: 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Logout
-              </p>
-            )}
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
-        {/* Header */}
+      {/* Header/Navbar */}
         <header style={{
           display: 'flex',
           alignItems: 'center',
@@ -658,35 +523,20 @@ const MyWorkshops = () => {
           backgroundColor: '#FFFFFF'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1D3557'
-              }}
-              aria-label="Toggle sidebar"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                menu
-              </span>
-            </button>
+          <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
-              margin: 0
+              margin: 0,
+              cursor: 'pointer'
             }}>
               Bindly
             </h2>
+          </Link>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
@@ -704,6 +554,11 @@ const MyWorkshops = () => {
                 Professor
               </p>
             </div>
+          <div 
+            data-profile-dropdown
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+          >
             {user?.profilePicturePath ? (
               <img
                 src={`http://localhost:5000${user.profilePicturePath}`}
@@ -730,42 +585,246 @@ const MyWorkshops = () => {
                 {(user?.firstName?.[0] || user?.name?.[0] || 'P').toUpperCase()}
               </div>
             )}
+            {showLogoutDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                zIndex: 1000,
+                minWidth: '150px'
+              }}>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    logout
+                  </span>
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
           </div>
         </header>
 
-        {/* Content */}
+      {/* Horizontal Menu Bar */}
+      <nav style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '1rem 2rem',
+        backgroundColor: '#FFFFFF',
+        borderBottom: '1px solid #e2e8f0'
+      }}>
+        {/* Navigation Links */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+          <Link
+            to="/dashboard"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Dashboard
+          </Link>
+          <Link
+            to="/professor/all-events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Discover Events
+          </Link>
+          <Link
+            to="/professor/events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Events
+          </Link>
+          <Link
+            to="/professor/my-workshops"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Workshops
+          </Link>
+          <Link
+            to="/gym-schedule"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/gym-schedule') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            View Gym Sessions
+          </Link>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
+
+        {/* Content - Split Screen Layout */}
         <div style={{
           flex: 1,
-          padding: '2rem',
-          overflowY: 'auto',
+          display: 'flex',
+          overflow: 'hidden',
           backgroundColor: '#f6f7f8'
         }}>
-          {/* Page Title Box */}
+          {/* Left Side - Workshops List */}
           <div style={{
-            backgroundColor: '#FFFFFF',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            flex: showCreateForm ? 1 : 1,
+          padding: '2rem',
+          overflowY: 'auto',
+            borderRight: showCreateForm ? '1px solid #e2e8f0' : 'none'
+        }}>
+          {/* Banner Header */}
+          <div style={{
+            position: 'relative',
+            height: '140px',
+            borderRadius: '0.75rem',
+            overflow: 'hidden',
             marginBottom: '1.5rem',
-            borderLeft: '4px solid #1D3557'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
           }}>
-            <h3 style={{
-              color: '#1D3557',
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              margin: 0
+            {/* Background Image */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(/assets/images/workshop.jpg)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
+            }}></div>
+            {/* Blue Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Content */}
+            <div style={{
+              position: 'relative',
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '2rem 2.5rem',
+              color: '#FFFFFF'
             }}>
-              My Workshops
-            </h3>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '1rem',
-              fontWeight: '400',
-              margin: '0.25rem 0 0 0'
-            }}>
-              View and manage your workshop submissions.
-            </p>
+              <h3 style={{
+                color: '#FFFFFF',
+                fontSize: '1.75rem',
+                fontWeight: '700',
+                margin: 0,
+                marginBottom: '0.5rem'
+              }}>
+                My Workshops
+              </h3>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '0.875rem',
+                fontWeight: '400',
+                margin: 0
+              }}>
+                View and manage your workshop submissions.
+              </p>
+            </div>
           </div>
+
+          {/* Create Workshop Button - Below Banner, Right Aligned */}
+          {!showCreateForm && (
+            <div style={{ 
+              marginBottom: '1.5rem',
+              display: 'flex',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => setShowCreateForm(true)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#1e40af',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#1e3a8a';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#1e40af';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                  add_circle
+                </span>
+                Create Workshop
+              </button>
+            </div>
+          )}
 
           {error && (
             <div style={{
@@ -807,17 +866,21 @@ const MyWorkshops = () => {
               <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
                 You haven't created any workshops yet.
               </p>
-              <Link
-                to="/professor/create-workshop"
+              <button
+                onClick={() => setShowCreateForm(true)}
                 style={{
                   padding: '0.75rem 1.5rem',
                   borderRadius: '0.5rem',
                   backgroundColor: '#1e40af',
                   color: '#FFFFFF',
-                  textDecoration: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
                   fontSize: '0.875rem',
                   fontWeight: '600',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
                 }}
                 onMouseEnter={(e) => {
                   e.target.style.backgroundColor = '#1e3a8a';
@@ -826,77 +889,19 @@ const MyWorkshops = () => {
                   e.target.style.backgroundColor = '#1e40af';
                 }}
               >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                  add_circle
+                </span>
                 Create Your First Workshop
-              </Link>
+              </button>
             </div>
           ) : (
             <div style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '0.75rem',
-              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-              overflowX: 'auto'
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+              gap: '1.5rem'
             }}>
-              <table style={{ width: '100%', textAlign: 'left' }}>
-                <thead style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <tr>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Workshop Name
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Date
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Location
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      textAlign: 'center'
-                    }}>
-                      Status
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      textAlign: 'right'
-                    }}>
-                      Actions
-                    </th>
-                    <th style={{ padding: '1rem 1.5rem', width: '48px' }}></th>
-                  </tr>
-                </thead>
-                <tbody style={{ borderTop: '1px solid #e5e7eb' }}>
                   {workshops.map((workshop) => {
-                    const isExpanded = expandedRows.has(workshop._id);
                     const statusColors = {
                       pending: { bg: '#fef3c7', text: '#92400e' },
                       approved: { bg: '#d1fae5', text: '#065f46' },
@@ -904,60 +909,175 @@ const MyWorkshops = () => {
                       needs_edits: { bg: '#fed7aa', text: '#ea580c' }
                     };
                     const statusStyle = statusColors[workshop.status?.toLowerCase()] || statusColors.pending;
+                const workshopTitle = workshop.workshopName || workshop.title || 'Untitled Workshop';
 
                     return (
-                      <React.Fragment key={workshop._id}>
-                        <tr style={{
-                          borderBottom: '1px solid #e5e7eb',
-                          transition: 'background-color 0.2s',
-                          cursor: 'pointer'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                        onClick={() => toggleRowExpansion(workshop._id)}
-                        >
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            fontWeight: '500',
-                            color: '#111827'
-                          }}>
-                            {workshop.workshopName}
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            color: '#6b7280'
-                          }}>
-                            {formatTableDate(workshop.startDate)}
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            color: '#6b7280'
-                          }}>
-                            {workshop.location}
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            textAlign: 'center'
-                          }}>
+                  <div
+                    key={workshop._id}
+                    onClick={() => handleEditClick(workshop)}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '0.75rem',
+                      padding: 0,
+                      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      border: '1px solid #e5e7eb',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.borderColor = '#1e40af';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                    }}
+                  >
+                    {/* Workshop Image - Top Half */}
+                    {getEventTypeImage('workshop') && (
+                      <div style={{
+                        width: '100%',
+                        height: '180px',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        backgroundColor: '#f3f4f6',
+                        flexShrink: 0
+                      }}>
+                        <img
+                          src={getEventTypeImage('workshop')}
+                          alt="Workshop"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'center'
+                          }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.parentElement.style.backgroundColor = getEventTypeColor('workshop');
+                            e.target.parentElement.style.display = 'flex';
+                            e.target.parentElement.style.alignItems = 'center';
+                            e.target.parentElement.style.justifyContent = 'center';
+                            if (!e.target.parentElement.querySelector('.fallback-text')) {
+                              const fallback = document.createElement('div');
+                              fallback.className = 'fallback-text';
+                              fallback.textContent = 'WORKSHOP';
+                              fallback.style.color = '#FFFFFF';
+                              fallback.style.fontSize = '1.5rem';
+                              fallback.style.fontWeight = '700';
+                              e.target.parentElement.appendChild(fallback);
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
+                    
+                    <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                        <div style={{
+                          padding: '0.375rem 0.875rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: getEventTypeColor('workshop'),
+                          color: '#FFFFFF',
+                          fontSize: '0.6875rem',
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Workshop
+                        </div>
                             <span style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               padding: '0.25rem 0.75rem',
                               borderRadius: '9999px',
-                              fontSize: '0.875rem',
+                          fontSize: '0.75rem',
                               fontWeight: '500',
                               backgroundColor: statusStyle.bg,
                               color: statusStyle.text
                             }}>
                               {getStatusLabel(workshop.status)}
                             </span>
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            textAlign: 'right'
+                      </div>
+                      
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '0.75rem',
+                        marginTop: 0,
+                        lineHeight: '1.4'
+                      }}>
+                        {workshopTitle}
+                      </h3>
+                      
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem',
+                        marginBottom: '0.75rem',
+                        flex: 1
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            calendar_today
+                          </span>
+                          <span>{formatDateOnly(workshop.startDate)}</span>
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            location_on
+                          </span>
+                          <span>{workshop.location}</span>
+                        </div>
+                        {workshop.capacity && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.625rem',
+                            fontSize: '0.8125rem',
+                            color: '#6b7280'
+                          }}>
+                            <span className="material-symbols-outlined" style={{
+                              fontSize: '1.125rem',
+                              color: '#9ca3af'
+                            }}>
+                              people
+                            </span>
+                            <span>Capacity: {workshop.capacity}</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        marginTop: 'auto',
+                        paddingTop: '0.75rem',
+                        borderTop: '1px solid #e5e7eb'
                           }}>
                             <button
                               onClick={(e) => {
@@ -965,117 +1085,622 @@ const MyWorkshops = () => {
                                 handleEditClick(workshop);
                               }}
                               style={{
+                            flex: 1,
                                 padding: '0.5rem',
                                 borderRadius: '0.375rem',
-                                backgroundColor: 'transparent',
-                                border: '1px solid #d1d5db',
+                            backgroundColor: '#1e40af',
+                            color: '#FFFFFF',
+                            border: 'none',
                                 cursor: 'pointer',
-                                display: 'inline-flex',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
+                            gap: '0.25rem',
                                 transition: 'all 0.2s'
                               }}
                               onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = '#f3f4f6';
-                                e.target.style.borderColor = '#9ca3af';
+                            e.target.style.backgroundColor = '#1e3a8a';
                               }}
                               onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = 'transparent';
-                                e.target.style.borderColor = '#d1d5db';
+                            e.target.style.backgroundColor = '#1e40af';
                               }}
-                              title="Edit Workshop"
                             >
-                              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem', color: '#374151' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
                                 edit
                               </span>
+                          Edit
                             </button>
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            textAlign: 'center'
-                          }}>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          </div>
+
+          {/* Right Side - Create Workshop Form */}
+          {showCreateForm && (
+            <div style={{
+              flex: 1,
+              padding: '2rem',
+              overflowY: 'auto',
+              backgroundColor: '#FFFFFF',
+              borderLeft: '1px solid #e2e8f0'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1.5rem'
+              }}>
+                <h3 style={{
+                  color: '#1D3557',
+                  fontSize: '1.25rem',
+                  fontWeight: '600',
+                  margin: 0
+                }}>
+                  Create Workshop
+                </h3>
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleRowExpansion(workshop._id);
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setCreateFormData({
+                      workshopName: '',
+                      location: 'GUC Cairo',
+                      startDate: '',
+                      endDate: '',
+                      startTime: '',
+                      endTime: '',
+                      registrationDeadline: '',
+                      shortDescription: '',
+                      fullAgenda: '',
+                      facultyResponsible: 'MET',
+                      professorsParticipating: '',
+                      requiredBudget: '',
+                      fundingSource: 'GUC',
+                      extraRequiredResources: '',
+                      capacity: ''
+                    });
+                    setError('');
+                    setCreateSuccess(false);
                               }}
                               style={{
                                 background: 'none',
                                 border: 'none',
                                 cursor: 'pointer',
-                                padding: '0.25rem',
+                    padding: '0.5rem',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                color: '#6b7280',
-                                transition: 'transform 0.2s'
-                              }}
-                            >
-                              <span className="material-symbols-outlined" style={{
-                                fontSize: '1.25rem',
-                                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                                transition: 'transform 0.2s'
-                              }}>
-                                expand_more
+                    color: '#6b7280'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                    close
                               </span>
                             </button>
-                          </td>
-                        </tr>
-                        {isExpanded && (
-                          <tr style={{ backgroundColor: '#f9fafb' }}>
-                            <td colSpan="6" style={{ padding: '1.5rem' }}>
+              </div>
+
+              {error && (
                               <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                                gap: '1.5rem'
-                              }}>
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1.5rem',
+                  borderRadius: '0.375rem',
+                  backgroundColor: '#fee2e2',
+                  color: '#991b1b',
+                  fontSize: '0.875rem'
+                }}>
+                  {error}
+                </div>
+              )}
+
+              {createSuccess && (
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1.5rem',
+                  borderRadius: '0.375rem',
+                  backgroundColor: '#d1fae5',
+                  color: '#065f46',
+                  fontSize: '0.875rem'
+                }}>
+                  Workshop created successfully!
+                </div>
+              )}
+
+              <form onSubmit={handleCreateSubmit} style={{ maxWidth: '600px' }}>
+                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                  {/* Workshop Name */}
                                 <div>
-                                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.5rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</div>
-                                  <div style={{ color: '#374151', fontSize: '0.875rem', lineHeight: '1.5' }}>
-                                    {workshop.shortDescription || 'No description available.'}
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Workshop Name <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="workshopName"
+                      value={createFormData.workshopName}
+                      onChange={handleCreateChange}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        boxSizing: 'border-box'
+                      }}
+                    />
                                   </div>
+
+                  {/* Location */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Location <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <select
+                      name="location"
+                      value={createFormData.location}
+                      onChange={handleCreateChange}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        backgroundColor: '#FFFFFF',
+                        cursor: 'pointer',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="GUC Cairo">GUC Cairo</option>
+                      <option value="GUC Berlin">GUC Berlin</option>
+                    </select>
                                 </div>
+
+                  {/* Date and Time Row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div>
-                                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.5rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Workshop Details</div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                    <div style={{ color: '#374151', fontSize: '0.875rem' }}>
-                                      <strong>Start:</strong> {formatDateOnly(workshop.startDate)} {workshop.startTime}
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Start Date <span style={{ color: '#dc2626' }}>*</span>
+                      </label>
+                      <input
+                        type="date"
+                        name="startDate"
+                        value={createFormData.startDate}
+                        onChange={handleCreateChange}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          boxSizing: 'border-box'
+                        }}
+                      />
                                     </div>
-                                    <div style={{ color: '#374151', fontSize: '0.875rem' }}>
-                                      <strong>End:</strong> {formatDateOnly(workshop.endDate)} {workshop.endTime}
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Start Time <span style={{ color: '#dc2626' }}>*</span>
+                      </label>
+                      <input
+                        type="time"
+                        name="startTime"
+                        value={createFormData.startTime}
+                        onChange={handleCreateChange}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          boxSizing: 'border-box'
+                        }}
+                      />
                                     </div>
-                                    <div style={{ color: '#374151', fontSize: '0.875rem' }}>
-                                      <strong>Faculty:</strong> {workshop.facultyResponsible}
                                     </div>
-                                    <div style={{ color: '#374151', fontSize: '0.875rem' }}>
-                                      <strong>Capacity:</strong> {workshop.capacity}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        End Date <span style={{ color: '#dc2626' }}>*</span>
+                      </label>
+                      <input
+                        type="date"
+                        name="endDate"
+                        value={createFormData.endDate}
+                        onChange={handleCreateChange}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          boxSizing: 'border-box'
+                        }}
+                      />
                                     </div>
-                                    {workshop.registrationDeadline && (
-                                      <div style={{ color: '#374151', fontSize: '0.875rem' }}>
-                                        <strong>Registration Deadline:</strong> {formatDate(workshop.registrationDeadline)}
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        End Time <span style={{ color: '#dc2626' }}>*</span>
+                      </label>
+                      <input
+                        type="time"
+                        name="endTime"
+                        value={createFormData.endTime}
+                        onChange={handleCreateChange}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          boxSizing: 'border-box'
+                        }}
+                      />
                                       </div>
-                                    )}
                                   </div>
+
+                  {/* Registration Deadline */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Registration Deadline <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      name="registrationDeadline"
+                      value={createFormData.registrationDeadline}
+                      onChange={handleCreateChange}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        boxSizing: 'border-box'
+                      }}
+                    />
                                 </div>
+
+                  {/* Short Description */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Short Description <span style={{ color: '#dc2626' }}>*</span> (max 200 characters)
+                    </label>
+                    <textarea
+                      name="shortDescription"
+                      value={createFormData.shortDescription}
+                      onChange={handleCreateChange}
+                      required
+                      maxLength={200}
+                      rows={3}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        fontFamily: 'inherit',
+                        resize: 'vertical',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                    <p style={{
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      marginTop: '0.25rem',
+                      marginBottom: 0
+                    }}>
+                      {createFormData.shortDescription.length}/200 characters
+                    </p>
                               </div>
-                              {(workshop.status === 'rejected' && workshop.rejectionReason) || (workshop.status === 'needs_edits' && workshop.editRequests) ? (
-                                <div style={{ marginTop: '1.5rem', padding: '1rem', borderRadius: '0.5rem', backgroundColor: workshop.status === 'rejected' ? '#fee2e2' : '#fef3c7', border: `1px solid ${workshop.status === 'rejected' ? '#fecaca' : '#fde68a'}` }}>
-                                  <div style={{ fontSize: '0.75rem', color: workshop.status === 'rejected' ? '#991b1b' : '#92400e', marginBottom: '0.5rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    {workshop.status === 'rejected' ? 'Rejection Reason' : 'Edit Requests'}
+
+                  {/* Full Agenda */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Full Agenda <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <textarea
+                      name="fullAgenda"
+                      value={createFormData.fullAgenda}
+                      onChange={handleCreateChange}
+                      required
+                      rows={6}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        fontFamily: 'inherit',
+                        resize: 'vertical',
+                        boxSizing: 'border-box'
+                      }}
+                    />
                                   </div>
-                                  <div style={{ color: workshop.status === 'rejected' ? '#991b1b' : '#92400e', fontSize: '0.875rem', lineHeight: '1.5' }}>
-                                    {workshop.status === 'rejected' ? workshop.rejectionReason : workshop.editRequests}
+
+                  {/* Faculty Responsible */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Faculty Responsible <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <select
+                      name="facultyResponsible"
+                      value={createFormData.facultyResponsible}
+                      onChange={handleCreateChange}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        backgroundColor: '#FFFFFF',
+                        cursor: 'pointer',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="MET">MET</option>
+                      <option value="IET">IET</option>
+                      <option value="EMS">EMS</option>
+                      <option value="BI">BI</option>
+                      <option value="MGT">MGT</option>
+                      <option value="Dentistry">Dentistry</option>
+                      <option value="AA">AA</option>
+                      <option value="Pharm">Pharm</option>
+                      <option value="Arch">Arch</option>
+                    </select>
                                   </div>
+
+                  {/* Professors Participating */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Professor(s) Participating <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="professorsParticipating"
+                      value={createFormData.professorsParticipating}
+                      onChange={handleCreateChange}
+                      required
+                      placeholder="Separate multiple professors with commas"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        boxSizing: 'border-box'
+                      }}
+                    />
                                 </div>
-                              ) : null}
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
+
+                  {/* Budget and Funding Source Row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Required Budget <span style={{ color: '#dc2626' }}>*</span>
+                      </label>
+                      <input
+                        type="number"
+                        name="requiredBudget"
+                        value={createFormData.requiredBudget}
+                        onChange={handleCreateChange}
+                        required
+                        min="0"
+                        step="0.01"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Funding Source <span style={{ color: '#dc2626' }}>*</span>
+                      </label>
+                      <select
+                        name="fundingSource"
+                        value={createFormData.fundingSource}
+                        onChange={handleCreateChange}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          backgroundColor: '#FFFFFF',
+                          cursor: 'pointer',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <option value="GUC">GUC</option>
+                        <option value="external">External</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Extra Required Resources */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Extra Required Resources
+                    </label>
+                    <textarea
+                      name="extraRequiredResources"
+                      value={createFormData.extraRequiredResources}
+                      onChange={handleCreateChange}
+                      rows={3}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        fontFamily: 'inherit',
+                        resize: 'vertical',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {/* Capacity */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Capacity <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="number"
+                      name="capacity"
+                      value={createFormData.capacity}
+                      onChange={handleCreateChange}
+                      required
+                      min="1"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                    <button
+                      type="submit"
+                      disabled={creating || createSuccess}
+                      style={{
+                        flex: 1,
+                        padding: '0.75rem 1.5rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: creating || createSuccess ? '#9ca3af' : '#1e40af',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        cursor: creating || createSuccess ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!creating && !createSuccess) {
+                          e.target.style.backgroundColor = '#1e3a8a';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!creating && !createSuccess) {
+                          e.target.style.backgroundColor = '#1e40af';
+                        }
+                      }}
+                    >
+                      {creating ? 'Creating...' : createSuccess ? 'Created!' : 'Create Workshop'}
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
           )}
         </div>
