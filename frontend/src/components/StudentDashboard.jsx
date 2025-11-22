@@ -424,64 +424,84 @@ const StudentDashboard = () => {
 
             {/* Main Content */}
             <main style={{
+                flex: 1,
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                overflow: 'hidden'
             }}>
-                {/* Content Wrapper with Margins */}
+                {/* Content */}
                 <div style={{
-                    marginLeft: '4rem',
-                    marginRight: '4rem'
+                    flex: 1,
+                    padding: '2rem 0',
+                    overflowY: 'auto',
+                    backgroundColor: '#f6f7f8'
                 }}>
-                    {/* Dashboard Banner with Background Image */}
+                    {/* Content Wrapper with Margins */}
                     <div style={{
-                        position: 'relative',
-                        width: '100%',
-                        height: '200px',
-                        backgroundImage: 'url(/assets/images/dashboard-image.jpg)',
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat',
-                        marginBottom: '2rem',
-                        borderRadius: '1rem',
-                        overflow: 'hidden'
+                        marginLeft: '4rem',
+                        marginRight: '4rem'
                     }}>
-                        {/* Blue Blur Overlay */}
+                        {/* Dashboard Banner with Background Image */}
+                        <div style={{
+                        position: 'relative',
+                        height: '140px',
+                        borderRadius: '0.75rem',
+                        overflow: 'hidden',
+                        marginBottom: '1.5rem',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                    }}>
+                        {/* Background Image */}
                         <div style={{
                             position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            backgroundColor: 'rgba(37, 99, 235, 0.6)',
-                            backdropFilter: 'blur(4px)',
-                            WebkitBackdropFilter: 'blur(4px)'
+                            inset: 0,
+                            backgroundImage: 'url(/assets/images/dashboardimage.jpg)',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundSize: 'cover',
+                            filter: 'blur(2px)'
                         }}></div>
-                        {/* Centered Dashboard Text */}
+                        {/* Blue Overlay */}
                         <div style={{
                             position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            textAlign: 'center',
-                            color: '#FFFFFF',
-                            zIndex: 1
+                            inset: 0,
+                            backgroundColor: 'rgba(29, 53, 87, 0.75)'
+                        }}></div>
+                        {/* Content */}
+                        <div style={{
+                            position: 'relative',
+                            zIndex: 10,
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            alignItems: 'flex-start',
+                            padding: '2rem 2.5rem',
+                            color: '#FFFFFF'
                         }}>
-                            <h1 style={{
+                            <h3 style={{
+                                color: '#FFFFFF',
                                 fontSize: '1.75rem',
-                                fontWeight: '500',
+                                fontWeight: '700',
                                 margin: 0,
-                                textShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                                letterSpacing: '0.5px'
+                                marginBottom: '0.5rem'
                             }}>
                                 Dashboard
-                            </h1>
+                            </h3>
+                            <p style={{
+                                color: 'rgba(255, 255, 255, 0.9)',
+                                fontSize: '0.875rem',
+                                fontWeight: '400',
+                                margin: 0
+                            }}>
+                                Overview of your events, registrations, and upcoming deadlines.
+                            </p>
                         </div>
                     </div>
 
-                    {/* Content */}
-                    <div style={{
-                        padding: '0 0 2rem 0'
-                    }}>
+                        {/* Content */}
+                        <div style={{
+                            padding: '0 0 2rem 0'
+                        }}>
 
                     {/* Quick Stats */}
                     <div style={{ marginBottom: '1.5rem' }}>
@@ -801,7 +821,8 @@ const StudentDashboard = () => {
                             )}
                         </div>
                     </div>
-                </div>
+                        </div>
+                    </div>
                 </div>
             </main>
         </div>
