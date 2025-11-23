@@ -831,33 +831,46 @@ const StaffEventsView = () => {
               {/* Filter Buttons - Right Side */}
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }}>
                 {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
-                <button
-                  onClick={handleSearch}
-                  style={{
-                    padding: '0.875rem 1.75rem',
-                    borderRadius: '0.5rem',
-                    backgroundColor: '#1e40af',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    flexShrink: 0
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#1e3a8a';
-                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#1e40af';
-                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                  }}
-                >
-                  Search
-                </button>
+                  <button
+                    key={type}
+                    onClick={() => {
+                      setFilter(type);
+                      loadEvents();
+                    }}
+                    style={{
+                      padding: '0.875rem 1.75rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: filter === type ? '#1e40af' : '#f3f4f6',
+                      color: filter === type ? '#FFFFFF' : '#374151',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap',
+                      boxShadow: filter === type ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                      flexShrink: 0
+                    }}
+                    onMouseEnter={(e) => {
+                      if (filter !== type) {
+                        e.target.style.backgroundColor = '#e5e7eb';
+                      } else {
+                        e.target.style.backgroundColor = '#1e3a8a';
+                        e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (filter !== type) {
+                        e.target.style.backgroundColor = '#f3f4f6';
+                        e.target.style.boxShadow = 'none';
+                      } else {
+                        e.target.style.backgroundColor = '#1e40af';
+                        e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                      }
+                    }}
+                  >
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </button>
                 ))}
               </div>
             </div>
@@ -1191,11 +1204,12 @@ const StaffEventsView = () => {
                               fontSize: '0.8125rem',
                               color: '#6b7280'
                             }}>
-                              storefront
-                            </span>
-                            <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
-                          </div>
-                        )}
+                              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                storefront
+                              </span>
+                              <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
+                            </div>
+                          )}
                       </div>
 
                       {event.description && (
@@ -1231,19 +1245,16 @@ const StaffEventsView = () => {
                               marginTop: 'auto',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '0.625rem',
-                              fontSize: '0.8125rem',
-                              color: '#6b7280'
+                              justifyContent: 'center',
+                              gap: '0.5rem'
                             }}>
-                              <span className="material-symbols-outlined" style={{
-                                fontSize: '1.125rem',
-                                color: '#9ca3af'
-                              }}>
-                                storefront
+                              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                                check_circle
                               </span>
-                              <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
-                            </div>
-                          )}
+                              <span>Registered</span>
+                            </button>
+                          ) : null
+                        )}
                           {(event.type === 'workshop' || event.type === 'conference') && (
                             <div style={{
                               display: 'flex',
