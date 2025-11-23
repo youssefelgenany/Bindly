@@ -257,11 +257,15 @@ exports.getAllEvents = async (req, res) => {
 
     // For non-admin/event-office users, only show approved events
     // Check if user is admin or event office
+    const userTypeLower = req.user?.userType?.toLowerCase();
+    const roleLower = req.user?.role?.toLowerCase();
     const isAdminOrEventOffice = req.user && (
-      req.user.userType === 'admin' ||
+      userTypeLower === 'admin' ||
+      req.user.userType === 'Admin' ||
       req.user.userType === 'Event Office' ||
       req.user.userType === 'Events Office' ||
       req.user.userType === 'event_office' ||
+      roleLower === 'admin' ||
       req.user.role === 'admin' ||
       req.user.role === 'event_office' ||
       req.user.role === 'Event Office'
@@ -288,39 +292,49 @@ exports.getAllEvents = async (req, res) => {
     }
 
     // Add date filter: ONLY include future events - EXCLUDE all past events
+    // BUT: Admin and Events Office users should see ALL events (including past ones)
     const now = new Date();
     console.log('🔍 getAllEvents - Date filter - Current time:', now.toISOString());
+    console.log('🔍 isAdminOrEventOffice:', isAdminOrEventOffice);
     
-    // SIMPLE AND DIRECT: Only show events where endDate > now OR (no endDate AND startDate > now)
-    const dateFilter = {
-      $or: [
-        // Case 1: Event has endDate and it's in the future
-        {
-          endDate: { $gt: now }
-        },
-        // Case 2: Event has no endDate but has startDate in the future
-        {
-          $and: [
-            {
-              $or: [
-                { endDate: { $exists: false } },
-                { endDate: null }
-              ]
-            },
-            { startDate: { $gt: now } }
-          ]
-        }
-      ]
-    };
+    // Only apply date filter for non-admin/event-office users
+    let finalMatch = { ...baseMatch };
     
-    // Combine baseMatch with dateFilter
-    const finalMatch = {
-      ...baseMatch,
-      ...dateFilter
-    };
+    if (!isAdminOrEventOffice) {
+      // For regular users, only show future events
+      const dateFilter = {
+        $or: [
+          // Case 1: Event has endDate and it's in the future
+          {
+            endDate: { $gt: now }
+          },
+          // Case 2: Event has no endDate but has startDate in the future
+          {
+            $and: [
+              {
+                $or: [
+                  { endDate: { $exists: false } },
+                  { endDate: null }
+                ]
+              },
+              { startDate: { $gt: now } }
+            ]
+          }
+        ]
+      };
+      
+      // Combine baseMatch with dateFilter
+      finalMatch = {
+        ...baseMatch,
+        ...dateFilter
+      };
+      
+      console.log('🔍 Non-admin user - WILL EXCLUDE events where endDate <=', now.toISOString(), 'OR (no endDate AND startDate <=', now.toISOString(), ')');
+    } else {
+      console.log('🔍 Admin/Events Office user - Showing ALL events (including past events)');
+    }
     
-    console.log('🔍 Final baseMatch filter with date filter:', JSON.stringify(finalMatch, null, 2));
-    console.log('🔍 WILL EXCLUDE events where endDate <=', now.toISOString(), 'OR (no endDate AND startDate <=', now.toISOString(), ')');
+    console.log('🔍 Final baseMatch filter:', JSON.stringify(finalMatch, null, 2));
 
     if (type) {
       const typeMap = {
@@ -492,32 +506,38 @@ exports.getAllEvents = async (req, res) => {
     }
 
     // POST-FILTER: Double-check and remove ANY past events that might have slipped through
-    const nowPostFilter = new Date();
-    const initialCount = events.length;
-    events = events.filter(event => {
-      // If event has endDate, check if it's in the future
-      if (event.endDate) {
-        const endDate = new Date(event.endDate);
-        if (endDate <= nowPostFilter) {
-          console.log('🚫 getAllEvents POST-FILTER: Removing past event:', event.title, 'endDate:', event.endDate, 'now:', nowPostFilter.toISOString());
+    // BUT: Only apply this filter for non-admin/event-office users
+    // Admin and Events Office users should see ALL events (including past ones)
+    if (!isAdminOrEventOffice) {
+      const nowPostFilter = new Date();
+      const initialCount = events.length;
+      events = events.filter(event => {
+        // If event has endDate, check if it's in the future
+        if (event.endDate) {
+          const endDate = new Date(event.endDate);
+          if (endDate <= nowPostFilter) {
+            console.log('🚫 getAllEvents POST-FILTER: Removing past event:', event.title, 'endDate:', event.endDate, 'now:', nowPostFilter.toISOString());
+            return false;
+          }
+        } else if (event.startDate) {
+          // If no endDate, check startDate
+          const startDate = new Date(event.startDate);
+          if (startDate <= nowPostFilter) {
+            console.log('🚫 getAllEvents POST-FILTER: Removing past event (no endDate):', event.title, 'startDate:', event.startDate, 'now:', nowPostFilter.toISOString());
+            return false;
+          }
+        } else {
+          // No dates at all - exclude it
+          console.log('🚫 getAllEvents POST-FILTER: Removing event with no dates:', event.title);
           return false;
         }
-      } else if (event.startDate) {
-        // If no endDate, check startDate
-        const startDate = new Date(event.startDate);
-        if (startDate <= nowPostFilter) {
-          console.log('🚫 getAllEvents POST-FILTER: Removing past event (no endDate):', event.title, 'startDate:', event.startDate, 'now:', nowPostFilter.toISOString());
-          return false;
-        }
-      } else {
-        // No dates at all - exclude it
-        console.log('🚫 getAllEvents POST-FILTER: Removing event with no dates:', event.title);
-        return false;
+        return true;
+      });
+      if (events.length < initialCount) {
+        console.log('🚫 getAllEvents POST-FILTER: Removed', (initialCount - events.length), 'past events');
       }
-      return true;
-    });
-    if (events.length < initialCount) {
-      console.log('🚫 getAllEvents POST-FILTER: Removed', (initialCount - events.length), 'past events');
+    } else {
+      console.log('🔍 Admin/Events Office user - Skipping post-filter, showing ALL events (including past)');
     }
 
     // Filter by user type restrictions
@@ -746,35 +766,23 @@ exports.getAllEventsForStudents = async (req, res) => {
     // Build filter - Event Office users can see all events, others only see approved
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     
-    // Build date filter: ONLY include future events - EXCLUDE all past events
+    // Check if user is Events Office (needed for date filter decision)
+    const isEventOffice = req.user.userType === 'Event Office' ||
+      req.user.userType === 'Events Office' ||
+      req.user.userType === 'event_office' ||
+      req.user.role === 'event_office' ||
+      req.user.role === 'Event Office' ||
+      req.user.userType === 'event office' ||
+      req.user.role === 'event office';
+    
+    // Build date filter: ALL users should see ALL events (including past ones)
+    // No date filter - show all events regardless of date
     const now = new Date();
     console.log('🔍 Date filter - Current time:', now.toISOString());
-    console.log('🔍 Date filter - Current timestamp:', now.getTime());
+    console.log('🔍 isEventOffice:', isEventOffice);
+    console.log('🔍 Showing ALL events (including past events) for all users');
     
-    // SIMPLE AND DIRECT: Only show events where endDate > now OR (no endDate AND startDate > now)
-    const dateFilter = {
-      $or: [
-        // Case 1: Event has endDate and it's in the future
-        {
-          endDate: { $gt: now }
-        },
-        // Case 2: Event has no endDate but has startDate in the future
-        {
-          $and: [
-            {
-              $or: [
-                { endDate: { $exists: false } },
-                { endDate: null }
-              ]
-            },
-            { startDate: { $gt: now } }
-          ]
-        }
-      ]
-    };
-    
-    console.log('🔍 Date filter applied:', JSON.stringify(dateFilter, null, 2));
-    console.log('🔍 WILL EXCLUDE events where endDate <=', now.toISOString(), 'OR (no endDate AND startDate <=', now.toISOString(), ')');
+    let dateFilter = {}; // Empty date filter - no date restrictions
     
     // Base filter conditions
     const baseFilter = {
@@ -823,11 +831,23 @@ exports.getAllEventsForStudents = async (req, res) => {
       console.log('🔍 No type filter or type is "all", showing all valid types');
     }
     
-    const filter = {
+    // Build filter - conditionally include dateFilter only for non-Events Office users
+    // Combine baseFilter (which has $and) with typeFilter and conditionally dateFilter
+    let filter = {
       ...baseFilter,
-      ...typeFilter,
-      ...dateFilter
+      ...typeFilter
     };
+    
+    // Only add dateFilter if it's not empty (i.e., for non-Events Office users)
+    // For Events Office users, dateFilter will be empty {}, so we don't add it
+    if (!isEventOffice && dateFilter && Object.keys(dateFilter).length > 0) {
+      // Merge dateFilter into the existing filter
+      // Since dateFilter has $or, we can add it at the root level alongside $and
+      filter = {
+        ...filter,
+        ...dateFilter
+      };
+    }
     
     // Exclude events the user is already registered for from "Discover Events"
     // Registered events should only appear in "My Events"
@@ -848,13 +868,7 @@ exports.getAllEventsForStudents = async (req, res) => {
     }
     
     // Only filter by status for non-Event Office users
-    const isEventOffice = req.user.userType === 'Event Office' ||
-      req.user.userType === 'Events Office' ||
-      req.user.userType === 'event_office' ||
-      req.user.role === 'event_office' ||
-      req.user.role === 'Event Office' ||
-      req.user.userType === 'event office' ||
-      req.user.role === 'event office';
+    // (isEventOffice already defined above for date filter)
 
     if (!isEventOffice) {
       filter.status = 'approved';
@@ -1017,36 +1031,20 @@ exports.getAllEventsForStudents = async (req, res) => {
       }
     ];
 
-    let events = await Event.aggregate(pipeline);
-
-    // POST-FILTER: Double-check and remove ANY past events that might have slipped through
-    const nowPostFilter = new Date();
-    const initialCount = events.length;
-    events = events.filter(event => {
-      // If event has endDate, check if it's in the future
-      if (event.endDate) {
-        const endDate = new Date(event.endDate);
-        if (endDate <= nowPostFilter) {
-          console.log('🚫 POST-FILTER: Removing past event:', event.title, 'endDate:', event.endDate, 'now:', nowPostFilter.toISOString());
-          return false;
-        }
-      } else if (event.startDate) {
-        // If no endDate, check startDate
-        const startDate = new Date(event.startDate);
-        if (startDate <= nowPostFilter) {
-          console.log('🚫 POST-FILTER: Removing past event (no endDate):', event.title, 'startDate:', event.startDate, 'now:', nowPostFilter.toISOString());
-          return false;
-        }
-      } else {
-        // No dates at all - exclude it
-        console.log('🚫 POST-FILTER: Removing event with no dates:', event.title);
-        return false;
-      }
-      return true;
-    });
-    if (events.length < initialCount) {
-      console.log('🚫 POST-FILTER: Removed', (initialCount - events.length), 'past events');
+    let events = [];
+    try {
+      console.log('🔍 Executing aggregation pipeline with filter:', JSON.stringify(filter, null, 2));
+      events = await Event.aggregate(pipeline);
+      console.log('✅ Aggregation successful, found', events.length, 'events');
+    } catch (aggError) {
+      console.error('❌ Aggregation error in getAllEventsForStudents:', aggError);
+      console.error('❌ Aggregation error stack:', aggError.stack);
+      console.error('❌ Pipeline:', JSON.stringify(pipeline, null, 2));
+      throw aggError; // Re-throw to be caught by outer catch
     }
+
+    // POST-FILTER: Removed - All users should see ALL events (including past ones)
+    console.log('🔍 All users - Showing ALL events (including past events)');
 
     // Filter by user type restrictions
     if (req.user && req.user.userType) {
