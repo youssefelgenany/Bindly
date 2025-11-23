@@ -6,6 +6,7 @@ const StudentRegistrationForm = ({ event, onClose, onSuccess }) => {
   const { user } = useAuth();
   const isStaff = user?.userType === 'Staff';
   const isProfessor = user?.userType === 'Professor';
+  const isTA = user?.userType === 'TA';
   const [formData, setFormData] = useState({
     studentName: '',
     studentId: '',
@@ -341,7 +342,7 @@ const StudentRegistrationForm = ({ event, onClose, onSuccess }) => {
                 color: '#374151',
                 marginBottom: '0.5rem'
               }}>
-                {isProfessor ? 'Professor ID' : isStaff ? 'Staff ID' : 'Student ID'} <span style={{ color: '#ef4444' }}>*</span>
+                {isProfessor ? 'Professor ID' : isTA ? 'TA ID' : isStaff ? 'Staff ID' : 'Student ID'} <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <input
                 type="text"
@@ -350,7 +351,7 @@ const StudentRegistrationForm = ({ event, onClose, onSuccess }) => {
                 value={formData.studentId}
                 onChange={handleInputChange}
                 required
-                placeholder={isProfessor ? 'Enter your professor ID' : isStaff ? 'Enter your staff ID' : 'Enter your student ID'}
+                placeholder={isProfessor ? 'Enter your professor ID' : isTA ? 'Enter your TA ID' : isStaff ? 'Enter your staff ID' : 'Enter your student ID'}
                 style={{
                   width: '100%',
                   padding: '0.75rem',
