@@ -866,6 +866,14 @@ const StudentEventsView = () => {
                             // Navigate to My Events for reminders
                             navigate(`/student/my-registrations`);
                             setShowNotificationsDropdown(false);
+                          } else if (
+                            notification.type === 'new_loyalty_partner' || 
+                            notification.type === 'loyalty_partner_added' ||
+                            (notification.type === 'system' && notification.metadata?.vendorId)
+                          ) {
+                            // Navigate to Loyalty Partners page
+                            navigate(`/student/loyalty-vendors`);
+                            setShowNotificationsDropdown(false);
                           }
                         }}
                         style={{
