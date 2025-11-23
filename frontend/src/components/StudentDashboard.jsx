@@ -479,20 +479,53 @@ const StudentDashboard = () => {
                                                     if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
                                                         navigate(`/student/events`);
                                                         setShowNotificationsDropdown(false);
+                                                    } else if (
+                                                        (notification.type === 'event_reminder' || 
+                                                         notification.type === 'workshop_reminder' || 
+                                                         notification.type === 'trip_reminder' ||
+                                                         notification.type === 'gym_session_reminder') && 
+                                                        (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                                                    ) {
+                                                        // Navigate to My Events for reminders
+                                                        navigate(`/student/my-registrations`);
+                                                        setShowNotificationsDropdown(false);
+                                                    } else if (
+                                                        notification.type === 'new_loyalty_partner' || 
+                                                        notification.type === 'loyalty_partner_added' ||
+                                                        (notification.type === 'system' && notification.metadata?.vendorId)
+                                                    ) {
+                                                        // Navigate to Loyalty Partners page
+                                                        navigate(`/student/loyalty-vendors`);
+                                                        setShowNotificationsDropdown(false);
                                                     }
                                                 }}
                                                 style={{
                                                     padding: '1rem',
                                                     borderBottom: '1px solid #f3f4f6',
                                                     cursor: 'pointer',
-                                                    backgroundColor: notification.isRead ? '#FFFFFF' : '#eff6ff',
+                                                    backgroundColor: notification.isRead 
+                                                        ? '#FFFFFF' 
+                                                        : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                                          ? '#fef2f2'
+                                                          : '#eff6ff',
+                                                    borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
+                                                        ? '3px solid #ef4444'
+                                                        : 'none',
                                                     transition: 'background-color 0.2s'
                                                 }}
                                                 onMouseEnter={(e) => {
-                                                    e.currentTarget.style.backgroundColor = notification.isRead ? '#f9fafb' : '#dbeafe';
+                                                    e.currentTarget.style.backgroundColor = notification.isRead 
+                                                        ? '#f9fafb' 
+                                                        : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                                          ? '#fee2e2'
+                                                          : '#dbeafe';
                                                 }}
                                                 onMouseLeave={(e) => {
-                                                    e.currentTarget.style.backgroundColor = notification.isRead ? '#FFFFFF' : '#eff6ff';
+                                                    e.currentTarget.style.backgroundColor = notification.isRead 
+                                                        ? '#FFFFFF' 
+                                                        : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                                          ? '#fef2f2'
+                                                          : '#eff6ff';
                                                 }}
                                             >
                                                 <div style={{
@@ -959,6 +992,58 @@ const StudentDashboard = () => {
                             </div>
                         )}
                     </div>
+
+                        {/* Quick Actions */}
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <h3 style={{
+                                color: '#1D3557',
+                                fontSize: '1.125rem',
+                                fontWeight: '600',
+                                marginBottom: '1rem',
+                                marginTop: 0
+                            }}>
+                                Quick Actions
+                            </h3>
+                            <div style={{
+                                display: 'flex',
+                                gap: '1rem',
+                                flexWrap: 'wrap'
+                            }}>
+                                <button
+                                    onClick={() => navigate('/student/loyalty-vendors')}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.75rem',
+                                        padding: '0.75rem 1.5rem',
+                                        backgroundColor: '#1D3557',
+                                        color: '#FFFFFF',
+                                        border: 'none',
+                                        borderRadius: '0.5rem',
+                                        fontSize: '0.875rem',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.backgroundColor = '#152a47';
+                                        e.target.style.transform = 'translateY(-1px)';
+                                        e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.backgroundColor = '#1D3557';
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                                    }}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                        local_offer
+                                    </span>
+                                    View Loyalty Partners
+                                </button>
+                            </div>
+                        </div>
 
                         {/* Recent Activity and Upcoming Deadlines */}
                         <div style={{

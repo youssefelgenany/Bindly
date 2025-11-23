@@ -1672,29 +1672,60 @@ exports.getEventRegistrations = async (req, res) => {
       return res.status(403).json({ msg: "Not authorized to view registrations for this event" });
     }
 
-    // Get registrations for this event with user details
-    const registrations = await Registration.find({ event: eventId })
-      .populate('user', 'firstName lastName email gucId userType')
-      .sort({ createdAt: -1 });
+    // Get registrations for this event
+    // For workshops and trips, check StudentRegistration
+    // For other events, check Registration
+    let registrations = [];
+    let studentRegistrations = [];
 
-    console.log('📊 Found registrations:', registrations.length);
+    if (event.type === 'workshop' || event.type === 'trip') {
+      // Get student registrations for workshops/trips
+      studentRegistrations = await StudentRegistration.find({ event: eventId })
+        .sort({ registeredAt: -1 });
 
-    // Transform the data to match frontend expectations
-    const transformedRegistrations = registrations.map(reg => ({
-      id: reg._id,
-      name: `${reg.user.firstName} ${reg.user.lastName}`,
-      email: reg.user.email,
-      studentId: reg.user.gucId || '',
-      userType: reg.user.userType,
-      status: reg.status,
-      registeredAt: reg.createdAt
-    }));
+      console.log('📊 Found student registrations:', studentRegistrations.length);
 
-    res.status(200).json({
-      success: true,
-      message: 'Event registrations fetched successfully',
-      registrations: transformedRegistrations
-    });
+      // Transform student registrations to match frontend expectations
+      const transformedStudentRegs = studentRegistrations.map(reg => ({
+        id: reg._id,
+        name: reg.studentName || 'Unknown',
+        email: reg.studentEmail || '',
+        studentId: reg.studentId || '',
+        userType: 'Student',
+        status: reg.status || 'approved',
+        registeredAt: reg.registeredAt || reg.createdAt
+      }));
+
+      res.status(200).json({
+        success: true,
+        message: 'Event registrations fetched successfully',
+        registrations: transformedStudentRegs
+      });
+    } else {
+      // Get regular registrations for other event types
+      registrations = await Registration.find({ event: eventId })
+        .populate('user', 'firstName lastName email gucId userType')
+        .sort({ createdAt: -1 });
+
+      console.log('📊 Found registrations:', registrations.length);
+
+      // Transform the data to match frontend expectations
+      const transformedRegistrations = registrations.map(reg => ({
+        id: reg._id,
+        name: reg.user ? `${reg.user.firstName} ${reg.user.lastName}` : 'Unknown',
+        email: reg.user ? reg.user.email : '',
+        studentId: reg.user ? (reg.user.gucId || '') : '',
+        userType: reg.user ? reg.user.userType : '',
+        status: reg.status,
+        registeredAt: reg.createdAt
+      }));
+
+      res.status(200).json({
+        success: true,
+        message: 'Event registrations fetched successfully',
+        registrations: transformedRegistrations
+      });
+    }
   } catch (err) {
     console.error("❌ Error fetching event registrations:", err);
     res.status(500).json({
