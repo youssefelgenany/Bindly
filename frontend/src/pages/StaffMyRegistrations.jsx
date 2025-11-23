@@ -37,14 +37,12 @@ const StaffMyRegistrations = () => {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (showLogoutDropdown && event.target instanceof Element && !event.target.closest('[data-profile-dropdown]')) {
+      if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLogoutDropdown]);
 
   const loadMyRegistrations = useCallback(async () => {
@@ -572,6 +570,46 @@ const StaffMyRegistrations = () => {
                             objectPosition: 'center'
                           }}
                           onError={(e) => {
+                            // Fallback if image doesn't exist
+                            e.target.style.display = 'none';
+                            e.target.parentElement.style.backgroundColor = getEventTypeColor(registration.eventType);
+                            e.target.parentElement.style.display = 'flex';
+                            e.target.parentElement.style.alignItems = 'center';
+                            e.target.parentElement.style.justifyContent = 'center';
+                            if (!e.target.parentElement.querySelector('.fallback-text')) {
+                              const fallback = document.createElement('div');
+                              fallback.className = 'fallback-text';
+                              fallback.textContent = getEventTypeFallbackText(registration.eventType);
+                              fallback.style.color = '#FFFFFF';
+                              fallback.style.fontSize = '1.5rem';
+                              fallback.style.fontWeight = '700';
+                              e.target.parentElement.appendChild(fallback);
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
+                    
+                    <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                      <div style={{
+                        width: '100%',
+                        height: '180px',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        backgroundColor: '#f3f4f6',
+                        flexShrink: 0
+                      }}>
+                        <img
+                          src={getEventTypeImage(registration.eventType)}
+                          alt={registration.eventType ? registration.eventType.charAt(0).toUpperCase() + registration.eventType.slice(1) : 'Event'}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'center'
+                          }}
+                          onError={(e) => {
                             e.target.style.display = 'none';
                             e.target.parentElement.style.backgroundColor = getEventTypeColor(registration.eventType);
                             e.target.parentElement.style.display = 'flex';
@@ -681,6 +719,22 @@ const StaffMyRegistrations = () => {
                         <span>{registration.eventLocation}</span>
                       </div>
                     </div>
+
+                      {registration.eventDescription && (
+                        <p style={{
+                          color: '#6b7280',
+                          fontSize: '0.8125rem',
+                          marginBottom: '0.75rem',
+                          marginTop: 0,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          lineHeight: '1.5'
+                        }}>
+                          {registration.eventDescription}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -722,80 +776,82 @@ const StaffMyRegistrations = () => {
               position: 'relative'
             }}
           >
-            {/* Event Image at Top */}
-            {getEventTypeImage(selectedRegistration.eventType) && (
-              <div style={{
-                width: '100%',
-                height: '200px',
-                overflow: 'hidden',
-                position: 'relative',
-                backgroundColor: '#f3f4f6',
-                flexShrink: 0
-              }}>
-                <img
-                  src={getEventTypeImage(selectedRegistration.eventType)}
-                  alt={selectedRegistration.eventType ? selectedRegistration.eventType.charAt(0).toUpperCase() + selectedRegistration.eventType.slice(1) : 'Event'}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    objectPosition: 'center'
-                  }}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.parentElement.style.backgroundColor = getEventTypeColor(selectedRegistration.eventType);
-                    e.target.parentElement.style.display = 'flex';
-                    e.target.parentElement.style.alignItems = 'center';
-                    e.target.parentElement.style.justifyContent = 'center';
-                    if (!e.target.parentElement.querySelector('.fallback-text')) {
-                      const fallback = document.createElement('div');
-                      fallback.className = 'fallback-text';
-                      fallback.textContent = getEventTypeFallbackText(selectedRegistration.eventType);
-                      fallback.style.color = '#FFFFFF';
-                      fallback.style.fontSize = '1.5rem';
-                      fallback.style.fontWeight = '700';
-                      e.target.parentElement.appendChild(fallback);
-                    }
-                  }}
-                />
-              </div>
-            )}
-            
-            {/* Close Button - Upper Right Corner */}
-            <button
-              onClick={() => setSelectedRegistration(null)}
-              style={{
-                position: 'absolute',
-                top: '0.75rem',
-                right: '0.75rem',
-                background: 'rgba(255, 255, 255, 0.9)',
-                border: 'none',
-                fontSize: '1.5rem',
-                cursor: 'pointer',
-                color: '#6b7280',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '0.375rem',
-                transition: 'all 0.2s',
-                lineHeight: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '2rem',
-                height: '2rem',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-                zIndex: 10
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#ffffff';
-                e.target.style.color = '#1D3557';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                e.target.style.color = '#6b7280';
-              }}
-            >
-              ×
-            </button>
+            {/* Event Image at Top with Close Button Overlay */}
+            <div style={{ position: 'relative' }}>
+              {getEventTypeImage(selectedRegistration.eventType) && (
+                <div style={{
+                  width: '100%',
+                  height: '200px',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  backgroundColor: '#f3f4f6',
+                  flexShrink: 0
+                }}>
+                  <img
+                    src={getEventTypeImage(selectedRegistration.eventType)}
+                    alt={selectedRegistration.eventType ? selectedRegistration.eventType.charAt(0).toUpperCase() + selectedRegistration.eventType.slice(1) : 'Event'}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center'
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.style.backgroundColor = getEventTypeColor(selectedRegistration.eventType);
+                      e.target.parentElement.style.display = 'flex';
+                      e.target.parentElement.style.alignItems = 'center';
+                      e.target.parentElement.style.justifyContent = 'center';
+                      if (!e.target.parentElement.querySelector('.fallback-text')) {
+                        const fallback = document.createElement('div');
+                        fallback.className = 'fallback-text';
+                        fallback.textContent = getEventTypeFallbackText(selectedRegistration.eventType);
+                        fallback.style.color = '#FFFFFF';
+                        fallback.style.fontSize = '1.5rem';
+                        fallback.style.fontWeight = '700';
+                        e.target.parentElement.appendChild(fallback);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              
+              {/* Close Button - Upper Right Corner */}
+              <button
+                onClick={() => setSelectedRegistration(null)}
+                style={{
+                  position: 'absolute',
+                  top: '0.75rem',
+                  right: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2rem',
+                  height: '2rem',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                  zIndex: 10
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#ffffff';
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                ×
+              </button>
+            </div>
             
             <div style={{
               display: 'flex',

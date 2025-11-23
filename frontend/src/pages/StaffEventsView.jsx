@@ -59,9 +59,12 @@ const StaffEventsView = () => {
     try {
       setError('');
       setLoading(true);
+      const typeParam = filter && filter !== 'all' && filter.trim() !== '' ? filter.trim().toLowerCase() : undefined;
+      console.log('🔍 Frontend - Filter state:', filter, '-> Sending type param:', typeParam);
+      
       const result = await eventsApiService.getStudentEvents({
         q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
-        type: filter !== 'all' ? filter : undefined
+        type: typeParam
       });
       
       if (result.success) {
@@ -96,9 +99,47 @@ const StaffEventsView = () => {
           const type = (ev.type || '').toLowerCase();
           const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
           // Only keep events with valid types and non-empty title/location
-          return validTypes.includes(type) && 
-                 ev.title && ev.title.trim() !== '' && 
-                 ev.location && ev.location.trim() !== '';
+          if (!validTypes.includes(type) || !ev.title || ev.title.trim() === '' || !ev.location || ev.location.trim() === '') {
+            return false;
+          }
+          
+          // Apply type filter if not 'all' - strict matching
+          if (filter && filter !== 'all' && filter.trim() !== '') {
+            const filterType = filter.trim().toLowerCase();
+            const eventType = (type || '').toString().trim().toLowerCase();
+            if (eventType !== filterType) {
+              return false;
+            }
+          }
+          
+          // Filter out past events - use endDate to allow events that haven't ended yet
+          const now = new Date();
+          if (ev.endDate) {
+            const endDate = new Date(ev.endDate);
+            if (!isNaN(endDate.getTime()) && endDate < now) {
+              return false;
+            }
+          } else if (ev.startDate) {
+            // If no endDate, use startDate (for backward compatibility)
+            const startDate = new Date(ev.startDate);
+            if (!isNaN(startDate.getTime()) && startDate < now) {
+              return false;
+            }
+          }
+          
+          return true;
+        });
+        
+        console.log('🔍 StaffEventsView - Events loaded:', {
+          totalEvents: mapped.length,
+          workshopEvents: mapped.filter(e => e.type === 'workshop').length,
+          workshopTitles: mapped.filter(e => e.type === 'workshop').map(e => e.title),
+          allWorkshops: mapped.filter(e => e.type === 'workshop').map(e => ({
+            title: e.title,
+            status: e.status,
+            startDate: e.startDate,
+            endDate: e.endDate
+          }))
         });
         setEvents(mapped);
       } else {
@@ -585,10 +626,10 @@ const StaffEventsView = () => {
             marginBottom: '1.5rem',
             boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'nowrap', justifyContent: 'space-between' }}>
               {/* Search Input and Button - Left Side */}
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: '0 1 auto' }}>
-                <div style={{ position: 'relative', width: '520px' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: '1 1 auto', minWidth: 0 }}>
+                <div style={{ position: 'relative', flex: '1 1 auto', minWidth: '200px', maxWidth: '520px' }}>
                   <span className="material-symbols-outlined" style={{
                     position: 'absolute',
                     left: '0.75rem',
@@ -660,39 +701,35 @@ const StaffEventsView = () => {
               </div>
               
               {/* Filter Buttons - Right Side */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginLeft: 'auto' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }}>
                 {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setFilter(type)}
-                    style={{
-                      padding: '0.625rem 1.25rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: filter === type ? '#1e40af' : '#f9fafb',
-                      color: filter === type ? '#FFFFFF' : '#6b7280',
-                      border: filter === type ? 'none' : '1px solid #e5e7eb',
-                      cursor: 'pointer',
-                      fontSize: '0.8125rem',
-                      fontWeight: filter === type ? '600' : '500',
-                      textTransform: 'capitalize',
-                      transition: 'all 0.2s',
-                      boxShadow: filter === type ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (filter !== type) {
-                        e.target.style.backgroundColor = '#f3f4f6';
-                        e.target.style.borderColor = '#d1d5db';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (filter !== type) {
-                        e.target.style.backgroundColor = '#f9fafb';
-                        e.target.style.borderColor = '#e5e7eb';
-                      }
-                    }}
-                  >
-                    {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
-                  </button>
+                <button
+                  onClick={handleSearch}
+                  style={{
+                    padding: '0.875rem 1.75rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#1e40af',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    flexShrink: 0
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#1e3a8a';
+                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#1e40af';
+                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                  }}
+                >
+                  Search
+                </button>
                 ))}
               </div>
             </div>
@@ -891,18 +928,41 @@ const StaffEventsView = () => {
                           }}>
                             {event.type}
                           </div>
-                          {statusInfo && (
-                            <div style={{
-                              fontSize: '0.75rem',
-                              color: statusInfo.color === 'blue' ? '#1e40af' : statusInfo.color === 'green' ? '#059669' : statusInfo.color === 'red' ? '#dc2626' : '#6b7280',
-                              fontWeight: '600',
-                              backgroundColor: statusInfo.color === 'blue' ? '#eff6ff' : statusInfo.color === 'green' ? '#d1fae5' : statusInfo.color === 'red' ? '#fee2e2' : '#f3f4f6',
-                              padding: '0.25rem 0.625rem',
-                              borderRadius: '0.375rem'
-                            }}>
-                              {statusInfo.label}
-                            </div>
-                          )}
+                        )}
+                      </div>
+                      
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '0.75rem',
+                        marginTop: 0,
+                        lineHeight: '1.4'
+                      }}>
+                        {event.title}
+                      </h3>
+                      
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem',
+                        marginBottom: '0.75rem',
+                        flex: 1
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            calendar_today
+                          </span>
+                          <span>{formatDate(event.startDate)}</span>
                         </div>
                         
                         <h3 style={{
@@ -961,17 +1021,44 @@ const StaffEventsView = () => {
                               fontSize: '0.8125rem',
                               color: '#6b7280'
                             }}>
-                              <span className="material-symbols-outlined" style={{
-                                fontSize: '1.125rem',
-                                color: '#9ca3af'
-                              }}>
-                                groups
-                              </span>
-                              {event.registeredCount || 0} / {event.capacity} registered
-                            </div>
-                          )}
-                          {(event.type === 'bazaar' || event.type === 'booth') && (
-                            <div style={{
+                              storefront
+                            </span>
+                            <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {event.description && (
+                        <p style={{
+                          color: '#6b7280',
+                          fontSize: '0.8125rem',
+                          marginBottom: '0.75rem',
+                          marginTop: 0,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          lineHeight: '1.5'
+                        }}>
+                          {event.description}
+                        </p>
+                      )}
+
+                      {(event.type === 'workshop' || event.type === 'trip') && (
+                        isRegistered ? (
+                          <button
+                            disabled
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: '#10b981',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              cursor: 'not-allowed',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              marginTop: 'auto',
                               display: 'flex',
                               alignItems: 'center',
                               gap: '0.625rem',
@@ -1105,84 +1192,85 @@ const StaffEventsView = () => {
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               display: 'flex',
               flexDirection: 'column',
-              overflow: 'hidden',
-              position: 'relative'
+              overflow: 'hidden'
             }}
           >
-            {/* Event Image at Top */}
-            {getEventTypeImage(selectedEvent.type) && (
-              <div style={{
-                width: '100%',
-                height: '200px',
-                overflow: 'hidden',
-                position: 'relative',
-                backgroundColor: '#f3f4f6',
-                flexShrink: 0
-              }}>
-                <img
-                  src={getEventTypeImage(selectedEvent.type)}
-                  alt={selectedEvent.type ? selectedEvent.type.charAt(0).toUpperCase() + selectedEvent.type.slice(1) : 'Event'}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    objectPosition: 'center'
-                  }}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.parentElement.style.backgroundColor = getEventTypeColor(selectedEvent.type);
-                    e.target.parentElement.style.display = 'flex';
-                    e.target.parentElement.style.alignItems = 'center';
-                    e.target.parentElement.style.justifyContent = 'center';
-                    if (!e.target.parentElement.querySelector('.fallback-text')) {
-                      const fallback = document.createElement('div');
-                      fallback.className = 'fallback-text';
-                      fallback.textContent = getEventTypeFallbackText(selectedEvent.type);
-                      fallback.style.color = '#FFFFFF';
-                      fallback.style.fontSize = '1.5rem';
-                      fallback.style.fontWeight = '700';
-                      e.target.parentElement.appendChild(fallback);
-                    }
-                  }}
-                />
-              </div>
-            )}
-            
-            {/* Close Button - Upper Right Corner */}
-            <button
-              onClick={() => setSelectedEvent(null)}
-              style={{
-                position: 'absolute',
-                top: '0.75rem',
-                right: '0.75rem',
-                background: 'rgba(255, 255, 255, 0.9)',
-                border: 'none',
-                fontSize: '1.5rem',
-                cursor: 'pointer',
-                color: '#6b7280',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '0.375rem',
-                transition: 'all 0.2s',
-                lineHeight: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '2rem',
-                height: '2rem',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-                zIndex: 10
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#ffffff';
-                e.target.style.color = '#1D3557';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                e.target.style.color = '#6b7280';
-              }}
-            >
-              ×
-            </button>
+            {/* Event Image at Top with Close Button Overlay */}
+            <div style={{ position: 'relative' }}>
+              {getEventTypeImage(selectedEvent.type) && (
+                <div style={{
+                  width: '100%',
+                  height: '200px',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  backgroundColor: '#f3f4f6',
+                  flexShrink: 0
+                }}>
+                  <img
+                    src={getEventTypeImage(selectedEvent.type)}
+                    alt={selectedEvent.type ? selectedEvent.type.charAt(0).toUpperCase() + selectedEvent.type.slice(1) : 'Event'}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center'
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.style.backgroundColor = getEventTypeColor(selectedEvent.type);
+                      e.target.parentElement.style.display = 'flex';
+                      e.target.parentElement.style.alignItems = 'center';
+                      e.target.parentElement.style.justifyContent = 'center';
+                      if (!e.target.parentElement.querySelector('.fallback-text')) {
+                        const fallback = document.createElement('div');
+                        fallback.className = 'fallback-text';
+                        fallback.textContent = getEventTypeFallbackText(selectedEvent.type);
+                        fallback.style.color = '#FFFFFF';
+                        fallback.style.fontSize = '1.5rem';
+                        fallback.style.fontWeight = '700';
+                        e.target.parentElement.appendChild(fallback);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              
+              {/* Close Button - Upper Right Corner */}
+              <button
+                onClick={() => setSelectedEvent(null)}
+                style={{
+                  position: 'absolute',
+                  top: '0.75rem',
+                  right: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2rem',
+                  height: '2rem',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                  zIndex: 10
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#ffffff';
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                ×
+              </button>
+            </div>
             
             <div style={{
               display: 'flex',
@@ -1203,7 +1291,7 @@ const StaffEventsView = () => {
             </div>
             
             <div style={{ 
-              padding: '1.5rem',
+              padding: '1rem 1.5rem 1.5rem 1.5rem',
               overflowY: 'auto',
               flex: 1,
               minHeight: 0

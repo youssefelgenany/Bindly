@@ -9,6 +9,7 @@ import AdminPlatformBoothRequests from './pages/AdminPlatformBoothRequests';
 import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import EventsOfficeDashboard from './pages/EventsOfficeDashboard';
 import PendingVerification from './pages/PendingVerification';
@@ -240,6 +241,14 @@ const AppContent = () => {
               element={
                 <PublicRoute>
                   <Signup />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/verify-email"
+              element={
+                <PublicRoute>
+                  <VerifyEmail />
                 </PublicRoute>
               }
             />
