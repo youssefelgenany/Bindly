@@ -112,6 +112,14 @@ exports.verifyPayment = async (req, res) => {
         }
       }
 
+      // Get event details for response
+      const Event = require('../models/eventModel');
+      const Trip = require('../models/tripModel');
+      let event = await Event.findById(payment.event);
+      if (!event) {
+        event = await Trip.findById(payment.event);
+      }
+
       return res.status(200).json({
         success: true,
         msg: 'Payment verified and processed successfully',
@@ -119,8 +127,14 @@ exports.verifyPayment = async (req, res) => {
           id: payment._id,
           status: payment.status,
           amount: payment.amount,
-          method: payment.paymentMethod
-        }
+          method: payment.paymentMethod,
+          event: payment.event
+        },
+        event: event ? {
+          _id: event._id,
+          title: event.title || event.name,
+          type: event.type
+        } : null
       });
     }
 

@@ -127,9 +127,12 @@ const ProfessorEventsView = () => {
         // So we need to check the student registration API, not the professor registration API
         const result = await studentRegistrationApi.getMyRegistrations(user.email);
         if (result.success && result.data.registrations) {
-          // Extract event IDs from registrations
+          // Extract event IDs from PAID registrations only
           const registeredIds = new Set();
           result.data.registrations.forEach(reg => {
+            // Only include paid registrations
+            if (reg.paid !== true) return;
+            
             // Check for eventId in the formatted response
             if (reg.eventId) {
               registeredIds.add(String(reg.eventId));

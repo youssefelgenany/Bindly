@@ -667,20 +667,71 @@ exports.getAllEventsForStudents = async (req, res) => {
     const userEmail = req.user.email;
     
     // Get registrations from Registration model
-    const registrations = await Registration.find({ user: userId })
-      .select('event')
+    // Get all non-cancelled registrations, then filter by paid status based on event price
+    const registrations = await Registration.find({ 
+      user: userId,
+      status: { $ne: 'cancelled' }
+    })
+      .select('event paid')
       .lean();
+    
+    // Get event prices to determine which registrations are valid
+    const registrationEventIds = registrations.map(r => r.event).filter(id => id != null);
+    let eventPriceMap = new Map();
+    if (registrationEventIds.length > 0) {
+      const registrationEvents = await Event.find({ _id: { $in: registrationEventIds } })
+        .select('_id price')
+        .lean();
+      eventPriceMap = new Map(registrationEvents.map(e => [e._id.toString(), e.price || 0]));
+    }
+    
+    // Filter: for paid events, only include if paid: true; for free events, include all non-cancelled
     const registeredEventIds1 = registrations
+      .filter(r => {
+        if (!r.event) return false;
+        const eventPrice = eventPriceMap.get(r.event.toString()) || 0;
+        if (eventPrice > 0) {
+          // Paid event - must be paid
+          return r.paid === true;
+        } else {
+          // Free event - any non-cancelled registration is valid
+          return true;
+        }
+      })
       .map(r => r.event)
       .filter(id => id != null);
     
     // Get registrations from StudentRegistration model (by email)
     const studentRegistrations = await StudentRegistration.find({ 
-      studentEmail: userEmail 
+      studentEmail: userEmail,
+      status: { $ne: 'cancelled' }
     })
-      .select('event')
+      .select('event paid')
       .lean();
+    
+    // Get event prices for student registrations
+    const studentRegEventIds = studentRegistrations.map(r => r.event).filter(id => id != null);
+    let studentEventPriceMap = new Map();
+    if (studentRegEventIds.length > 0) {
+      const studentEvents = await Event.find({ _id: { $in: studentRegEventIds } })
+        .select('_id price')
+        .lean();
+      studentEventPriceMap = new Map(studentEvents.map(e => [e._id.toString(), e.price || 0]));
+    }
+    
+    // Filter student registrations similarly
     const registeredEventIds2 = studentRegistrations
+      .filter(r => {
+        if (!r.event) return false;
+        const eventPrice = studentEventPriceMap.get(r.event.toString()) || 0;
+        if (eventPrice > 0) {
+          // Paid event - must be paid
+          return r.paid === true;
+        } else {
+          // Free event - any non-cancelled registration is valid
+          return true;
+        }
+      })
       .map(r => r.event)
       .filter(id => id != null);
     
@@ -1333,10 +1384,33 @@ exports.registerForEvent = async (req, res) => {
       return res.status(400).json({ msg: `${holderType === 'trip' ? 'Trip' : 'Event'} is full` });
     }
 
-    // Prevent duplicate registration
-    const existing = await Registration.findOne({ event: id, user: userId });
+    // Prevent duplicate registration - check both Registration and StudentRegistration
+    // Also check StudentRegistration by email
+    const user = await User.findById(userId);
+    let existing = await Registration.findOne({ event: id, user: userId });
+    
+    // If not found in Registration, check StudentRegistration
+    if (!existing && user && user.email) {
+      existing = await StudentRegistration.findOne({
+        event: id,
+        studentEmail: user.email.toLowerCase(),
+        status: { $ne: 'cancelled' }
+      });
+    }
+    
+    // If registration exists, check if it's a valid (paid) registration for paid events
     if (existing) {
-      return res.status(400).json({ msg: "You are already registered" });
+      const eventPrice = holder.price || 0;
+      if (eventPrice > 0) {
+        // For paid events, only block if the registration is paid
+        if (existing.paid === true) {
+          return res.status(400).json({ msg: "You are already registered" });
+        }
+        // If unpaid, allow re-registration (will create new pending registration)
+      } else {
+        // For free events, block any existing registration
+        return res.status(400).json({ msg: "You are already registered" });
+      }
     }
 
     // Normalize role to match Registration model enum (lowercase)
@@ -1348,12 +1422,17 @@ exports.registerForEvent = async (req, res) => {
       userRole = 'student'; // Default to student if role doesn't match enum
     }
 
+    // Set paid status: false if event has a price (requires payment), true if free
+    const eventPrice = holder.price || 0;
+    const paidStatus = eventPrice <= 0;
+
     // Create registration (store the same id in `event` field)
     const registration = await Registration.create({
       event: id,                 // works for both Event and Trip ids
       user: userId,
       role: userRole,
-      status: "approved"
+      status: "approved",
+      paid: paidStatus           // Set paid field consistently
     });
 
     // Generate QR code for bazaar/booth events (after registration is created to include registration ID)
@@ -1919,6 +1998,18 @@ exports.payForEvent = async (req, res) => {
       // Mark registration as paid
       registration.paid = true;
       await registration.save();
+      
+      // Also update StudentRegistration if it exists
+      if (registration.constructor.modelName !== 'StudentRegistration') {
+        const studentReg = await StudentRegistration.findOne({
+          event: eventId,
+          studentEmail: user.email.toLowerCase()
+        });
+        if (studentReg) {
+          studentReg.paid = true;
+          await studentReg.save();
+        }
+      }
 
       // Send receipt email
       try {
@@ -1979,8 +2070,8 @@ exports.payForEvent = async (req, res) => {
           }
         ],
         mode: 'payment',
-        success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/events/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/events/${eventId}`,
+        success_url: `${process.env.API_BASE_URL || process.env.BACKEND_URL || 'http://localhost:5000'}/api/events/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/events/${eventId}/payment`,
         metadata: {
           paymentId: payment._id.toString(),
           userId: userId.toString(),
@@ -2021,35 +2112,46 @@ exports.cancelRegistration = async (req, res) => {
     const eventId = req.params.id;
     const userId = req.user._id;
 
+    console.log('🔍 Cancelling registration for event:', eventId, 'user:', userId);
+
     // Find event
     const event = await Event.findById(eventId);
     if (!event) {
+      console.log('❌ Event not found:', eventId);
       return res.status(404).json({
         success: false,
         msg: "Event not found"
       });
     }
 
-    // Find registration
+    // Find registration - try Registration model first
     let registration = await Registration.findOne({
       user: userId,
       event: eventId
     });
 
+    // If not found, try StudentRegistration
     if (!registration) {
       const user = await User.findById(userId);
       if (user && user.email) {
+        console.log('🔍 Looking for StudentRegistration with email:', user.email.toLowerCase());
         registration = await StudentRegistration.findOne({
           event: eventId,
           studentEmail: user.email.toLowerCase()
         });
+        if (registration) {
+          console.log('✅ Found StudentRegistration:', registration._id);
+        }
       }
+    } else {
+      console.log('✅ Found Registration:', registration._id);
     }
 
     if (!registration) {
+      console.log('❌ Registration not found for event:', eventId, 'user:', userId);
       return res.status(404).json({
         success: false,
-        msg: "Registration not found"
+        msg: "Registration not found. You may not be registered for this event."
       });
     }
 
@@ -2061,22 +2163,64 @@ exports.cancelRegistration = async (req, res) => {
       });
     }
 
-    // Find payment if exists
-    const payment = await Payment.findOne({
+    // Find payment if exists - try multiple ways
+    let payment = await Payment.findOne({
       user: userId,
       event: eventId,
       status: 'success'
     });
 
-    // Process refund if payment was made
-    if (payment && payment.paid) {
-      const eventPrice = event.price || 0;
+    // If payment not found, try to find by event only (for StudentRegistration cases)
+    // This handles cases where payment was created but user link might be different
+    if (!payment) {
+      const allPayments = await Payment.find({
+        event: eventId,
+        status: 'success'
+      }).populate('user', 'email');
       
-      if (payment.paymentMethod === 'wallet' && eventPrice > 0) {
+      // Try to match by user email if we have StudentRegistration
+      if (registration.constructor.modelName === 'StudentRegistration' || registration.studentEmail) {
+        const user = await User.findById(userId);
+        if (user && user.email) {
+          payment = allPayments.find(p => 
+            p.user && p.user.email && 
+            p.user.email.toLowerCase() === user.email.toLowerCase()
+          );
+        }
+      }
+      
+      // If still not found, just take the first one (fallback)
+      if (!payment && allPayments.length > 0) {
+        payment = allPayments[0];
+      }
+    }
+    
+    console.log('🔍 Payment lookup result:', payment ? `Found payment ${payment._id}, method: ${payment.paymentMethod}` : 'No payment found');
+
+    const eventPrice = event.price || 0;
+    const registrationPaid = registration.paid || false;
+    
+    console.log('💰 Refund check - Payment found:', payment ? 'yes' : 'no');
+    console.log('💰 Refund check - Registration paid:', registrationPaid);
+    console.log('💰 Refund check - Event price:', eventPrice);
+    
+    // Process refund if payment was made OR registration is marked as paid OR event has a price
+    // This ensures refunds work even if payment record is missing or paid field wasn't set correctly
+    const shouldRefund = (payment && payment.status === 'success') || 
+                         (registrationPaid && eventPrice > 0) || 
+                         (eventPrice > 0); // Always refund if event has a price (fallback safety)
+    
+    if (shouldRefund && eventPrice > 0) {
+      const paymentMethod = payment ? payment.paymentMethod : 'wallet'; // Default to wallet if no payment record
+      
+      console.log('💰 Processing refund - Method:', paymentMethod, 'Amount:', eventPrice);
+      
+      if (paymentMethod === 'wallet' && eventPrice > 0) {
         // Refund to wallet
         const user = await User.findById(userId);
         if (user) {
-          user.walletBalance = (user.walletBalance || 0) + eventPrice;
+          const oldBalance = user.walletBalance || 0;
+          user.walletBalance = oldBalance + eventPrice;
           if (!user.walletTransactions) {
             user.walletTransactions = [];
           }
@@ -2089,42 +2233,144 @@ exports.cancelRegistration = async (req, res) => {
             createdAt: new Date()
           });
           await user.save();
+          console.log(`✅ Refund of ${eventPrice} EGP added to wallet. Old balance: ${oldBalance}, New balance: ${user.walletBalance}`);
 
-          // Send refund email
-          try {
-            const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
-            await sendRefundEmail(
-              user.email,
-              userName,
-              event.title,
-              eventPrice,
-              new Date()
-            );
-          } catch (emailError) {
-            console.error('❌ Failed to send refund email:', emailError);
+          // Refund email removed per user request
+        } else {
+          console.error('❌ User not found for refund:', userId);
+        }
+      } else if (payment && payment.paymentMethod === 'card' && eventPrice > 0) {
+        // Process Stripe refund for card payments
+        console.log(`💳 Processing Stripe refund for payment: ${payment._id}, amount: ${eventPrice}`);
+        
+        if (!stripe) {
+          console.error('❌ Stripe not configured. Cannot process card refund.');
+          return res.status(500).json({
+            success: false,
+            msg: "Stripe refund cannot be processed. Please contact support."
+          });
+        }
+
+        try {
+          // Get the payment intent ID from the payment record
+          let paymentIntentId = payment.stripePaymentIntentId;
+          
+          // If we don't have payment intent ID, try to get it from the session
+          if (!paymentIntentId && payment.stripeSessionId) {
+            const session = await stripe.checkout.sessions.retrieve(payment.stripeSessionId);
+            paymentIntentId = session.payment_intent;
+            
+            // Update payment record with payment intent ID if we found it
+            if (paymentIntentId) {
+              payment.stripePaymentIntentId = paymentIntentId;
+              await payment.save();
+            }
+          }
+
+          if (paymentIntentId) {
+            // Create refund in Stripe
+            const refund = await stripe.refunds.create({
+              payment_intent: paymentIntentId,
+              amount: Math.round(eventPrice * 100), // Convert to cents
+              reason: 'requested_by_customer'
+            });
+
+            console.log(`✅ Stripe refund created: ${refund.id}, status: ${refund.status}`);
+
+            // Update payment status to refunded
+            payment.status = 'refunded';
+            await payment.save();
+
+            console.log(`✅ Payment ${payment._id} marked as refunded`);
+          } else {
+            console.error('❌ Payment intent ID not found. Cannot process Stripe refund.');
+            // Fallback: refund to wallet if we can't process Stripe refund
+            const user = await User.findById(userId);
+            if (user) {
+              const oldBalance = user.walletBalance || 0;
+              user.walletBalance = oldBalance + eventPrice;
+              if (!user.walletTransactions) {
+                user.walletTransactions = [];
+              }
+              user.walletTransactions.push({
+                amount: eventPrice,
+                type: 'refund',
+                description: `Refund for cancelled registration (Stripe refund failed, refunded to wallet): ${event.title}`,
+                balanceAfter: user.walletBalance,
+                reference: eventId.toString(),
+                createdAt: new Date()
+              });
+              await user.save();
+              console.log(`✅ Fallback: Refund of ${eventPrice} EGP added to wallet. Old balance: ${oldBalance}, New balance: ${user.walletBalance}`);
+            }
+          }
+        } catch (stripeError) {
+          console.error('❌ Error processing Stripe refund:', stripeError);
+          
+          // Fallback: refund to wallet if Stripe refund fails
+          const user = await User.findById(userId);
+          if (user) {
+            const oldBalance = user.walletBalance || 0;
+            user.walletBalance = oldBalance + eventPrice;
+            if (!user.walletTransactions) {
+              user.walletTransactions = [];
+            }
+            user.walletTransactions.push({
+              amount: eventPrice,
+              type: 'refund',
+              description: `Refund for cancelled registration (Stripe refund failed, refunded to wallet): ${event.title}`,
+              balanceAfter: user.walletBalance,
+              reference: eventId.toString(),
+              createdAt: new Date()
+            });
+            await user.save();
+            console.log(`✅ Fallback: Refund of ${eventPrice} EGP added to wallet due to Stripe error. Old balance: ${oldBalance}, New balance: ${user.walletBalance}`);
           }
         }
-      } else if (payment.paymentMethod === 'card' && eventPrice > 0) {
-        // For card payments, mark for manual refund or process via Stripe
-        // For now, just log it - manual refund may be required
-        console.log(`⚠️ Card payment refund needed for payment: ${payment._id}, amount: ${eventPrice}`);
       }
     }
+    
+    // Note: The refund logic above now always processes refunds if eventPrice > 0
+    // This ensures consistency across all event types and registration models
 
     // Delete registration
-    if (registration.constructor.modelName === 'Registration') {
-      await Registration.findByIdAndDelete(registration._id);
-    } else {
-      await StudentRegistration.findByIdAndDelete(registration._id);
+    try {
+      if (registration.constructor.modelName === 'Registration') {
+        await Registration.findByIdAndDelete(registration._id);
+        console.log('✅ Deleted Registration:', registration._id);
+      } else {
+        await StudentRegistration.findByIdAndDelete(registration._id);
+        console.log('✅ Deleted StudentRegistration:', registration._id);
+      }
+    } catch (deleteError) {
+      console.error('❌ Error deleting registration:', deleteError);
+      return res.status(500).json({
+        success: false,
+        msg: "Error deleting registration",
+        error: deleteError.message
+      });
     }
 
     // Update event registered count
-    await Event.findByIdAndUpdate(eventId, { $inc: { registeredCount: -1 } });
+    try {
+      await Event.findByIdAndUpdate(eventId, { $inc: { registeredCount: -1 } });
+      console.log('✅ Updated event registered count');
+    } catch (updateError) {
+      console.error('⚠️ Error updating event count:', updateError);
+      // Don't fail the request if count update fails
+    }
 
+    console.log('✅ Registration cancelled successfully');
+    // Determine if refund was processed - check if event has price and refund conditions were met
+    const wasRefunded = eventPrice > 0 && shouldRefund;
+    
     res.status(200).json({
       success: true,
-      msg: "Registration cancelled successfully",
-      refunded: payment && payment.paid && (payment.paymentMethod === 'wallet')
+      msg: wasRefunded ? 
+        `Registration cancelled successfully. ${eventPrice} EGP has been refunded to your wallet.` : 
+        "Registration cancelled successfully",
+      refunded: wasRefunded,
+      refundAmount: wasRefunded ? eventPrice : 0
     });
 
   } catch (err) {

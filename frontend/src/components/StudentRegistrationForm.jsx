@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
 
 const StudentRegistrationForm = ({ event, onClose, onSuccess }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isStaff = user?.userType === 'Staff';
   const isProfessor = user?.userType === 'Professor';
+  const isTA = user?.userType === 'TA';
   const [formData, setFormData] = useState({
     studentName: '',
     studentId: '',
@@ -81,16 +84,47 @@ const StudentRegistrationForm = ({ event, onClose, onSuccess }) => {
     setError('');
 
     try {
-      const result = await studentRegistrationApi.register(event.id, formData);
+      // Check if event requires payment (trip or workshop with price > 0)
+      const requiresPayment = (event.type === 'trip' || event.type === 'workshop') && 
+                              event.price && event.price > 0;
       
-      if (result.success) {
-        setSuccess(true);
-        setTimeout(() => {
-          onSuccess && onSuccess(result.data);
+      if (requiresPayment) {
+        // Create pending registration first, then redirect to payment
+        const result = await studentRegistrationApi.register(event.id, formData);
+        
+        if (result.success) {
+          // Store registration data in sessionStorage for payment page
+          sessionStorage.setItem('pendingRegistration', JSON.stringify({
+            eventId: event.id,
+            registrationId: result.data.registration?._id || result.data.registrationId,
+            formData: formData,
+            event: {
+              id: event.id,
+              title: event.title,
+              type: event.type,
+              price: event.price
+            }
+          }));
+          
+          // Redirect to payment page
           onClose();
-        }, 2000);
+          navigate(`/events/${event.id}/payment`);
+        } else {
+          setError(result.message || 'Registration failed');
+        }
       } else {
-        setError(result.message || 'Registration failed');
+        // Free event - register directly
+        const result = await studentRegistrationApi.register(event.id, formData);
+        
+        if (result.success) {
+          setSuccess(true);
+          setTimeout(() => {
+            onSuccess && onSuccess(result.data);
+            onClose();
+          }, 2000);
+        } else {
+          setError(result.message || 'Registration failed');
+        }
       }
     } catch (err) {
       setError('An unexpected error occurred');
@@ -341,7 +375,7 @@ const StudentRegistrationForm = ({ event, onClose, onSuccess }) => {
                 color: '#374151',
                 marginBottom: '0.5rem'
               }}>
-                {isProfessor ? 'Professor ID' : isStaff ? 'Staff ID' : 'Student ID'} <span style={{ color: '#ef4444' }}>*</span>
+                {isProfessor ? 'Professor ID' : isTA ? 'TA ID' : isStaff ? 'Staff ID' : 'Student ID'} <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <input
                 type="text"
@@ -350,7 +384,7 @@ const StudentRegistrationForm = ({ event, onClose, onSuccess }) => {
                 value={formData.studentId}
                 onChange={handleInputChange}
                 required
-                placeholder={isProfessor ? 'Enter your professor ID' : isStaff ? 'Enter your staff ID' : 'Enter your student ID'}
+                placeholder={isProfessor ? 'Enter your professor ID' : isTA ? 'Enter your TA ID' : isStaff ? 'Enter your staff ID' : 'Enter your student ID'}
                 style={{
                   width: '100%',
                   padding: '0.75rem',
