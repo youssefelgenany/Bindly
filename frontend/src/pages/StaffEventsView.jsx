@@ -47,23 +47,24 @@ const StaffEventsView = () => {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (showLogoutDropdown && event.target instanceof Element && !event.target.closest('[data-profile-dropdown]')) {
+      if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLogoutDropdown]);
 
   const loadEvents = useCallback(async () => {
     try {
       setError('');
       setLoading(true);
+      const typeParam = filter && filter !== 'all' && filter.trim() !== '' ? filter.trim().toLowerCase() : undefined;
+      console.log('🔍 Frontend - Filter state:', filter, '-> Sending type param:', typeParam);
+      
       const result = await eventsApiService.getStudentEvents({
         q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
-        type: filter !== 'all' ? filter : undefined
+        type: typeParam
       });
       
       if (result.success) {
@@ -99,6 +100,15 @@ const StaffEventsView = () => {
           // Only keep events with valid types and non-empty title/location
           if (!validTypes.includes(type) || !ev.title || ev.title.trim() === '' || !ev.location || ev.location.trim() === '') {
             return false;
+          }
+          
+          // Apply type filter if not 'all' - strict matching
+          if (filter && filter !== 'all' && filter.trim() !== '') {
+            const filterType = filter.trim().toLowerCase();
+            const eventType = (type || '').toString().trim().toLowerCase();
+            if (eventType !== filterType) {
+              return false;
+            }
           }
           
           // Filter out past events - use endDate to allow events that haven't ended yet
@@ -540,110 +550,116 @@ const StaffEventsView = () => {
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '0.75rem',
-            padding: '1.5rem',
-            marginBottom: '2rem',
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+            padding: '1rem 1.5rem',
+            marginBottom: '1.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
-            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', alignItems: 'center' }}>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <span className="material-symbols-outlined" style={{
-                  position: 'absolute',
-                  left: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#9ca3af',
-                  fontSize: '1.25rem',
-                  pointerEvents: 'none'
-                }}>
-                  search
-                </span>
-                <input
-                  type="text"
-                  placeholder="Search by event name, professor name, location, or description..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem 0.875rem 0.875rem 2.75rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb',
-                    backgroundColor: '#f9fafb',
-                    fontSize: '0.875rem',
-                    outline: 'none',
-                    transition: 'all 0.2s',
-                    boxSizing: 'border-box'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#1e40af';
-                    e.target.style.backgroundColor = '#ffffff';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.backgroundColor = '#f9fafb';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                />
-              </div>
-              <button
-                onClick={handleSearch}
-                style={{
-                  padding: '0.875rem 1.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#1e40af',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#1e3a8a';
-                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#1e40af';
-                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                }}
-              >
-                Search
-              </button>
-              {searchQuery && (
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              {/* Search Input and Button - Left Side */}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: '0 1 auto' }}>
+                <div style={{ position: 'relative', width: '520px' }}>
+                  <span className="material-symbols-outlined" style={{
+                    position: 'absolute',
+                    left: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#9ca3af',
+                    fontSize: '1.25rem',
+                    pointerEvents: 'none',
+                    zIndex: 1
+                  }}>
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search by event name, professor name, location, or description..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: '#ffffff',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'all 0.2s',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#1e40af';
+                      e.target.style.backgroundColor = '#ffffff';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e5e7eb';
+                      e.target.style.backgroundColor = '#ffffff';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
                 <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    loadEvents();
-                  }}
+                  onClick={handleSearch}
                   style={{
-                    padding: '0.875rem 1rem',
+                    padding: '0.875rem 1.75rem',
                     borderRadius: '0.5rem',
-                    backgroundColor: '#f3f4f6',
-                    color: '#6b7280',
-                    border: '1px solid #e5e7eb',
+                    backgroundColor: '#1e40af',
+                    color: '#FFFFFF',
+                    border: 'none',
                     cursor: 'pointer',
                     fontSize: '0.875rem',
-                    fontWeight: '500',
+                    fontWeight: '600',
                     transition: 'all 0.2s',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    flexShrink: 0
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#e5e7eb';
+                    e.target.style.backgroundColor = '#1e3a8a';
+                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.backgroundColor = '#1e40af';
+                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
                   }}
                 >
-                  Clear
+                  Search
                 </button>
-              )}
-            </div>
-            
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      loadEvents();
+                    }}
+                    style={{
+                      padding: '0.875rem 1rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#f3f4f6',
+                      color: '#6b7280',
+                      border: '1px solid #e5e7eb',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#e5e7eb';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              
+              {/* Filter Buttons - Right Side */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginLeft: 'auto' }}>
+                {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
                 <button
                   key={type}
                   onClick={() => setFilter(type)}
@@ -675,7 +691,8 @@ const StaffEventsView = () => {
                 >
                   {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
                 </button>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 
@@ -771,7 +788,7 @@ const StaffEventsView = () => {
               </button>
             </div>
           ) : (
-            <div key="events-list">
+            <>
               <div style={{
                 marginBottom: '1.5rem',
                 color: '#6b7280',
@@ -889,7 +906,7 @@ const StaffEventsView = () => {
                         color: '#1D3557',
                         fontSize: '1.125rem',
                         fontWeight: '600',
-                        marginBottom: '1rem',
+                        marginBottom: '0.75rem',
                         marginTop: 0,
                         lineHeight: '1.4'
                       }}>
@@ -899,8 +916,8 @@ const StaffEventsView = () => {
                       <div style={{
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '0.625rem',
-                        marginBottom: '1rem',
+                        gap: '0.5rem',
+                        marginBottom: '0.75rem',
                         flex: 1
                       }}>
                         <div style={{
@@ -990,7 +1007,7 @@ const StaffEventsView = () => {
                         <p style={{
                           color: '#6b7280',
                           fontSize: '0.8125rem',
-                          marginBottom: '1rem',
+                          marginBottom: '0.75rem',
                           marginTop: 0,
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
@@ -1065,7 +1082,7 @@ const StaffEventsView = () => {
                   );
                 })}
               </div>
-            </div>
+            </>
           )}
           </div>
         </div>
@@ -1095,55 +1112,113 @@ const StaffEventsView = () => {
               maxWidth: '600px',
               width: '100%',
               maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
             }}
           >
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '1.5rem',
-              borderBottom: '1px solid #e5e7eb'
-            }}>
-              <h2 style={{
-                color: '#1D3557',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                margin: 0
-              }}>
-                {selectedEvent.title}
-              </h2>
+            {/* Event Image at Top with Close Button Overlay */}
+            <div style={{ position: 'relative' }}>
+              {getEventTypeImage(selectedEvent.type) && (
+                <div style={{
+                  width: '100%',
+                  height: '200px',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  backgroundColor: '#f3f4f6',
+                  flexShrink: 0
+                }}>
+                  <img
+                    src={getEventTypeImage(selectedEvent.type)}
+                    alt={selectedEvent.type ? selectedEvent.type.charAt(0).toUpperCase() + selectedEvent.type.slice(1) : 'Event'}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center'
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.style.backgroundColor = getEventTypeColor(selectedEvent.type);
+                      e.target.parentElement.style.display = 'flex';
+                      e.target.parentElement.style.alignItems = 'center';
+                      e.target.parentElement.style.justifyContent = 'center';
+                      if (!e.target.parentElement.querySelector('.fallback-text')) {
+                        const fallback = document.createElement('div');
+                        fallback.className = 'fallback-text';
+                        fallback.textContent = getEventTypeFallbackText(selectedEvent.type);
+                        fallback.style.color = '#FFFFFF';
+                        fallback.style.fontSize = '1.5rem';
+                        fallback.style.fontWeight = '700';
+                        e.target.parentElement.appendChild(fallback);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              
+              {/* Close Button - Upper Right Corner */}
               <button
                 onClick={() => setSelectedEvent(null)}
                 style={{
-                  background: 'none',
+                  position: 'absolute',
+                  top: '0.75rem',
+                  right: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.9)',
                   border: 'none',
                   fontSize: '1.5rem',
                   cursor: 'pointer',
                   color: '#6b7280',
                   padding: '0.25rem 0.5rem',
-                  borderRadius: '0.25rem',
-                  transition: 'background-color 0.2s',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
                   lineHeight: 1,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   width: '2rem',
-                  height: '2rem'
+                  height: '2rem',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                  zIndex: 10
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.backgroundColor = '#ffffff';
+                  e.target.style.color = '#1D3557';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  e.target.style.color = '#6b7280';
                 }}
               >
                 ×
               </button>
             </div>
             
-            <div style={{ padding: '1.5rem' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                margin: 0,
+                paddingRight: '1rem'
+              }}>
+                {selectedEvent.title}
+              </h2>
+            </div>
+            
+            <div style={{ 
+              padding: '1rem 1.5rem 1.5rem 1.5rem',
+              overflowY: 'auto',
+              flex: 1,
+              minHeight: 0
+            }}>
               <div style={{
                 padding: '0.375rem 0.875rem',
                 borderRadius: '0.5rem',
