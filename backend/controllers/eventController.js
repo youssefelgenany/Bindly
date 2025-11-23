@@ -80,8 +80,10 @@ exports.createEvent = async (req, res) => {
 
     await newEvent.save();
 
-    // Send notifications to all eligible users about the new event
-    await notifyNewEventCreated(newEvent);
+    // Send notifications to all eligible users about the new event (only if approved)
+    if (newEvent.status === 'approved') {
+      await notifyNewEventCreated(newEvent);
+    }
 
     // Notify events office if a workshop is submitted by a doctor (Professor)
     if (type === 'workshop' && req.user.userType === 'Professor') {
@@ -1235,8 +1237,16 @@ exports.updateEvent = async (req, res) => {
     console.log('📊 Current event status:', event.status);
     console.log('📊 New status:', updates.status);
 
+    const wasPending = event.status === 'pending';
+    const isNowApproved = updates.status === 'approved';
+
     Object.assign(event, updates);
     await event.save();
+
+    // Send notifications if event was just approved (changed from pending to approved)
+    if (wasPending && isNowApproved) {
+      await notifyNewEventCreated(event);
+    }
 
     console.log('✅ Event updated successfully');
     res.json({ msg: "Event updated successfully", event });
