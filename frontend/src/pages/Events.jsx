@@ -59,24 +59,52 @@ const Events = () => {
     // Search by event name or professor name
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      list = list.filter(e =>
-        (e.title || '').toLowerCase().includes(q) ||
-        (e.professorName || '').toLowerCase().includes(q) ||
-        (e.createdByName || '').toLowerCase().includes(q) ||
-        (e.creatorName || '').toLowerCase().includes(q) ||
-        (e.organizer || '').toLowerCase().includes(q)
-      );
+      list = list.filter(e => {
+        const titleMatch = (e.title || '').toLowerCase().includes(q);
+        const professorNameMatch = (e.professorName || '').toLowerCase().includes(q);
+        const createdByNameMatch = (e.createdByName || '').toLowerCase().includes(q);
+        const creatorNameMatch = (e.creatorName || '').toLowerCase().includes(q);
+        const organizerMatch = (e.organizer || '').toLowerCase().includes(q);
+        // For workshops, also check the professors field
+        const professorsMatch = e.type === 'workshop' && e.professors 
+          ? (typeof e.professors === 'string' 
+              ? e.professors.toLowerCase().includes(q)
+              : Array.isArray(e.professors) && e.professors.some(p => p.toLowerCase().includes(q)))
+          : false;
+        // Check createdBy object if available
+        const createdByMatch = e.createdBy 
+          ? ((e.createdBy.firstName || '').toLowerCase().includes(q) ||
+             (e.createdBy.lastName || '').toLowerCase().includes(q) ||
+             `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim().toLowerCase().includes(q))
+          : false;
+        
+        return titleMatch || professorNameMatch || createdByNameMatch || creatorNameMatch || organizerMatch || professorsMatch || createdByMatch;
+      });
     }
     
     // Filter by professor name specifically
     if (professorFilter.trim()) {
       const prof = professorFilter.trim().toLowerCase();
-      list = list.filter(e =>
-        (e.professorName || '').toLowerCase().includes(prof) ||
-        (e.createdByName || '').toLowerCase().includes(prof) ||
-        (e.creatorName || '').toLowerCase().includes(prof) ||
-        (e.organizer || '').toLowerCase().includes(prof)
-      );
+      list = list.filter(e => {
+        const professorNameMatch = (e.professorName || '').toLowerCase().includes(prof);
+        const createdByNameMatch = (e.createdByName || '').toLowerCase().includes(prof);
+        const creatorNameMatch = (e.creatorName || '').toLowerCase().includes(prof);
+        const organizerMatch = (e.organizer || '').toLowerCase().includes(prof);
+        // For workshops, also check the professors field
+        const professorsMatch = e.type === 'workshop' && e.professors 
+          ? (typeof e.professors === 'string' 
+              ? e.professors.toLowerCase().includes(prof)
+              : Array.isArray(e.professors) && e.professors.some(p => p.toLowerCase().includes(prof)))
+          : false;
+        // Check createdBy object if available
+        const createdByMatch = e.createdBy 
+          ? ((e.createdBy.firstName || '').toLowerCase().includes(prof) ||
+             (e.createdBy.lastName || '').toLowerCase().includes(prof) ||
+             `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim().toLowerCase().includes(prof))
+          : false;
+        
+        return professorNameMatch || createdByNameMatch || creatorNameMatch || organizerMatch || professorsMatch || createdByMatch;
+      });
     }
     
     // Filter by type

@@ -80,8 +80,10 @@ exports.createEvent = async (req, res) => {
 
     await newEvent.save();
 
-    // Send notifications to all eligible users about the new event
-    await notifyNewEventCreated(newEvent);
+    // Send notifications to all eligible users about the new event (only if approved)
+    if (newEvent.status === 'approved') {
+      await notifyNewEventCreated(newEvent);
+    }
 
     // Notify events office if a workshop is submitted by a doctor (Professor)
     if (type === 'workshop' && req.user.userType === 'Professor') {
@@ -234,11 +236,19 @@ exports.getAllEvents = async (req, res) => {
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     const baseMatch = {
       type: { $in: validTypes }, // Only include valid event types
-      archived: false, // Exclude archived events by default
       $and: [
+        // Exclude archived events (include if archived is false or doesn't exist)
+        {
+          $or: [
+            { archived: false },
+            { archived: { $exists: false } } // Include events where archived field doesn't exist (defaults to false)
+          ]
+        },
+        // Require valid title
         { title: { $exists: true } },
         { title: { $ne: null } },
         { title: { $ne: '' } },
+        // Require valid location
         { location: { $exists: true } },
         { location: { $ne: null } },
         { location: { $ne: '' } }
@@ -277,7 +287,40 @@ exports.getAllEvents = async (req, res) => {
       console.log('🔍 Filtering by status:', status);
     }
 
-    console.log('🔍 Final baseMatch filter:', JSON.stringify(baseMatch, null, 2));
+    // Add date filter: ONLY include future events - EXCLUDE all past events
+    const now = new Date();
+    console.log('🔍 getAllEvents - Date filter - Current time:', now.toISOString());
+    
+    // SIMPLE AND DIRECT: Only show events where endDate > now OR (no endDate AND startDate > now)
+    const dateFilter = {
+      $or: [
+        // Case 1: Event has endDate and it's in the future
+        {
+          endDate: { $gt: now }
+        },
+        // Case 2: Event has no endDate but has startDate in the future
+        {
+          $and: [
+            {
+              $or: [
+                { endDate: { $exists: false } },
+                { endDate: null }
+              ]
+            },
+            { startDate: { $gt: now } }
+          ]
+        }
+      ]
+    };
+    
+    // Combine baseMatch with dateFilter
+    const finalMatch = {
+      ...baseMatch,
+      ...dateFilter
+    };
+    
+    console.log('🔍 Final baseMatch filter with date filter:', JSON.stringify(finalMatch, null, 2));
+    console.log('🔍 WILL EXCLUDE events where endDate <=', now.toISOString(), 'OR (no endDate AND startDate <=', now.toISOString(), ')');
 
     if (type) {
       const typeMap = {
@@ -288,13 +331,85 @@ exports.getAllEvents = async (req, res) => {
         confrence: 'conference',
         conference: 'conference'
       };
-      baseMatch.type = typeMap[type] || type;
+      finalMatch.type = typeMap[type] || type;
     }
 
     const pipeline = [
-      { $match: baseMatch },
+      { $match: finalMatch },
       { $lookup: { from: 'users', localField: 'createdBy', foreignField: '_id', as: 'creator' } },
       { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
+      // Lookup student registrations to get student names
+      {
+        $lookup: {
+          from: 'studentregistrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'studentRegistrations'
+        }
+      },
+      // Lookup registrations and populate user names
+      {
+        $lookup: {
+          from: 'registrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'registrations'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'registrations.user',
+          foreignField: '_id',
+          as: 'registeredUsers'
+        }
+      },
+      // Add creator name fields and student names for easier searching
+      {
+        $addFields: {
+          creatorFullName: {
+            $concat: [
+              { $ifNull: ['$creator.firstName', ''] },
+              ' ',
+              { $ifNull: ['$creator.lastName', ''] }
+            ]
+          },
+          // Create a searchable string with all student names from StudentRegistration
+          allStudentNames: {
+            $reduce: {
+              input: '$studentRegistrations',
+              initialValue: '',
+              in: {
+                $concat: [
+                  '$$value',
+                  { $cond: [{ $eq: ['$$value', ''] }, '', ' '] },
+                  { $ifNull: ['$$this.studentName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.studentEmail', ''] }
+                ]
+              }
+            }
+          },
+          // Create a searchable string with all user names from Registration
+          allRegisteredUserNames: {
+            $reduce: {
+              input: '$registeredUsers',
+              initialValue: '',
+              in: {
+                $concat: [
+                  '$$value',
+                  { $cond: [{ $eq: ['$$value', ''] }, '', ' '] },
+                  { $ifNull: ['$$this.firstName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.lastName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.email', ''] }
+                ]
+              }
+            }
+          }
+        }
+      },
     ];
 
     if (search) {
@@ -306,8 +421,15 @@ exports.getAllEvents = async (req, res) => {
             { name: nameRegex },
             { description: nameRegex },
             { location: nameRegex },
+            { faculty: nameRegex },
+            { professors: nameRegex },
             { 'creator.firstName': nameRegex },
             { 'creator.lastName': nameRegex },
+            { creatorFullName: nameRegex },
+            // Search in the concatenated student names field
+            { allStudentNames: nameRegex },
+            // Search in the concatenated registered user names field
+            { allRegisteredUserNames: nameRegex }
           ]
         }
       });
@@ -343,6 +465,10 @@ exports.getAllEvents = async (req, res) => {
           bannerFile: 1,
           isRestricted: 1,
           allowedUserTypes: 1,
+          creatorFullName: 1,
+          creatorName: '$creatorFullName',
+          professorName: '$creatorFullName',
+          createdByName: '$creatorFullName',
           createdBy: {
             _id: '$creator._id',
             firstName: '$creator.firstName',
@@ -354,7 +480,45 @@ exports.getAllEvents = async (req, res) => {
       }
     );
 
-    let events = await Event.aggregate(pipeline);
+    let events = [];
+    try {
+      events = await Event.aggregate(pipeline);
+      console.log('✅ Aggregation successful, found', events.length, 'events');
+    } catch (aggError) {
+      console.error('❌ Aggregation error:', aggError);
+      console.error('❌ Aggregation error stack:', aggError.stack);
+      console.error('❌ Pipeline:', JSON.stringify(pipeline, null, 2));
+      throw aggError; // Re-throw to be caught by outer catch
+    }
+
+    // POST-FILTER: Double-check and remove ANY past events that might have slipped through
+    const nowPostFilter = new Date();
+    const initialCount = events.length;
+    events = events.filter(event => {
+      // If event has endDate, check if it's in the future
+      if (event.endDate) {
+        const endDate = new Date(event.endDate);
+        if (endDate <= nowPostFilter) {
+          console.log('🚫 getAllEvents POST-FILTER: Removing past event:', event.title, 'endDate:', event.endDate, 'now:', nowPostFilter.toISOString());
+          return false;
+        }
+      } else if (event.startDate) {
+        // If no endDate, check startDate
+        const startDate = new Date(event.startDate);
+        if (startDate <= nowPostFilter) {
+          console.log('🚫 getAllEvents POST-FILTER: Removing past event (no endDate):', event.title, 'startDate:', event.startDate, 'now:', nowPostFilter.toISOString());
+          return false;
+        }
+      } else {
+        // No dates at all - exclude it
+        console.log('🚫 getAllEvents POST-FILTER: Removing event with no dates:', event.title);
+        return false;
+      }
+      return true;
+    });
+    if (events.length < initialCount) {
+      console.log('🚫 getAllEvents POST-FILTER: Removed', (initialCount - events.length), 'past events');
+    }
 
     // Filter by user type restrictions
     if (req.user && req.user.userType) {
@@ -387,9 +551,12 @@ exports.getAllEvents = async (req, res) => {
 
     // For bazaars and booths, get vendor information
     const eventsWithVendors = await Promise.all(events.map(async (e) => {
+      const creatorFullName = e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null;
       const baseEvent = {
         ...e,
-        creatorName: e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null,
+        creatorName: creatorFullName,
+        professorName: creatorFullName,
+        createdByName: creatorFullName,
         creatorRole: e.createdBy ? (e.createdBy.userType || null) : null,
         creatorFirstName: e.createdBy?.firstName || null,
         creatorLastName: e.createdBy?.lastName || null,
@@ -473,7 +640,13 @@ exports.getAllEvents = async (req, res) => {
     res.json(eventsWithVendors);
   } catch (err) {
     console.error("❌ Error fetching events:", err);
-    res.status(500).json({ msg: "Server error" });
+    console.error("❌ Error stack:", err.stack);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message,
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 };
 
@@ -494,20 +667,71 @@ exports.getAllEventsForStudents = async (req, res) => {
     const userEmail = req.user.email;
     
     // Get registrations from Registration model
-    const registrations = await Registration.find({ user: userId })
-      .select('event')
+    // Get all non-cancelled registrations, then filter by paid status based on event price
+    const registrations = await Registration.find({ 
+      user: userId,
+      status: { $ne: 'cancelled' }
+    })
+      .select('event paid')
       .lean();
+    
+    // Get event prices to determine which registrations are valid
+    const registrationEventIds = registrations.map(r => r.event).filter(id => id != null);
+    let eventPriceMap = new Map();
+    if (registrationEventIds.length > 0) {
+      const registrationEvents = await Event.find({ _id: { $in: registrationEventIds } })
+        .select('_id price')
+        .lean();
+      eventPriceMap = new Map(registrationEvents.map(e => [e._id.toString(), e.price || 0]));
+    }
+    
+    // Filter: for paid events, only include if paid: true; for free events, include all non-cancelled
     const registeredEventIds1 = registrations
+      .filter(r => {
+        if (!r.event) return false;
+        const eventPrice = eventPriceMap.get(r.event.toString()) || 0;
+        if (eventPrice > 0) {
+          // Paid event - must be paid
+          return r.paid === true;
+        } else {
+          // Free event - any non-cancelled registration is valid
+          return true;
+        }
+      })
       .map(r => r.event)
       .filter(id => id != null);
     
     // Get registrations from StudentRegistration model (by email)
     const studentRegistrations = await StudentRegistration.find({ 
-      studentEmail: userEmail 
+      studentEmail: userEmail,
+      status: { $ne: 'cancelled' }
     })
-      .select('event')
+      .select('event paid')
       .lean();
+    
+    // Get event prices for student registrations
+    const studentRegEventIds = studentRegistrations.map(r => r.event).filter(id => id != null);
+    let studentEventPriceMap = new Map();
+    if (studentRegEventIds.length > 0) {
+      const studentEvents = await Event.find({ _id: { $in: studentRegEventIds } })
+        .select('_id price')
+        .lean();
+      studentEventPriceMap = new Map(studentEvents.map(e => [e._id.toString(), e.price || 0]));
+    }
+    
+    // Filter student registrations similarly
     const registeredEventIds2 = studentRegistrations
+      .filter(r => {
+        if (!r.event) return false;
+        const eventPrice = studentEventPriceMap.get(r.event.toString()) || 0;
+        if (eventPrice > 0) {
+          // Paid event - must be paid
+          return r.paid === true;
+        } else {
+          // Free event - any non-cancelled registration is valid
+          return true;
+        }
+      })
       .map(r => r.event)
       .filter(id => id != null);
     
@@ -522,25 +746,35 @@ exports.getAllEventsForStudents = async (req, res) => {
     // Build filter - Event Office users can see all events, others only see approved
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     
-    // Build date filter: only include future events (not past events)
-    // Show events that haven't ended yet (endDate is in the future or doesn't exist)
+    // Build date filter: ONLY include future events - EXCLUDE all past events
     const now = new Date();
+    console.log('🔍 Date filter - Current time:', now.toISOString());
+    console.log('🔍 Date filter - Current timestamp:', now.getTime());
+    
+    // SIMPLE AND DIRECT: Only show events where endDate > now OR (no endDate AND startDate > now)
     const dateFilter = {
       $or: [
-        { endDate: { $gt: now } }, // Events with endDate in the future
-        { 
+        // Case 1: Event has endDate and it's in the future
+        {
+          endDate: { $gt: now }
+        },
+        // Case 2: Event has no endDate but has startDate in the future
+        {
           $and: [
-            { 
+            {
               $or: [
                 { endDate: { $exists: false } },
                 { endDate: null }
               ]
             },
-            { startDate: { $gt: now } } // Events without endDate but with future startDate
+            { startDate: { $gt: now } }
           ]
         }
       ]
     };
+    
+    console.log('🔍 Date filter applied:', JSON.stringify(dateFilter, null, 2));
+    console.log('🔍 WILL EXCLUDE events where endDate <=', now.toISOString(), 'OR (no endDate AND startDate <=', now.toISOString(), ')');
     
     // Base filter conditions
     const baseFilter = {
@@ -595,6 +829,24 @@ exports.getAllEventsForStudents = async (req, res) => {
       ...dateFilter
     };
     
+    // Exclude events the user is already registered for from "Discover Events"
+    // Registered events should only appear in "My Events"
+    if (registeredEventIds.length > 0) {
+      const mongoose = require('mongoose');
+      const registeredObjectIds = registeredEventIds.map(id => {
+        try {
+          return mongoose.Types.ObjectId(id);
+        } catch (e) {
+          return null;
+        }
+      }).filter(id => id !== null);
+      
+      if (registeredObjectIds.length > 0) {
+        filter._id = { $nin: registeredObjectIds };
+        console.log('🔍 Excluding registered events from Discover Events:', registeredObjectIds.length, 'events');
+      }
+    }
+    
     // Only filter by status for non-Event Office users
     const isEventOffice = req.user.userType === 'Event Office' ||
       req.user.userType === 'Events Office' ||
@@ -634,7 +886,33 @@ exports.getAllEventsForStudents = async (req, res) => {
         }
       },
       { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
-      // Add creator name fields for easier searching
+      // Lookup student registrations to get student names
+      {
+        $lookup: {
+          from: 'studentregistrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'studentRegistrations'
+        }
+      },
+      // Lookup registrations and populate user names
+      {
+        $lookup: {
+          from: 'registrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'registrations'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'registrations.user',
+          foreignField: '_id',
+          as: 'registeredUsers'
+        }
+      },
+      // Add creator name fields and student names for easier searching
       {
         $addFields: {
           creatorFullName: {
@@ -643,10 +921,44 @@ exports.getAllEventsForStudents = async (req, res) => {
               ' ',
               { $ifNull: ['$creator.lastName', ''] }
             ]
+          },
+          // Create a searchable string with all student names from StudentRegistration
+          allStudentNames: {
+            $reduce: {
+              input: '$studentRegistrations',
+              initialValue: '',
+              in: {
+                $concat: [
+                  '$$value',
+                  { $cond: [{ $eq: ['$$value', ''] }, '', ' '] },
+                  { $ifNull: ['$$this.studentName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.studentEmail', ''] }
+                ]
+              }
+            }
+          },
+          // Create a searchable string with all user names from Registration
+          allRegisteredUserNames: {
+            $reduce: {
+              input: '$registeredUsers',
+              initialValue: '',
+              in: {
+                $concat: [
+                  '$$value',
+                  { $cond: [{ $eq: ['$$value', ''] }, '', ' '] },
+                  { $ifNull: ['$$this.firstName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.lastName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.email', ''] }
+                ]
+              }
+            }
           }
         }
       },
-      // Apply search filter after adding creator name
+      // Apply search filter after adding creator name and student registrations
       ...(q ? [{
         $match: {
           $or: [
@@ -655,7 +967,11 @@ exports.getAllEventsForStudents = async (req, res) => {
             { location: new RegExp(q, "i") },
             { faculty: new RegExp(q, "i") },
             { professors: new RegExp(q, "i") },
-            { creatorFullName: new RegExp(q, "i") }
+            { creatorFullName: new RegExp(q, "i") },
+            // Search in the concatenated student names field
+            { allStudentNames: new RegExp(q, "i") },
+            // Search in the concatenated registered user names field
+            { allRegisteredUserNames: new RegExp(q, "i") }
           ]
         }
       }] : []),
@@ -686,6 +1002,10 @@ exports.getAllEventsForStudents = async (req, res) => {
           bannerFile: 1,
           isRestricted: 1,
           allowedUserTypes: 1,
+          creatorFullName: 1,
+          creatorName: '$creatorFullName',
+          professorName: '$creatorFullName',
+          createdByName: '$creatorFullName',
           createdBy: {
             _id: '$creator._id',
             firstName: '$creator.firstName',
@@ -698,6 +1018,35 @@ exports.getAllEventsForStudents = async (req, res) => {
     ];
 
     let events = await Event.aggregate(pipeline);
+
+    // POST-FILTER: Double-check and remove ANY past events that might have slipped through
+    const nowPostFilter = new Date();
+    const initialCount = events.length;
+    events = events.filter(event => {
+      // If event has endDate, check if it's in the future
+      if (event.endDate) {
+        const endDate = new Date(event.endDate);
+        if (endDate <= nowPostFilter) {
+          console.log('🚫 POST-FILTER: Removing past event:', event.title, 'endDate:', event.endDate, 'now:', nowPostFilter.toISOString());
+          return false;
+        }
+      } else if (event.startDate) {
+        // If no endDate, check startDate
+        const startDate = new Date(event.startDate);
+        if (startDate <= nowPostFilter) {
+          console.log('🚫 POST-FILTER: Removing past event (no endDate):', event.title, 'startDate:', event.startDate, 'now:', nowPostFilter.toISOString());
+          return false;
+        }
+      } else {
+        // No dates at all - exclude it
+        console.log('🚫 POST-FILTER: Removing event with no dates:', event.title);
+        return false;
+      }
+      return true;
+    });
+    if (events.length < initialCount) {
+      console.log('🚫 POST-FILTER: Removed', (initialCount - events.length), 'past events');
+    }
 
     // Filter by user type restrictions
     if (req.user && req.user.userType) {
@@ -713,7 +1062,7 @@ exports.getAllEventsForStudents = async (req, res) => {
       });
     }
 
-    console.log('🔍 Found events:', events.length);
+    console.log('🔍 Found events after all filters:', events.length);
     if (q) {
       console.log('🔍 Search results for query "' + q + '":', events.map(e => ({
         title: e.title,
@@ -760,10 +1109,13 @@ exports.getAllEventsForStudents = async (req, res) => {
           }
         }
 
+        const creatorFullName = event.createdBy ? `${event.createdBy.firstName || ''} ${event.createdBy.lastName || ''}`.trim() : null;
         return {
           ...event,
           vendors,
-          creatorName: event.createdBy ? `${event.createdBy.firstName || ''} ${event.createdBy.lastName || ''}`.trim() : null,
+          creatorName: creatorFullName,
+          professorName: creatorFullName,
+          createdByName: creatorFullName,
           creatorRole: event.createdBy ? (event.createdBy.userType || null) : null,
           creatorFirstName: event.createdBy?.firstName || null,
           creatorLastName: event.createdBy?.lastName || null,
@@ -937,8 +1289,16 @@ exports.updateEvent = async (req, res) => {
     console.log('📊 Current event status:', event.status);
     console.log('📊 New status:', updates.status);
 
+    const wasPending = event.status === 'pending';
+    const isNowApproved = updates.status === 'approved';
+
     Object.assign(event, updates);
     await event.save();
+
+    // Send notifications if event was just approved (changed from pending to approved)
+    if (wasPending && isNowApproved) {
+      await notifyNewEventCreated(event);
+    }
 
     console.log('✅ Event updated successfully');
     res.json({ msg: "Event updated successfully", event });
@@ -1025,10 +1385,33 @@ exports.registerForEvent = async (req, res) => {
       return res.status(400).json({ msg: `${holderType === 'trip' ? 'Trip' : 'Event'} is full` });
     }
 
-    // Prevent duplicate registration
-    const existing = await Registration.findOne({ event: id, user: userId });
+    // Prevent duplicate registration - check both Registration and StudentRegistration
+    // Also check StudentRegistration by email
+    const user = await User.findById(userId);
+    let existing = await Registration.findOne({ event: id, user: userId });
+    
+    // If not found in Registration, check StudentRegistration
+    if (!existing && user && user.email) {
+      existing = await StudentRegistration.findOne({
+        event: id,
+        studentEmail: user.email.toLowerCase(),
+        status: { $ne: 'cancelled' }
+      });
+    }
+    
+    // If registration exists, check if it's a valid (paid) registration for paid events
     if (existing) {
-      return res.status(400).json({ msg: "You are already registered" });
+      const eventPrice = holder.price || 0;
+      if (eventPrice > 0) {
+        // For paid events, only block if the registration is paid
+        if (existing.paid === true) {
+          return res.status(400).json({ msg: "You are already registered" });
+        }
+        // If unpaid, allow re-registration (will create new pending registration)
+      } else {
+        // For free events, block any existing registration
+        return res.status(400).json({ msg: "You are already registered" });
+      }
     }
 
     // Normalize role to match Registration model enum (lowercase)
@@ -1040,12 +1423,17 @@ exports.registerForEvent = async (req, res) => {
       userRole = 'student'; // Default to student if role doesn't match enum
     }
 
+    // Set paid status: false if event has a price (requires payment), true if free
+    const eventPrice = holder.price || 0;
+    const paidStatus = eventPrice <= 0;
+
     // Create registration (store the same id in `event` field)
     const registration = await Registration.create({
       event: id,                 // works for both Event and Trip ids
       user: userId,
       role: userRole,
-      status: "approved"
+      status: "approved",
+      paid: paidStatus           // Set paid field consistently
     });
 
     // Generate QR code for bazaar/booth events (after registration is created to include registration ID)
@@ -1619,6 +2007,18 @@ exports.payForEvent = async (req, res) => {
       // Mark registration as paid
       registration.paid = true;
       await registration.save();
+      
+      // Also update StudentRegistration if it exists
+      if (registration.constructor.modelName !== 'StudentRegistration') {
+        const studentReg = await StudentRegistration.findOne({
+          event: eventId,
+          studentEmail: user.email.toLowerCase()
+        });
+        if (studentReg) {
+          studentReg.paid = true;
+          await studentReg.save();
+        }
+      }
 
       // Send receipt email
       try {
@@ -1679,8 +2079,8 @@ exports.payForEvent = async (req, res) => {
           }
         ],
         mode: 'payment',
-        success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/events/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/events/${eventId}`,
+        success_url: `${process.env.API_BASE_URL || process.env.BACKEND_URL || 'http://localhost:5000'}/api/events/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/events/${eventId}/payment`,
         metadata: {
           paymentId: payment._id.toString(),
           userId: userId.toString(),
@@ -1721,35 +2121,46 @@ exports.cancelRegistration = async (req, res) => {
     const eventId = req.params.id;
     const userId = req.user._id;
 
+    console.log('🔍 Cancelling registration for event:', eventId, 'user:', userId);
+
     // Find event
     const event = await Event.findById(eventId);
     if (!event) {
+      console.log('❌ Event not found:', eventId);
       return res.status(404).json({
         success: false,
         msg: "Event not found"
       });
     }
 
-    // Find registration
+    // Find registration - try Registration model first
     let registration = await Registration.findOne({
       user: userId,
       event: eventId
     });
 
+    // If not found, try StudentRegistration
     if (!registration) {
       const user = await User.findById(userId);
       if (user && user.email) {
+        console.log('🔍 Looking for StudentRegistration with email:', user.email.toLowerCase());
         registration = await StudentRegistration.findOne({
           event: eventId,
           studentEmail: user.email.toLowerCase()
         });
+        if (registration) {
+          console.log('✅ Found StudentRegistration:', registration._id);
+        }
       }
+    } else {
+      console.log('✅ Found Registration:', registration._id);
     }
 
     if (!registration) {
+      console.log('❌ Registration not found for event:', eventId, 'user:', userId);
       return res.status(404).json({
         success: false,
-        msg: "Registration not found"
+        msg: "Registration not found. You may not be registered for this event."
       });
     }
 
@@ -1761,22 +2172,64 @@ exports.cancelRegistration = async (req, res) => {
       });
     }
 
-    // Find payment if exists
-    const payment = await Payment.findOne({
+    // Find payment if exists - try multiple ways
+    let payment = await Payment.findOne({
       user: userId,
       event: eventId,
       status: 'success'
     });
 
-    // Process refund if payment was made
-    if (payment && payment.paid) {
-      const eventPrice = event.price || 0;
+    // If payment not found, try to find by event only (for StudentRegistration cases)
+    // This handles cases where payment was created but user link might be different
+    if (!payment) {
+      const allPayments = await Payment.find({
+        event: eventId,
+        status: 'success'
+      }).populate('user', 'email');
       
-      if (payment.paymentMethod === 'wallet' && eventPrice > 0) {
+      // Try to match by user email if we have StudentRegistration
+      if (registration.constructor.modelName === 'StudentRegistration' || registration.studentEmail) {
+        const user = await User.findById(userId);
+        if (user && user.email) {
+          payment = allPayments.find(p => 
+            p.user && p.user.email && 
+            p.user.email.toLowerCase() === user.email.toLowerCase()
+          );
+        }
+      }
+      
+      // If still not found, just take the first one (fallback)
+      if (!payment && allPayments.length > 0) {
+        payment = allPayments[0];
+      }
+    }
+    
+    console.log('🔍 Payment lookup result:', payment ? `Found payment ${payment._id}, method: ${payment.paymentMethod}` : 'No payment found');
+
+    const eventPrice = event.price || 0;
+    const registrationPaid = registration.paid || false;
+    
+    console.log('💰 Refund check - Payment found:', payment ? 'yes' : 'no');
+    console.log('💰 Refund check - Registration paid:', registrationPaid);
+    console.log('💰 Refund check - Event price:', eventPrice);
+    
+    // Process refund if payment was made OR registration is marked as paid OR event has a price
+    // This ensures refunds work even if payment record is missing or paid field wasn't set correctly
+    const shouldRefund = (payment && payment.status === 'success') || 
+                         (registrationPaid && eventPrice > 0) || 
+                         (eventPrice > 0); // Always refund if event has a price (fallback safety)
+    
+    if (shouldRefund && eventPrice > 0) {
+      const paymentMethod = payment ? payment.paymentMethod : 'wallet'; // Default to wallet if no payment record
+      
+      console.log('💰 Processing refund - Method:', paymentMethod, 'Amount:', eventPrice);
+      
+      if (paymentMethod === 'wallet' && eventPrice > 0) {
         // Refund to wallet
         const user = await User.findById(userId);
         if (user) {
-          user.walletBalance = (user.walletBalance || 0) + eventPrice;
+          const oldBalance = user.walletBalance || 0;
+          user.walletBalance = oldBalance + eventPrice;
           if (!user.walletTransactions) {
             user.walletTransactions = [];
           }
@@ -1789,42 +2242,144 @@ exports.cancelRegistration = async (req, res) => {
             createdAt: new Date()
           });
           await user.save();
+          console.log(`✅ Refund of ${eventPrice} EGP added to wallet. Old balance: ${oldBalance}, New balance: ${user.walletBalance}`);
 
-          // Send refund email
-          try {
-            const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
-            await sendRefundEmail(
-              user.email,
-              userName,
-              event.title,
-              eventPrice,
-              new Date()
-            );
-          } catch (emailError) {
-            console.error('❌ Failed to send refund email:', emailError);
+          // Refund email removed per user request
+        } else {
+          console.error('❌ User not found for refund:', userId);
+        }
+      } else if (payment && payment.paymentMethod === 'card' && eventPrice > 0) {
+        // Process Stripe refund for card payments
+        console.log(`💳 Processing Stripe refund for payment: ${payment._id}, amount: ${eventPrice}`);
+        
+        if (!stripe) {
+          console.error('❌ Stripe not configured. Cannot process card refund.');
+          return res.status(500).json({
+            success: false,
+            msg: "Stripe refund cannot be processed. Please contact support."
+          });
+        }
+
+        try {
+          // Get the payment intent ID from the payment record
+          let paymentIntentId = payment.stripePaymentIntentId;
+          
+          // If we don't have payment intent ID, try to get it from the session
+          if (!paymentIntentId && payment.stripeSessionId) {
+            const session = await stripe.checkout.sessions.retrieve(payment.stripeSessionId);
+            paymentIntentId = session.payment_intent;
+            
+            // Update payment record with payment intent ID if we found it
+            if (paymentIntentId) {
+              payment.stripePaymentIntentId = paymentIntentId;
+              await payment.save();
+            }
+          }
+
+          if (paymentIntentId) {
+            // Create refund in Stripe
+            const refund = await stripe.refunds.create({
+              payment_intent: paymentIntentId,
+              amount: Math.round(eventPrice * 100), // Convert to cents
+              reason: 'requested_by_customer'
+            });
+
+            console.log(`✅ Stripe refund created: ${refund.id}, status: ${refund.status}`);
+
+            // Update payment status to refunded
+            payment.status = 'refunded';
+            await payment.save();
+
+            console.log(`✅ Payment ${payment._id} marked as refunded`);
+          } else {
+            console.error('❌ Payment intent ID not found. Cannot process Stripe refund.');
+            // Fallback: refund to wallet if we can't process Stripe refund
+            const user = await User.findById(userId);
+            if (user) {
+              const oldBalance = user.walletBalance || 0;
+              user.walletBalance = oldBalance + eventPrice;
+              if (!user.walletTransactions) {
+                user.walletTransactions = [];
+              }
+              user.walletTransactions.push({
+                amount: eventPrice,
+                type: 'refund',
+                description: `Refund for cancelled registration (Stripe refund failed, refunded to wallet): ${event.title}`,
+                balanceAfter: user.walletBalance,
+                reference: eventId.toString(),
+                createdAt: new Date()
+              });
+              await user.save();
+              console.log(`✅ Fallback: Refund of ${eventPrice} EGP added to wallet. Old balance: ${oldBalance}, New balance: ${user.walletBalance}`);
+            }
+          }
+        } catch (stripeError) {
+          console.error('❌ Error processing Stripe refund:', stripeError);
+          
+          // Fallback: refund to wallet if Stripe refund fails
+          const user = await User.findById(userId);
+          if (user) {
+            const oldBalance = user.walletBalance || 0;
+            user.walletBalance = oldBalance + eventPrice;
+            if (!user.walletTransactions) {
+              user.walletTransactions = [];
+            }
+            user.walletTransactions.push({
+              amount: eventPrice,
+              type: 'refund',
+              description: `Refund for cancelled registration (Stripe refund failed, refunded to wallet): ${event.title}`,
+              balanceAfter: user.walletBalance,
+              reference: eventId.toString(),
+              createdAt: new Date()
+            });
+            await user.save();
+            console.log(`✅ Fallback: Refund of ${eventPrice} EGP added to wallet due to Stripe error. Old balance: ${oldBalance}, New balance: ${user.walletBalance}`);
           }
         }
-      } else if (payment.paymentMethod === 'card' && eventPrice > 0) {
-        // For card payments, mark for manual refund or process via Stripe
-        // For now, just log it - manual refund may be required
-        console.log(`⚠️ Card payment refund needed for payment: ${payment._id}, amount: ${eventPrice}`);
       }
     }
+    
+    // Note: The refund logic above now always processes refunds if eventPrice > 0
+    // This ensures consistency across all event types and registration models
 
     // Delete registration
-    if (registration.constructor.modelName === 'Registration') {
-      await Registration.findByIdAndDelete(registration._id);
-    } else {
-      await StudentRegistration.findByIdAndDelete(registration._id);
+    try {
+      if (registration.constructor.modelName === 'Registration') {
+        await Registration.findByIdAndDelete(registration._id);
+        console.log('✅ Deleted Registration:', registration._id);
+      } else {
+        await StudentRegistration.findByIdAndDelete(registration._id);
+        console.log('✅ Deleted StudentRegistration:', registration._id);
+      }
+    } catch (deleteError) {
+      console.error('❌ Error deleting registration:', deleteError);
+      return res.status(500).json({
+        success: false,
+        msg: "Error deleting registration",
+        error: deleteError.message
+      });
     }
 
     // Update event registered count
-    await Event.findByIdAndUpdate(eventId, { $inc: { registeredCount: -1 } });
+    try {
+      await Event.findByIdAndUpdate(eventId, { $inc: { registeredCount: -1 } });
+      console.log('✅ Updated event registered count');
+    } catch (updateError) {
+      console.error('⚠️ Error updating event count:', updateError);
+      // Don't fail the request if count update fails
+    }
 
+    console.log('✅ Registration cancelled successfully');
+    // Determine if refund was processed - check if event has price and refund conditions were met
+    const wasRefunded = eventPrice > 0 && shouldRefund;
+    
     res.status(200).json({
       success: true,
-      msg: "Registration cancelled successfully",
-      refunded: payment && payment.paid && (payment.paymentMethod === 'wallet')
+      msg: wasRefunded ? 
+        `Registration cancelled successfully. ${eventPrice} EGP has been refunded to your wallet.` : 
+        "Registration cancelled successfully",
+      refunded: wasRefunded,
+      refundAmount: wasRefunded ? eventPrice : 0
     });
 
   } catch (err) {
@@ -1883,7 +2438,99 @@ exports.getWalletTransactions = async (req, res) => {
   }
 };
 
-// 📊 Get ratings and comments for an event (placeholder until schema is created)
+// ⭐ Submit a rating for an event (1-5 stars) - uses Event.ratings array
+exports.submitRating = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rating } = req.body;
+    const userId = req.user._id;
+    const userType = req.user.userType;
+    const userEmail = req.user.email;
+
+    // Validate input
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        msg: "Rating must be between 1 and 5"
+      });
+    }
+
+    // Verify event exists
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        msg: "Event not found"
+      });
+    }
+
+    // Check if user has attended/registered for this event
+    const allowedUserTypes = ['Student', 'Staff', 'TA', 'Professor'];
+    if (allowedUserTypes.includes(userType)) {
+      // Check Registration model
+      const registration = await Registration.findOne({
+        event: id,
+        user: userId,
+        status: { $in: ['approved', 'pending'] }
+      });
+
+      // Check StudentRegistration model
+      let studentRegistration = null;
+      if (userEmail) {
+        studentRegistration = await StudentRegistration.findOne({
+          event: id,
+          studentEmail: userEmail.toLowerCase(),
+          status: { $in: ['approved', 'pending'] }
+        });
+      }
+
+      // User must be registered in at least one of the registration systems
+      if (!registration && !studentRegistration) {
+        return res.status(403).json({
+          success: false,
+          msg: "You can only rate events you have attended/registered for"
+        });
+      }
+    }
+
+    // Check if user already rated this event
+    const existingRatingIndex = event.ratings.findIndex(r => 
+      r.user && r.user.toString() === userId.toString()
+    );
+
+    if (existingRatingIndex !== -1) {
+      // Update existing rating
+      event.ratings[existingRatingIndex].rating = rating;
+      event.ratings[existingRatingIndex].createdAt = new Date();
+    } else {
+      // Add new rating to Event.ratings array
+      event.ratings.push({
+        user: userId,
+        rating: rating,
+        createdAt: new Date()
+      });
+    }
+
+    await event.save();
+
+    res.status(201).json({
+      success: true,
+      message: existingRatingIndex !== -1 ? "Rating updated successfully" : "Rating submitted successfully",
+      rating: {
+        rating: rating,
+        user: userId
+      }
+    });
+  } catch (err) {
+    console.error("❌ Error submitting rating:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
 // 💬 Submit a comment on an event
 exports.submitComment = async (req, res) => {
   try {

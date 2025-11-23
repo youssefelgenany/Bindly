@@ -102,10 +102,10 @@ module.exports = async (req, res) => {
       // Send receipt email
       console.log('📧 Sending receipt email...');
       const user = await User.findById(payment.user);
+      let eventTitle = 'Event'; // Declare outside if block for redirect use
       if (user) {
         // Get vendor's personal name for greeting
         const vendorPersonalName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.companyName || user.email;
-        let eventTitle = 'Event';
         let receiptDetails = {};
         
         if (payment.vendorRequest) {
@@ -174,10 +174,28 @@ module.exports = async (req, res) => {
       console.error('❌ User not found for payment:', payment.user);
     }
 
-    // Redirect to success page
+    // Redirect to My Events page with success message
     console.log('✅ Payment processing complete. Redirecting...');
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-    res.redirect(`${clientUrl}/payment-success?session_id=${session_id}`);
+    
+    // Determine the correct My Events route based on user type
+    // eventTitle and user are already set above in the email sending section
+    let redirectUrl = `${clientUrl}/payment-success?session_id=${session_id}`;
+    
+    // Get user if not already fetched (for redirect logic)
+    const redirectUser = user || await User.findById(payment.user);
+    
+    if (redirectUser) {
+      if (redirectUser.userType === 'TA' || redirectUser.userType === 'Staff') {
+        redirectUrl = `${clientUrl}/staff/my-registrations?payment_success=true&event_title=${encodeURIComponent(eventTitle || 'the event')}`;
+      } else if (redirectUser.userType === 'Professor') {
+        redirectUrl = `${clientUrl}/professor/events?payment_success=true&event_title=${encodeURIComponent(eventTitle || 'the event')}`;
+      } else if (redirectUser.userType === 'Student') {
+        redirectUrl = `${clientUrl}/student/my-registrations?payment_success=true&event_title=${encodeURIComponent(eventTitle || 'the event')}`;
+      }
+    }
+    
+    res.redirect(redirectUrl);
   } catch (error) {
     console.error('❌ Error processing payment success:', error);
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';

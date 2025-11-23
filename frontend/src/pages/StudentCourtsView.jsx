@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import courtsApiService from '../api/courtsApi';
+import { notificationApiService } from '../api/notificationApi';
 
 const StudentCourtsView = () => {
   const { user, logout } = useAuth();
@@ -15,6 +16,20 @@ const StudentCourtsView = () => {
   const [availabilityData, setAvailabilityData] = useState(null);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [bookingData, setBookingData] = useState({
+    purpose: '',
+    participants: [{ name: '', email: '' }],
+    notes: ''
+  });
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState('');
+  const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -39,10 +54,13 @@ const StudentCourtsView = () => {
       if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
+      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLogoutDropdown]);
+  }, [showLogoutDropdown, showNotificationsDropdown]);
 
   const loadCourts = useCallback(async () => {
     try {
@@ -80,6 +98,83 @@ const StudentCourtsView = () => {
   useEffect(() => {
     loadCourts();
   }, [loadCourts]);
+
+  // Load notifications
+  const loadNotifications = useCallback(async () => {
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+      
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(notificationsResult.data.data.notifications || notificationsResult.data.data || []);
+      }
+      
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, []);
+
+  // Load notifications on mount and poll for updates
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
+
+  // Mark notification as read
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev => prev.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Mark all as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  // Format notification date
+  const formatNotificationDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   const loadCourtAvailability = async (courtId, date) => {
     try {
@@ -155,6 +250,85 @@ const StudentCourtsView = () => {
     }
   };
 
+  const handleSlotClick = (slot) => {
+    setSelectedSlot(slot);
+    setBookingData({
+      purpose: '',
+      participants: [{ name: '', email: '' }],
+      notes: ''
+    });
+    setBookingError('');
+    setBookingSuccess(false);
+    setShowBookingForm(true);
+  };
+
+  const handleBookingSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedCourt || !selectedSlot) return;
+
+    setBookingLoading(true);
+    setBookingError('');
+    setBookingSuccess(false);
+
+    try {
+      const result = await courtsApiService.bookCourt({
+        courtId: selectedCourt._id || selectedCourt.id,
+        bookingDate: selectedDate,
+        startTime: selectedSlot.startTime,
+        endTime: selectedSlot.endTime,
+        purpose: bookingData.purpose,
+        participants: bookingData.participants.filter(p => p.name && p.email),
+        notes: bookingData.notes
+      });
+
+      if (result.success) {
+        setBookingSuccess(true);
+        setTimeout(() => {
+          setShowBookingForm(false);
+          setSelectedSlot(null);
+          setBookingData({
+            purpose: '',
+            participants: [{ name: '', email: '' }],
+            notes: ''
+          });
+          // Refresh availability
+          loadCourtAvailability(selectedCourt._id || selectedCourt.id, selectedDate);
+        }, 2000);
+      } else {
+        setBookingError(result.message || 'Failed to book court');
+      }
+    } catch (error) {
+      setBookingError('An unexpected error occurred. Please try again.');
+      console.error('Booking error:', error);
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  const addParticipant = () => {
+    setBookingData({
+      ...bookingData,
+      participants: [...bookingData.participants, { name: '', email: '' }]
+    });
+  };
+
+  const removeParticipant = (index) => {
+    const newParticipants = bookingData.participants.filter((_, i) => i !== index);
+    setBookingData({
+      ...bookingData,
+      participants: newParticipants.length > 0 ? newParticipants : [{ name: '', email: '' }]
+    });
+  };
+
+  const updateParticipant = (index, field, value) => {
+    const newParticipants = [...bookingData.participants];
+    newParticipants[index][field] = value;
+    setBookingData({
+      ...bookingData,
+      participants: newParticipants
+    });
+  };
+
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
     : user?.name || 'User';
@@ -191,6 +365,218 @@ const StudentCourtsView = () => {
           </Link>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          {/* Notifications Bell */}
+          <div style={{ position: 'relative' }} data-notifications-dropdown>
+            <button
+              onClick={() => {
+                setShowNotificationsDropdown(!showNotificationsDropdown);
+                setShowLogoutDropdown(false);
+                if (!showNotificationsDropdown) {
+                  loadNotifications();
+                }
+              }}
+              style={{
+                position: 'relative',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span className="material-symbols-outlined" style={{
+                fontSize: '1.5rem',
+                color: '#1D3557'
+              }}>
+                notifications
+              </span>
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '0.25rem',
+                  right: '0.25rem',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  borderRadius: '50%',
+                  width: '1.125rem',
+                  height: '1.125rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.625rem',
+                  fontWeight: '700',
+                  border: '2px solid #FFFFFF'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {showNotificationsDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 1001,
+                width: '360px',
+                maxHeight: '500px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  padding: '1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    margin: 0
+                  }}>
+                    Notifications
+                  </h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllAsRead}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#1e40af',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        padding: '0.25rem 0.5rem'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.textDecoration = 'underline';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.textDecoration = 'none';
+                      }}
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                <div style={{
+                  overflowY: 'auto',
+                  maxHeight: '400px'
+                }}>
+                  {loadingNotifications ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      Loading...
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification._id}
+                        onClick={() => {
+                          if (!notification.isRead) {
+                            handleMarkAsRead(notification._id);
+                          }
+                          if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                            navigate(`/student/events`);
+                            setShowNotificationsDropdown(false);
+                          }
+                        }}
+                        style={{
+                          padding: '1rem',
+                          borderBottom: '1px solid #f3f4f6',
+                          cursor: 'pointer',
+                          backgroundColor: notification.isRead ? '#FFFFFF' : '#eff6ff',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead ? '#f9fafb' : '#dbeafe';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead ? '#FFFFFF' : '#eff6ff';
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{
+                              fontSize: '0.875rem',
+                              fontWeight: notification.isRead ? '400' : '600',
+                              color: '#1D3557',
+                              margin: 0,
+                              marginBottom: '0.25rem'
+                            }}>
+                              {notification.title || notification.message}
+                            </p>
+                            {notification.message && notification.message !== notification.title && (
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                margin: 0
+                              }}>
+                                {notification.message}
+                              </p>
+                            )}
+                            <p style={{
+                              fontSize: '0.625rem',
+                              color: '#9ca3af',
+                              margin: '0.5rem 0 0 0'
+                            }}>
+                              {formatNotificationDate(notification.createdAt)}
+                            </p>
+                          </div>
+                          {!notification.isRead && (
+                            <div style={{
+                              width: '0.5rem',
+                              height: '0.5rem',
+                              borderRadius: '50%',
+                              backgroundColor: '#1e40af',
+                              flexShrink: 0,
+                              marginTop: '0.25rem'
+                            }} />
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div style={{ textAlign: 'right' }}>
             <p style={{
               fontSize: '0.875rem',
@@ -208,10 +594,15 @@ const StudentCourtsView = () => {
               Student
             </p>
           </div>
+
+          {/* Student Profile Icon */}
           <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            onClick={() => {
+              setShowLogoutDropdown(!showLogoutDropdown);
+              setShowNotificationsDropdown(false);
+            }}
           >
             {user?.profilePicturePath ? (
               <img
@@ -1070,12 +1461,23 @@ const StudentCourtsView = () => {
                         .map((slot, index) => (
                         <div
                           key={index}
+                          onClick={() => handleSlotClick(slot)}
                           style={{
                             padding: '0.75rem',
                             borderRadius: '0.5rem',
                             backgroundColor: '#d1fae5',
                             border: '1px solid #10b981',
-                            textAlign: 'center'
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#10b981';
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#d1fae5';
+                            e.currentTarget.style.transform = 'scale(1)';
                           }}
                         >
                           <p style={{
@@ -1085,6 +1487,14 @@ const StudentCourtsView = () => {
                             margin: 0
                           }}>
                             {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                          </p>
+                          <p style={{
+                            color: '#059669',
+                            fontSize: '0.75rem',
+                            margin: '0.25rem 0 0 0',
+                            opacity: 0.8
+                          }}>
+                            Click to book
                           </p>
                         </div>
                       ))}
@@ -1163,6 +1573,482 @@ const StudentCourtsView = () => {
                     Select a date to view availability
                   </p>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Booking Form Modal */}
+      {showBookingForm && selectedSlot && selectedCourt && (
+        <div
+          onClick={() => {
+            if (!bookingLoading) {
+              setShowBookingForm(false);
+              setSelectedSlot(null);
+              setBookingError('');
+              setBookingSuccess(false);
+            }
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+              position: 'relative'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                margin: 0
+              }}>
+                Book Court
+              </h2>
+              <button
+                onClick={() => {
+                  if (!bookingLoading) {
+                    setShowBookingForm(false);
+                    setSelectedSlot(null);
+                    setBookingError('');
+                    setBookingSuccess(false);
+                  }
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: bookingLoading ? 'not-allowed' : 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s'
+                }}
+                disabled={bookingLoading}
+                onMouseEnter={(e) => {
+                  if (!bookingLoading) {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.color = '#1D3557';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!bookingLoading) {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = '#6b7280';
+                  }
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.5rem' }}>
+              {bookingSuccess ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <div style={{
+                    width: '4rem',
+                    height: '4rem',
+                    borderRadius: '50%',
+                    backgroundColor: '#d1fae5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 1rem'
+                  }}>
+                    <span style={{ fontSize: '2rem' }}>✓</span>
+                  </div>
+                  <h3 style={{
+                    color: '#059669',
+                    fontSize: '1.125rem',
+                    fontWeight: '600',
+                    margin: '0 0 0.5rem 0'
+                  }}>
+                    Booking Successful!
+                  </h3>
+                  <p style={{
+                    color: '#6b7280',
+                    fontSize: '0.875rem',
+                    margin: 0
+                  }}>
+                    Your reservation has been submitted. Your name and GUC ID have been automatically included.
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleBookingSubmit}>
+                  {/* Court and Time Info */}
+                  <div style={{
+                    backgroundColor: '#f3f4f6',
+                    padding: '1rem',
+                    borderRadius: '0.5rem',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        margin: '0 0 0.25rem 0'
+                      }}>
+                        Court
+                      </p>
+                      <p style={{
+                        color: '#1D3557',
+                        fontSize: '0.9375rem',
+                        fontWeight: '600',
+                        margin: 0
+                      }}>
+                        {selectedCourt.name}
+                      </p>
+                    </div>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        margin: '0 0 0.25rem 0'
+                      }}>
+                        Date
+                      </p>
+                      <p style={{
+                        color: '#1D3557',
+                        fontSize: '0.9375rem',
+                        fontWeight: '600',
+                        margin: 0
+                      }}>
+                        {new Date(selectedDate).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                    <div>
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        margin: '0 0 0.25rem 0'
+                      }}>
+                        Time Slot
+                      </p>
+                      <p style={{
+                        color: '#1D3557',
+                        fontSize: '0.9375rem',
+                        fontWeight: '600',
+                        margin: 0
+                      }}>
+                        {formatTime(selectedSlot.startTime)} - {formatTime(selectedSlot.endTime)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Student Info Notice */}
+                  <div style={{
+                    backgroundColor: '#dbeafe',
+                    border: '1px solid #3b82f6',
+                    borderRadius: '0.5rem',
+                    padding: '0.75rem',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <p style={{
+                      color: '#1e40af',
+                      fontSize: '0.875rem',
+                      margin: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                        info
+                      </span>
+                      Your name ({user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.name || 'N/A'}) and GUC ID ({user?.gucId || 'N/A'}) will be automatically included in the reservation.
+                    </p>
+                  </div>
+
+                  {/* Purpose */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{
+                      display: 'block',
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Purpose <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={bookingData.purpose}
+                      onChange={(e) => setBookingData({ ...bookingData, purpose: e.target.value })}
+                      placeholder="e.g., Basketball practice, Tennis match"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        outline: 'none',
+                        transition: 'border-color 0.2s',
+                        boxSizing: 'border-box'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                      onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                    />
+                  </div>
+
+                  {/* Participants */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{
+                      display: 'block',
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Participants (Optional)
+                    </label>
+                    {bookingData.participants.map((participant, index) => (
+                      <div key={index} style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <input
+                          type="text"
+                          value={participant.name}
+                          onChange={(e) => updateParticipant(index, 'name', e.target.value)}
+                          placeholder="Name"
+                          style={{
+                            flex: 1,
+                            padding: '0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            transition: 'border-color 0.2s',
+                            boxSizing: 'border-box'
+                          }}
+                          onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                          onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                        />
+                        <input
+                          type="email"
+                          value={participant.email}
+                          onChange={(e) => updateParticipant(index, 'email', e.target.value)}
+                          placeholder="Email"
+                          style={{
+                            flex: 1,
+                            padding: '0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            transition: 'border-color 0.2s',
+                            boxSizing: 'border-box'
+                          }}
+                          onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                          onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                        />
+                        {bookingData.participants.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeParticipant(index)}
+                            style={{
+                              background: '#fee2e2',
+                              border: '1px solid #f87171',
+                              color: '#dc2626',
+                              borderRadius: '0.5rem',
+                              padding: '0.75rem',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.background = '#fecaca';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.background = '#fee2e2';
+                            }}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {bookingData.participants.length < 5 && (
+                      <button
+                        type="button"
+                        onClick={addParticipant}
+                        style={{
+                          background: '#d1fae5',
+                          border: '1px solid #10b981',
+                          color: '#059669',
+                          borderRadius: '0.5rem',
+                          padding: '0.5rem 1rem',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          transition: 'all 0.2s',
+                          marginTop: '0.5rem'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = '#a7f3d0';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = '#d1fae5';
+                        }}
+                      >
+                        + Add Participant
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Notes */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{
+                      display: 'block',
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Notes (Optional)
+                    </label>
+                    <textarea
+                      value={bookingData.notes}
+                      onChange={(e) => setBookingData({ ...bookingData, notes: e.target.value })}
+                      placeholder="Any additional notes..."
+                      rows="3"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        outline: 'none',
+                        transition: 'border-color 0.2s',
+                        boxSizing: 'border-box',
+                        fontFamily: 'inherit',
+                        resize: 'vertical'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                      onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                    />
+                  </div>
+
+                  {/* Error Message */}
+                  {bookingError && (
+                    <div style={{
+                      backgroundColor: '#fee2e2',
+                      border: '1px solid #f87171',
+                      borderRadius: '0.5rem',
+                      padding: '0.75rem',
+                      marginBottom: '1.5rem'
+                    }}>
+                      <p style={{
+                        color: '#dc2626',
+                        fontSize: '0.875rem',
+                        margin: 0
+                      }}>
+                        {bookingError}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Submit Buttons */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    justifyContent: 'flex-end'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowBookingForm(false);
+                        setSelectedSlot(null);
+                        setBookingError('');
+                        setBookingSuccess(false);
+                      }}
+                      disabled={bookingLoading}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        backgroundColor: '#FFFFFF',
+                        color: '#374151',
+                        cursor: bookingLoading ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!bookingLoading) {
+                          e.target.style.backgroundColor = '#f3f4f6';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!bookingLoading) {
+                          e.target.style.backgroundColor = '#FFFFFF';
+                        }
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={bookingLoading}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        borderRadius: '0.5rem',
+                        border: 'none',
+                        backgroundColor: bookingLoading ? '#9ca3af' : '#1e40af',
+                        color: '#FFFFFF',
+                        cursor: bookingLoading ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!bookingLoading) {
+                          e.target.style.backgroundColor = '#1e3a8a';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!bookingLoading) {
+                          e.target.style.backgroundColor = '#1e40af';
+                        }
+                      }}
+                    >
+                      {bookingLoading ? 'Submitting...' : 'Submit Booking'}
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
           </div>

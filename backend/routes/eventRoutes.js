@@ -21,6 +21,9 @@ const {
   cancelRegistration,
   getWalletTransactions,
   getEventRatingsAndComments,
+  submitRating,
+  submitComment,
+  deleteComment,
   cleanupInvalidEvents,
   getSalesReport,
   archiveEvent,
@@ -148,12 +151,6 @@ router.post(
   payForEvent
 );
 
-// ✅ Confirm Stripe payment success (callback after redirect - public route)
-router.get(
-  "/payment-success",
-  require("../controllers/stripeSuccessController")
-);
-
 // 🔍 Manual payment verification endpoint (for testing/debugging)
 router.get(
   "/verify-payment",
@@ -165,6 +162,14 @@ router.get(
 // 🚫 Cancel event registration and get refund
 router.post(
   "/:id/cancel",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  cancelRegistration
+);
+
+// 🚫 Cancel event registration (DELETE method for consistency with frontend)
+router.delete(
+  "/:id/register",
   protect,
   permit("Student", "Staff", "TA", "Professor"),
   cancelRegistration

@@ -231,7 +231,7 @@ const Signup = () => {
       if (result.success) {
         setMessage('Account created successfully! Redirecting...');
         setTimeout(() => {
-          navigate('/login');
+          navigate('/verify-email');
         }, 800);
       } else {
         setMessage(result.message);

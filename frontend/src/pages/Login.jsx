@@ -84,7 +84,12 @@ const Login = () => {
             errorMessage = 'Incorrect password. Please check your password and try again.';
             break;
           case 'AWAITING_VERIFICATION':
-            errorMessage = 'Your account is pending admin verification. Please wait for an administrator to verify your account.';
+            // Check if the message indicates email verification (for students)
+            if (result.message && result.message.includes('verify your email')) {
+              errorMessage = 'Please verify your email address to login. Check your inbox for the verification link. If you didn\'t receive it, please check your spam folder.';
+            } else {
+              errorMessage = 'Your account is pending admin verification. Please wait for an administrator to verify your account.';
+            }
             break;
           case 'ACCOUNT_BLOCKED':
             errorMessage = `Your account is currently ${result.user?.status || 'blocked'}. Please contact an administrator for assistance.`;

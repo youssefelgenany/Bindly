@@ -9,6 +9,7 @@ import AdminPlatformBoothRequests from './pages/AdminPlatformBoothRequests';
 import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import EventsOfficeDashboard from './pages/EventsOfficeDashboard';
 import PendingVerification from './pages/PendingVerification';
@@ -34,9 +35,12 @@ import StudentMyRegistrations from './pages/StudentMyRegistrations';
 import StudentCourtsView from './pages/StudentCourtsView';
 import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
+import StaffFavorites from './pages/StaffFavorites';
+import EventPayment from './pages/EventPayment';
+import PaymentSuccess from './pages/PaymentSuccess';
+import MyWallet from './pages/MyWallet';
 import CourtAvailability from './pages/CourtAvailability';
 import PlatformBoothReservation from './pages/PlatformBoothReservation';
-import PlatformBooths from './pages/PlatformBooths';
 import EventsOfficeEventsView from './pages/EventsOfficeEventsView';
 import EventsOfficeWorkshops from './pages/EventsOfficeWorkshops';
 import EventsOfficeVendors from './pages/EventsOfficeVendors';
@@ -270,6 +274,14 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/verify-email"
+              element={
+                <PublicRoute>
+                  <VerifyEmail />
+                </PublicRoute>
+              }
+            />
+            <Route
               path="/pending-verification"
               element={<PendingVerification />}
             />
@@ -335,7 +347,7 @@ const AppContent = () => {
               path="/vendor/platform-booths"
               element={
                 <ProtectedRoute>
-                  <PlatformBooths />
+                  <Navigate to="/vendor" replace />
                 </ProtectedRoute>
               }
             />
@@ -460,6 +472,48 @@ const AppContent = () => {
                   <StaffAndTAOnly>
                     <StaffMyRegistrations />
                   </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/favorites"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <StaffFavorites />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events/:id/payment"
+              element={
+                <ProtectedRoute>
+                  <EventPayment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payment-success"
+              element={
+                <ProtectedRoute>
+                  <PaymentSuccess />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events/payment-success"
+              element={
+                <ProtectedRoute>
+                  <PaymentSuccess />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/wallet"
+              element={
+                <ProtectedRoute>
+                  <MyWallet />
                 </ProtectedRoute>
               }
             />

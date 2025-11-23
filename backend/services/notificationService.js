@@ -1,7 +1,6 @@
 const Notification = require('../models/notificationModel');
 const StudentRegistration = require('../models/studentRegistrationModel');
 const Event = require('../models/eventModel');
-const Workshop = require('../models/Workshop');
 const Trip = require('../models/tripModel');
 const GymSession = require('../models/gymSessionModel');
 const User = require('../models/userModel');
@@ -25,12 +24,14 @@ exports.createEventReminders = async () => {
       startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
     });
     
-    // Workshops
-    const workshopsIn1Day = await Workshop.find({
+    // Workshops (now in Event model with type: 'workshop')
+    const workshopsIn1Day = await Event.find({
+      type: 'workshop',
       startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
     });
     
-    const workshopsIn1Hour = await Workshop.find({
+    const workshopsIn1Hour = await Event.find({
+      type: 'workshop',
       startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
     });
     
@@ -132,12 +133,12 @@ async function processWorkshopReminders(workshops, timeframe) {
             await Notification.create({
               recipient: user._id,
               type: 'workshop_reminder',
-              title: `Reminder: ${workshop.workshopName} starts in ${timeframe}`,
-              message: `The workshop "${workshop.workshopName}" will start in ${timeframe} at ${workshop.location}`,
-              relatedWorkshop: workshop._id,
+              title: `Reminder: ${workshop.title} starts in ${timeframe}`,
+              message: `The workshop "${workshop.title}" will start in ${timeframe} at ${workshop.location}`,
+              relatedEvent: workshop._id,
               priority: timeframe === '1 hour' ? 'high' : 'medium',
               metadata: {
-                workshopName: workshop.workshopName,
+                workshopName: workshop.title,
                 workshopDate: workshop.startDate,
                 location: workshop.location,
                 studentEmail: registration.studentEmail,
