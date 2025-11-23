@@ -2173,7 +2173,99 @@ exports.getWalletTransactions = async (req, res) => {
   }
 };
 
-// 📊 Get ratings and comments for an event (placeholder until schema is created)
+// ⭐ Submit a rating for an event (1-5 stars) - uses Event.ratings array
+exports.submitRating = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rating } = req.body;
+    const userId = req.user._id;
+    const userType = req.user.userType;
+    const userEmail = req.user.email;
+
+    // Validate input
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        msg: "Rating must be between 1 and 5"
+      });
+    }
+
+    // Verify event exists
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        msg: "Event not found"
+      });
+    }
+
+    // Check if user has attended/registered for this event
+    const allowedUserTypes = ['Student', 'Staff', 'TA', 'Professor'];
+    if (allowedUserTypes.includes(userType)) {
+      // Check Registration model
+      const registration = await Registration.findOne({
+        event: id,
+        user: userId,
+        status: { $in: ['approved', 'pending'] }
+      });
+
+      // Check StudentRegistration model
+      let studentRegistration = null;
+      if (userEmail) {
+        studentRegistration = await StudentRegistration.findOne({
+          event: id,
+          studentEmail: userEmail.toLowerCase(),
+          status: { $in: ['approved', 'pending'] }
+        });
+      }
+
+      // User must be registered in at least one of the registration systems
+      if (!registration && !studentRegistration) {
+        return res.status(403).json({
+          success: false,
+          msg: "You can only rate events you have attended/registered for"
+        });
+      }
+    }
+
+    // Check if user already rated this event
+    const existingRatingIndex = event.ratings.findIndex(r => 
+      r.user && r.user.toString() === userId.toString()
+    );
+
+    if (existingRatingIndex !== -1) {
+      // Update existing rating
+      event.ratings[existingRatingIndex].rating = rating;
+      event.ratings[existingRatingIndex].createdAt = new Date();
+    } else {
+      // Add new rating to Event.ratings array
+      event.ratings.push({
+        user: userId,
+        rating: rating,
+        createdAt: new Date()
+      });
+    }
+
+    await event.save();
+
+    res.status(201).json({
+      success: true,
+      message: existingRatingIndex !== -1 ? "Rating updated successfully" : "Rating submitted successfully",
+      rating: {
+        rating: rating,
+        user: userId
+      }
+    });
+  } catch (err) {
+    console.error("❌ Error submitting rating:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
 // 💬 Submit a comment on an event
 exports.submitComment = async (req, res) => {
   try {

@@ -190,6 +190,34 @@ export const eventsApiService = {
         error: error.response?.data || error.message,
       };
     }
+  },
+  
+  // ⭐ Submit a rating for an event (1-5 stars)
+  submitRating: async (eventId, rating) => {
+    try {
+      const response = await eventsApi.post(`/${eventId}/ratings`, { rating });
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to submit rating',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+  
+  // 📊 Get ratings and comments for an event
+  getRatingsAndComments: async (eventId) => {
+    try {
+      const response = await eventsApi.get(`/${eventId}/ratings`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch ratings and comments',
+        error: error.response?.data || error.message,
+      };
+    }
   }
 };
 
