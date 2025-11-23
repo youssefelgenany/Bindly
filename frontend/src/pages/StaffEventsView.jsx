@@ -554,10 +554,10 @@ const StaffEventsView = () => {
             marginBottom: '1.5rem',
             boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'nowrap', justifyContent: 'space-between' }}>
               {/* Search Input and Button - Left Side */}
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: '0 1 auto' }}>
-                <div style={{ position: 'relative', width: '520px' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: '1 1 auto', minWidth: 0 }}>
+                <div style={{ position: 'relative', flex: '1 1 auto', minWidth: '200px', maxWidth: '520px' }}>
                   <span className="material-symbols-outlined" style={{
                     position: 'absolute',
                     left: '0.75rem',
@@ -626,39 +626,10 @@ const StaffEventsView = () => {
                 >
                   Search
                 </button>
-                {searchQuery && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery('');
-                      loadEvents();
-                    }}
-                    style={{
-                      padding: '0.875rem 1rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: '#f3f4f6',
-                      color: '#6b7280',
-                      border: '1px solid #e5e7eb',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      transition: 'all 0.2s',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#e5e7eb';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#f3f4f6';
-                    }}
-                  >
-                    Clear
-                  </button>
-                )}
               </div>
               
               {/* Filter Buttons - Right Side */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginLeft: 'auto' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }}>
                 {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
                 <button
                   key={type}
