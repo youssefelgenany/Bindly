@@ -301,6 +301,35 @@ const TADashboard = () => {
                                 zIndex: 1000,
                                 minWidth: '150px'
                             }}>
+                                <Link
+                                    to="/wallet"
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        textAlign: 'left',
+                                        backgroundColor: 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        fontSize: '0.875rem',
+                                        color: '#1D3557',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        textDecoration: 'none'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.backgroundColor = '#f3f4f6';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.backgroundColor = 'transparent';
+                                    }}
+                                    onClick={() => setShowLogoutDropdown(false)}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                        account_balance_wallet
+                                    </span>
+                                    My Wallet
+                                </Link>
                                 <button
                                     onClick={handleLogout}
                                     style={{
@@ -381,6 +410,19 @@ const TADashboard = () => {
                         }}
                     >
                         My Events
+                    </Link>
+                    <Link
+                        to="/staff/favorites"
+                        style={{
+                            textDecoration: 'none',
+                            color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
+                            fontSize: '0.875rem',
+                            fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
+                            paddingBottom: '0.5rem',
+                            borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+                        }}
+                    >
+                        My Favorites
                     </Link>
                     <Link
                         to="/gym-schedule"

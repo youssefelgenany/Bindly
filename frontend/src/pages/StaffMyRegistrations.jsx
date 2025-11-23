@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
+import { eventsApiService } from '../api/eventsApi';
 import { useAuth } from '../contexts/AuthContext';
 
 const StaffMyRegistrations = () => {
@@ -12,6 +13,13 @@ const StaffMyRegistrations = () => {
   const [error, setError] = useState('');
   const [selectedRegistration, setSelectedRegistration] = useState(null);
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelRegistrationData, setCancelRegistrationData] = useState(null);
+  const [favoriteEventIds, setFavoriteEventIds] = useState(new Set());
+  const [showCancelSuccess, setShowCancelSuccess] = useState(false);
+  const [cancelSuccessData, setCancelSuccessData] = useState(null);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -59,7 +67,10 @@ const StaffMyRegistrations = () => {
       const result = await studentRegistrationApi.getMyRegistrations(user.email);
       
       if (result.success) {
-        setRegistrations(result.data.registrations || []);
+        // Filter out unpaid registrations (only show paid registrations)
+        const allRegistrations = result.data.registrations || [];
+        const paidRegistrations = allRegistrations.filter(reg => reg.paid === true);
+        setRegistrations(paidRegistrations);
       } else {
         setError(result.message || 'Failed to fetch registrations');
         setRegistrations([]);
@@ -77,7 +88,70 @@ const StaffMyRegistrations = () => {
     if (user && user.email) {
       loadMyRegistrations();
     }
+    
+    // Check for payment success query param
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('payment_success') === 'true') {
+      const eventTitle = searchParams.get('event_title') || 'the event';
+      setShowPaymentSuccess(true);
+      // Store event title for display
+      sessionStorage.setItem('paymentSuccessEventTitle', eventTitle);
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, [user, loadMyRegistrations]);
+
+  // Load user's favorite events (for TA users)
+  useEffect(() => {
+    const loadFavoriteEvents = async () => {
+      if (!user || user.userType !== 'TA') return;
+      
+      try {
+        const result = await eventsApiService.getFavoriteEvents();
+        if (result.success) {
+          const favoriteIds = new Set();
+          const events = Array.isArray(result.data) ? result.data : (result.data.events || []);
+          events.forEach(event => {
+            if (event._id) favoriteIds.add(String(event._id));
+            if (event.id) favoriteIds.add(String(event.id));
+          });
+          setFavoriteEventIds(favoriteIds);
+        }
+      } catch (error) {
+        console.error('Error loading favorite events:', error);
+      }
+    };
+
+    loadFavoriteEvents();
+  }, [user]);
+
+  const handleToggleFavorite = async (eventId, e) => {
+    e.stopPropagation(); // Prevent card click
+    
+    if (!user || user.userType !== 'TA') return;
+    
+    const isFavorite = favoriteEventIds.has(String(eventId));
+    
+    try {
+      if (isFavorite) {
+        const result = await eventsApiService.removeFromFavorites(eventId);
+        if (result.success) {
+          setFavoriteEventIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(String(eventId));
+            return newSet;
+          });
+        }
+      } else {
+        const result = await eventsApiService.addToFavorites(eventId);
+        if (result.success) {
+          setFavoriteEventIds(prev => new Set([...prev, String(eventId)]));
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
@@ -265,6 +339,37 @@ const StaffMyRegistrations = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
+                {user?.userType === 'TA' && (
+                  <Link
+                    to="/wallet"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#1D3557',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                    }}
+                    onClick={() => setShowLogoutDropdown(false)}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      account_balance_wallet
+                    </span>
+                    My Wallet
+                  </Link>
+                )}
                 <button
                   onClick={handleLogout}
                   style={{
@@ -345,6 +450,19 @@ const StaffMyRegistrations = () => {
             }}
           >
             My Events
+          </Link>
+          <Link
+            to="/staff/favorites"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Favorites
           </Link>
           <Link
             to="/gym-schedule"
@@ -626,6 +744,48 @@ const StaffMyRegistrations = () => {
                             }
                           }}
                         />
+                        {/* Heart Icon for TA users */}
+                        {user?.userType === 'TA' && (
+                          <button
+                            onClick={(e) => handleToggleFavorite(registration.eventId, e)}
+                            style={{
+                              position: 'absolute',
+                              top: '0.75rem',
+                              right: '0.75rem',
+                              background: 'rgba(255, 255, 255, 0.9)',
+                              border: 'none',
+                              borderRadius: '50%',
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                              transition: 'all 0.2s',
+                              zIndex: 10
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.background = '#ffffff';
+                              e.target.style.transform = 'scale(1.1)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.background = 'rgba(255, 255, 255, 0.9)';
+                              e.target.style.transform = 'scale(1)';
+                            }}
+                          >
+                            <span 
+                              className="material-symbols-outlined"
+                              style={{
+                                fontSize: '1.25rem',
+                                color: favoriteEventIds.has(String(registration.eventId)) ? '#dc2626' : '#6b7280',
+                                transition: 'color 0.2s'
+                              }}
+                            >
+                              {favoriteEventIds.has(String(registration.eventId)) ? 'favorite' : 'favorite_border'}
+                            </span>
+                          </button>
+                        )}
                       </div>
                     )}
                     
@@ -643,17 +803,40 @@ const StaffMyRegistrations = () => {
                         }}>
                           {registration.eventType}
                         </div>
-                        <div style={{
-                          padding: '0.375rem 0.875rem',
-                          borderRadius: '0.5rem',
-                          backgroundColor: getStatusColor(registration.status),
-                          color: '#FFFFFF',
-                          fontSize: '0.6875rem',
-                          fontWeight: '700',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
-                          {registration.status}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (registration.status?.toLowerCase() === 'approved') {
+                              setCancelRegistrationData(registration);
+                              setShowCancelModal(true);
+                            }
+                          }}
+                          style={{
+                            padding: '0.375rem 0.875rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: getStatusColor(registration.status),
+                            color: '#FFFFFF',
+                            fontSize: '0.6875rem',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            cursor: registration.status?.toLowerCase() === 'approved' ? 'pointer' : 'default',
+                            transition: registration.status?.toLowerCase() === 'approved' ? 'all 0.2s' : 'none'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (registration.status?.toLowerCase() === 'approved') {
+                              e.target.style.opacity = '0.9';
+                              e.target.style.transform = 'scale(1.05)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (registration.status?.toLowerCase() === 'approved') {
+                              e.target.style.opacity = '1';
+                              e.target.style.transform = 'scale(1)';
+                            }
+                          }}
+                        >
+                          {getDisplayStatus(registration.status)}
                         </div>
                       </div>
 
@@ -1126,7 +1309,372 @@ const StaffMyRegistrations = () => {
                   )}
                 </div>
               )}
+
+              {/* Cancel Button - Only show for paid registrations that haven't started */}
+              {selectedRegistration.paid && 
+               selectedRegistration.eventDate && 
+               new Date(selectedRegistration.eventDate) > new Date() && (
+                <div style={{
+                  marginTop: '1.5rem',
+                  paddingTop: '1.5rem',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  <button
+                    onClick={async () => {
+                      if (window.confirm('Are you sure you want to cancel this registration? The refund will be added to your wallet.')) {
+                        setCancelling(true);
+                        try {
+                          const eventId = selectedRegistration.eventId;
+                          if (!eventId) {
+                            alert('Event ID not found');
+                            setCancelling(false);
+                            return;
+                          }
+                          const result = await eventsApiService.cancelRegistration(eventId);
+                          if (result.success) {
+                            alert(result.data.msg || 'Registration cancelled successfully. Refund has been added to your wallet.');
+                            setSelectedRegistration(null);
+                            loadMyRegistrations();
+                            // Reload wallet balance if on wallet page
+                            if (window.location.pathname === '/wallet') {
+                              window.location.reload();
+                            }
+                          } else {
+                            alert(result.message || 'Failed to cancel registration');
+                          }
+                        } catch (err) {
+                          console.error('Cancel error:', err);
+                          alert('An error occurred while cancelling registration');
+                        } finally {
+                          setCancelling(false);
+                        }
+                      }
+                    }}
+                    disabled={cancelling}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: cancelling ? '#9ca3af' : '#dc2626',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      cursor: cancelling ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      cancel
+                    </span>
+                    {cancelling ? 'Cancelling...' : 'Cancel Registration & Get Refund'}
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Registration Modal */}
+      {showCancelModal && cancelRegistrationData && (
+        <div
+          onClick={() => setShowCancelModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '400px',
+              width: '100%',
+              padding: '2rem',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              marginBottom: '1rem',
+              marginTop: 0
+            }}>
+              Cancel Registration
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '0.875rem',
+              marginBottom: '1.5rem'
+            }}>
+              Are you sure you want to cancel your registration for <strong>{cancelRegistrationData.eventTitle}</strong>?
+              {cancelRegistrationData.paid && ' The refund will be added to your wallet.'}
+            </p>
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}
+              >
+                Close
+              </button>
+              <button
+                onClick={async () => {
+                  setCancelling(true);
+                  try {
+                    const eventId = cancelRegistrationData.eventId;
+                    if (!eventId) {
+                      alert('Event ID not found');
+                      setCancelling(false);
+                      return;
+                    }
+                    const result = await eventsApiService.cancelRegistration(eventId);
+                    if (result.success) {
+                      setCancelSuccessData({
+                        eventTitle: cancelRegistrationData.eventTitle,
+                        refunded: result.data.refunded || false
+                      });
+                      setShowCancelModal(false);
+                      setCancelRegistrationData(null);
+                      setShowCancelSuccess(true);
+                      loadMyRegistrations();
+                      // Trigger wallet refresh event for wallet page if open
+                      window.dispatchEvent(new Event('walletRefresh'));
+                    } else {
+                      alert(result.message || 'Failed to cancel registration');
+                    }
+                  } catch (err) {
+                    console.error('Cancel error:', err);
+                    alert('An error occurred while cancelling registration');
+                  } finally {
+                    setCancelling(false);
+                  }
+                }}
+                disabled={cancelling}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: cancelling ? '#9ca3af' : '#dc2626',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: cancelling ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}
+              >
+                {cancelling ? 'Cancelling...' : 'Cancel Registration'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancellation Success Modal */}
+      {showCancelSuccess && cancelSuccessData && (
+        <div
+          onClick={() => {
+            setShowCancelSuccess(false);
+            setCancelSuccessData(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '500px',
+              width: '100%',
+              padding: '3rem 2rem',
+              textAlign: 'center',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            <div style={{
+              width: '4rem',
+              height: '4rem',
+              borderRadius: '50%',
+              backgroundColor: '#d1fae5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+              fontSize: '2rem'
+            }}>
+              ✅
+            </div>
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.5rem',
+              fontWeight: '600',
+              marginBottom: '1rem',
+              marginTop: 0
+            }}>
+              Registration Cancelled!
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '0.875rem',
+              marginBottom: '0.5rem'
+            }}>
+              Your registration for <strong style={{ color: '#1D3557' }}>{cancelSuccessData.eventTitle}</strong> has been cancelled successfully.
+            </p>
+            {cancelSuccessData.refunded && (
+              <p style={{
+                color: '#6b7280',
+                fontSize: '0.875rem',
+                marginBottom: '1.5rem'
+              }}>
+                The refund has been added to your wallet.
+              </p>
+            )}
+            <button
+              onClick={() => {
+                setShowCancelSuccess(false);
+                setCancelSuccessData(null);
+              }}
+              style={{
+                padding: '0.75rem 2rem',
+                borderRadius: '0.5rem',
+                backgroundColor: '#1e40af',
+                color: '#FFFFFF',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#1e3a8a';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#1e40af';
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Success Modal */}
+      {showPaymentSuccess && (
+        <div
+          onClick={() => setShowPaymentSuccess(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '500px',
+              width: '100%',
+              padding: '3rem 2rem',
+              textAlign: 'center',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            <div style={{
+              width: '4rem',
+              height: '4rem',
+              borderRadius: '50%',
+              backgroundColor: '#d1fae5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+              fontSize: '2rem'
+            }}>
+              ✅
+            </div>
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.5rem',
+              fontWeight: '600',
+              marginBottom: '1rem',
+              marginTop: 0
+            }}>
+              Registration Successful!
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '0.875rem',
+              marginBottom: '0.5rem'
+            }}>
+              You have been successfully registered for <strong style={{ color: '#1D3557' }}>{sessionStorage.getItem('paymentSuccessEventTitle') || 'the event'}</strong>
+            </p>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '0.875rem',
+              marginBottom: '1.5rem'
+            }}>
+              A payment confirmation email has been sent to <strong style={{ color: '#1D3557' }}>{user?.email}</strong>
+            </p>
+            <button
+              onClick={() => setShowPaymentSuccess(false)}
+              style={{
+                padding: '0.75rem 2rem',
+                borderRadius: '0.5rem',
+                backgroundColor: '#1e40af',
+                color: '#FFFFFF',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#1e3a8a';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#1e40af';
+              }}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

@@ -668,6 +668,7 @@ const getCurrentUser = async (req, res) => {
         isVerified: user.isVerified,
         isActive: user.isActive,
         profilePicturePath: user.profilePicturePath,
+        walletBalance: user.walletBalance || 0,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       }

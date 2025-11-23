@@ -43,6 +43,7 @@ export const eventsApiService = {
       };
     }
   },
+
   // Authenticated: fetch events visible to logged-in users
   getAllEventsAuthenticated: async (params = {}) => {
     try {
@@ -74,6 +75,7 @@ export const eventsApiService = {
       };
     }
   },
+
   deleteEvent: async (id) => {
     try {
       const response = await eventsApi.delete(`/${id}`);
@@ -86,6 +88,7 @@ export const eventsApiService = {
       };
     }
   },
+
   updateEvent: async (id, eventData) => {
     try {
       const response = await eventsApi.put(`/${id}`, eventData);
@@ -98,6 +101,7 @@ export const eventsApiService = {
       };
     }
   },
+
   updateEventStatus: async (id, statusData) => {
     try {
       const response = await eventsApi.put(`/${id}`, statusData);
@@ -110,6 +114,7 @@ export const eventsApiService = {
       };
     }
   },
+
   // Fetch events for students with vendor details for bazaars
   getStudentEvents: async (filters = {}) => {
     try {
@@ -118,16 +123,17 @@ export const eventsApiService = {
       if (filters.type) query.append('type', filters.type);
       if (filters.status) query.append('status', filters.status);
       
-      // Use the same endpoint as professors: /api/events instead of /api/events/student
+      // Use the student-specific endpoint
       const suffix = query.toString() ? `?${query.toString()}` : '';
-      const url = `/${suffix}`;
-      console.log('🔍 API call URL (using same endpoint as professors):', url);
+      const url = `/student${suffix}`;
+      console.log('🔍 API call URL:', url);
       const response = await eventsApi.get(url);
-      // Backend returns array directly or wrapped in events property
+      // Backend returns { success: true, events: [...] }
       const events = Array.isArray(response.data) ? response.data : (response.data?.events || []);
       return { success: true, data: events };
     } catch (error) {
       console.error('🔍 API error:', error);
+      console.error('🔍 Error response:', error.response?.data);
       return {
         success: false,
         message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch events',
@@ -192,6 +198,20 @@ export const eventsApiService = {
     }
   },
   
+  // ⭐ Get user's favorite events
+  getFavoriteEvents: async () => {
+    try {
+      const response = await eventsApi.get('/favorites');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch favorite events',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
   // ⭐ Submit a rating for an event (1-5 stars)
   submitRating: async (eventId, rating) => {
     try {
@@ -205,7 +225,35 @@ export const eventsApiService = {
       };
     }
   },
+
+  // ⭐ Add event to favorites
+  addToFavorites: async (eventId) => {
+    try {
+      const response = await eventsApi.post(`/${eventId}/favorite`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to add event to favorites',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
   
+  // ⭐ Remove event from favorites
+  removeFromFavorites: async (eventId) => {
+    try {
+      const response = await eventsApi.delete(`/${eventId}/favorite`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to remove event from favorites',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
   // 📊 Get ratings and comments for an event
   getRatingsAndComments: async (eventId) => {
     try {
@@ -215,6 +263,48 @@ export const eventsApiService = {
       return {
         success: false,
         message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch ratings and comments',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+  
+  // 💳 Pay for an event
+  payForEvent: async (eventId, paymentData) => {
+    try {
+      const response = await eventsApi.post(`/${eventId}/pay`, paymentData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Payment failed',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+  
+  // 🚫 Cancel event registration
+  cancelRegistration: async (eventId) => {
+    try {
+      const response = await eventsApi.delete(`/${eventId}/register`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to cancel registration',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
+  // 💰 Get wallet transactions
+  getWalletTransactions: async () => {
+    try {
+      const response = await eventsApi.get('/wallet/transactions');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch wallet transactions',
         error: error.response?.data || error.message,
       };
     }

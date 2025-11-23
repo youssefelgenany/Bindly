@@ -215,9 +215,12 @@ const StudentEventsView = () => {
       try {
         const result = await studentRegistrationApi.getMyRegistrations(user.email);
         if (result.success && result.data.registrations) {
-          // Extract event IDs from registrations
+          // Extract event IDs from PAID registrations only
           const registeredIds = new Set();
           result.data.registrations.forEach(reg => {
+            // Only include paid registrations
+            if (reg.paid !== true) return;
+            
             // Check for eventId in the formatted response
             if (reg.eventId) {
               registeredIds.add(String(reg.eventId));
@@ -252,12 +255,38 @@ const StudentEventsView = () => {
 
   const handleRegistrationSuccess = (registrationData) => {
     setShowRegistrationForm(false);
-    // Add the event ID to registered set
-    if (registrationEvent?.id) {
+    // Only add to registered set if payment was completed (paid: true)
+    // For free events, registrationData will have paid: true
+    // For paid events, this will only be called after successful payment
+    if (registrationEvent?.id && registrationData?.paid !== false) {
       setRegisteredEventIds(prev => new Set([...prev, String(registrationEvent.id)]));
     }
     setRegistrationEvent(null);
     loadEvents();
+    // Reload registrations to update the registered events list
+    const loadUserRegistrations = async () => {
+      if (!user?.email) return;
+      try {
+        const result = await studentRegistrationApi.getMyRegistrations(user.email);
+        if (result.success && result.data.registrations) {
+          const registeredIds = new Set();
+          result.data.registrations.forEach(reg => {
+            if (reg.paid !== true) return;
+            if (reg.eventId) {
+              registeredIds.add(String(reg.eventId));
+            } else if (reg.event && typeof reg.event === 'object' && reg.event._id) {
+              registeredIds.add(String(reg.event._id));
+            } else if (reg.event && typeof reg.event === 'string') {
+              registeredIds.add(reg.event);
+            }
+          });
+          setRegisteredEventIds(registeredIds);
+        }
+      } catch (error) {
+        console.error('Error reloading user registrations:', error);
+      }
+    };
+    loadUserRegistrations();
   };
 
   const handleCloseRegistrationForm = () => {

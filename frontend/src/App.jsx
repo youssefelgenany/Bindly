@@ -35,6 +35,10 @@ import StudentMyRegistrations from './pages/StudentMyRegistrations';
 import StudentCourtsView from './pages/StudentCourtsView';
 import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
+import StaffFavorites from './pages/StaffFavorites';
+import EventPayment from './pages/EventPayment';
+import PaymentSuccess from './pages/PaymentSuccess';
+import MyWallet from './pages/MyWallet';
 import CourtAvailability from './pages/CourtAvailability';
 import PlatformBoothReservation from './pages/PlatformBoothReservation';
 import EventsOfficeEventsView from './pages/EventsOfficeEventsView';
@@ -433,6 +437,48 @@ const AppContent = () => {
                   <StaffAndTAOnly>
                     <StaffMyRegistrations />
                   </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/favorites"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <StaffFavorites />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events/:id/payment"
+              element={
+                <ProtectedRoute>
+                  <EventPayment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payment-success"
+              element={
+                <ProtectedRoute>
+                  <PaymentSuccess />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events/payment-success"
+              element={
+                <ProtectedRoute>
+                  <PaymentSuccess />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/wallet"
+              element={
+                <ProtectedRoute>
+                  <MyWallet />
                 </ProtectedRoute>
               }
             />
