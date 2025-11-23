@@ -336,6 +336,78 @@ exports.getAllEvents = async (req, res) => {
       { $match: finalMatch },
       { $lookup: { from: 'users', localField: 'createdBy', foreignField: '_id', as: 'creator' } },
       { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
+      // Lookup student registrations to get student names
+      {
+        $lookup: {
+          from: 'studentregistrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'studentRegistrations'
+        }
+      },
+      // Lookup registrations and populate user names
+      {
+        $lookup: {
+          from: 'registrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'registrations'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'registrations.user',
+          foreignField: '_id',
+          as: 'registeredUsers'
+        }
+      },
+      // Add creator name fields and student names for easier searching
+      {
+        $addFields: {
+          creatorFullName: {
+            $concat: [
+              { $ifNull: ['$creator.firstName', ''] },
+              ' ',
+              { $ifNull: ['$creator.lastName', ''] }
+            ]
+          },
+          // Create a searchable string with all student names from StudentRegistration
+          allStudentNames: {
+            $reduce: {
+              input: '$studentRegistrations',
+              initialValue: '',
+              in: {
+                $concat: [
+                  '$$value',
+                  { $cond: [{ $eq: ['$$value', ''] }, '', ' '] },
+                  { $ifNull: ['$$this.studentName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.studentEmail', ''] }
+                ]
+              }
+            }
+          },
+          // Create a searchable string with all user names from Registration
+          allRegisteredUserNames: {
+            $reduce: {
+              input: '$registeredUsers',
+              initialValue: '',
+              in: {
+                $concat: [
+                  '$$value',
+                  { $cond: [{ $eq: ['$$value', ''] }, '', ' '] },
+                  { $ifNull: ['$$this.firstName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.lastName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.email', ''] }
+                ]
+              }
+            }
+          }
+        }
+      },
     ];
 
     if (search) {
@@ -347,8 +419,15 @@ exports.getAllEvents = async (req, res) => {
             { name: nameRegex },
             { description: nameRegex },
             { location: nameRegex },
+            { faculty: nameRegex },
+            { professors: nameRegex },
             { 'creator.firstName': nameRegex },
             { 'creator.lastName': nameRegex },
+            { creatorFullName: nameRegex },
+            // Search in the concatenated student names field
+            { allStudentNames: nameRegex },
+            // Search in the concatenated registered user names field
+            { allRegisteredUserNames: nameRegex }
           ]
         }
       });
@@ -384,6 +463,10 @@ exports.getAllEvents = async (req, res) => {
           bannerFile: 1,
           isRestricted: 1,
           allowedUserTypes: 1,
+          creatorFullName: 1,
+          creatorName: '$creatorFullName',
+          professorName: '$creatorFullName',
+          createdByName: '$creatorFullName',
           createdBy: {
             _id: '$creator._id',
             firstName: '$creator.firstName',
@@ -466,9 +549,12 @@ exports.getAllEvents = async (req, res) => {
 
     // For bazaars and booths, get vendor information
     const eventsWithVendors = await Promise.all(events.map(async (e) => {
+      const creatorFullName = e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null;
       const baseEvent = {
         ...e,
-        creatorName: e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null,
+        creatorName: creatorFullName,
+        professorName: creatorFullName,
+        createdByName: creatorFullName,
         creatorRole: e.createdBy ? (e.createdBy.userType || null) : null,
         creatorFirstName: e.createdBy?.firstName || null,
         creatorLastName: e.createdBy?.lastName || null,
@@ -746,7 +832,33 @@ exports.getAllEventsForStudents = async (req, res) => {
         }
       },
       { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
-      // Add creator name fields for easier searching
+      // Lookup student registrations to get student names
+      {
+        $lookup: {
+          from: 'studentregistrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'studentRegistrations'
+        }
+      },
+      // Lookup registrations and populate user names
+      {
+        $lookup: {
+          from: 'registrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'registrations'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'registrations.user',
+          foreignField: '_id',
+          as: 'registeredUsers'
+        }
+      },
+      // Add creator name fields and student names for easier searching
       {
         $addFields: {
           creatorFullName: {
@@ -755,10 +867,44 @@ exports.getAllEventsForStudents = async (req, res) => {
               ' ',
               { $ifNull: ['$creator.lastName', ''] }
             ]
+          },
+          // Create a searchable string with all student names from StudentRegistration
+          allStudentNames: {
+            $reduce: {
+              input: '$studentRegistrations',
+              initialValue: '',
+              in: {
+                $concat: [
+                  '$$value',
+                  { $cond: [{ $eq: ['$$value', ''] }, '', ' '] },
+                  { $ifNull: ['$$this.studentName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.studentEmail', ''] }
+                ]
+              }
+            }
+          },
+          // Create a searchable string with all user names from Registration
+          allRegisteredUserNames: {
+            $reduce: {
+              input: '$registeredUsers',
+              initialValue: '',
+              in: {
+                $concat: [
+                  '$$value',
+                  { $cond: [{ $eq: ['$$value', ''] }, '', ' '] },
+                  { $ifNull: ['$$this.firstName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.lastName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.email', ''] }
+                ]
+              }
+            }
           }
         }
       },
-      // Apply search filter after adding creator name
+      // Apply search filter after adding creator name and student registrations
       ...(q ? [{
         $match: {
           $or: [
@@ -767,7 +913,11 @@ exports.getAllEventsForStudents = async (req, res) => {
             { location: new RegExp(q, "i") },
             { faculty: new RegExp(q, "i") },
             { professors: new RegExp(q, "i") },
-            { creatorFullName: new RegExp(q, "i") }
+            { creatorFullName: new RegExp(q, "i") },
+            // Search in the concatenated student names field
+            { allStudentNames: new RegExp(q, "i") },
+            // Search in the concatenated registered user names field
+            { allRegisteredUserNames: new RegExp(q, "i") }
           ]
         }
       }] : []),
@@ -798,6 +948,10 @@ exports.getAllEventsForStudents = async (req, res) => {
           bannerFile: 1,
           isRestricted: 1,
           allowedUserTypes: 1,
+          creatorFullName: 1,
+          creatorName: '$creatorFullName',
+          professorName: '$creatorFullName',
+          createdByName: '$creatorFullName',
           createdBy: {
             _id: '$creator._id',
             firstName: '$creator.firstName',
@@ -901,10 +1055,13 @@ exports.getAllEventsForStudents = async (req, res) => {
           }
         }
 
+        const creatorFullName = event.createdBy ? `${event.createdBy.firstName || ''} ${event.createdBy.lastName || ''}`.trim() : null;
         return {
           ...event,
           vendors,
-          creatorName: event.createdBy ? `${event.createdBy.firstName || ''} ${event.createdBy.lastName || ''}`.trim() : null,
+          creatorName: creatorFullName,
+          professorName: creatorFullName,
+          createdByName: creatorFullName,
           creatorRole: event.createdBy ? (event.createdBy.userType || null) : null,
           creatorFirstName: event.createdBy?.firstName || null,
           creatorLastName: event.createdBy?.lastName || null,
