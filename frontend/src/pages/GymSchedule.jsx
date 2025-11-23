@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { gymApiService } from '../api/gymApi';
 import { gymSessionApi } from '../api/gymSessionApi';
 import GymSessionForm from '../components/GymSessionForm';
+import GymSessionRegistrationForm from '../components/GymSessionRegistrationForm';
 
 const TYPES = ['yoga', 'pilates', 'aerobics', 'zumba', 'cross circuit', 'kick-boxing', 'strength', 'cardio', 'other'];
 
@@ -60,6 +61,8 @@ const GymSchedule = () => {
   const [typeFilter, setTypeFilter] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -935,6 +938,15 @@ const GymSchedule = () => {
                               const sessionType = s.type || 'other';
                               const sessionColor = getSessionTypeColor(sessionType);
 
+                              // Check if user can register (not Events Office)
+                              const canRegister = user?.userType && ['Student', 'Staff', 'TA', 'Professor'].includes(user.userType);
+                              // Check if session is active and not in the past
+                              const sessionDate = new Date(s.date);
+                              const [hh = '0', mm = '0'] = String(s.time || '00:00').split(':');
+                              const sessionDateTime = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate(), parseInt(hh, 10) || 0, parseInt(mm, 10) || 0);
+                              const isFuture = sessionDateTime > new Date();
+                              const isActive = s.status === 'active';
+
                               return (
                                 <div
                                   key={s._id || s.id || sessionIdx}
@@ -944,19 +956,29 @@ const GymSchedule = () => {
                                     borderRadius: '0.25rem',
                                     padding: '0.25rem 0.375rem',
                                     fontSize: '0.625rem',
-                                    cursor: 'pointer',
+                                    cursor: (canRegister && isActive && isFuture) ? 'pointer' : 'default',
                                     transition: 'opacity 0.2s, transform 0.2s',
                                     boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
                                   }}
+                                  onClick={() => {
+                                    if (canRegister && isActive && isFuture) {
+                                      setSelectedSession(s);
+                                      setIsRegistrationModalOpen(true);
+                                    }
+                                  }}
                                   onMouseEnter={(e) => {
-                                    e.target.style.opacity = '0.9';
-                                    e.target.style.transform = 'scale(1.02)';
+                                    if (canRegister && isActive && isFuture) {
+                                      e.target.style.opacity = '0.9';
+                                      e.target.style.transform = 'scale(1.02)';
+                                    }
                                   }}
                                   onMouseLeave={(e) => {
-                                    e.target.style.opacity = '1';
-                                    e.target.style.transform = 'scale(1)';
+                                    if (canRegister && isActive && isFuture) {
+                                      e.target.style.opacity = '1';
+                                      e.target.style.transform = 'scale(1)';
+                                    }
                                   }}
-                                  title={`${typeLabel} at ${timeStr}`}
+                                  title={canRegister && isActive && isFuture ? `Click to register for ${typeLabel} at ${timeStr}` : `${typeLabel} at ${timeStr}`}
                                 >
                                   <div style={{
                                     fontWeight: '600',
@@ -993,6 +1015,22 @@ const GymSchedule = () => {
           )}
         </div>
       </main>
+
+      {/* Registration Modal */}
+      {isRegistrationModalOpen && selectedSession && (
+        <GymSessionRegistrationForm
+          gymSession={selectedSession}
+          onClose={() => {
+            setIsRegistrationModalOpen(false);
+            setSelectedSession(null);
+          }}
+          onSuccess={(result) => {
+            console.log('Registration successful:', result);
+            // Reload sessions to update the display
+            load();
+          }}
+        />
+      )}
 
       {/* Create Gym Session Modal */}
       {isCreateModalOpen && isEventsOffice && (

@@ -2,6 +2,7 @@ const GymSession = require('../models/gymSessionModel');
 const GymRegistration = require('../models/gymRegistrationModel');
 const User = require('../models/userModel');
 const { sendGymCancellationEmail } = require('../utils/sendGymCancellationEmail');
+const { sendGymEditEmail } = require('../utils/sendGymEditEmail');
 
 // Create a new gym session
 exports.createGymSession = async (req, res) => {
@@ -233,12 +234,72 @@ exports.updateGymSession = async (req, res) => {
     const wasActive = gymSession.status === 'active';
     const isBeingCancelled = updates.status === 'cancelled' && wasActive;
 
+    // Check if session details are being edited (date, time, or location changed)
+    const isBeingEdited = (updates.date && updates.date.toString() !== gymSession.date.toString()) ||
+                          (updates.time && updates.time !== gymSession.time) ||
+                          (updates.location && updates.location !== gymSession.location);
+
+    // Store old values for email notification
+    const oldDate = gymSession.date;
+    const oldTime = gymSession.time;
+    const oldLocation = gymSession.location;
+
     // Use findByIdAndUpdate to avoid full validation issues
     const updatedGymSession = await GymSession.findByIdAndUpdate(
       id,
       { $set: updates },
       { new: true, runValidators: false }
     );
+
+    // If session was edited (not cancelled), notify all registered users
+    if (isBeingEdited && !isBeingCancelled && wasActive) {
+      try {
+        const registrations = await GymRegistration.find({
+          gymSession: id,
+          status: 'registered'
+        }).populate('user', 'email firstName lastName');
+
+        console.log(`📧 Sending edit notification emails to ${registrations.length} registered users...`);
+
+        for (const registration of registrations) {
+          if (registration.user && registration.user.email) {
+            const userName = registration.user.firstName
+              ? `${registration.user.firstName} ${registration.user.lastName || ''}`.trim()
+              : registration.user.email;
+
+            try {
+              const emailResult = await sendGymEditEmail(
+                registration.user.email,
+                userName,
+                updatedGymSession.type,
+                oldDate,
+                oldTime,
+                updatedGymSession.date,
+                updatedGymSession.time,
+                oldLocation,
+                updatedGymSession.location
+              );
+
+              if (emailResult.sent) {
+                console.log(`✅ Edit notification email sent to ${registration.user.email}`);
+              } else {
+                console.error(`❌ Failed to send edit notification email to ${registration.user.email}:`,
+                  emailResult.reason || emailResult.error);
+              }
+            } catch (emailError) {
+              console.error(`❌ Exception sending edit notification email to ${registration.user.email}:`,
+                emailError.message);
+              // Continue with other users even if one fails
+            }
+          }
+        }
+
+        console.log('✅ Finished sending edit notification emails');
+      } catch (error) {
+        console.error('❌ Error sending edit notification emails:', error);
+        // Don't fail the update if email sending fails
+      }
+    }
 
     // If session was cancelled, notify all registered users
     if (isBeingCancelled) {
@@ -573,6 +634,7 @@ exports.getGymSessionStats = async (req, res) => {
 exports.registerForGymSession = async (req, res) => {
   try {
     const { id } = req.params;
+    const { name, id: registrationId, email } = req.body; // Optional: name, id, email from form
     const userId = req.user._id;
     const userType = req.user.userType || req.user.role;
 

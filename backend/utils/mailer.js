@@ -14,8 +14,11 @@ const transporter = nodemailer.createTransport({
 async function sendVerificationEmail(to, token, name) {
   console.log('📧 sendVerificationEmail called with:', { to, token, name });
   
-  const verifyUrl = `${process.env.BACKEND_URL || "http://localhost:5000"}/api/auth/verify-email?token=${token}`;
-  const loginRedirect = process.env.APP_LOGIN_URL || "http://localhost:3000/login";
+  // Use FRONTEND_URL for the verification endpoint redirect, or BACKEND_URL as fallback
+  const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+  const frontendUrl = process.env.FRONTEND_URL || process.env.APP_LOGIN_URL?.replace('/login', '') || "http://localhost:3000";
+  const verifyUrl = `${backendUrl}/api/auth/verify-email?token=${token}`;
+  const loginRedirect = `${frontendUrl}/login`;
   
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -56,7 +59,11 @@ async function sendVerificationEmail(to, token, name) {
   
   // Check if SMTP is configured
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.log('📧 Development Mode: Storing email in database instead of sending');
+    console.log('📧 [Verification Email - Dev Mode] Email not sent (SMTP disabled).');
+    console.log('   To:', to);
+    console.log('   Name:', name);
+    console.log('   Verification URL:', verifyUrl);
+    console.log('   ⚠️  To enable email sending, configure SMTP_HOST, SMTP_USER, and SMTP_PASS in .env');
     
     // Store email in database for development
     try {
@@ -68,46 +75,45 @@ async function sendVerificationEmail(to, token, name) {
         verificationUrl: verifyUrl,
         userInfo: {
           name: name,
-          userType: 'Staff/TA/Professor', // This will be updated based on actual user type
+          userType: 'Staff/TA/Professor',
           email: to
         }
       });
       
       await emailRecord.save();
       console.log('✅ Email stored in database for development');
-      console.log('🔗 Verification URL:', verifyUrl);
       console.log('📧 View emails at: http://localhost:5000/api/dev/emails');
-      
-      return; // Success - email stored in database
     } catch (error) {
       console.error('❌ Error storing email in database:', error);
-      // Fallback to console logging
-      console.log('🔗 VERIFICATION LINK (Fallback):');
-      console.log('   User:', name);
-      console.log('   Email:', to);
-      console.log('   Verification URL:', verifyUrl);
-      console.log('   Token:', token);
-      return;
     }
+    
+    return { sent: false, reason: 'SMTP not configured' };
   }
   
-  console.log('📧 Sending email with config:', {
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    user: process.env.SMTP_USER,
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
-    to,
-    subject: "GUC Events — Verify your account"
-  });
+  console.log('📧 Attempting to send verification email...');
+  console.log('   SMTP Host:', process.env.SMTP_HOST);
+  console.log('   SMTP Port:', process.env.SMTP_PORT || 587);
+  console.log('   SMTP User:', process.env.SMTP_USER);
+  console.log('   To:', to);
+  console.log('   Subject: GUC Events — Verify your account');
 
   try {
-    await transporter.sendMail({
+    // Verify transporter connection first
+    await transporter.verify();
+    console.log('✅ SMTP connection verified');
+
+    const mailOptions = {
       from: process.env.SMTP_FROM || `Bindly <${process.env.SMTP_USER}>`,
       to,
       subject: "GUC Events — Verify your account",
       html,
-    });
-    console.log('✅ Email sent successfully to:', to);
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Verification email sent successfully!');
+    console.log('   Message ID:', info.messageId);
+    console.log('   To:', to);
+    console.log('   Verification URL:', verifyUrl);
     
     // If using Mailtrap (testing service), also log the verification link
     if (process.env.SMTP_HOST && process.env.SMTP_HOST.includes('mailtrap')) {
@@ -118,9 +124,15 @@ async function sendVerificationEmail(to, token, name) {
       console.log('   Token:', token);
       console.log('   ⚠️  Mailtrap is a testing service - check Mailtrap inbox for the email');
     }
+    
+    return { sent: true, messageId: info.messageId };
   } catch (error) {
-    console.error('❌ Failed to send email:', error);
-    throw error;
+    console.error('❌ Failed to send verification email:');
+    console.error('   Error:', error.message);
+    console.error('   Error Code:', error.code);
+    console.error('   Error Response:', error.response);
+    console.error('   Full Error:', error);
+    return { sent: false, error: error.message, code: error.code };
   }
 }
 

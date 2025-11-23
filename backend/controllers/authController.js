@@ -473,17 +473,40 @@ async function resendVerification(req, res) {
     if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    if (user.userType !== 'Student') return res.status(400).json({ success: false, message: 'Only students require verification' });
+    
+    // Allow resending for all user types that need verification (Student, Staff, TA, Professor)
+    const requiresVerification = ['Student', 'Staff', 'TA', 'Professor'].includes(user.userType);
+    if (!requiresVerification) {
+      return res.status(400).json({ success: false, message: 'This user type does not require verification' });
+    }
+    
     if (user.isVerified) return res.status(400).json({ success: false, message: 'User already verified' });
 
+    // Generate new token if missing or expired
     if (!user.verificationToken || !user.verificationExpiresAt || user.verificationExpiresAt <= new Date()) {
       user.verificationToken = crypto.randomBytes(32).toString('hex');
       user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await user.save();
     }
 
-    await sendVerificationEmail(user.email, user.verificationToken);
-    return res.json({ success: true, message: 'Verification email resent' });
+    // Get user name for email
+    const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.name || user.email;
+    
+    // Send verification email
+    const emailResult = await sendVerificationEmail(user.email, user.verificationToken, userName);
+    
+    if (emailResult.sent) {
+      console.log('✅ Verification email resent successfully to:', user.email);
+      return res.json({ success: true, message: 'Verification email resent successfully' });
+    } else {
+      console.error('❌ Verification email not sent:', emailResult.reason || emailResult.error);
+      return res.status(500).json({ 
+        success: false, 
+        message: emailResult.reason === 'SMTP not configured' 
+          ? 'Email service is not configured. Please contact support.' 
+          : 'Failed to send verification email. Please try again later.' 
+      });
+    }
   } catch (e) {
     console.error('resendVerification error:', e);
     return res.status(500).json({ success: false, message: 'Internal server error' });

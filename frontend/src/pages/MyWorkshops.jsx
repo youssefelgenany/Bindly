@@ -788,13 +788,9 @@ const MyWorkshops = () => {
             </div>
           </div>
 
-          {/* Create Workshop Button - Below Banner, Right Aligned */}
+          {/* Create Workshop Button - Below Banner */}
           {!showCreateForm && (
-            <div style={{ 
-              marginBottom: '1.5rem',
-              display: 'flex',
-              justifyContent: 'flex-end'
-            }}>
+            <div style={{ marginBottom: '1.5rem' }}>
               <button
                 onClick={() => setShowCreateForm(true)}
                 style={{
