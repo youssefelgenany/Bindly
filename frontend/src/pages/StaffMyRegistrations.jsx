@@ -556,7 +556,7 @@ const StaffMyRegistrations = () => {
               </p>
             </div>
           </div>
-      {error && (
+          {error && (
             <div style={{
               padding: '0.75rem 1rem',
               marginBottom: '1.5rem',
@@ -566,8 +566,8 @@ const StaffMyRegistrations = () => {
               fontSize: '0.875rem'
             }}>
               {error}
-        </div>
-      )}
+            </div>
+          )}
 
           {!loading && registrations.length === 0 ? (
             <div style={{
@@ -689,45 +689,6 @@ const StaffMyRegistrations = () => {
                           }}
                           onError={(e) => {
                             // Fallback if image doesn't exist
-                            e.target.style.display = 'none';
-                            e.target.parentElement.style.backgroundColor = getEventTypeColor(registration.eventType);
-                            e.target.parentElement.style.display = 'flex';
-                            e.target.parentElement.style.alignItems = 'center';
-                            e.target.parentElement.style.justifyContent = 'center';
-                            if (!e.target.parentElement.querySelector('.fallback-text')) {
-                              const fallback = document.createElement('div');
-                              fallback.className = 'fallback-text';
-                              fallback.textContent = getEventTypeFallbackText(registration.eventType);
-                              fallback.style.color = '#FFFFFF';
-                              fallback.style.fontSize = '1.5rem';
-                              fallback.style.fontWeight = '700';
-                              e.target.parentElement.appendChild(fallback);
-                            }
-                          }}
-                        />
-                      </div>
-                    )}
-                    
-                    <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                      <div style={{
-                        width: '100%',
-                        height: '180px',
-                        overflow: 'hidden',
-                        position: 'relative',
-                        backgroundColor: '#f3f4f6',
-                        flexShrink: 0
-                      }}>
-                        <img
-                          src={getEventTypeImage(registration.eventType)}
-                          alt={registration.eventType ? registration.eventType.charAt(0).toUpperCase() + registration.eventType.slice(1) : 'Event'}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            objectPosition: 'center'
-                          }}
-                          onError={(e) => {
                             e.target.style.display = 'none';
                             e.target.parentElement.style.backgroundColor = getEventTypeColor(registration.eventType);
                             e.target.parentElement.style.display = 'flex';
@@ -901,7 +862,7 @@ const StaffMyRegistrations = () => {
                         </span>
                         <span>{registration.eventLocation}</span>
                       </div>
-                    </div>
+                      </div>
 
                       {registration.eventDescription && (
                         <p style={{
