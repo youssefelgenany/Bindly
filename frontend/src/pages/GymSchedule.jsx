@@ -332,8 +332,8 @@ const GymSchedule = () => {
           </div>
         </header>
 
-        {/* Horizontal Menu Bar - Show for Students and Professors */}
-        {(user?.userType === 'Student' || user?.userType === 'Professor') && (
+        {/* Horizontal Menu Bar - Show for Students, Professors, and TA */}
+        {(user?.userType === 'Student' || user?.userType === 'Professor' || user?.userType === 'TA') && (
           <nav style={{
             display: 'flex',
             alignItems: 'center',
@@ -355,7 +355,49 @@ const GymSchedule = () => {
             >
               Dashboard
             </Link>
-            {user?.userType === 'Student' ? (
+            {user?.userType === 'TA' ? (
+              <>
+                <Link
+                  to="/staff/events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  Discover Events
+                </Link>
+                <Link
+                  to="/staff/my-registrations"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Events
+                </Link>
+                <Link
+                  to="/staff/favorites"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Favorites
+                </Link>
+              </>
+            ) : user?.userType === 'Student' ? (
               <>
                 <Link
                   to="/student/events"

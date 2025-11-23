@@ -93,6 +93,13 @@ router.get("/:id/ratings", protect, getEventRatingsAndComments);
 router.get("/:id/comments", protect, getEventRatingsAndComments);
 router.get("/:id/feedback", protect, getEventRatingsAndComments);
 
+// ✅ Confirm Stripe payment success (callback after redirect - public route)
+// MUST be before /:id route to avoid route matching conflicts
+router.get(
+  "/payment-success",
+  require("../controllers/stripeSuccessController")
+);
+
 // 🔍 Get a specific event by its ID
 router.get("/:id", protect, getEventById);
 
@@ -128,12 +135,6 @@ router.post(
   payForEvent
 );
 
-// ✅ Confirm Stripe payment success (callback after redirect - public route)
-router.get(
-  "/payment-success",
-  require("../controllers/stripeSuccessController")
-);
-
 // 🔍 Manual payment verification endpoint (for testing/debugging)
 router.get(
   "/verify-payment",
@@ -145,6 +146,14 @@ router.get(
 // 🚫 Cancel event registration and get refund
 router.post(
   "/:id/cancel",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  cancelRegistration
+);
+
+// 🚫 Cancel event registration (DELETE method for consistency with frontend)
+router.delete(
+  "/:id/register",
   protect,
   permit("Student", "Staff", "TA", "Professor"),
   cancelRegistration

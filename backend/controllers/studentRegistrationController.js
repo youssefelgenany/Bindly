@@ -73,17 +73,37 @@ exports.registerStudentForEvent = async (req, res) => {
       });
     }
 
-    // Check for duplicate registration
+    // Check for duplicate registration - exclude cancelled registrations
     const existingRegistration = await StudentRegistration.findOne({ 
       event: eventId, 
-      studentEmail: studentEmail.toLowerCase() 
+      studentEmail: studentEmail.toLowerCase(),
+      status: { $ne: 'cancelled' } // Exclude cancelled registrations
     });
     
+    // If registration exists, check if it's a valid (paid) registration
     if (existingRegistration) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'You are already registered for this event' 
-      });
+      const eventPrice = event.price || 0;
+      if (eventPrice > 0) {
+        // For paid events, only block if the registration is paid
+        if (existingRegistration.paid === true) {
+          return res.status(400).json({ 
+            success: false,
+            message: 'You are already registered for this event' 
+          });
+        }
+        // If unpaid, delete the old unpaid registration to allow new registration
+        // This handles cases where user went back from payment page without paying
+        console.log('🗑️ Deleting unpaid registration to allow re-registration:', existingRegistration._id);
+        await StudentRegistration.findByIdAndDelete(existingRegistration._id);
+        // Decrement event registered count
+        await Event.findByIdAndUpdate(eventId, { $inc: { registeredCount: -1 } });
+      } else {
+        // For free events, block any existing registration
+        return res.status(400).json({ 
+          success: false,
+          message: 'You are already registered for this event' 
+        });
+      }
     }
 
     // Create registration
@@ -101,6 +121,10 @@ exports.registerStudentForEvent = async (req, res) => {
       if (dietaryRequirements) registrationData.dietaryRequirements = dietaryRequirements;
       if (medicalConditions) registrationData.medicalConditions = medicalConditions;
     }
+
+    // Set paid status: false if event has a price (requires payment), true if free
+    const eventPrice = event.price || 0;
+    registrationData.paid = eventPrice <= 0;
 
     const registration = await StudentRegistration.create(registrationData);
 
@@ -326,6 +350,7 @@ exports.getStudentRegistrationsByEmail = async (req, res) => {
         studentId: reg.studentId,
         studentEmail: reg.studentEmail,
         status: reg.status,
+        paid: reg.paid || false,
         registeredAt: reg.registeredAt,
         emergencyContact: reg.emergencyContact,
         dietaryRequirements: reg.dietaryRequirements,
