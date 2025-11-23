@@ -487,6 +487,30 @@ export const professorApiService = {
     }
   },
 
+  // Get workshop status and edit requests (for professors)
+  getMyWorkshopsStatus: async () => {
+    try {
+      console.log('📊 Fetching workshop status and edit requests...');
+      const response = await axios.get('http://localhost:5000/api/workshops/my-workshops/status', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      console.log('✅ Workshop status fetched successfully:', response.data);
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('❌ Error fetching workshop status:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.error || 'Failed to fetch workshop status',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
   // Update a workshop (for professors)
   updateWorkshop: async (workshopId, workshopData) => {
     try {

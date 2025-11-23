@@ -657,3 +657,4 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
 export default PlatformBoothsModal;
 
 
+

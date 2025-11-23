@@ -807,6 +807,158 @@ exports.getAttendeesReport = async (req, res) => {
   }
 };
 
+// Get sales report for Events Office/Admin
+exports.getSalesReport = async (req, res) => {
+  try {
+    console.log('💰 Generating sales report...');
+
+    // Extract filter parameters from query string
+    const { eventType, startDate, endDate, sortBy } = req.query;
+
+    console.log('🔍 Filters applied:', { eventType, startDate, endDate, sortBy });
+
+    const Payment = require('../models/paymentModel');
+    const Event = require('../models/eventModel');
+    const Trip = require('../models/tripModel');
+
+    // Build event filter object
+    const eventFilter = {};
+
+    // Filter by event type
+    if (eventType) {
+      eventFilter.type = eventType;
+    }
+
+    // Filter by date range (event dates)
+    if (startDate || endDate) {
+      if (startDate && endDate) {
+        eventFilter.$and = [
+          { startDate: { $lte: new Date(endDate) } },
+          { endDate: { $gte: new Date(startDate) } }
+        ];
+      } else if (startDate) {
+        eventFilter.endDate = { $gte: new Date(startDate) };
+      } else if (endDate) {
+        eventFilter.startDate = { $lte: new Date(endDate) };
+      }
+    }
+
+    // Get all events matching the filter
+    const events = await Event.find(eventFilter).lean();
+    const trips = await Trip.find(eventFilter).lean();
+    const allEvents = [...events, ...trips];
+    
+    const eventIds = allEvents.map(e => e._id);
+    console.log(`📅 Found ${allEvents.length} events matching filters`);
+
+    // Get successful payments for these events
+    const payments = await Payment.find({
+      event: { $in: eventIds },
+      status: 'success'
+    }).lean();
+
+    console.log(`💳 Found ${payments.length} successful payments`);
+
+    // Build report structure
+    const report = {
+      summary: {
+        totalEvents: allEvents.length,
+        totalRevenue: 0,
+        totalPayments: payments.length
+      },
+      byEventType: {},
+      byEvent: []
+    };
+
+    // Aggregate revenue by event
+    const revenueByEvent = {};
+    payments.forEach(payment => {
+      const eventId = payment.event.toString();
+      if (!revenueByEvent[eventId]) {
+        revenueByEvent[eventId] = {
+          totalRevenue: 0,
+          paymentCount: 0
+        };
+      }
+      revenueByEvent[eventId].totalRevenue += payment.amount;
+      revenueByEvent[eventId].paymentCount += 1;
+    });
+
+    // Build per-event details
+    allEvents.forEach(event => {
+      const eventId = event._id.toString();
+      const eventType = event.type || 'other';
+      const revenue = revenueByEvent[eventId] || { totalRevenue: 0, paymentCount: 0 };
+
+      // Initialize event type in report if not exists
+      if (!report.byEventType[eventType]) {
+        report.byEventType[eventType] = {
+          eventCount: 0,
+          totalRevenue: 0,
+          paymentCount: 0
+        };
+      }
+
+      // Update event type totals
+      report.byEventType[eventType].eventCount++;
+      report.byEventType[eventType].totalRevenue += revenue.totalRevenue;
+      report.byEventType[eventType].paymentCount += revenue.paymentCount;
+
+      // Add per-event details
+      report.byEvent.push({
+        eventId: eventId,
+        title: event.title || event.name,
+        type: eventType,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        location: event.location,
+        price: event.price || 0,
+        revenue: revenue.totalRevenue,
+        paymentCount: revenue.paymentCount,
+        status: event.status
+      });
+    });
+
+    // Calculate total revenue
+    report.summary.totalRevenue = payments.reduce((sum, payment) => sum + payment.amount, 0);
+
+    // Sort events by revenue
+    if (sortBy === 'revenue-asc') {
+      report.byEvent.sort((a, b) => a.revenue - b.revenue);
+    } else if (sortBy === 'revenue-desc') {
+      report.byEvent.sort((a, b) => b.revenue - a.revenue);
+    } else {
+      // Default: sort by start date (most recent first)
+      report.byEvent.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+    }
+
+    console.log('✅ Sales report generated successfully');
+    console.log(`   Total Revenue: ${report.summary.totalRevenue}`);
+    console.log(`   Total Events: ${report.summary.totalEvents}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Sales report fetched successfully',
+      report: report,
+      filters: {
+        eventType: eventType || null,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        sortBy: sortBy || null
+      },
+      generatedAt: new Date()
+    });
+
+  } catch (error) {
+    console.error('❌ Error generating sales report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate sales report',
+      error: error.message
+    });
+  }
+};
+
 // Block a user account
 exports.blockUser = async (req, res) => {
   try {

@@ -97,6 +97,7 @@ const getMyWorkshops = async (req, res) => {
       extraRequiredResources: event.extraResources,
       extraResources: event.extraResources,
       capacity: event.capacity,
+      registeredCount: event.registeredCount || 0,
       professorId: event.createdBy,
       createdBy: event.createdBy,
       status: event.status,
@@ -444,6 +445,45 @@ const updateWorkshop = async (req, res) => {
       return res.status(400).json({ error: 'Registration deadline must be before the workshop start date' });
     }
 
+    // First, find the existing event to check if it has edit requests
+    const existingEvent = await Event.findOne({
+      _id: req.params.id,
+      type: 'workshop',
+      createdBy: req.user._id
+    });
+
+    if (!existingEvent) {
+      return res.status(404).json({ error: 'Workshop not found or not authorized' });
+    }
+
+    // Prepare update data
+    const updateData = {
+      title: workshopName,
+      description: shortDescription,
+      location: location,
+      startDate: startDateTime,
+      endDate: endDateTime,
+      registrationDeadline: registrationDeadlineDate,
+      capacity: capacity,
+      // Workshop-specific fields
+      agenda: fullAgenda,
+      faculty: facultyResponsible,
+      professors: Array.isArray(professorsParticipating) 
+        ? professorsParticipating 
+        : (professorsParticipating ? professorsParticipating.split(',').map(p => p.trim()).filter(p => p) : []),
+      extraResources: req.body.extraRequiredResources || '',
+      fundingSource: fundingSource || 'GUC',
+      budget: requiredBudget,
+      updatedAt: new Date()
+    };
+
+    // If workshop has edit requests (status is 'needs_edits'), clear them and reset status to 'pending'
+    if (existingEvent.status === 'needs_edits' && existingEvent.editRequests) {
+      updateData.editRequests = '';
+      updateData.status = 'pending';
+      console.log('✅ Clearing edit requests and resetting status to pending for workshop:', req.params.id);
+    }
+
     // Find and update the Event document (workshops are stored in Event model)
     const event = await Event.findOneAndUpdate(
       { 
@@ -451,32 +491,10 @@ const updateWorkshop = async (req, res) => {
         type: 'workshop',
         createdBy: req.user._id 
       },
-      { 
-        title: workshopName,
-        description: shortDescription,
-        location: location,
-        startDate: startDateTime,
-        endDate: endDateTime,
-        registrationDeadline: registrationDeadlineDate,
-        capacity: capacity,
-        // Workshop-specific fields
-        agenda: fullAgenda,
-        faculty: facultyResponsible,
-        professors: Array.isArray(professorsParticipating) 
-          ? professorsParticipating 
-          : (professorsParticipating ? professorsParticipating.split(',').map(p => p.trim()).filter(p => p) : []),
-        extraResources: req.body.extraRequiredResources || '',
-        fundingSource: fundingSource || 'GUC',
-        budget: requiredBudget,
-        updatedAt: new Date()
-        // Note: status is NOT updated by professor (only Events Office can change status)
-      },
+      updateData,
       { new: true, runValidators: true }
     );
 
-    if (!event) {
-      return res.status(404).json({ error: 'Workshop not found or not authorized' });
-    }
 
     // Transform Event document back to workshop format for backward compatibility
     const formattedWorkshop = {
@@ -621,6 +639,10 @@ const approveWorkshop = async (req, res) => {
       endDate: event.endDate,
       registrationDeadline: event.registrationDeadline
     });
+    
+    // Send notifications to all eligible users about the newly approved event
+    const { notifyNewEventCreated } = require("../services/notificationService");
+    await notifyNewEventCreated(event);
     
     // Create notification for the professor
     try {

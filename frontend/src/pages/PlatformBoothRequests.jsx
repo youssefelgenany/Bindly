@@ -285,6 +285,84 @@ const PlatformBoothRequests = () => {
               </Link>
 
               <Link
+                to="/event-office/vendors"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/vendors') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/vendors')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/vendors')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  storefront
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/vendors') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Vendors
+                </p>
+              </Link>
+
+              <Link
+                to="/event-office/loyalty-partners"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/loyalty-partners') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/loyalty-partners')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/loyalty-partners')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/loyalty-partners') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  card_giftcard
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/loyalty-partners') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/loyalty-partners') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Loyalty Partners
+                </p>
+              </Link>
+
+              <Link
                 to="/event-office/workshops"
                 style={{
                   display: 'flex',
@@ -352,15 +430,15 @@ const PlatformBoothRequests = () => {
                   location_on
                 </span>
                 {sidebarOpen && (
-                  <p style={{
+                <p style={{
                     color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
+                  fontSize: '0.875rem',
                     fontWeight: isActiveRoute('/event-office/platform-booth-requests') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
                     Platform Booths
-                  </p>
+                </p>
                 )}
               </Link>
 
@@ -393,13 +471,13 @@ const PlatformBoothRequests = () => {
                   calendar_month
                 </span>
                 {sidebarOpen && (
-                  <p style={{
+                <p style={{
                     color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
+                  fontSize: '0.875rem',
                     fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
                     View Gym Sessions
                   </p>
                 )}

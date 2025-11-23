@@ -36,6 +36,12 @@ const MyWorkshops = () => {
   });
   const [creating, setCreating] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [selectedWorkshopForParticipants, setSelectedWorkshopForParticipants] = useState(null);
+  const [participants, setParticipants] = useState([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
+  const [workshopStatus, setWorkshopStatus] = useState(null);
+  const [loadingStatus, setLoadingStatus] = useState(false);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -71,11 +77,43 @@ const MyWorkshops = () => {
     setError('');
 
     try {
-      const result = await professorApiService.getMyWorkshops();
-      if (result.success) {
-        setWorkshops(Array.isArray(result.data) ? result.data : []);
+      // Load both workshops and status in parallel
+      const [workshopsResult, statusResult] = await Promise.all([
+        professorApiService.getMyWorkshops(),
+        professorApiService.getMyWorkshopsStatus()
+      ]);
+
+      if (workshopsResult.success) {
+        let workshopsData = Array.isArray(workshopsResult.data) ? workshopsResult.data : [];
+        
+        // Merge status data if available
+        if (statusResult.success && statusResult.data && statusResult.data.workshops) {
+          setWorkshopStatus(statusResult.data);
+          const statusMap = new Map();
+          statusResult.data.workshops.forEach(status => {
+            statusMap.set(status.id, status);
+          });
+          
+          workshopsData = workshopsData.map(workshop => {
+            const status = statusMap.get(workshop._id || workshop.id);
+            if (status) {
+              return {
+                ...workshop,
+                editRequests: status.editRequests,
+                rejectionReason: status.rejectionReason,
+                hasEditRequests: status.hasEditRequests,
+                hasRejectionReason: status.hasRejectionReason,
+                submittedAt: status.submittedAt,
+                lastUpdated: status.lastUpdated
+              };
+            }
+            return workshop;
+          });
+        }
+        
+        setWorkshops(workshopsData);
       } else {
-        setError(result.message || 'Failed to load workshops');
+        setError(workshopsResult.message || 'Failed to load workshops');
         setWorkshops([]);
       }
     } catch (err) {
@@ -84,6 +122,7 @@ const MyWorkshops = () => {
       setWorkshops([]);
     } finally {
       setLoading(false);
+      setLoadingStatus(false);
     }
   }, [user]);
 
@@ -92,6 +131,7 @@ const MyWorkshops = () => {
       loadWorkshops();
     }
   }, [user, loadWorkshops]);
+
 
   useEffect(() => {
     if (location.pathname === '/professor/my-workshops' && user) {
@@ -325,7 +365,8 @@ const MyWorkshops = () => {
         setShowEditModal(false);
         setSelectedWorkshop(null);
         setError('');
-        await loadWorkshops(); // Reload workshops
+        // Reload workshops and status to reflect cleared edit requests
+        await loadWorkshops();
       } else {
         setError(result.message || result.error?.message || 'Failed to update workshop');
       }
@@ -503,6 +544,43 @@ const MyWorkshops = () => {
       booth: '#ec4899'
     };
     return colorMap[type?.toLowerCase()] || '#6b7280';
+  };
+
+  const handleViewParticipants = async (workshop) => {
+    setSelectedWorkshopForParticipants(workshop);
+    setShowParticipantsModal(true);
+    setLoadingParticipants(true);
+    setParticipants([]);
+
+    try {
+      console.log('📋 Loading participants for workshop:', workshop._id, workshop.title);
+      const result = await professorApiService.getEventRegistrations(workshop._id);
+      console.log('📋 Participants API response:', result);
+      
+      if (result.success && result.data && result.data.registrations) {
+        console.log('✅ Found participants:', result.data.registrations.length);
+        setParticipants(result.data.registrations);
+      } else if (result.success && Array.isArray(result.data)) {
+        // Handle case where registrations are returned directly as array
+        console.log('✅ Found participants (array format):', result.data.length);
+        setParticipants(result.data);
+      } else {
+        console.log('⚠️ No participants found or unexpected response format');
+        setParticipants([]);
+      }
+    } catch (err) {
+      console.error('❌ Error loading participants:', err);
+      console.error('❌ Error details:', err.response?.data || err.message);
+      setParticipants([]);
+    } finally {
+      setLoadingParticipants(false);
+    }
+  };
+
+  const getRemainingSpots = (workshop) => {
+    const capacity = workshop.capacity || 0;
+    const registered = workshop.registeredCount || 0;
+    return Math.max(0, capacity - registered);
   };
 
   return (
@@ -788,6 +866,79 @@ const MyWorkshops = () => {
             </div>
           </div>
 
+          {/* Summary Section */}
+          {!showCreateForm && workshopStatus && workshopStatus.summary && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: '1rem',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Pending</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#f59e0b' }}>
+                  {workshopStatus.summary.pending || 0}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Approved</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#059669' }}>
+                  {workshopStatus.summary.approved || 0}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Needs Edits</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#d97706' }}>
+                  {workshopStatus.summary.needsEdits || 0}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Rejected</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#dc2626' }}>
+                  {workshopStatus.summary.rejected || 0}
+                </div>
+              </div>
+              {workshopStatus.summary.withEditRequests > 0 && (
+                <div style={{
+                  backgroundColor: '#FEF3C7',
+                  padding: '1rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #FCD34D',
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                }}>
+                  <div style={{ fontSize: '0.75rem', color: '#92400e', marginBottom: '0.25rem' }}>With Edit Requests</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#92400e' }}>
+                    {workshopStatus.summary.withEditRequests || 0}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Create Workshop Button - Below Banner */}
           {!showCreateForm && (
             <div style={{ marginBottom: '1.5rem' }}>
@@ -1063,10 +1214,90 @@ const MyWorkshops = () => {
                             }}>
                               people
                             </span>
-                            <span>Capacity: {workshop.capacity}</span>
+                            <span>
+                              {workshop.registeredCount || 0} / {workshop.capacity} registered
+                              {getRemainingSpots(workshop) > 0 && (
+                                <span style={{ color: '#059669', fontWeight: '600', marginLeft: '0.5rem' }}>
+                                  ({getRemainingSpots(workshop)} spots remaining)
+                                </span>
+                              )}
+                            </span>
                           </div>
                         )}
                       </div>
+
+                      {/* Edit Requests and Rejection Reasons */}
+                      {(workshop.hasEditRequests || workshop.hasRejectionReason) && (
+                        <div style={{
+                          marginBottom: '0.75rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.5rem'
+                        }}>
+                          {workshop.hasEditRequests && workshop.editRequests && (
+                            <div style={{
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: '#FEF3C7',
+                              border: '1px solid #FCD34D'
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                marginBottom: '0.5rem',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                color: '#92400e'
+                              }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                  edit_note
+                                </span>
+                                Edit Requests
+                              </div>
+                              <div style={{
+                                fontSize: '0.8125rem',
+                                color: '#78350f',
+                                lineHeight: '1.5',
+                                whiteSpace: 'pre-wrap'
+                              }}>
+                                {workshop.editRequests}
+                              </div>
+                            </div>
+                          )}
+                          {workshop.hasRejectionReason && workshop.rejectionReason && (
+                            <div style={{
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: '#FEE2E2',
+                              border: '1px solid #FCA5A5'
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                marginBottom: '0.5rem',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                color: '#991b1b'
+                              }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                  cancel
+                                </span>
+                                Rejection Reason
+                              </div>
+                              <div style={{
+                                fontSize: '0.8125rem',
+                                color: '#7f1d1d',
+                                lineHeight: '1.5',
+                                whiteSpace: 'pre-wrap'
+                              }}>
+                                {workshop.rejectionReason}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       
                       <div style={{
                         display: 'flex',
@@ -1075,6 +1306,39 @@ const MyWorkshops = () => {
                         paddingTop: '0.75rem',
                         borderTop: '1px solid #e5e7eb'
                           }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewParticipants(workshop);
+                              }}
+                              style={{
+                            flex: 1,
+                                padding: '0.5rem',
+                                borderRadius: '0.375rem',
+                            backgroundColor: '#059669',
+                            color: '#FFFFFF',
+                            border: 'none',
+                                cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            gap: '0.25rem',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#047857';
+                              }}
+                              onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = '#059669';
+                              }}
+                            >
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                groups
+                              </span>
+                          Participants
+                            </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -2303,6 +2567,245 @@ const MyWorkshops = () => {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Participants Modal */}
+      {showParticipantsModal && selectedWorkshopForParticipants && (
+        <div
+          onClick={() => setShowParticipantsModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem',
+            backdropFilter: 'blur(4px)'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '700px',
+              width: '100%',
+              maxHeight: '90vh',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <div>
+                <h2 style={{
+                  color: '#1D3557',
+                  fontSize: '1.5rem',
+                  fontWeight: '700',
+                  margin: 0,
+                  marginBottom: '0.25rem'
+                }}>
+                  Workshop Participants
+                </h2>
+                <p style={{
+                  color: '#6b7280',
+                  fontSize: '0.875rem',
+                  margin: 0
+                }}>
+                  {selectedWorkshopForParticipants.workshopName || selectedWorkshopForParticipants.title}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowParticipantsModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2rem',
+                  height: '2rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Participants Info */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              backgroundColor: '#f9fafb'
+            }}>
+              <div style={{
+                display: 'flex',
+                gap: '2rem',
+                alignItems: 'center',
+                flexWrap: 'wrap'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Total Capacity</div>
+                  <div style={{ color: '#374151', fontWeight: '600', fontSize: '1rem' }}>
+                    {selectedWorkshopForParticipants.capacity || 0}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Registered</div>
+                  <div style={{ color: '#374151', fontWeight: '600', fontSize: '1rem' }}>
+                    {selectedWorkshopForParticipants.registeredCount || 0}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Remaining Spots</div>
+                  <div style={{ 
+                    color: getRemainingSpots(selectedWorkshopForParticipants) > 0 ? '#059669' : '#dc2626', 
+                    fontWeight: '600', 
+                    fontSize: '1rem' 
+                  }}>
+                    {getRemainingSpots(selectedWorkshopForParticipants)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Participants List */}
+            <div style={{
+              padding: '1.5rem',
+              overflowY: 'auto',
+              flex: 1,
+              minHeight: 0
+            }}>
+              {loadingParticipants ? (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: '3rem',
+                  color: '#6b7280'
+                }}>
+                  <div style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    border: '3px solid #e5e7eb',
+                    borderTop: '3px solid #1e40af',
+                    borderRadius: '50%',
+                    display: 'inline-block',
+                    marginBottom: '1rem'
+                  }} className="spinner"></div>
+                  <span>Loading participants...</span>
+                </div>
+              ) : participants.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '3rem',
+                  color: '#6b7280'
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '3rem', opacity: 0.5, marginBottom: '1rem', display: 'block' }}>
+                    person_off
+                  </span>
+                  <p style={{ fontSize: '1rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+                    No participants yet
+                  </p>
+                  <p style={{ fontSize: '0.875rem', margin: 0 }}>
+                    No one has registered for this workshop yet.
+                  </p>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem'
+                }}>
+                  {participants.map((participant, index) => (
+                    <div
+                      key={participant.id || index}
+                      style={{
+                        padding: '1rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{
+                          fontWeight: '600',
+                          color: '#1D3557',
+                          fontSize: '0.875rem',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {participant.name || 'Unknown'}
+                        </div>
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280',
+                          marginBottom: '0.125rem'
+                        }}>
+                          {participant.email}
+                        </div>
+                        {participant.studentId && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280'
+                          }}>
+                            {participant.userType === 'TA' ? 'TA ID' : 'Student ID'}: {participant.studentId}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{
+                        padding: '0.375rem 0.75rem',
+                        borderRadius: '0.375rem',
+                        backgroundColor: participant.status === 'approved' || participant.status === 'registered' 
+                          ? '#d1fae5' 
+                          : participant.status === 'pending'
+                          ? '#fef3c7'
+                          : '#fee2e2',
+                        color: participant.status === 'approved' || participant.status === 'registered'
+                          ? '#065f46'
+                          : participant.status === 'pending'
+                          ? '#92400e'
+                          : '#991b1b',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        textTransform: 'capitalize'
+                      }}>
+                        {participant.status || 'pending'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

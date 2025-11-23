@@ -455,6 +455,92 @@ export const adminApiService = {
       };
     }
   },
+
+  // Get attendees report
+  getAttendeesReport: async (filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.eventName) params.append('eventName', filters.eventName);
+      if (filters.eventType) params.append('eventType', filters.eventType);
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+      
+      const response = await adminApi.get(`/reports/attendees?${params.toString()}`);
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('Error fetching attendees report:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch attendees report',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
+  // Get sales report
+  getSalesReport: async (filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.eventType) params.append('eventType', filters.eventType);
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+      if (filters.sortBy) params.append('sortBy', filters.sortBy);
+      
+      const response = await adminApi.get(`/reports/sales?${params.toString()}`);
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('Error fetching sales report:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch sales report',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
+  // Block a user account
+  blockUser: async (userId, reason = null) => {
+    try {
+      const response = await adminApi.post(`/users/${userId}/block`, reason ? { reason } : {});
+      return {
+        success: true,
+        data: response.data,
+        message: response.data.message || 'User blocked successfully',
+      };
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to block user',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
+  // Unblock a user account
+  unblockUser: async (userId) => {
+    try {
+      const response = await adminApi.post(`/users/${userId}/unblock`);
+      return {
+        success: true,
+        data: response.data,
+        message: response.data.message || 'User unblocked successfully',
+      };
+    } catch (error) {
+      console.error('Error unblocking user:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to unblock user',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
 };
 
 export default adminApiService;

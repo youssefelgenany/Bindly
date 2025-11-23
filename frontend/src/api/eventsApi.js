@@ -142,6 +142,61 @@ export const eventsApiService = {
     }
   },
   
+  // 📦 Archive an event (Events Office only)
+  archiveEvent: async (id) => {
+    try {
+      const response = await eventsApi.post(`/${id}/archive`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to archive event',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+  // 📦 Unarchive an event (Events Office only)
+  unarchiveEvent: async (id) => {
+    try {
+      const response = await eventsApi.post(`/${id}/unarchive`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to unarchive event',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+  // 📦 Get archived events (Events Office only)
+  getArchivedEvents: async (params = {}) => {
+    try {
+      const query = new URLSearchParams();
+      if (params.q) query.append('q', params.q);
+      if (params.type) query.append('type', params.type);
+
+      const suffix = query.toString() ? `?${query.toString()}` : '';
+      const url = `/archived${suffix}`;
+      console.log('🔍 Fetching archived events from:', url);
+      const response = await eventsApi.get(url);
+      console.log('🔍 Archived events response:', response);
+      console.log('🔍 Response data:', response.data);
+      console.log('🔍 Response data type:', Array.isArray(response.data) ? 'array' : typeof response.data);
+      console.log('🔍 Response data length:', Array.isArray(response.data) ? response.data.length : 'not an array');
+      
+      // Backend returns an array directly
+      const events = Array.isArray(response.data) ? response.data : [];
+      return { success: true, data: events };
+    } catch (error) {
+      console.error('❌ Error fetching archived events:', error);
+      console.error('❌ Error response:', error.response);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch archived events',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
   // 💬 Get comments for an event
   getComments: async (eventId) => {
     try {
@@ -151,6 +206,20 @@ export const eventsApiService = {
       return {
         success: false,
         message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch comments',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+  
+  // ⭐ Get ratings and comments for an event
+  getRatingsAndComments: async (eventId) => {
+    try {
+      const response = await eventsApi.get(`/${eventId}/ratings`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch ratings and comments',
         error: error.response?.data || error.message,
       };
     }
