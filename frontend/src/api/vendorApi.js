@@ -86,6 +86,17 @@ export const vendorApi = {
             console.error('❌ vendorApi.listMyRequests - Error response:', error.response?.data);
             throw error;
         }
+    },
+
+    // Get loyalty program vendors
+    getLoyaltyProgramVendors: async () => {
+        try {
+            const res = await api.get('/loyalty-program/vendors');
+            return res.data;
+        } catch (error) {
+            console.error('Error fetching loyalty program vendors:', error);
+            throw error;
+        }
     }
 };
 
