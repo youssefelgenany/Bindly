@@ -337,3 +337,54 @@ exports.notifyWorkshopSubmitted = async (event, submitter) => {
     console.error('Error notifying workshop submission:', error);
   }
 };
+
+// Notify Events Office users about new vendor requests
+exports.notifyVendorRequest = async (vendorRequest, vendor, event) => {
+  try {
+    // Find all events office users
+    const eventsOfficeUsers = await User.find({ 
+      $or: [
+        { userType: 'Event Office' },
+        { userType: 'Events Office' },
+        { userType: 'event_office' },
+        { role: 'Event Office' },
+        { role: 'event_office' }
+      ]
+    });
+    
+    const vendorName = vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || vendor.email;
+    const eventName = event?.title || event?.name || 'Event';
+    const eventType = vendorRequest.eventType || event?.type || 'bazaar';
+    
+    for (const eventsOfficeUser of eventsOfficeUsers) {
+      // Check if notification already exists
+      const existingNotification = await Notification.findOne({
+        recipient: eventsOfficeUser._id,
+        type: 'vendor_request',
+        'metadata.requestId': vendorRequest._id.toString()
+      });
+      
+      if (!existingNotification) {
+        await Notification.create({
+          recipient: eventsOfficeUser._id,
+          type: 'vendor_request',
+          title: `New Vendor Request: ${vendorName}`,
+          message: `${vendorName} has submitted a vendor request for "${eventName}" (${eventType})`,
+          priority: 'medium',
+          metadata: {
+            requestId: vendorRequest._id.toString(),
+            vendorId: vendor._id.toString(),
+            vendorName: vendorName,
+            eventId: event?._id?.toString() || null,
+            eventName: eventName,
+            eventType: eventType,
+            status: vendorRequest.status || 'pending',
+            createdAt: new Date()
+          }
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error notifying vendor request:', error);
+  }
+};
