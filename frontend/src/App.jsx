@@ -36,7 +36,6 @@ import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
 import CourtAvailability from './pages/CourtAvailability';
 import PlatformBoothReservation from './pages/PlatformBoothReservation';
-import PlatformBooths from './pages/PlatformBooths';
 import EventsOfficeEventsView from './pages/EventsOfficeEventsView';
 import EventsOfficeWorkshops from './pages/EventsOfficeWorkshops';
 import VendorAcceptedEvents from './pages/VendorAcceptedEvents';
@@ -310,7 +309,7 @@ const AppContent = () => {
               path="/vendor/platform-booths"
               element={
                 <ProtectedRoute>
-                  <PlatformBooths />
+                  <Navigate to="/vendor" replace />
                 </ProtectedRoute>
               }
             />
