@@ -332,8 +332,8 @@ const GymSchedule = () => {
           </div>
         </header>
 
-        {/* Horizontal Menu Bar - Show for Students, Professors, and TA */}
-        {(user?.userType === 'Student' || user?.userType === 'Professor' || user?.userType === 'TA') && (
+        {/* Horizontal Menu Bar - Show for Students, Professors, Staff, and TA */}
+        {(user?.userType === 'Student' || user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA') && (
           <nav style={{
             display: 'flex',
             alignItems: 'center',
@@ -439,7 +439,7 @@ const GymSchedule = () => {
                   Campus Courts
                 </Link>
               </>
-            ) : (
+            ) : user?.userType === 'Professor' ? (
               <>
                 <Link
                   to="/professor/all-events"
@@ -481,7 +481,36 @@ const GymSchedule = () => {
                   My Workshops
                 </Link>
               </>
-            )}
+            ) : (user?.userType === 'Staff' || user?.userType === 'TA') ? (
+              <>
+                <Link
+                  to="/staff/events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  Discover Events
+                </Link>
+                <Link
+                  to="/staff/my-registrations"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Events
+                </Link>
+              </>
+            ) : null}
             <Link
               to="/gym-schedule"
               style={{
