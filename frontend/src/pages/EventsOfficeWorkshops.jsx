@@ -22,6 +22,9 @@ const EventsOfficeWorkshops = () => {
     editRequests: '', 
     allowedUserTypes: [] 
   });
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -55,6 +58,62 @@ const EventsOfficeWorkshops = () => {
   useEffect(() => {
     loadWorkshops();
   }, [loadWorkshops]);
+
+  // Close notification panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationPanelOpen && 
+          !event.target.closest('[data-notification-panel]') && 
+          !event.target.closest('[data-notification-icon]')) {
+        setNotificationPanelOpen(false);
+      }
+    };
+
+    if (notificationPanelOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [notificationPanelOpen]);
+
+  // Fetch notifications
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      const headers = { Authorization: `Bearer ${token}` };
+      const [notificationsRes, unreadCountRes] = await Promise.all([
+        axios.get('http://localhost:5000/api/notifications?limit=50', { headers }).catch(err => {
+          console.error('Error fetching notifications:', err);
+          return { data: { success: false, data: { notifications: [] } } };
+        }),
+        axios.get('http://localhost:5000/api/notifications/unread-count', { headers }).catch(err => {
+          console.error('Error fetching unread count:', err);
+          return { data: { success: false, unreadCount: 0 } };
+        })
+      ]);
+      
+      let notificationsData = [];
+      if (notificationsRes.data?.success && notificationsRes.data.data?.notifications) {
+        notificationsData = notificationsRes.data.data.notifications;
+      }
+      
+      setNotifications(notificationsData);
+      const unreadCountValue = unreadCountRes.data?.success ? unreadCountRes.data.unreadCount : 0;
+      setUnreadCount(unreadCountValue);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+    // Refresh notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
 
   const filteredWorkshops = workshops.filter(workshop => {
     if (filter === 'all') return true;
@@ -341,6 +400,84 @@ const EventsOfficeWorkshops = () => {
               </Link>
 
               <Link
+                to="/event-office/vendors"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/vendors') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/vendors')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/vendors')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  storefront
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/vendors') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Vendors
+                </p>
+              </Link>
+
+              <Link
+                to="/event-office/loyalty-partners"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/loyalty-partners') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/loyalty-partners')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/loyalty-partners')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/loyalty-partners') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  card_giftcard
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/loyalty-partners') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/loyalty-partners') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Loyalty Partners
+                </p>
+              </Link>
+
+              <Link
                 to="/event-office/workshops"
                 style={{
                   display: 'flex',
@@ -408,15 +545,15 @@ const EventsOfficeWorkshops = () => {
                   location_on
                 </span>
                 {sidebarOpen && (
-                  <p style={{
+                <p style={{
                     color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
+                  fontSize: '0.875rem',
                     fontWeight: isActiveRoute('/event-office/platform-booth-requests') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
                     Platform Booths
-                  </p>
+                </p>
                 )}
               </Link>
 
@@ -449,13 +586,13 @@ const EventsOfficeWorkshops = () => {
                   calendar_month
                 </span>
                 {sidebarOpen && (
-                  <p style={{
+                <p style={{
                     color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
+                  fontSize: '0.875rem',
                     fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
                     View Gym Sessions
                   </p>
                 )}
@@ -551,7 +688,218 @@ const EventsOfficeWorkshops = () => {
               Bindly
             </h2>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+            {/* Notification Icon */}
+            <div 
+              data-notification-icon
+              onClick={() => setNotificationPanelOpen(!notificationPanelOpen)}
+              style={{ 
+                position: 'relative', 
+                cursor: 'pointer',
+                padding: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ 
+                fontSize: '1.5rem', 
+                color: '#1D3557'
+              }}>
+                notifications
+              </span>
+              {unreadCount > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '0.25rem',
+                  right: '0.25rem',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  borderRadius: '50%',
+                  width: '1.25rem',
+                  height: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
+                  border: '2px solid #FFFFFF'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </div>
+              )}
+            </div>
+            
+            {/* Notification Panel */}
+            {notificationPanelOpen && (
+              <div 
+                data-notification-panel
+                style={{
+                  position: 'absolute',
+                  top: '3.5rem',
+                  right: '0',
+                  width: '24rem',
+                  maxHeight: '32rem',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  border: '1px solid #e2e8f0',
+                  zIndex: 1000,
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
+                <div style={{
+                  padding: '1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    margin: 0
+                  }}>
+                    Notifications
+                  </h3>
+                  <button
+                    onClick={() => setNotificationPanelOpen(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#6b7280'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      close
+                    </span>
+                  </button>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  {notifications && notifications.length > 0 ? (
+                    <ul style={{
+                      listStyle: 'none',
+                      padding: 0,
+                      margin: 0
+                    }}>
+                      {notifications.map((notif, idx) => (
+                        <li
+                          key={notif._id || notif.id || `notif-${idx}`}
+                          onClick={async () => {
+                            const notifId = notif._id || notif.id;
+                            if (!notif.isRead && notifId) {
+                              try {
+                                const token = localStorage.getItem('token');
+                                await axios.put(
+                                  `http://localhost:5000/api/notifications/${notifId}/read`,
+                                  {},
+                                  { headers: { Authorization: `Bearer ${token}` } }
+                                );
+                                setNotifications(prev => prev.map(n => 
+                                  (n._id === notifId || n.id === notifId) ? { ...n, isRead: true } : n
+                                ));
+                                setUnreadCount(prev => Math.max(0, prev - 1));
+                              } catch (err) {
+                                console.error('Error marking notification as read:', err);
+                              }
+                            }
+                          }}
+                          style={{
+                            padding: '1rem',
+                            borderBottom: '1px solid #f3f4f6',
+                            cursor: 'pointer',
+                            backgroundColor: !notif.isRead ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = !notif.isRead 
+                              ? 'rgba(59, 130, 246, 0.1)' 
+                              : 'rgba(0, 0, 0, 0.02)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = !notif.isRead 
+                              ? 'rgba(59, 130, 246, 0.05)' 
+                              : 'transparent';
+                          }}
+                        >
+                          <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            <div style={{
+                              backgroundColor: !notif.isRead ? '#dbeafe' : '#e5e7eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              borderRadius: '50%',
+                              flexShrink: 0
+                            }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.25rem',
+                                color: !notif.isRead ? '#3b82f6' : '#6b7280'
+                              }}>
+                                {notif.type === 'workshop_submission' ? 'school' : 
+                                 notif.type === 'vendor_request' ? 'storefront' : 
+                                 notif.type === 'event_announcement' ? 'event' : 'notifications'}
+                              </span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{
+                                fontSize: '0.875rem',
+                                fontWeight: !notif.isRead ? '600' : '500',
+                                color: '#111827',
+                                margin: '0 0 0.25rem 0',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {notif.title || 'Notification'}
+                              </p>
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                margin: 0,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical'
+                              }}>
+                                {notif.message || ''}
+                              </p>
+                              <p style={{
+                                fontSize: '0.625rem',
+                                color: '#9ca3af',
+                                margin: '0.25rem 0 0 0'
+                              }}>
+                                {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
+                              </p>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div style={{
+                      padding: '3rem 1rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',

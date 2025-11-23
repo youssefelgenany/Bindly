@@ -43,6 +43,9 @@ import CourtAvailability from './pages/CourtAvailability';
 import PlatformBoothReservation from './pages/PlatformBoothReservation';
 import EventsOfficeEventsView from './pages/EventsOfficeEventsView';
 import EventsOfficeWorkshops from './pages/EventsOfficeWorkshops';
+import EventsOfficeVendors from './pages/EventsOfficeVendors';
+import AdminLoyaltyProgramVendors from './pages/AdminLoyaltyProgramVendors';
+import EventsOfficeLoyaltyProgramVendors from './pages/EventsOfficeLoyaltyProgramVendors';
 import VendorAcceptedEvents from './pages/VendorAcceptedEvents';
 import VendorMyRequests from './pages/VendorMyRequests';
 import PlatformBoothRequests from './pages/PlatformBoothRequests';
@@ -155,6 +158,28 @@ const EventsOfficeOnly = ({ children }) => {
   const isAdmin = user && (user.role === 'admin' || user.role === 'Admin' || user.userType === 'Admin' || user.userType === 'admin');
 
   return (isEventsOffice || isAdmin) ? children : <Navigate to="/dashboard" />;
+};
+
+// Admin or Events Office guard
+const AdminOrEventsOfficeOnly = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
+      }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  const isAdmin = user && (user.userType === 'admin' || user.userType === 'Admin' || user.role === 'admin' || user.role === 'Admin');
+  const isEventsOffice = user && (user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office');
+  return (isAdmin || isEventsOffice) ? children : <Navigate to="/dashboard" />;
 };
 
 // Student-only guard
@@ -368,6 +393,16 @@ const AppContent = () => {
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <EventsOfficeWorkshops />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/event-office/vendors"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <EventsOfficeVendors />
                   </EventsOfficeOnly>
                 </ProtectedRoute>
               }
@@ -599,6 +634,26 @@ const AppContent = () => {
                   <AdminOnly>
                     <AdminEventsView />
                   </AdminOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/loyalty-program-vendors"
+              element={
+                <ProtectedRoute>
+                  <AdminOnly>
+                    <AdminLoyaltyProgramVendors />
+                  </AdminOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/event-office/loyalty-partners"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <EventsOfficeLoyaltyProgramVendors />
+                  </EventsOfficeOnly>
                 </ProtectedRoute>
               }
             />

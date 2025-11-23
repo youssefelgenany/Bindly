@@ -640,6 +640,10 @@ const approveWorkshop = async (req, res) => {
       registrationDeadline: event.registrationDeadline
     });
     
+    // Send notifications to all eligible users about the newly approved event
+    const { notifyNewEventCreated } = require("../services/notificationService");
+    await notifyNewEventCreated(event);
+    
     // Create notification for the professor
     try {
       const recipientId = event.createdBy instanceof mongoose.Types.ObjectId 
