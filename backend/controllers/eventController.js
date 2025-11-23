@@ -784,7 +784,8 @@ exports.getAllEventsForStudents = async (req, res) => {
         { title: { $ne: '' } },
         { location: { $exists: true } },
         { location: { $ne: null } },
-        { location: { $ne: '' } }
+        { location: { $ne: '' } },
+        { archived: false } // Exclude archived events
       ]
     };
     
@@ -1707,116 +1708,124 @@ exports.getEventRegistrations = async (req, res) => {
 
 // Export registered names to .xlsx (except conferences)
 exports.exportRegistrations = async (req, res) => {
-  console.log('📊 Export registrations called for event:', req.params.id);
   try {
+    console.log('📊 Export registrations called for event:', req.params.id);
     const XLSX = require('xlsx');
     const eventId = req.params.id;
     
     // Check if event exists
     const event = await Event.findById(eventId);
     if (!event) {
-      console.log('📊 Event not found:', eventId);
+      console.log('❌ Event not found:', eventId);
       return res.status(404).json({ message: 'Event not found' });
     }
-    console.log('📊 Event found:', event.title, event.type);
     
+    console.log('✅ Event found:', event.title, event.type);
+    
+    // Don't allow export for conferences
     if (event.type === 'conference') {
-      return res.status(400).json({ message: 'Cannot export for conferences' });
+      console.log('❌ Cannot export conferences');
+      return res.status(400).json({ message: 'Cannot export registrations for conferences' });
     }
     
-    // Check total registrations in DB
-    const allRegistrations = await Registration.find({});
-    console.log('📊 Total registrations in DB:', allRegistrations.length);
+    // Get registrations from Registration model (for logged-in users)
+    console.log('📊 Fetching registrations from Registration model...');
+    const registrations = await Registration.find({ 
+      event: eventId, 
+      status: { $ne: 'cancelled' } 
+    })
+      .populate('user', 'firstName lastName email gucId userType')
+      .sort({ createdAt: 1 });
+    console.log('📊 Found', registrations.length, 'registrations from Registration model');
     
-    // Check registrations for this event
-    const registrations = await Registration.find({ event: eventId, status: { $ne: 'cancelled' } });
-    console.log('📊 Found registrations for event (before populate):', registrations.length);
+    // Get registrations from StudentRegistration model (for workshops/trips)
+    console.log('📊 Fetching registrations from StudentRegistration model...');
+    const studentRegistrations = await StudentRegistration.find({ 
+      event: eventId, 
+      status: { $ne: 'cancelled' } 
+    })
+      .sort({ createdAt: 1 });
+    console.log('📊 Found', studentRegistrations.length, 'registrations from StudentRegistration model');
     
-    // Try populate
-    const populatedRegistrations = await Registration.find({ event: eventId, status: { $ne: 'cancelled' } }).populate('user', 'firstName lastName name userType');
-    console.log('📊 Found registrations for event (after populate):', populatedRegistrations.length);
-    
-    if (populatedRegistrations.length > 0) {
-      console.log('📊 First registration raw:', registrations[0]);
-      console.log('📊 First registration populated:', populatedRegistrations[0]);
-    }
-    
-    // Also try without status filter
-    const allEventRegistrations = await Registration.find({ event: eventId }).populate('user', 'firstName lastName name');
-    console.log('📊 All registrations for event (including cancelled):', allEventRegistrations.length);
-    
-    if (allEventRegistrations.length > 0) {
-      console.log('📊 Sample registration:', {
-        id: allEventRegistrations[0]._id,
-        user: allEventRegistrations[0].user,
-        status: allEventRegistrations[0].status,
-        event: allEventRegistrations[0].event
-      });
-    }
-    
-    // Process registrations and build data array
+    // Combine and format data for Excel
     const data = [];
-    for (const reg of populatedRegistrations) {
-      console.log('📊 Processing registration:', {
-        id: reg._id,
-        userId: reg.user,
-        userPopulated: !!reg.user,
-        userType: reg.user ? typeof reg.user : 'null',
-        userData: reg.user ? {
-          firstName: reg.user.firstName,
-          lastName: reg.user.lastName,
-          name: reg.user.name,
-          userType: reg.user.userType
-        } : null
-      });
-      
-      // Try to get user name
-      let fullName = 'Unknown User';
-      if (reg.user) {
-        if (reg.user.firstName || reg.user.lastName) {
-          fullName = `${reg.user.firstName || ''} ${reg.user.lastName || ''}`.trim();
-        } else if (reg.user.name) {
-          fullName = reg.user.name;
-        }
-      } else {
-        // If populate failed, try to fetch user manually
-        try {
-          const User = require('../models/userModel');
-          const userDoc = await User.findById(reg.user).select('firstName lastName name userType');
-          if (userDoc) {
-            if (userDoc.firstName || userDoc.lastName) {
-              fullName = `${userDoc.firstName || ''} ${userDoc.lastName || ''}`.trim();
-            } else if (userDoc.name) {
-              fullName = userDoc.name;
-            }
-            console.log('📊 Manual user fetch succeeded:', fullName);
-          } else {
-            console.log('📊 Manual user fetch failed: user not found');
-          }
-        } catch (err) {
-          console.log('📊 Manual user fetch error:', err.message);
-        }
-      }
-      
-      if (fullName !== 'Unknown User') {
-        data.push({ Name: fullName });
-      }
-    }
     
-    console.log('📊 Final data array:', data);
+    // Add registrations from Registration model
+    registrations.forEach(reg => {
+      if (reg.user) {
+        data.push({
+          'Name': `${reg.user.firstName || ''} ${reg.user.lastName || ''}`.trim() || 'N/A',
+          'Email': reg.user.email || 'N/A',
+          'Student ID': reg.user.gucId || 'N/A',
+          'User Type': reg.user.userType || 'N/A',
+          'Registration Date': reg.createdAt ? new Date(reg.createdAt).toLocaleDateString() : 'N/A',
+          'Status': reg.status || 'N/A',
+          'Paid': reg.paid ? 'Yes' : 'No'
+        });
+      }
+    });
+    
+    // Add registrations from StudentRegistration model
+    studentRegistrations.forEach(reg => {
+      data.push({
+        'Name': reg.studentName || 'N/A',
+        'Email': reg.studentEmail || 'N/A',
+        'Student ID': reg.studentId || 'N/A',
+        'User Type': 'Student',
+        'Registration Date': reg.createdAt ? new Date(reg.createdAt).toLocaleDateString() : 'N/A',
+        'Status': reg.status || 'N/A',
+        'Paid': reg.paid ? 'Yes' : 'No'
+      });
+    });
     
     if (data.length === 0) {
-      return res.status(200).json({ message: 'No registrations to export' });
+      return res.status(404).json({ message: 'No registrations found for this event' });
     }
+    
+    // Create Excel workbook
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Registrations');
-    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    res.setHeader('Content-Disposition', 'attachment; filename="registrations.xlsx"');
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.send(buffer);
+    
+    // Set column widths
+    const colWidths = [
+      { wch: 25 }, // Name
+      { wch: 30 }, // Email
+      { wch: 15 }, // Student ID
+      { wch: 15 }, // User Type
+      { wch: 20 }, // Registration Date
+      { wch: 12 }, // Status
+      { wch: 10 }  // Paid
+    ];
+    ws['!cols'] = colWidths;
+    
+    console.log('📊 Creating Excel file with', data.length, 'rows...');
+    
+    // Generate buffer
+    try {
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      console.log('✅ Excel buffer created, size:', buffer.length, 'bytes');
+      
+      // Set response headers
+      const fileName = `${event.title.replace(/[^a-z0-9]/gi, '_')}_registrations.xlsx`;
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.send(buffer);
+      console.log('✅ File sent successfully');
+    } catch (xlsxError) {
+      console.error("❌ Error creating Excel file:", xlsxError);
+      throw xlsxError;
+    }
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("❌ Error exporting registrations:", error);
+    console.error("❌ Error stack:", error.stack);
+    console.error("❌ Error message:", error.message);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error', 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 
@@ -3084,6 +3093,209 @@ exports.removeFromFavorites = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error"
+    });
+  }
+};
+
+// 📦 Archive an event (Events Office only)
+exports.archiveEvent = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+
+    // Find the event
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found"
+      });
+    }
+
+    // Check if event has already passed
+    const now = new Date();
+    if (new Date(event.endDate) > now) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot archive events that haven't ended yet"
+      });
+    }
+
+    // Archive the event
+    event.archived = true;
+    await event.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Event archived successfully',
+      event: event
+    });
+  } catch (err) {
+    console.error("❌ Error archiving event:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+// 📦 Unarchive an event (Events Office only)
+exports.unarchiveEvent = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+
+    // Find the event
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found"
+      });
+    }
+
+    // Unarchive the event
+    event.archived = false;
+    await event.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Event unarchived successfully',
+      event: event
+    });
+  } catch (err) {
+    console.error("❌ Error unarchiving event:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+// 📦 Get archived events (Events Office only)
+exports.getArchivedEvents = async (req, res) => {
+  try {
+    console.log('🔍 getArchivedEvents called');
+    console.log('🔍 User:', req.user);
+    console.log('🔍 Query params:', req.query);
+    
+    const { q, type } = req.query;
+    const search = (q || '').toString().trim();
+
+    // Base match - only archived events
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+    const baseMatch = {
+      type: { $in: validTypes },
+      archived: true,
+      $and: [
+        { title: { $exists: true } },
+        { title: { $ne: null } },
+        { title: { $ne: '' } },
+        { location: { $exists: true } },
+        { location: { $ne: null } },
+        { location: { $ne: '' } }
+      ]
+    };
+    
+    console.log('🔍 Base match:', JSON.stringify(baseMatch, null, 2));
+
+    if (type && type !== 'all') {
+      const typeMap = {
+        workshops: 'workshop',
+        trips: 'trip',
+        bazaars: 'bazaar',
+        booths: 'booth',
+        confrence: 'conference',
+        conference: 'conference'
+      };
+      baseMatch.type = typeMap[type] || type;
+    }
+
+    const pipeline = [
+      { $match: baseMatch },
+      { $lookup: { from: 'users', localField: 'createdBy', foreignField: '_id', as: 'creator' } },
+      { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
+    ];
+
+    if (search) {
+      const nameRegex = new RegExp(search, 'i');
+      pipeline.push({
+        $match: {
+          $or: [
+            { title: nameRegex },
+            { name: nameRegex },
+            { description: nameRegex },
+            { location: nameRegex },
+            { 'creator.firstName': nameRegex },
+            { 'creator.lastName': nameRegex },
+          ]
+        }
+      });
+    }
+
+    pipeline.push(
+      { $sort: { endDate: -1 } }, // Sort by end date descending (most recent first)
+      {
+        $project: {
+          _id: 1,
+          title: 1,
+          name: 1,
+          description: 1,
+          type: 1,
+          startDate: 1,
+          endDate: 1,
+          registrationDeadline: 1,
+          location: 1,
+          capacity: 1,
+          price: 1,
+          registeredCount: 1,
+          status: 1,
+          archived: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          agenda: 1,
+          website: 1,
+          budget: 1,
+          fundingSource: 1,
+          extraResources: 1,
+          faculty: 1,
+          professors: 1,
+          bannerFile: 1,
+          isRestricted: 1,
+          allowedUserTypes: 1,
+          createdBy: {
+            _id: '$creator._id',
+            firstName: '$creator.firstName',
+            lastName: '$creator.lastName',
+            email: '$creator.email',
+            userType: '$creator.userType'
+          }
+        }
+      }
+    );
+
+    console.log('🔍 Executing aggregation pipeline for archived events...');
+    console.log('🔍 Pipeline:', JSON.stringify(pipeline, null, 2));
+    
+    try {
+      const events = await Event.aggregate(pipeline);
+      console.log(`✅ Found ${events.length} archived events`);
+      console.log('🔍 First event sample:', events[0] ? JSON.stringify(events[0], null, 2) : 'No events');
+      
+      res.status(200).json(events);
+    } catch (aggError) {
+      console.error("❌ Aggregation error:", aggError);
+      console.error("❌ Aggregation error stack:", aggError.stack);
+      throw aggError; // Re-throw to be caught by outer catch
+    }
+  } catch (err) {
+    console.error("❌ Error fetching archived events:", err);
+    console.error("❌ Error stack:", err.stack);
+    console.error("❌ Error message:", err.message);
+    console.error("❌ Error name:", err.name);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }
 };

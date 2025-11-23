@@ -8,6 +8,7 @@ import BazaarForm from '../components/BazaarForm';
 import ConferenceForm from '../components/ConferenceForm';
 import TripForm from '../components/TripForm';
 import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
+import axios from 'axios';
 
 const EventsOfficeEventsView = () => {
   const { user, logout } = useAuth();
@@ -19,6 +20,40 @@ const EventsOfficeEventsView = () => {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
+  const [professorNameFilter, setProfessorNameFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [sortBy, setSortBy] = useState('suggested'); // suggested, date-asc, date-desc
+  const [showArchivedModal, setShowArchivedModal] = useState(false);
+  const [archivedEvents, setArchivedEvents] = useState([]);
+  const [loadingArchived, setLoadingArchived] = useState(false);
+  const [showArchiveConfirmModal, setShowArchiveConfirmModal] = useState(false);
+  const [eventToArchive, setEventToArchive] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportData, setReportData] = useState(null);
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [reportFilters, setReportFilters] = useState({
+    eventName: '',
+    eventType: '',
+    startDate: '',
+    endDate: ''
+  });
+  const [showSalesReportModal, setShowSalesReportModal] = useState(false);
+  const [salesReportData, setSalesReportData] = useState(null);
+  const [loadingSalesReport, setLoadingSalesReport] = useState(false);
+  const [salesReportFilters, setSalesReportFilters] = useState({
+    eventType: '',
+    startDate: '',
+    endDate: '',
+    sortBy: ''
+  });
+  const [salesReportSortBy, setSalesReportSortBy] = useState('revenue-desc');
+  const [showRatingsModal, setShowRatingsModal] = useState(false);
+  const [ratingsData, setRatingsData] = useState(null);
+  const [loadingRatings, setLoadingRatings] = useState(false);
+  const [selectedEventForRatings, setSelectedEventForRatings] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [deletingEventId, setDeletingEventId] = useState(null);
@@ -42,6 +77,9 @@ const EventsOfficeEventsView = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [activeCreateTab, setActiveCreateTab] = useState('bazaar');
   const [creating, setCreating] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -91,6 +129,7 @@ const EventsOfficeEventsView = () => {
           title: ev.title || ev.name,
           type: ev.type,
           status: ev.status || 'approved',
+          archived: ev.archived || false,
           location: ev.location,
           startDate: ev.startDate,
           endDate: ev.endDate,
@@ -232,7 +271,110 @@ const EventsOfficeEventsView = () => {
     loadEvents();
   }, [filter, loadEvents]);
 
-  // Filter events based on type
+  // Reload archived events when modal opens
+  useEffect(() => {
+    if (showArchivedModal) {
+      console.log('🔍 Modal opened, loading archived events...');
+      loadArchivedEvents();
+    }
+  }, [showArchivedModal]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showFilterModal && !event.target.closest('[data-filter-dropdown]')) {
+        setShowFilterModal(false);
+      }
+      if (showSortModal && !event.target.closest('[data-sort-dropdown]')) {
+        setShowSortModal(false);
+      }
+      if (notificationPanelOpen && 
+          !event.target.closest('[data-notification-panel]') && 
+          !event.target.closest('[data-notification-icon]')) {
+        setNotificationPanelOpen(false);
+      }
+    };
+
+    if (showFilterModal || showSortModal || notificationPanelOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showFilterModal, showSortModal, notificationPanelOpen]);
+
+  // Fetch notifications
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      const headers = { Authorization: `Bearer ${token}` };
+      const [notificationsRes, unreadCountRes] = await Promise.all([
+        axios.get('http://localhost:5000/api/notifications?limit=50', { headers }).catch(err => {
+          console.error('Error fetching notifications:', err);
+          return { data: { success: false, data: { notifications: [] } } };
+        }),
+        axios.get('http://localhost:5000/api/notifications/unread-count', { headers }).catch(err => {
+          console.error('Error fetching unread count:', err);
+          return { data: { success: false, unreadCount: 0 } };
+        })
+      ]);
+      
+      let notificationsData = [];
+      if (notificationsRes.data?.success && notificationsRes.data.data?.notifications) {
+        notificationsData = notificationsRes.data.data.notifications;
+      }
+      
+      setNotifications(notificationsData);
+      const unreadCountValue = unreadCountRes.data?.success ? unreadCountRes.data.unreadCount : 0;
+      setUnreadCount(unreadCountValue);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+    // Refresh notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  // Get unique event names
+  const availableEventNames = React.useMemo(() => {
+    const names = new Set();
+    events.forEach(event => {
+      if (event.title && event.title.trim()) {
+        names.add(event.title.trim());
+      }
+    });
+    return Array.from(names).sort();
+  }, [events]);
+
+  // Get unique professors from workshops and conferences
+  const availableProfessors = React.useMemo(() => {
+    const profs = new Set();
+    events.forEach(event => {
+      if ((event.type === 'workshop' || event.type === 'conference') && event.creatorName) {
+        profs.add(event.creatorName);
+      }
+    });
+    return Array.from(profs).sort();
+  }, [events]);
+
+  // Get unique locations from all events
+  const availableLocations = React.useMemo(() => {
+    const locs = new Set();
+    events.forEach(event => {
+      if (event.location && event.location.trim()) {
+        locs.add(event.location.trim());
+      }
+    });
+    return Array.from(locs).sort();
+  }, [events]);
+
+  // Filter events based on type, professor name, location, and date
   // Events Office should see all events (including past ones), but we can filter by type
   const filteredEvents = events.filter(event => {
     // Skip invalid/empty events
@@ -253,13 +395,64 @@ const EventsOfficeEventsView = () => {
     
     if (event.type === 'other') return false;
     
+    // Filter by type
     const typeMatch = filter === 'all' || (event.type && event.type === filter);
-    return typeMatch;
+    if (!typeMatch) return false;
+    
+    // Filter by professor name (for workshops and conferences)
+    if (professorNameFilter.trim()) {
+      const profFilter = professorNameFilter.trim().toLowerCase();
+      const creatorName = (event.creatorName || event.professorName || '').toLowerCase();
+      if (!creatorName.includes(profFilter)) return false;
+    }
+    
+    // Filter by location
+    if (locationFilter.trim()) {
+      const location = (event.location || '').trim();
+      if (location !== locationFilter.trim()) return false;
+    }
+    
+    // Filter by date
+    if (dateFilter.trim()) {
+      const filterDate = new Date(dateFilter);
+      if (!isNaN(filterDate.getTime())) {
+        const eventDate = new Date(event.startDate);
+        // Compare dates (ignore time)
+        const filterDateOnly = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate());
+        const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+        if (eventDateOnly.getTime() !== filterDateOnly.getTime()) return false;
+      }
+    }
+    
+    return true;
   });
   
+  // Sort events
+  const sortedAndFilteredEvents = React.useMemo(() => {
+    let sorted = [...filteredEvents];
+    
+    if (sortBy === 'date-asc') {
+      sorted.sort((a, b) => {
+        const dateA = new Date(a.startDate);
+        const dateB = new Date(b.startDate);
+        return dateA - dateB;
+      });
+    } else if (sortBy === 'date-desc') {
+      sorted.sort((a, b) => {
+        const dateA = new Date(a.startDate);
+        const dateB = new Date(b.startDate);
+        return dateB - dateA;
+      });
+    }
+    // 'suggested' keeps original order
+    
+    return sorted;
+  }, [filteredEvents, sortBy]);
+
   console.log('🔍 EventsOfficeEventsView - Filtered events:', {
     totalEvents: events.length,
     filteredCount: filteredEvents.length,
+    sortedCount: sortedAndFilteredEvents.length,
     workshopEvents: filteredEvents.filter(e => e.type === 'workshop').length,
     workshopTitles: filteredEvents.filter(e => e.type === 'workshop').map(e => e.title),
     filter: filter
@@ -303,6 +496,252 @@ const EventsOfficeEventsView = () => {
   const cancelDelete = () => {
     setShowDeleteModal(false);
     setEventToDelete(null);
+  };
+
+  const handleArchiveEvent = (event) => {
+    if (!event) return;
+    
+    // Check if event has passed
+    const now = new Date();
+    const endDate = new Date(event.endDate);
+    if (endDate > now) {
+      alert('Cannot archive events that haven\'t ended yet');
+      return;
+    }
+
+    setEventToArchive(event);
+    setShowArchiveConfirmModal(true);
+  };
+
+  const confirmArchiveEvent = async () => {
+    if (!eventToArchive) return;
+
+    try {
+      setProcessingIds(prev => ({ ...prev, [eventToArchive.id]: true }));
+      setShowArchiveConfirmModal(false);
+      
+      const result = await eventsApiService.archiveEvent(eventToArchive.id);
+      
+      if (result.success) {
+        console.log('✅ Event archived successfully');
+        await loadEvents();
+        // Always reload archived events to update the list
+        console.log('🔄 Reloading archived events after archiving...');
+        await loadArchivedEvents();
+        console.log('✅ Archived events reloaded');
+      } else {
+        alert(`Error archiving event: ${result.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      alert(`Error archiving event: ${error.message}`);
+    } finally {
+      setProcessingIds(prev => ({ ...prev, [eventToArchive.id]: false }));
+      setEventToArchive(null);
+    }
+  };
+
+  const cancelArchiveEvent = () => {
+    setShowArchiveConfirmModal(false);
+    setEventToArchive(null);
+  };
+
+  const loadArchivedEvents = async () => {
+    try {
+      setLoadingArchived(true);
+      console.log('🔍 Loading archived events...');
+      const result = await eventsApiService.getArchivedEvents();
+      console.log('🔍 Archived events API result:', result);
+      
+      if (result.success) {
+        const rawEvents = result.data || [];
+        console.log('🔍 Raw archived events:', rawEvents);
+        console.log('🔍 Number of archived events:', rawEvents.length);
+        console.log('🔍 Is array?', Array.isArray(rawEvents));
+        
+        // Ensure we have an array
+        const eventsArray = Array.isArray(rawEvents) ? rawEvents : [];
+        console.log('🔍 Events array length:', eventsArray.length);
+        
+        const mapped = eventsArray.map(ev => {
+          const mappedEvent = {
+            id: ev._id || ev.id,
+            title: ev.title || ev.name || 'Untitled Event',
+            type: ev.type || 'event',
+            status: ev.status || 'approved',
+            archived: ev.archived !== undefined ? ev.archived : false,
+            location: ev.location || 'TBD',
+            startDate: ev.startDate,
+            endDate: ev.endDate,
+            creatorName: ev.createdBy?.firstName && ev.createdBy?.lastName
+              ? `${ev.createdBy.firstName} ${ev.createdBy.lastName}`
+              : ev.createdBy?.email || 'Unknown'
+          };
+          console.log('🔍 Mapped event:', mappedEvent);
+          return mappedEvent;
+        });
+        console.log('🔍 Final mapped archived events:', mapped);
+        console.log('🔍 Setting archivedEvents state with', mapped.length, 'events');
+        setArchivedEvents(mapped);
+      } else {
+        console.error('🔍 Failed to load archived events:', result.message);
+        console.error('🔍 Error details:', result.error);
+        setArchivedEvents([]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading archived events:', error);
+      setArchivedEvents([]);
+    } finally {
+      setLoadingArchived(false);
+    }
+  };
+
+  const handleUnarchiveEvent = async (event) => {
+    if (!event) return;
+
+    if (!window.confirm(`Are you sure you want to unarchive "${event.title}"? This will make it visible to all users again.`)) {
+      return;
+    }
+
+    try {
+      setProcessingIds(prev => ({ ...prev, [event.id]: true }));
+      const result = await eventsApiService.unarchiveEvent(event.id);
+      
+      if (result.success) {
+        await loadArchivedEvents();
+        await loadEvents();
+      } else {
+        alert(`Error unarchiving event: ${result.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      alert(`Error unarchiving event: ${error.message}`);
+    } finally {
+      setProcessingIds(prev => ({ ...prev, [event.id]: false }));
+    }
+  };
+
+  const loadAttendeesReport = async () => {
+    try {
+      setLoadingReport(true);
+      const result = await adminApiService.getAttendeesReport(reportFilters);
+      
+      if (result.success) {
+        setReportData(result.data);
+      } else {
+        alert(`Error loading report: ${result.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error loading attendees report:', error);
+      alert(`Error loading report: ${error.message}`);
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
+  const handleOpenReportModal = async () => {
+    setShowReportModal(true);
+    await loadAttendeesReport();
+  };
+
+  const handleOpenRatingsModal = async (event) => {
+    setSelectedEventForRatings(event);
+    setShowRatingsModal(true);
+    setLoadingRatings(true);
+    try {
+      const result = await eventsApiService.getRatingsAndComments(event._id || event.id);
+      if (result.success) {
+        setRatingsData(result.data);
+      } else {
+        alert(result.message || 'Failed to load ratings and comments');
+      }
+    } catch (error) {
+      console.error('Error loading ratings and comments:', error);
+      alert('Failed to load ratings and comments');
+    } finally {
+      setLoadingRatings(false);
+    }
+  };
+
+  const loadSalesReport = async () => {
+    try {
+      setLoadingSalesReport(true);
+      const result = await adminApiService.getSalesReport(salesReportFilters);
+      
+      if (result.success) {
+        setSalesReportData(result.data);
+      } else {
+        alert(`Error loading sales report: ${result.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error loading sales report:', error);
+      alert(`Error loading sales report: ${error.message}`);
+    } finally {
+      setLoadingSalesReport(false);
+    }
+  };
+
+  const handleOpenSalesReportModal = async () => {
+    setShowSalesReportModal(true);
+    await loadSalesReport();
+  };
+
+  const handleExportRegistrations = async (event) => {
+    if (!event) return;
+
+    // Don't allow export for conferences
+    if (event.type === 'conference') {
+      return;
+    }
+
+    // Don't allow export if no registrations
+    if ((event.registeredCount || 0) === 0) {
+      return;
+    }
+
+    try {
+      setProcessingIds(prev => ({ ...prev, [`export-${event.id}`]: true }));
+      
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/events/${event.id}/export-registrations`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Don't show alert for "no registrations" error
+        if (errorData.message && errorData.message.includes('No registrations found')) {
+          return;
+        }
+        throw new Error(errorData.message || 'Failed to export registrations');
+      }
+
+      // Get the blob from response
+      const blob = await response.blob();
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${event.title.replace(/[^a-z0-9]/gi, '_')}_registrations.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error exporting registrations:', error);
+      // Only show alert for actual errors, not "no registrations"
+      if (!error.message || !error.message.includes('No registrations found')) {
+        alert(`Error exporting registrations: ${error.message}`);
+      }
+    } finally {
+      setProcessingIds(prev => {
+        const newState = { ...prev };
+        delete newState[`export-${event.id}`];
+        return newState;
+      });
+    }
   };
 
   const formatDate = (dateString) => {
@@ -769,6 +1208,84 @@ const EventsOfficeEventsView = () => {
               </Link>
 
               <Link
+                to="/event-office/vendors"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/vendors') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/vendors')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/vendors')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  storefront
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/vendors') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Vendors
+                </p>
+              </Link>
+
+              <Link
+                to="/event-office/loyalty-partners"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/loyalty-partners') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/loyalty-partners')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/loyalty-partners')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/loyalty-partners') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  card_giftcard
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/loyalty-partners') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/loyalty-partners') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Loyalty Partners
+                </p>
+              </Link>
+
+              <Link
                 to="/event-office/workshops"
                 style={{
                   display: 'flex',
@@ -836,15 +1353,15 @@ const EventsOfficeEventsView = () => {
                   location_on
                 </span>
                 {sidebarOpen && (
-                  <p style={{
+                <p style={{
                     color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
+                  fontSize: '0.875rem',
                     fontWeight: isActiveRoute('/event-office/platform-booth-requests') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
                     Platform Booths
-                  </p>
+                </p>
                 )}
               </Link>
 
@@ -877,13 +1394,13 @@ const EventsOfficeEventsView = () => {
                   calendar_month
                 </span>
                 {sidebarOpen && (
-                  <p style={{
+                <p style={{
                     color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
+                  fontSize: '0.875rem',
                     fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
                     View Gym Sessions
                   </p>
                 )}
@@ -978,7 +1495,218 @@ const EventsOfficeEventsView = () => {
               Bindly
             </h2>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+            {/* Notification Icon */}
+            <div 
+              data-notification-icon
+              onClick={() => setNotificationPanelOpen(!notificationPanelOpen)}
+              style={{ 
+                position: 'relative', 
+                cursor: 'pointer',
+                padding: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ 
+                fontSize: '1.5rem', 
+                color: '#1D3557'
+              }}>
+                notifications
+              </span>
+              {unreadCount > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '0.25rem',
+                  right: '0.25rem',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  borderRadius: '50%',
+                  width: '1.25rem',
+                  height: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
+                  border: '2px solid #FFFFFF'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </div>
+              )}
+            </div>
+            
+            {/* Notification Panel */}
+            {notificationPanelOpen && (
+              <div 
+                data-notification-panel
+                style={{
+                  position: 'absolute',
+                  top: '3.5rem',
+                  right: '0',
+                  width: '24rem',
+                  maxHeight: '32rem',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  border: '1px solid #e2e8f0',
+                  zIndex: 1000,
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
+                <div style={{
+                  padding: '1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    margin: 0
+                  }}>
+                    Notifications
+                  </h3>
+                  <button
+                    onClick={() => setNotificationPanelOpen(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#6b7280'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      close
+                    </span>
+                  </button>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  {notifications && notifications.length > 0 ? (
+                    <ul style={{
+                      listStyle: 'none',
+                      padding: 0,
+                      margin: 0
+                    }}>
+                      {notifications.map((notif, idx) => (
+                        <li
+                          key={notif._id || notif.id || `notif-${idx}`}
+                          onClick={async () => {
+                            const notifId = notif._id || notif.id;
+                            if (!notif.isRead && notifId) {
+                              try {
+                                const token = localStorage.getItem('token');
+                                await axios.put(
+                                  `http://localhost:5000/api/notifications/${notifId}/read`,
+                                  {},
+                                  { headers: { Authorization: `Bearer ${token}` } }
+                                );
+                                setNotifications(prev => prev.map(n => 
+                                  (n._id === notifId || n.id === notifId) ? { ...n, isRead: true } : n
+                                ));
+                                setUnreadCount(prev => Math.max(0, prev - 1));
+                              } catch (err) {
+                                console.error('Error marking notification as read:', err);
+                              }
+                            }
+                          }}
+                          style={{
+                            padding: '1rem',
+                            borderBottom: '1px solid #f3f4f6',
+                            cursor: 'pointer',
+                            backgroundColor: !notif.isRead ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = !notif.isRead 
+                              ? 'rgba(59, 130, 246, 0.1)' 
+                              : 'rgba(0, 0, 0, 0.02)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = !notif.isRead 
+                              ? 'rgba(59, 130, 246, 0.05)' 
+                              : 'transparent';
+                          }}
+                        >
+                          <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            <div style={{
+                              backgroundColor: !notif.isRead ? '#dbeafe' : '#e5e7eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              borderRadius: '50%',
+                              flexShrink: 0
+                            }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.25rem',
+                                color: !notif.isRead ? '#3b82f6' : '#6b7280'
+                              }}>
+                                {notif.type === 'workshop_submission' ? 'school' : 
+                                 notif.type === 'vendor_request' ? 'storefront' : 
+                                 notif.type === 'event_announcement' ? 'event' : 'notifications'}
+                              </span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{
+                                fontSize: '0.875rem',
+                                fontWeight: !notif.isRead ? '600' : '500',
+                                color: '#111827',
+                                margin: '0 0 0.25rem 0',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {notif.title || 'Notification'}
+                              </p>
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                margin: 0,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical'
+                              }}>
+                                {notif.message || ''}
+                              </p>
+                              <p style={{
+                                fontSize: '0.625rem',
+                                color: '#9ca3af',
+                                margin: '0.25rem 0 0 0'
+                              }}>
+                                {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
+                              </p>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div style={{
+                      padding: '3rem 1rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
@@ -1138,111 +1866,559 @@ const EventsOfficeEventsView = () => {
               {/* Search Bar */}
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
                 <div style={{ position: 'relative', width: '400px' }}>
-                  <span className="material-symbols-outlined" style={{
-                    position: 'absolute',
-                    left: '0.75rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#9ca3af',
-                    fontSize: '1.25rem',
-                    pointerEvents: 'none'
-                  }}>
-                    search
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Search by event name, professor name, location, or description..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem 0.875rem 0.875rem 2.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #e5e7eb',
-                      backgroundColor: '#FFFFFF',
-                      fontSize: '0.875rem',
-                      outline: 'none',
-                      transition: 'all 0.2s',
-                      boxSizing: 'border-box'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = '#1e40af';
-                      e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = '#e5e7eb';
-                      e.target.style.boxShadow = 'none';
-                    }}
-                  />
-                </div>
-                <button
-                  onClick={handleSearch}
+                <span className="material-symbols-outlined" style={{
+                  position: 'absolute',
+                  left: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#9ca3af',
+                  fontSize: '1.25rem',
+                  pointerEvents: 'none'
+                }}>
+                  search
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search by event name, professor name, location, or description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   style={{
-                    padding: '0.875rem 1.75rem',
+                    width: '100%',
+                    padding: '0.875rem 0.875rem 0.875rem 2.75rem',
                     borderRadius: '0.5rem',
-                    backgroundColor: '#1e40af',
-                    color: '#FFFFFF',
-                    border: 'none',
+                    border: '1px solid #e5e7eb',
+                      backgroundColor: '#FFFFFF',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1e40af';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+              <button
+                onClick={handleSearch}
+                style={{
+                  padding: '0.875rem 1.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#1e40af',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    flexShrink: 0
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#1e3a8a';
+                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#1e40af';
+                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                }}
+              >
+                Search
+              </button>
+              </div>
+              
+              {/* Filter, Sort, Archive, and Report Buttons */}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
+              {/* Report Button */}
+              <button
+                onClick={handleOpenReportModal}
+                style={{
+                  padding: '0.875rem 1rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#f9fafb',
+                  color: '#6b7280',
+                  border: '1px solid #e5e7eb',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.borderColor = '#d1d5db';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#f9fafb';
+                  e.target.style.borderColor = '#e5e7eb';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                  assessment
+                </span>
+                Attendees Report
+              </button>
+              {/* Sales Report Button */}
+              <button
+                onClick={handleOpenSalesReportModal}
+                style={{
+                  padding: '0.875rem 1rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#f9fafb',
+                  color: '#6b7280',
+                  border: '1px solid #e5e7eb',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.borderColor = '#d1d5db';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#f9fafb';
+                  e.target.style.borderColor = '#e5e7eb';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                  attach_money
+                </span>
+                Sales Report
+              </button>
+              {/* Archive List Button */}
+              <div style={{ position: 'relative' }} data-archive-dropdown>
+                <button
+                  onClick={async () => {
+                    setShowArchivedModal(true);
+                    // Always reload archived events when opening the modal
+                    await loadArchivedEvents();
+                  }}
+                  style={{
+                    padding: '0.875rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#f9fafb',
+                    color: '#6b7280',
+                    border: '1px solid #e5e7eb',
                     cursor: 'pointer',
                     fontSize: '0.875rem',
                     fontWeight: '600',
                     transition: 'all 0.2s',
                     whiteSpace: 'nowrap',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    flexShrink: 0
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#1e3a8a';
-                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.borderColor = '#d1d5db';
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#1e40af';
-                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                    e.target.style.backgroundColor = '#f9fafb';
+                    e.target.style.borderColor = '#e5e7eb';
                   }}
                 >
-                  Search
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    archive
+                  </span>
+                  Archived Events
                 </button>
               </div>
-              
-              {/* Filter Buttons */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', flexShrink: 0 }}>
-              {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
+              {/* Filter Button */}
+              <div style={{ position: 'relative' }} data-filter-dropdown>
                 <button
-                  key={type}
-                  onClick={() => {
-                    setFilter(type);
-                    handleSearch();
-                  }}
+                onClick={() => setShowFilterModal(!showFilterModal)}
                   style={{
-                    padding: '0.625rem 1.25rem',
+                  padding: '0.875rem 1.5rem',
                     borderRadius: '0.5rem',
-                    backgroundColor: filter === type ? '#1e40af' : '#f9fafb',
-                    color: filter === type ? '#FFFFFF' : '#6b7280',
-                    border: filter === type ? 'none' : '1px solid #e5e7eb',
+                  backgroundColor: (filter !== 'all' || professorNameFilter || locationFilter || dateFilter) ? '#1e40af' : '#f9fafb',
+                  color: (filter !== 'all' || professorNameFilter || locationFilter || dateFilter) ? '#FFFFFF' : '#6b7280',
+                  border: (filter !== 'all' || professorNameFilter || locationFilter || dateFilter) ? 'none' : '1px solid #e5e7eb',
                     cursor: 'pointer',
-                    fontSize: '0.8125rem',
-                    fontWeight: filter === type ? '600' : '500',
-                    textTransform: 'capitalize',
+                    fontSize: '0.875rem',
+                  fontWeight: '600',
                     transition: 'all 0.2s',
-                    boxShadow: filter === type ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+                  whiteSpace: 'nowrap',
+                  boxShadow: (filter !== 'all' || professorNameFilter || locationFilter || dateFilter) ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
                   }}
                   onMouseEnter={(e) => {
-                    if (filter !== type) {
+                  if (!(filter !== 'all' || professorNameFilter || locationFilter || dateFilter)) {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.borderColor = '#d1d5db';
+                  }
+                  }}
+                  onMouseLeave={(e) => {
+                  if (!(filter !== 'all' || professorNameFilter || locationFilter || dateFilter)) {
+                    e.target.style.backgroundColor = '#f9fafb';
+                    e.target.style.borderColor = '#e5e7eb';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                  filter_list
+                </span>
+                Filters
+                {(filter !== 'all' || professorNameFilter || locationFilter || dateFilter) && (
+                  <span style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                    borderRadius: '9999px',
+                    padding: '0.125rem 0.5rem',
+                    fontSize: '0.75rem',
+                    fontWeight: '600'
+                  }}>
+                    {[filter !== 'all' ? 1 : 0, professorNameFilter, locationFilter, dateFilter].filter(f => f).length}
+                  </span>
+                )}
+                </button>
+
+              {/* Dropdown Modal */}
+              {showFilterModal && (
+                <div 
+                  data-filter-dropdown
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '0.5rem',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '0.75rem',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                    width: '400px',
+                    zIndex: 1000,
+                    border: '1px solid #e5e7eb'
+                  }}>
+                  <div style={{
+                    padding: '1.5rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1.5rem',
+                    maxHeight: '600px',
+                    overflowY: 'auto'
+                  }}>
+                    {/* Event Type Section */}
+                    <div>
+                      <h5 style={{
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#111827',
+                        margin: 0,
+                        marginBottom: '1rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        Event Type
+                      </h5>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {[
+                          { value: 'all', label: 'All Events' },
+                          { value: 'bazaar', label: 'Bazaars' },
+                          { value: 'trip', label: 'Trips' },
+                          { value: 'workshop', label: 'Workshops' },
+                          { value: 'conference', label: 'Conferences' },
+                          { value: 'booth', label: 'Booths' }
+                        ].map(type => (
+                          <label
+                            key={type.value}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              color: '#374151'
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              name="eventType"
+                              value={type.value}
+                              checked={filter === type.value}
+                              onChange={(e) => {
+                                setFilter(e.target.value);
+                                handleSearch();
+                              }}
+                              style={{
+                                width: '1rem',
+                                height: '1rem',
+                                cursor: 'pointer',
+                                accentColor: '#1e40af'
+                              }}
+                            />
+                            <span>{type.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Professor Name Filter - Only show for workshop/conference */}
+                    {(filter === 'workshop' || filter === 'conference') && (
+                      <div>
+                        <h5 style={{
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#111827',
+                          margin: 0,
+                          marginBottom: '1rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Professor Name
+                        </h5>
+                        <select
+                          value={professorNameFilter}
+                          onChange={(e) => setProfessorNameFilter(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            backgroundColor: '#FFFFFF',
+                            cursor: 'pointer',
+                            transition: 'border-color 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#1e40af';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#e5e7eb';
+                          }}
+                        >
+                          <option value="">All Professors</option>
+                          {availableProfessors.map(prof => (
+                            <option key={prof} value={prof}>{prof}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Location Filter */}
+                    <div>
+                      <h5 style={{
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#111827',
+                        margin: 0,
+                        marginBottom: '1rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        Location
+                      </h5>
+                      <select
+                        value={locationFilter}
+                        onChange={(e) => setLocationFilter(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                    border: '1px solid #e5e7eb',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          outline: 'none',
+                          backgroundColor: '#FFFFFF',
+                    cursor: 'pointer',
+                          transition: 'border-color 0.2s'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#1e40af';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = '#e5e7eb';
+                        }}
+                      >
+                        <option value="">All Locations</option>
+                        {availableLocations.map(loc => (
+                          <option key={loc} value={loc}>{loc}</option>
+                        ))}
+                      </select>
+                    </div>
+            
+                    {/* Date Filter */}
+                    <div>
+                      <h5 style={{
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#111827',
+                        margin: 0,
+                        marginBottom: '1rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        Date
+                      </h5>
+                      <input
+                        type="date"
+                        value={dateFilter}
+                        onChange={(e) => setDateFilter(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid #e5e7eb',
+                          backgroundColor: '#FFFFFF',
+                          fontSize: '0.875rem',
+                          outline: 'none',
+                          transition: 'border-color 0.2s',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#1e40af';
+                          e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = '#e5e7eb';
+                          e.target.style.boxShadow = 'none';
+                        }}
+                      />
+                    </div>
+
+                    {/* Clear Filters Button */}
+                    <div style={{ paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                <button
+                        onClick={() => {
+                          setProfessorNameFilter('');
+                          setLocationFilter('');
+                          setDateFilter('');
+                          setFilter('all');
+                          handleSearch();
+                        }}
+                  style={{
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                          backgroundColor: '#f3f4f6',
+                          color: '#374151',
+                          border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                          transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#e5e7eb';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                >
+                        Clear All Filters
+                </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+              {/* Sort Button */}
+              <div style={{ position: 'relative' }} data-sort-dropdown>
+                <button
+                  onClick={() => setShowSortModal(!showSortModal)}
+                  style={{
+                    padding: '0.875rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: sortBy !== 'suggested' ? '#1e40af' : '#f9fafb',
+                    color: sortBy !== 'suggested' ? '#FFFFFF' : '#6b7280',
+                    border: sortBy !== 'suggested' ? 'none' : '1px solid #e5e7eb',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
+                    boxShadow: sortBy !== 'suggested' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (sortBy === 'suggested') {
                       e.target.style.backgroundColor = '#f3f4f6';
                       e.target.style.borderColor = '#d1d5db';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (filter !== type) {
+                    if (sortBy === 'suggested') {
                       e.target.style.backgroundColor = '#f9fafb';
                       e.target.style.borderColor = '#e5e7eb';
                     }
                   }}
                 >
-                  {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    sort
+                  </span>
+                  Sort
                 </button>
-              ))}
+
+                {/* Sort Dropdown */}
+                {showSortModal && (
+                  <div 
+                    data-sort-dropdown
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '0.5rem',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '0.75rem',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      width: '250px',
+                      zIndex: 1000,
+                      border: '1px solid #e5e7eb',
+                      padding: '1rem'
+                    }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {[
+                        { value: 'suggested', label: 'Suggested' },
+                        { value: 'date-asc', label: 'Date (Ascending)' },
+                        { value: 'date-desc', label: 'Date (Descending)' }
+                      ].map(option => (
+                        <label
+                          key={option.value}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            color: '#374151'
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="sortBy"
+                            value={option.value}
+                            checked={sortBy === option.value}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            style={{
+                              width: '1rem',
+                              height: '1rem',
+                              cursor: 'pointer',
+                              accentColor: '#1e40af'
+                            }}
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               </div>
             </div>
           </div>
@@ -1278,7 +2454,7 @@ const EventsOfficeEventsView = () => {
               }} className="spinner"></div>
               <p style={{ margin: 0, color: '#6b7280' }}>Loading events...</p>
             </div>
-          ) : filteredEvents.length === 0 ? (
+          ) : sortedAndFilteredEvents.length === 0 ? (
             <div style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '0.75rem',
@@ -1289,7 +2465,7 @@ const EventsOfficeEventsView = () => {
               <p style={{ color: '#6b7280' }}>No events found.</p>
             </div>
           ) : (
-            <div style={{
+              <div style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '0.75rem',
               boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
@@ -1302,7 +2478,7 @@ const EventsOfficeEventsView = () => {
                       padding: '1rem 1.5rem',
                       fontSize: '0.75rem',
                       fontWeight: '600',
-                      color: '#6b7280',
+                color: '#6b7280',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
                     }}>
@@ -1364,7 +2540,7 @@ const EventsOfficeEventsView = () => {
                   </tr>
                 </thead>
                 <tbody style={{ borderTop: '1px solid #e5e7eb' }}>
-                  {filteredEvents.map(event => {
+                  {sortedAndFilteredEvents.map(event => {
                     const statusInfo = getEventStatus(event);
                     const canEdit = canEditEvent(event);
                     const canDelete = canDeleteEvent(event);
@@ -1388,7 +2564,7 @@ const EventsOfficeEventsView = () => {
                         >
                           <td style={{
                             padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
+                fontSize: '0.875rem',
                             fontWeight: '500',
                             color: '#111827'
                           }}>
@@ -1497,8 +2673,8 @@ const EventsOfficeEventsView = () => {
                               )}
                               
                               {/* Edit Button */}
-                              <button
-                                onClick={() => {
+              <button
+                onClick={() => {
                                   if (event.type === 'bazaar') openBazaarEdit(event);
                                   else if (event.type === 'conference') openConferenceEdit(event);
                                   else if (event.type === 'trip') openTripEdit(event);
@@ -1508,23 +2684,23 @@ const EventsOfficeEventsView = () => {
                                   }
                                 }}
                                 disabled={!canEdit}
-                                style={{
+                style={{
                                   padding: '0.5rem',
-                                  borderRadius: '0.5rem',
-                                  border: 'none',
+                  borderRadius: '0.5rem',
+                  border: 'none',
                                   backgroundColor: 'transparent',
                                   color: canEdit ? '#6b7280' : '#d1d5db',
                                   cursor: canEdit ? 'pointer' : 'not-allowed',
                                   opacity: canEdit ? 1 : 0.5
                                 }}
                                 title={canEdit ? 'Edit Event' : (event.type === 'bazaar' || event.type === 'trip' ? 'Cannot edit: event has started' : event.type === 'workshop' ? 'Cannot edit: workshop already accepted' : 'Cannot edit')}
-                                onMouseEnter={(e) => {
+                onMouseEnter={(e) => {
                                   if (canEdit) {
                                     e.target.style.backgroundColor = '#f3f4f6';
                                     e.target.style.color = '#137fec';
                                   }
-                                }}
-                                onMouseLeave={(e) => {
+                }}
+                onMouseLeave={(e) => {
                                   if (canEdit) {
                                     e.target.style.backgroundColor = 'transparent';
                                     e.target.style.color = '#6b7280';
@@ -1535,6 +2711,105 @@ const EventsOfficeEventsView = () => {
                                   edit
                                 </span>
                               </button>
+
+                              {/* View Ratings Button */}
+                              <button
+                                onClick={() => handleOpenRatingsModal(event)}
+                                style={{
+                                  padding: '0.5rem',
+                                  borderRadius: '0.5rem',
+                                  border: 'none',
+                                  backgroundColor: 'transparent',
+                                  color: '#f59e0b',
+                                  cursor: 'pointer'
+                                }}
+                                title="View Ratings & Comments"
+                                onMouseEnter={(e) => {
+                                  e.target.style.backgroundColor = '#fef3c7';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                  comment
+                                </span>
+                              </button>
+
+                              {/* Export Registrations Button - Only show for non-conference events */}
+                              {event.type !== 'conference' && (
+                                <button
+                                  onClick={() => handleExportRegistrations(event)}
+                                  disabled={!!processingIds[`export-${event.id}`] || (event.registeredCount || 0) === 0}
+                                  style={{
+                                    padding: '0.5rem',
+                                    borderRadius: '0.5rem',
+                                    border: 'none',
+                                    backgroundColor: 'transparent',
+                                    color: (event.registeredCount || 0) === 0 ? '#d1d5db' : '#10b981',
+                                    cursor: (processingIds[`export-${event.id}`] || (event.registeredCount || 0) === 0) ? 'not-allowed' : 'pointer',
+                                    opacity: (processingIds[`export-${event.id}`] || (event.registeredCount || 0) === 0) ? 0.5 : 1,
+                                    filter: (event.registeredCount || 0) === 0 ? 'blur(0.5px)' : 'none'
+                                  }}
+                                  title={(event.registeredCount || 0) === 0 ? 'No registrations to export' : 'Export Registrations'}
+                                  onMouseEnter={(e) => {
+                                    if (!processingIds[`export-${event.id}`] && (event.registeredCount || 0) > 0) {
+                                      e.target.style.backgroundColor = '#d1fae5';
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!processingIds[`export-${event.id}`] && (event.registeredCount || 0) > 0) {
+                                      e.target.style.backgroundColor = 'transparent';
+                                    }
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                    {processingIds[`export-${event.id}`] ? 'hourglass_empty' : 'download'}
+                                  </span>
+                                </button>
+                              )}
+
+                              {/* Archive Button - Only show for past events that aren't archived */}
+                              {(() => {
+                                const now = new Date();
+                                const endDate = new Date(event.endDate);
+                                const isPastEvent = endDate < now;
+                                const isArchiving = processingIds[event.id];
+                                
+                                if (isPastEvent && !event.archived) {
+                                  return (
+                                    <button
+                                      onClick={() => handleArchiveEvent(event)}
+                                      disabled={isArchiving}
+                                      style={{
+                                        padding: '0.5rem',
+                                        borderRadius: '0.5rem',
+                                        border: 'none',
+                                        backgroundColor: 'transparent',
+                                        color: '#8b5cf6',
+                                        cursor: isArchiving ? 'not-allowed' : 'pointer',
+                                        opacity: isArchiving ? 0.5 : 1
+                                      }}
+                                      title="Archive Event"
+                                      onMouseEnter={(e) => {
+                                        if (!isArchiving) {
+                                          e.target.style.backgroundColor = '#f3e8ff';
+                                        }
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        if (!isArchiving) {
+                                          e.target.style.backgroundColor = 'transparent';
+                                        }
+                                      }}
+                                    >
+                                      <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                        archive
+                                      </span>
+                                    </button>
+                                  );
+                                }
+                                return null;
+                              })()}
 
                               {/* Delete Button */}
                               <button
@@ -1564,8 +2839,8 @@ const EventsOfficeEventsView = () => {
                                 <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
                                   delete
                                 </span>
-                              </button>
-                            </div>
+              </button>
+            </div>
                           </td>
                           <td style={{
                             padding: '1rem 1.5rem',
@@ -1573,21 +2848,21 @@ const EventsOfficeEventsView = () => {
                           }}>
                             <button
                               onClick={() => toggleRowExpansion(event.id, event.type)}
-                              style={{
+                    style={{
                                 padding: '0.5rem',
                                 borderRadius: '0.5rem',
                                 border: 'none',
                                 backgroundColor: 'transparent',
                                 color: '#6b7280',
-                                cursor: 'pointer',
+                      cursor: 'pointer',
                                 transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
                                 transition: 'transform 0.2s'
-                              }}
-                              onMouseEnter={(e) => {
+                    }}
+                    onMouseEnter={(e) => {
                                 e.target.style.backgroundColor = '#f3f4f6';
                                 e.target.style.color = '#137fec';
-                              }}
-                              onMouseLeave={(e) => {
+                    }}
+                    onMouseLeave={(e) => {
                                 e.target.style.backgroundColor = 'transparent';
                                 e.target.style.color = '#6b7280';
                               }}
@@ -1612,11 +2887,11 @@ const EventsOfficeEventsView = () => {
                                     <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
                                       {event.description}
                                     </p>
-                                  </div>
+                      </div>
                                 )}
 
                                 {/* Event Details Grid */}
-                                <div style={{
+                        <div style={{
                                   display: 'grid',
                                   gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
                                   gap: '1rem'
@@ -1650,8 +2925,8 @@ const EventsOfficeEventsView = () => {
                                       <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
                                         {new Date(event.registrationDeadline).toLocaleString()}
                                       </p>
-                                    </div>
-                                  )}
+                        </div>
+                      )}
 
                                   {/* Capacity */}
                                   {event.capacity && (
@@ -1662,7 +2937,7 @@ const EventsOfficeEventsView = () => {
                                       <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
                                         {event.registeredCount || 0} / {event.capacity} registered
                                       </p>
-                                    </div>
+                    </div>
                                   )}
 
                                   {/* Price (for trips) */}
@@ -1765,7 +3040,7 @@ const EventsOfficeEventsView = () => {
                                     <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
                                       Participating Vendors
                                     </h4>
-                                    <div style={{
+                    <div style={{
                                       display: 'grid',
                                       gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
                                       gap: '0.75rem'
@@ -1806,7 +3081,7 @@ const EventsOfficeEventsView = () => {
                                               Contact: {vendor.contactName}
                                             </p>
                                           )}
-                                        </div>
+                      </div>
                                       ))}
                                     </div>
                                   </div>
@@ -1837,7 +3112,7 @@ const EventsOfficeEventsView = () => {
                                                 backgroundColor: '#FFFFFF',
                                                 borderRadius: '0.5rem',
                                                 border: '1px solid #e5e7eb',
-                                                display: 'flex',
+                        display: 'flex',
                                                 flexDirection: 'column',
                                                 gap: '0.75rem'
                                               }}
@@ -1884,8 +3159,8 @@ const EventsOfficeEventsView = () => {
                                                           • {attendee.name} ({attendee.email})
                                                         </p>
                                                       ))}
-                                                    </div>
-                                                  )}
+                        </div>
+                      )}
 
                                                   {/* Booth Size */}
                                                   {request.boothSize && (
@@ -1940,19 +3215,19 @@ const EventsOfficeEventsView = () => {
                                                       }}>
                                                         "{request.message}"
                                                       </p>
-                                                    </div>
-                                                  )}
+                        </div>
+                      )}
 
                                                   {/* Request Date */}
                                                   {request.createdAt && (
-                                                    <p style={{
+                      <p style={{
                                                       fontSize: '0.75rem',
                                                       color: '#9ca3af',
                                                       margin: '0.5rem 0 0 0'
                                                     }}>
                                                       Requested: {new Date(request.createdAt).toLocaleDateString()}
-                                                    </p>
-                                                  )}
+                      </p>
+                    )}
                                                 </div>
 
                                                 {/* Status Badge and Actions */}
@@ -1978,29 +3253,29 @@ const EventsOfficeEventsView = () => {
                                                   {/* Action Buttons (only show for pending) */}
                                                   {status === 'pending' && (
                                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                      <button
+                    <button
                                                         onClick={() => handleVendorRequestStatus(request._id, 'accepted', event.id)}
                                                         disabled={isProcessing}
-                                                        style={{
+                      style={{
                                                           padding: '0.5rem 1rem',
                                                           borderRadius: '0.375rem',
-                                                          border: 'none',
+                        border: 'none',
                                                           backgroundColor: isProcessing ? '#9ca3af' : '#10b981',
                                                           color: '#FFFFFF',
                                                           fontSize: '0.75rem',
                                                           fontWeight: '500',
                                                           cursor: isProcessing ? 'not-allowed' : 'pointer',
-                                                          display: 'flex',
-                                                          alignItems: 'center',
+                        display: 'flex',
+                        alignItems: 'center',
                                                           gap: '0.25rem',
                                                           transition: 'background-color 0.2s'
-                                                        }}
-                                                        onMouseEnter={(e) => {
+                      }}
+                      onMouseEnter={(e) => {
                                                           if (!isProcessing) {
                                                             e.target.style.backgroundColor = '#059669';
-                                                          }
-                                                        }}
-                                                        onMouseLeave={(e) => {
+                        }
+                      }}
+                      onMouseLeave={(e) => {
                                                           if (!isProcessing) {
                                                             e.target.style.backgroundColor = '#10b981';
                                                           }
@@ -2030,23 +3305,23 @@ const EventsOfficeEventsView = () => {
                                                         }}
                                                         onMouseEnter={(e) => {
                                                           if (!isProcessing) {
-                                                            e.target.style.backgroundColor = '#dc2626';
+                          e.target.style.backgroundColor = '#dc2626';
                                                           }
                                                         }}
                                                         onMouseLeave={(e) => {
                                                           if (!isProcessing) {
                                                             e.target.style.backgroundColor = '#ef4444';
-                                                          }
-                                                        }}
-                                                      >
-                                                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                        }
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
                                                           close
-                                                        </span>
+                      </span>
                                                         Reject
-                                                      </button>
-                                                    </div>
+                    </button>
+                  </div>
                                                   )}
-                                                </div>
+              </div>
                                               </div>
                                             </div>
                                           );
@@ -2101,26 +3376,26 @@ const EventsOfficeEventsView = () => {
       {/* Edit Modals */}
       {isEditModalOpen && editingBazaar && (
         <div style={{ 
-          position: 'fixed', 
-          inset: 0, 
+            position: 'fixed',
+            inset: 0,
           background: 'rgba(0, 0, 0, 0.5)', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           zIndex: 3000, 
           padding: '1rem' 
         }}>
           <div style={{ 
             width: 'min(600px, 90vw)', 
             maxHeight: '85vh', 
-            overflowY: 'auto', 
+              overflowY: 'auto',
             background: '#FFFFFF', 
             borderRadius: '0.75rem',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
           }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
               justifyContent: 'space-between', 
               padding: '1.5rem',
               borderBottom: '1px solid #e5e7eb',
@@ -2130,14 +3405,14 @@ const EventsOfficeEventsView = () => {
               zIndex: 1 
             }}>
               <h3 style={{ 
-                color: '#1D3557', 
+                color: '#1D3557',
                 fontSize: '1.25rem', 
-                fontWeight: '700', 
-                margin: 0 
+                fontWeight: '700',
+                margin: 0
               }}>
                 Edit Bazaar
               </h3>
-              <button 
+              <button
                 onClick={closeBazaarEdit}
                 style={{
                   background: 'none',
@@ -2182,18 +3457,18 @@ const EventsOfficeEventsView = () => {
                   registrationDeadline: editingBazaar.registrationDeadline ? new Date(editingBazaar.registrationDeadline).toISOString().slice(0,16) : ''
                 }}
               />
-            </div>
+              </div>
           </div>
         </div>
       )}
-
+              
       {isConferenceModalOpen && editingConference && (
-        <div style={{ 
+              <div style={{
           position: 'fixed', 
           inset: 0, 
           background: 'rgba(0, 0, 0, 0.5)', 
-          display: 'flex', 
-          alignItems: 'center', 
+                  display: 'flex',
+                  alignItems: 'center',
           justifyContent: 'center', 
           zIndex: 3000, 
           padding: '1rem' 
@@ -2206,9 +3481,9 @@ const EventsOfficeEventsView = () => {
             borderRadius: '0.75rem',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
           }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
               justifyContent: 'space-between', 
               padding: '1.5rem',
               borderBottom: '1px solid #e5e7eb',
@@ -2219,7 +3494,7 @@ const EventsOfficeEventsView = () => {
             }}>
               <h3 style={{ 
                 color: '#1D3557', 
-                fontSize: '1.25rem', 
+                    fontSize: '1.25rem',
                 fontWeight: '700', 
                 margin: 0 
               }}>
@@ -2252,9 +3527,9 @@ const EventsOfficeEventsView = () => {
               >
                 <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
                   close
-                </span>
+                  </span>
               </button>
-            </div>
+                  </div>
             <div style={{ padding: '1.5rem' }}>
               <ConferenceForm
                 onSubmit={handleConferenceUpdate}
@@ -2275,18 +3550,18 @@ const EventsOfficeEventsView = () => {
                   capacity: editingConference.capacity || ''
                 }}
               />
-            </div>
+                </div>
           </div>
         </div>
       )}
 
       {isTripModalOpen && editingTrip && (
-        <div style={{ 
+                  <div style={{
           position: 'fixed', 
           inset: 0, 
           background: 'rgba(0, 0, 0, 0.5)', 
-          display: 'flex', 
-          alignItems: 'center', 
+                    display: 'flex',
+                    alignItems: 'center',
           justifyContent: 'center', 
           zIndex: 3000, 
           padding: '1rem' 
@@ -2299,9 +3574,9 @@ const EventsOfficeEventsView = () => {
             borderRadius: '0.75rem',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
           }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
               justifyContent: 'space-between', 
               padding: '1.5rem',
               borderBottom: '1px solid #e5e7eb',
@@ -2312,7 +3587,7 @@ const EventsOfficeEventsView = () => {
             }}>
               <h3 style={{ 
                 color: '#1D3557', 
-                fontSize: '1.25rem', 
+                      fontSize: '1.25rem',
                 fontWeight: '700', 
                 margin: 0 
               }}>
@@ -2345,7 +3620,7 @@ const EventsOfficeEventsView = () => {
               >
                 <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
                   close
-                </span>
+                    </span>
               </button>
             </div>
             <div style={{ padding: '1.5rem' }}>
@@ -2366,9 +3641,9 @@ const EventsOfficeEventsView = () => {
                 }}
               />
             </div>
-          </div>
-        </div>
-      )}
+                    </div>
+                  </div>
+                )}
 
       {isWorkshopModalOpen && editingWorkshop && (
         <WorkshopEditRequestModal
@@ -2385,12 +3660,12 @@ const EventsOfficeEventsView = () => {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && eventToDelete && (
-        <div style={{
+                  <div style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
           justifyContent: 'center',
           zIndex: 3000,
           padding: '1rem'
@@ -2404,9 +3679,9 @@ const EventsOfficeEventsView = () => {
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
           }}>
             {/* Warning Icon */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
               justifyContent: 'center',
               width: '3rem',
               height: '3rem',
@@ -2414,14 +3689,14 @@ const EventsOfficeEventsView = () => {
               background: '#fef2f2',
               marginBottom: '1.5rem',
               margin: '0 auto 1.5rem'
-            }}>
-              <span className="material-symbols-outlined" style={{
+                  }}>
+                    <span className="material-symbols-outlined" style={{
                 fontSize: '2rem',
                 color: '#ef4444'
-              }}>
+                    }}>
                 warning
-              </span>
-            </div>
+                    </span>
+              </div>
 
             {/* Title */}
             <h3 style={{
@@ -2438,7 +3713,7 @@ const EventsOfficeEventsView = () => {
             <p style={{
               fontSize: '0.875rem',
               color: '#6b7280',
-              marginBottom: '1.5rem',
+                  marginBottom: '1.5rem',
               textAlign: 'center',
               lineHeight: '1.5'
             }}>
@@ -2456,8 +3731,8 @@ const EventsOfficeEventsView = () => {
             </p>
 
             {/* Buttons */}
-            <div style={{
-              display: 'flex',
+                  <div style={{
+                    display: 'flex',
               gap: '0.75rem',
               justifyContent: 'flex-end'
             }}>
@@ -2470,7 +3745,7 @@ const EventsOfficeEventsView = () => {
                   border: '1px solid #d1d5db',
                   background: '#FFFFFF',
                   color: '#374151',
-                  fontSize: '0.875rem',
+                          fontSize: '0.875rem',
                   fontWeight: '500',
                   cursor: deleting ? 'not-allowed' : 'pointer',
                   opacity: deleting ? 0.5 : 1,
@@ -2517,22 +3792,22 @@ const EventsOfficeEventsView = () => {
               >
                 {deleting ? 'Deleting...' : 'Delete Event'}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
+                        </div>
+                          </div>
+                          </div>
+                        )}
 
       {/* Create Event Modal */}
       {isCreateModalOpen && (
-        <div style={{
+                          <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
+                            display: 'flex',
+                            alignItems: 'center',
           justifyContent: 'center',
           zIndex: 2000
         }}
@@ -2556,7 +3831,7 @@ const EventsOfficeEventsView = () => {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div style={{
+                <div style={{
               padding: '1.5rem',
               borderBottom: '1px solid #e5e7eb',
               display: 'flex',
@@ -2630,16 +3905,16 @@ const EventsOfficeEventsView = () => {
                   onMouseEnter={(e) => {
                     if (activeCreateTab !== tab.id) {
                       e.target.style.color = '#1D3557';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
+                  }
+                }}
+                onMouseLeave={(e) => {
                     if (activeCreateTab !== tab.id) {
                       e.target.style.color = '#6b7280';
-                    }
-                  }}
-                >
+                  }
+                }}
+              >
                   {tab.label}
-                </button>
+              </button>
               ))}
             </div>
 
@@ -2677,6 +3952,1711 @@ const EventsOfficeEventsView = () => {
           </div>
         </div>
       )}
+
+      {/* Archive Confirmation Modal */}
+      {showArchiveConfirmModal && eventToArchive && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            cancelArchiveEvent();
+          }
+        }}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            width: '90%',
+            maxWidth: '500px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              backgroundColor: '#fef3c7'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
+              }}>
+                <span className="material-symbols-outlined" style={{
+                  fontSize: '1.5rem',
+                  color: '#f59e0b'
+                }}>
+                  warning
+                </span>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '600',
+                  color: '#92400e',
+                  margin: 0
+                }}>
+                  Archive Event
+                </h2>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{
+              padding: '1.5rem'
+            }}>
+              <p style={{
+                fontSize: '1rem',
+                color: '#374151',
+                margin: 0,
+                marginBottom: '1rem',
+                lineHeight: '1.5'
+              }}>
+                Are you sure you want to archive <strong>"{eventToArchive.title}"</strong>?
+              </p>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                margin: 0,
+                lineHeight: '1.5'
+              }}>
+                This will hide the event from all users except Events Office. You can unarchive it later if needed.
+              </p>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.75rem',
+              backgroundColor: '#f9fafb'
+            }}>
+              <button
+                onClick={cancelArchiveEvent}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.borderColor = '#9ca3af';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#FFFFFF';
+                  e.target.style.borderColor = '#d1d5db';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmArchiveEvent}
+                disabled={processingIds[eventToArchive.id]}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  backgroundColor: '#8b5cf6',
+                  color: '#FFFFFF',
+                  cursor: processingIds[eventToArchive.id] ? 'not-allowed' : 'pointer',
+                  opacity: processingIds[eventToArchive.id] ? 0.6 : 1,
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (!processingIds[eventToArchive.id]) {
+                    e.target.style.backgroundColor = '#7c3aed';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!processingIds[eventToArchive.id]) {
+                    e.target.style.backgroundColor = '#8b5cf6';
+                  }
+                }}
+              >
+                {processingIds[eventToArchive.id] ? 'Archiving...' : 'Archive'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive Confirmation Modal */}
+      {showArchiveConfirmModal && eventToArchive && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            cancelArchiveEvent();
+          }
+        }}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            width: '90%',
+            maxWidth: '500px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              backgroundColor: '#fef3c7'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
+              }}>
+                <span className="material-symbols-outlined" style={{
+                  fontSize: '1.5rem',
+                  color: '#f59e0b'
+                }}>
+                  warning
+                </span>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '600',
+                  color: '#92400e',
+                  margin: 0
+                }}>
+                  Archive Event
+                </h2>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{
+              padding: '1.5rem'
+            }}>
+              <p style={{
+                fontSize: '1rem',
+                color: '#374151',
+                margin: 0,
+                marginBottom: '1rem',
+                lineHeight: '1.5'
+              }}>
+                Are you sure you want to archive <strong>"{eventToArchive.title}"</strong>?
+              </p>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                margin: 0,
+                lineHeight: '1.5'
+              }}>
+                This will hide the event from all users except Events Office. You can unarchive it later if needed.
+              </p>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.75rem',
+              backgroundColor: '#f9fafb'
+            }}>
+              <button
+                onClick={cancelArchiveEvent}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.borderColor = '#9ca3af';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#FFFFFF';
+                  e.target.style.borderColor = '#d1d5db';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmArchiveEvent}
+                disabled={processingIds[eventToArchive.id]}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  backgroundColor: '#8b5cf6',
+                  color: '#FFFFFF',
+                  cursor: processingIds[eventToArchive.id] ? 'not-allowed' : 'pointer',
+                  opacity: processingIds[eventToArchive.id] ? 0.6 : 1,
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (!processingIds[eventToArchive.id]) {
+                    e.target.style.backgroundColor = '#7c3aed';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!processingIds[eventToArchive.id]) {
+                    e.target.style.backgroundColor = '#8b5cf6';
+                  }
+                }}
+              >
+                {processingIds[eventToArchive.id] ? 'Archiving...' : 'Archive'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archived Events Modal */}
+      {showArchivedModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowArchivedModal(false);
+          }
+        }}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            width: '90%',
+            maxWidth: '1200px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: '600',
+                color: '#111827',
+                margin: 0
+              }}>
+                Archived Events
+              </h2>
+              <button
+                onClick={() => setShowArchivedModal(false)}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  close
+                </span>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.5rem'
+            }}>
+              {loadingArchived ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '4rem 2rem',
+                  color: '#6b7280'
+                }}>
+                  Loading archived events...
+                </div>
+              ) : archivedEvents.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '4rem 2rem',
+                  color: '#6b7280'
+                }}>
+                  No archived events found.
+                </div>
+              ) : (
+                <div style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '0.75rem',
+                  overflow: 'hidden'
+                }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Event Name
+                        </th>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Type
+                        </th>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          End Date
+                        </th>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Location
+                        </th>
+                        <th style={{ padding: '1rem 1.5rem', textAlign: 'right', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody style={{ borderTop: '1px solid #e5e7eb' }}>
+                      {archivedEvents.map(event => {
+                        const isProcessing = processingIds[event.id];
+                        
+                        return (
+                          <tr key={event.id} style={{
+                            borderBottom: '1px solid #e5e7eb',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <td style={{
+                              padding: '1rem 1.5rem',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              color: '#111827'
+                            }}>
+                              {event.title}
+                            </td>
+                            <td style={{
+                              padding: '1rem 1.5rem',
+                              fontSize: '0.875rem',
+                              color: '#6b7280'
+                            }}>
+                              {event.type ? event.type.charAt(0).toUpperCase() + event.type.slice(1) : 'Event'}
+                            </td>
+                            <td style={{
+                              padding: '1rem 1.5rem',
+                              fontSize: '0.875rem',
+                              color: '#6b7280'
+                            }}>
+                              {formatTableDate(event.endDate)}
+                            </td>
+                            <td style={{
+                              padding: '1rem 1.5rem',
+                              fontSize: '0.875rem',
+                              color: '#6b7280'
+                            }}>
+                              {event.location}
+                            </td>
+                            <td style={{
+                              padding: '1rem 1.5rem',
+                              textAlign: 'right'
+                            }}>
+                              <button
+                                onClick={() => handleUnarchiveEvent(event)}
+                                disabled={isProcessing}
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  borderRadius: '0.5rem',
+                                  border: 'none',
+                                  backgroundColor: '#8b5cf6',
+                                  color: '#FFFFFF',
+                                  cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                  opacity: isProcessing ? 0.5 : 1,
+                                  fontSize: '0.875rem',
+                                  fontWeight: '500'
+                                }}
+                                title="Unarchive Event"
+                                onMouseEnter={(e) => {
+                                  if (!isProcessing) {
+                                    e.target.style.backgroundColor = '#7c3aed';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isProcessing) {
+                                    e.target.style.backgroundColor = '#8b5cf6';
+                                  }
+                                }}
+                              >
+                                {isProcessing ? 'Processing...' : 'Unarchive'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Attendees Report Modal */}
+      {showReportModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowReportModal(false);
+          }
+        }}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            width: '90%',
+            maxWidth: '1400px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: '600',
+                color: '#111827',
+                margin: 0
+              }}>
+                Event Attendees Report
+              </h2>
+              <button
+                onClick={() => setShowReportModal(false)}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  close
+                </span>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.5rem'
+            }}>
+              {/* Filters */}
+              <div style={{
+                backgroundColor: '#f9fafb',
+                borderRadius: '0.5rem',
+                padding: '1.5rem',
+                marginBottom: '1.5rem'
+              }}>
+                <h3 style={{
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  marginBottom: '1rem'
+                }}>
+                  Filter Report
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '1rem'
+                }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Event Name
+                    </label>
+                    <select
+                      value={reportFilters.eventName}
+                      onChange={(e) => setReportFilters(prev => ({ ...prev, eventName: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem',
+                        backgroundColor: '#FFFFFF'
+                      }}
+                    >
+                      <option value="">All Events</option>
+                      {availableEventNames.map((name, index) => (
+                        <option key={index} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Event Type
+                    </label>
+                    <select
+                      value={reportFilters.eventType}
+                      onChange={(e) => setReportFilters(prev => ({ ...prev, eventType: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem',
+                        backgroundColor: '#FFFFFF'
+                      }}
+                    >
+                      <option value="">All Types</option>
+                      <option value="bazaar">Bazaar</option>
+                      <option value="trip">Trip</option>
+                      <option value="workshop">Workshop</option>
+                      <option value="conference">Conference</option>
+                      <option value="booth">Booth</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={reportFilters.startDate}
+                      onChange={(e) => setReportFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={reportFilters.endDate}
+                      onChange={(e) => setReportFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  gap: '0.75rem',
+                  marginTop: '1rem'
+                }}>
+                  <button
+                    onClick={loadAttendeesReport}
+                    disabled={loadingReport}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      border: 'none',
+                      backgroundColor: '#1e40af',
+                      color: '#FFFFFF',
+                      cursor: loadingReport ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      opacity: loadingReport ? 0.5 : 1
+                    }}
+                  >
+                    {loadingReport ? 'Loading...' : 'Apply Filters'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setReportFilters({
+                        eventName: '',
+                        eventType: '',
+                        startDate: '',
+                        endDate: ''
+                      });
+                    }}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      backgroundColor: '#FFFFFF',
+                      color: '#374151',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+
+              {/* Report Data */}
+              {loadingReport ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '4rem 2rem',
+                  color: '#6b7280'
+                }}>
+                  Loading report...
+                </div>
+              ) : reportData && reportData.report ? (
+                <div>
+                  {/* Summary */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '1rem',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{
+                      backgroundColor: '#f0f9ff',
+                      padding: '1.5rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #bae6fd'
+                    }}>
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: '#0369a1',
+                        fontWeight: '500',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Total Events
+                      </div>
+                      <div style={{
+                        fontSize: '2rem',
+                        fontWeight: '700',
+                        color: '#0c4a6e'
+                      }}>
+                        {reportData.report.summary.totalEvents}
+                      </div>
+                    </div>
+                    <div style={{
+                      backgroundColor: '#f0fdf4',
+                      padding: '1.5rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #bbf7d0'
+                    }}>
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: '#166534',
+                        fontWeight: '500',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Total Attendees
+                      </div>
+                      <div style={{
+                        fontSize: '2rem',
+                        fontWeight: '700',
+                        color: '#14532d'
+                      }}>
+                        {reportData.report.summary.totalAttendees}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Events Table */}
+                  {reportData.report.byEvent && reportData.report.byEvent.length > 0 ? (
+                    <div style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '0.75rem',
+                      overflow: 'hidden',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Event Name
+                            </th>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Type
+                            </th>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Date
+                            </th>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Location
+                            </th>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'center', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Attendees
+                            </th>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'center', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Capacity
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reportData.report.byEvent.map((event, index) => (
+                            <tr key={index} style={{
+                              borderBottom: index < reportData.report.byEvent.length - 1 ? '1px solid #e5e7eb' : 'none'
+                            }}>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                fontWeight: '500',
+                                color: '#111827'
+                              }}>
+                                {event.title}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                {event.type ? event.type.charAt(0).toUpperCase() + event.type.slice(1) : 'Event'}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                {event.startDate ? new Date(event.startDate).toLocaleDateString() : 'N/A'}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                {event.location || 'N/A'}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                color: '#111827',
+                                textAlign: 'center'
+                              }}>
+                                {event.actualAttendees || 0}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                color: '#6b7280',
+                                textAlign: 'center'
+                              }}>
+                                {event.capacity || 'N/A'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div style={{
+                      textAlign: 'center',
+                      padding: '4rem 2rem',
+                      color: '#6b7280'
+                    }}>
+                      No events found matching the filters.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '4rem 2rem',
+                  color: '#6b7280'
+                }}>
+                  No report data available.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sales Report Modal */}
+      {showSalesReportModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowSalesReportModal(false);
+          }
+        }}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            width: '90%',
+            maxWidth: '1400px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: '600',
+                color: '#111827',
+                margin: 0
+              }}>
+                Sales Report
+              </h2>
+              <button
+                onClick={() => setShowSalesReportModal(false)}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  close
+                </span>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.5rem'
+            }}>
+              {/* Filters */}
+              <div style={{
+                backgroundColor: '#f9fafb',
+                borderRadius: '0.5rem',
+                padding: '1.5rem',
+                marginBottom: '1.5rem'
+              }}>
+                <h3 style={{
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  marginBottom: '1rem'
+                }}>
+                  Filter & Sort Report
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '1rem'
+                }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Event Type
+                    </label>
+                    <select
+                      value={salesReportFilters.eventType}
+                      onChange={(e) => setSalesReportFilters(prev => ({ ...prev, eventType: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem',
+                        backgroundColor: '#FFFFFF'
+                      }}
+                    >
+                      <option value="">All Types</option>
+                      <option value="bazaar">Bazaar</option>
+                      <option value="trip">Trip</option>
+                      <option value="workshop">Workshop</option>
+                      <option value="conference">Conference</option>
+                      <option value="booth">Booth</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={salesReportFilters.startDate}
+                      onChange={(e) => setSalesReportFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={salesReportFilters.endDate}
+                      onChange={(e) => setSalesReportFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Sort By Revenue
+                    </label>
+                    <select
+                      value={salesReportFilters.sortBy}
+                      onChange={(e) => setSalesReportFilters(prev => ({ ...prev, sortBy: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.875rem',
+                        backgroundColor: '#FFFFFF'
+                      }}
+                    >
+                      <option value="">Default (Date)</option>
+                      <option value="revenue-asc">Revenue: Least to Greatest</option>
+                      <option value="revenue-desc">Revenue: Greatest to Least</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  gap: '0.75rem',
+                  marginTop: '1rem'
+                }}>
+                  <button
+                    onClick={loadSalesReport}
+                    disabled={loadingSalesReport}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      border: 'none',
+                      backgroundColor: '#1e40af',
+                      color: '#FFFFFF',
+                      cursor: loadingSalesReport ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      opacity: loadingSalesReport ? 0.5 : 1
+                    }}
+                  >
+                    {loadingSalesReport ? 'Loading...' : 'Apply Filters'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSalesReportFilters({
+                        eventType: '',
+                        startDate: '',
+                        endDate: '',
+                        sortBy: ''
+                      });
+                    }}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      backgroundColor: '#FFFFFF',
+                      color: '#374151',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+
+              {/* Report Data */}
+              {loadingSalesReport ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '4rem 2rem',
+                  color: '#6b7280'
+                }}>
+                  Loading sales report...
+                </div>
+              ) : salesReportData && salesReportData.report ? (
+                <div>
+                  {/* Summary */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '1rem',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{
+                      backgroundColor: '#f0f9ff',
+                      padding: '1.5rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #bae6fd'
+                    }}>
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: '#0369a1',
+                        fontWeight: '500',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Total Events
+                      </div>
+                      <div style={{
+                        fontSize: '2rem',
+                        fontWeight: '700',
+                        color: '#0c4a6e'
+                      }}>
+                        {salesReportData.report.summary.totalEvents}
+                      </div>
+                    </div>
+                    <div style={{
+                      backgroundColor: '#f0fdf4',
+                      padding: '1.5rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #bbf7d0'
+                    }}>
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: '#166534',
+                        fontWeight: '500',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Total Revenue
+                      </div>
+                      <div style={{
+                        fontSize: '2rem',
+                        fontWeight: '700',
+                        color: '#14532d'
+                      }}>
+                        ${salesReportData.report.summary.totalRevenue.toFixed(2)}
+                      </div>
+                    </div>
+                    <div style={{
+                      backgroundColor: '#fef3c7',
+                      padding: '1.5rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #fde68a'
+                    }}>
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: '#92400e',
+                        fontWeight: '500',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Total Payments
+                      </div>
+                      <div style={{
+                        fontSize: '2rem',
+                        fontWeight: '700',
+                        color: '#78350f'
+                      }}>
+                        {salesReportData.report.summary.totalPayments}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Events Table */}
+                  {salesReportData.report.byEvent && salesReportData.report.byEvent.length > 0 ? (
+                    <div style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '0.75rem',
+                      overflow: 'hidden',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Event Name
+                            </th>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Type
+                            </th>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Date
+                            </th>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Price
+                            </th>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'center', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Revenue
+                            </th>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'center', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Payments
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {salesReportData.report.byEvent.map((event, index) => (
+                            <tr key={index} style={{
+                              borderBottom: index < salesReportData.report.byEvent.length - 1 ? '1px solid #e5e7eb' : 'none'
+                            }}>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                fontWeight: '500',
+                                color: '#111827'
+                              }}>
+                                {event.title}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                {event.type ? event.type.charAt(0).toUpperCase() + event.type.slice(1) : 'Event'}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                {event.startDate ? new Date(event.startDate).toLocaleDateString() : 'N/A'}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                ${(event.price || 0).toFixed(2)}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                color: '#059669',
+                                textAlign: 'center'
+                              }}>
+                                ${(event.revenue || 0).toFixed(2)}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                color: '#6b7280',
+                                textAlign: 'center'
+                              }}>
+                                {event.paymentCount || 0}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div style={{
+                      textAlign: 'center',
+                      padding: '4rem 2rem',
+                      color: '#6b7280'
+                    }}>
+                      No events found matching the filters.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '4rem 2rem',
+                  color: '#6b7280'
+                }}>
+                  No sales data available.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ratings & Comments Modal */}
+      {showRatingsModal && selectedEventForRatings && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000
+        }}
+        onClick={() => {
+          setShowRatingsModal(false);
+          setSelectedEventForRatings(null);
+          setRatingsData(null);
+        }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              width: '90%',
+              maxWidth: '800px',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              margin: '0 1rem'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '700',
+                  color: '#1D3557',
+                  margin: 0,
+                  marginBottom: '0.25rem'
+                }}>
+                  Ratings & Comments
+                </h2>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  margin: 0
+                }}>
+                  {selectedEventForRatings.title || selectedEventForRatings.name}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowRatingsModal(false);
+                  setSelectedEventForRatings(null);
+                  setRatingsData(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6b7280',
+                  transition: 'color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.color = '#6b7280';
+                }}
+                aria-label="Close modal"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  close
+                </span>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.5rem'
+            }}>
+              {loadingRatings ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '3rem',
+                  color: '#6b7280',
+                  fontSize: '0.875rem'
+                }}>
+                  Loading ratings and comments...
+                </div>
+              ) : ratingsData ? (
+                <>
+                  {/* Ratings Summary */}
+                  <div style={{
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '0.5rem',
+                    padding: '1.5rem',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '2rem',
+                      flexWrap: 'wrap'
+                    }}>
+                      <div>
+                        <div style={{
+                          fontSize: '0.875rem',
+                          color: '#6b7280',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Average Rating
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}>
+                          <span style={{
+                            fontSize: '2rem',
+                            fontWeight: '700',
+                            color: '#1D3557'
+                          }}>
+                            {ratingsData.ratings?.average?.toFixed(1) || '0.0'}
+                          </span>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '2rem',
+                            color: '#fbbf24'
+                          }}>
+                            star
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{
+                          fontSize: '0.875rem',
+                          color: '#6b7280',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Total Ratings
+                        </div>
+                        <div style={{
+                          fontSize: '1.5rem',
+                          fontWeight: '700',
+                          color: '#1D3557'
+                        }}>
+                          {ratingsData.ratings?.count || 0}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{
+                          fontSize: '0.875rem',
+                          color: '#6b7280',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Total Comments
+                        </div>
+                        <div style={{
+                          fontSize: '1.5rem',
+                          fontWeight: '700',
+                          color: '#1D3557'
+                        }}>
+                          {ratingsData.comments?.length || 0}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Rating Distribution */}
+                    {ratingsData.ratings?.distribution && (
+                      <div style={{
+                        marginTop: '1.5rem',
+                        paddingTop: '1.5rem',
+                        borderTop: '1px solid #e5e7eb'
+                      }}>
+                        <div style={{
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#374151',
+                          marginBottom: '0.75rem'
+                        }}>
+                          Rating Distribution
+                        </div>
+                        {[5, 4, 3, 2, 1].map((rating) => {
+                          const count = ratingsData.ratings.distribution[rating] || 0;
+                          const total = ratingsData.ratings.count || 1;
+                          const percentage = total > 0 ? (count / total) * 100 : 0;
+                          return (
+                            <div key={rating} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem',
+                              marginBottom: '0.5rem'
+                            }}>
+                              <div style={{
+                                fontSize: '0.875rem',
+                                fontWeight: '500',
+                                color: '#374151',
+                                minWidth: '3rem'
+                              }}>
+                                {rating} ⭐
+                              </div>
+                              <div style={{
+                                flex: 1,
+                                height: '0.5rem',
+                                backgroundColor: '#e5e7eb',
+                                borderRadius: '0.25rem',
+                                overflow: 'hidden'
+                              }}>
+                                <div style={{
+                                  width: `${percentage}%`,
+                                  height: '100%',
+                                  backgroundColor: '#fbbf24',
+                                  transition: 'width 0.3s ease'
+                                }}></div>
+                              </div>
+                              <div style={{
+                                fontSize: '0.875rem',
+                                color: '#6b7280',
+                                minWidth: '3rem',
+                                textAlign: 'right'
+                              }}>
+                                {count} ({percentage.toFixed(0)}%)
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Comments Section */}
+                  <div>
+                    <h3 style={{
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      color: '#1D3557',
+                      marginBottom: '1rem'
+                    }}>
+                      Comments ({ratingsData.comments?.length || 0})
+                    </h3>
+                    {ratingsData.comments && ratingsData.comments.length > 0 ? (
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem'
+                      }}>
+                        {ratingsData.comments.map((comment) => (
+                          <div
+                            key={comment._id}
+                            style={{
+                              backgroundColor: '#FFFFFF',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '0.5rem',
+                              padding: '1rem',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.75rem'
+                            }}
+                          >
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start'
+                            }}>
+                              <div>
+                                <div style={{
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  color: '#111827',
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  {comment.user?.firstName && comment.user?.lastName
+                                    ? `${comment.user.firstName} ${comment.user.lastName}`
+                                    : comment.user?.email || 'Anonymous'}
+                                </div>
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: '#6b7280'
+                                }}>
+                                  {comment.user?.userType || 'User'} • {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  }) : 'Unknown date'}
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{
+                              fontSize: '0.875rem',
+                              color: '#374151',
+                              lineHeight: '1.5',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {comment.text}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{
+                        textAlign: 'center',
+                        padding: '3rem',
+                        color: '#6b7280',
+                        fontSize: '0.875rem'
+                      }}>
+                        No comments yet for this event.
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '3rem',
+                  color: '#6b7280',
+                  fontSize: '0.875rem'
+                }}>
+                  No ratings or comments data available.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
