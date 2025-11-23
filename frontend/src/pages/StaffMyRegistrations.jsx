@@ -593,30 +593,69 @@ const StaffMyRegistrations = () => {
                     <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
                       <div style={{
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: getEventTypeColor(registration.eventType),
-                        color: '#FFFFFF',
-                        fontSize: '0.6875rem',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
+                        width: '100%',
+                        height: '180px',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        backgroundColor: '#f3f4f6',
+                        flexShrink: 0
                       }}>
-                        {registration.eventType}
+                        <img
+                          src={getEventTypeImage(registration.eventType)}
+                          alt={registration.eventType ? registration.eventType.charAt(0).toUpperCase() + registration.eventType.slice(1) : 'Event'}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'center'
+                          }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.parentElement.style.backgroundColor = getEventTypeColor(registration.eventType);
+                            e.target.parentElement.style.display = 'flex';
+                            e.target.parentElement.style.alignItems = 'center';
+                            e.target.parentElement.style.justifyContent = 'center';
+                            if (!e.target.parentElement.querySelector('.fallback-text')) {
+                              const fallback = document.createElement('div');
+                              fallback.className = 'fallback-text';
+                              fallback.textContent = getEventTypeFallbackText(registration.eventType);
+                              fallback.style.color = '#FFFFFF';
+                              fallback.style.fontSize = '1.5rem';
+                              fallback.style.fontWeight = '700';
+                              e.target.parentElement.appendChild(fallback);
+                            }
+                          }}
+                        />
                       </div>
-                      <div style={{
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: getStatusColor(registration.status),
-                        color: '#FFFFFF',
-                        fontSize: '0.6875rem',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}>
-                        {getDisplayStatus(registration.status)}
+                    )}
+                    
+                    <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                        <div style={{
+                          padding: '0.375rem 0.875rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: getEventTypeColor(registration.eventType),
+                          color: '#FFFFFF',
+                          fontSize: '0.6875rem',
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          {registration.eventType}
+                        </div>
+                        <div style={{
+                          padding: '0.375rem 0.875rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: getStatusColor(registration.status),
+                          color: '#FFFFFF',
+                          fontSize: '0.6875rem',
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          {registration.status}
+                        </div>
                       </div>
-                    </div>
 
                       <h3 style={{
                         color: '#1D3557',
@@ -679,38 +718,6 @@ const StaffMyRegistrations = () => {
                         </span>
                         <span>{registration.eventLocation}</span>
                       </div>
-                      {registration.capacity && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
-                          color: '#6b7280'
-                        }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            people
-                          </span>
-                          <span>{registration.registeredCount || 0}/{registration.capacity} registered</span>
-        </div>
-      )}
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
-                      }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
-                        }}>
-                          schedule
-                        </span>
-                        <span>Registered: {formatDate(registration.registeredAt)}</span>
-                      </div>
                     </div>
 
                       {registration.eventDescription && (
@@ -731,7 +738,7 @@ const StaffMyRegistrations = () => {
                     </div>
                   </div>
                 ))}
-        </div>
+              </div>
             </>
           )}
           </div>
@@ -1054,7 +1061,7 @@ const StaffMyRegistrations = () => {
                     <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentName}</div>
               </div>
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Student ID</div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>{user?.userType === 'TA' ? 'TA ID' : 'Student ID'}</div>
                     <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentId}</div>
                 </div>
                   <div>

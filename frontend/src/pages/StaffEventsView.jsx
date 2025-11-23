@@ -21,20 +21,20 @@ const StaffEventsView = () => {
   const [showWorkshopEditModal, setShowWorkshopEditModal] = useState(false);
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
   const [registeredEventIds, setRegisteredEventIds] = useState(new Set());
+  const [expandedRows, setExpandedRows] = useState(new Set());
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
+    // Exact match
     if (currentPath === path) return true;
+    // For dashboard, check if it's exactly /dashboard (not /dashboard/something)
     if (path === '/dashboard') {
       return currentPath === '/dashboard';
     }
+    // For other routes, check if current path starts with the route path
     return currentPath.startsWith(path);
   };
-
-  const displayName = user?.firstName && user?.lastName 
-    ? `${user.firstName} ${user.lastName}`
-    : user?.name || 'Staff';
 
   const handleLogout = (e) => {
     if (e) {
@@ -68,7 +68,8 @@ const StaffEventsView = () => {
       });
       
       if (result.success) {
-        const mapped = (result.data || []).map(ev => ({
+        const eventsList = Array.isArray(result.data) ? result.data : (result.data.events || []);
+        const mapped = eventsList.map(ev => ({
           id: ev._id || ev.id,
           title: ev.title,
           type: ev.type,
@@ -140,7 +141,6 @@ const StaffEventsView = () => {
             endDate: e.endDate
           }))
         });
-        
         setEvents(mapped);
       } else {
         setEvents([]);
@@ -279,6 +279,77 @@ const StaffEventsView = () => {
     return type ? type.toUpperCase() : 'EVENT';
   };
 
+  const getEventStatus = (event) => {
+    const now = new Date();
+    const startDate = new Date(event.startDate);
+    const endDate = new Date(event.endDate);
+    
+    if (event.capacity && event.registeredCount >= event.capacity) {
+      return { label: 'Full', color: 'red' };
+    }
+    if (now >= startDate && now <= endDate) {
+      return { label: 'Active', color: 'green' };
+    }
+    if (now < startDate) {
+      return { label: 'Upcoming', color: 'blue' };
+    }
+    return { label: 'Past', color: 'gray' };
+  };
+
+  const formatTableDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const toggleRowExpansion = (eventId) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(eventId)) {
+        newSet.delete(eventId);
+      } else {
+        newSet.add(eventId);
+      }
+      return newSet;
+    });
+  };
+
+  // Filter events based on type
+  const filteredEvents = events.filter(event => {
+    const title = (event.title || '').trim();
+    if (!title) return false;
+    if (!event.startDate) return false;
+    
+    const startDate = new Date(event.startDate);
+    if (isNaN(startDate.getTime())) return false;
+    
+    // Filter out past events - only filter if the event has completely ended
+    const now = new Date();
+    if (event.endDate) {
+      const eventEndDate = new Date(event.endDate);
+      // Only filter out if endDate is valid and has passed
+      if (!isNaN(eventEndDate.getTime()) && eventEndDate < now) {
+        return false;
+      }
+    } else {
+      // If no endDate, use startDate (for backward compatibility)
+      // But be lenient - only filter if startDate is clearly in the past (more than 1 day ago)
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      if (startDate < oneDayAgo) {
+        return false;
+      }
+    }
+    
+    const typeMatch = filter === 'all' || (event.type && event.type === filter);
+    return typeMatch;
+  });
+
+  const displayName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`
+    : user?.name || (user?.userType === 'TA' ? 'TA' : 'Staff');
+  
+  const userRole = user?.userType === 'TA' ? 'TA' : 'Staff';
+
   return (
     <div style={{
       display: 'flex',
@@ -288,15 +359,15 @@ const StaffEventsView = () => {
       backgroundColor: '#f6f7f8'
     }}>
       {/* Header/Navbar */}
-        <header style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
-          padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+      <header style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottom: '1px solid #e2e8f0',
+        padding: '1rem 2.5rem',
+        backgroundColor: '#FFFFFF'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
@@ -309,25 +380,25 @@ const StaffEventsView = () => {
               Bindly
             </h2>
           </Link>
-          </div>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#1D3557',
-                margin: 0
-              }}>
-                {displayName}
-              </p>
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                margin: 0
-              }}>
-              Staff
-              </p>
-            </div>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#1D3557',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              {userRole}
+            </p>
+          </div>
           <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
@@ -354,7 +425,6 @@ const StaffEventsView = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#FFFFFF',
-                fontSize: '0.875rem',
                 fontWeight: '600'
               }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'S').toUpperCase()}
@@ -403,8 +473,8 @@ const StaffEventsView = () => {
               </div>
             )}
           </div>
-          </div>
-        </header>
+        </div>
+      </header>
 
       {/* Horizontal Menu Bar */}
       <nav style={{
@@ -414,6 +484,7 @@ const StaffEventsView = () => {
         backgroundColor: '#FFFFFF',
         borderBottom: '1px solid #e2e8f0'
       }}>
+        {/* Navigation Links */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
           <Link
             to="/dashboard"
@@ -526,26 +597,27 @@ const StaffEventsView = () => {
               alignItems: 'flex-start',
               padding: '2rem 2.5rem',
               color: '#FFFFFF'
-          }}>
-            <h3 style={{
+            }}>
+              <h3 style={{
                 color: '#FFFFFF',
                 fontSize: '1.75rem',
                 fontWeight: '700',
                 margin: 0,
                 marginBottom: '0.5rem'
-            }}>
-              Discover Events
-            </h3>
-            <p style={{
+              }}>
+                Discover Events
+              </h3>
+              <p style={{
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '0.875rem',
-              fontWeight: '400',
+                fontWeight: '400',
                 margin: 0
-            }}>
-              Browse and register for upcoming events.
-            </p>
+              }}>
+                Browse and register for upcoming events.
+              </p>
             </div>
           </div>
+
           {/* Search and Filters */}
           <div style={{
             backgroundColor: '#FFFFFF',
@@ -632,35 +704,31 @@ const StaffEventsView = () => {
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }}>
                 {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
                 <button
-                  key={type}
-                  onClick={() => setFilter(type)}
+                  onClick={handleSearch}
                   style={{
-                    padding: '0.625rem 1.25rem',
+                    padding: '0.875rem 1.75rem',
                     borderRadius: '0.5rem',
-                    backgroundColor: filter === type ? '#1e40af' : '#f9fafb',
-                    color: filter === type ? '#FFFFFF' : '#6b7280',
-                    border: filter === type ? 'none' : '1px solid #e5e7eb',
+                    backgroundColor: '#1e40af',
+                    color: '#FFFFFF',
+                    border: 'none',
                     cursor: 'pointer',
-                    fontSize: '0.8125rem',
-                    fontWeight: filter === type ? '600' : '500',
-                    textTransform: 'capitalize',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
                     transition: 'all 0.2s',
-                    boxShadow: filter === type ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    flexShrink: 0
                   }}
                   onMouseEnter={(e) => {
-                    if (filter !== type) {
-                      e.target.style.backgroundColor = '#f3f4f6';
-                      e.target.style.borderColor = '#d1d5db';
-                    }
+                    e.target.style.backgroundColor = '#1e3a8a';
+                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
                   }}
                   onMouseLeave={(e) => {
-                    if (filter !== type) {
-                      e.target.style.backgroundColor = '#f9fafb';
-                      e.target.style.borderColor = '#e5e7eb';
-                    }
+                    e.target.style.backgroundColor = '#1e40af';
+                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
                   }}
                 >
-                  {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
+                  Search
                 </button>
                 ))}
               </div>
@@ -698,7 +766,7 @@ const StaffEventsView = () => {
               }} className="spinner"></div>
               <p style={{ margin: 0, color: '#6b7280' }}>Loading events...</p>
             </div>
-          ) : events.length === 0 ? (
+          ) : filteredEvents.length === 0 ? (
             <div style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '0.75rem',
@@ -766,7 +834,7 @@ const StaffEventsView = () => {
                 fontSize: '0.875rem',
                 fontWeight: '500'
               }}>
-                Found {events.length} upcoming event{events.length !== 1 ? 's' : ''}
+                Found {filteredEvents.length} upcoming event{filteredEvents.length !== 1 ? 's' : ''}
                 {searchQuery && ` matching "${searchQuery}"`}
                 {filter !== 'all' && ` in ${filter} category`}
               </div>
@@ -776,8 +844,10 @@ const StaffEventsView = () => {
                 gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
                 gap: '1.5rem'
               }}>
-                {events.map(event => {
+                {filteredEvents.map(event => {
+                  const statusInfo = getEventStatus(event);
                   const isRegistered = registeredEventIds.has(String(event.id));
+                  
                   return (
                     <div
                       key={event.id}
@@ -825,7 +895,6 @@ const StaffEventsView = () => {
                               objectPosition: 'center'
                             }}
                             onError={(e) => {
-                              // Fallback if image doesn't exist
                               e.target.style.display = 'none';
                               e.target.parentElement.style.backgroundColor = getEventTypeColor(event.type);
                               e.target.parentElement.style.display = 'flex';
@@ -847,28 +916,17 @@ const StaffEventsView = () => {
                       
                       <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                        <div style={{
-                          padding: '0.375rem 0.875rem',
-                          borderRadius: '0.5rem',
-                          backgroundColor: getEventTypeColor(event.type),
-                          color: '#FFFFFF',
-                          fontSize: '0.6875rem',
-                          fontWeight: '700',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
-                          {event.type}
-                        </div>
-                        {getDaysUntilEvent(event.startDate) && (
                           <div style={{
-                            fontSize: '0.75rem',
-                            color: '#1e40af',
-                            fontWeight: '600',
-                            backgroundColor: '#eff6ff',
-                            padding: '0.25rem 0.625rem',
-                            borderRadius: '0.375rem'
+                            padding: '0.375rem 0.875rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: getEventTypeColor(event.type),
+                            color: '#FFFFFF',
+                            fontSize: '0.6875rem',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
                           }}>
-                            {getDaysUntilEvent(event.startDate)}
+                            {event.type}
                           </div>
                         )}
                       </div>
@@ -906,22 +964,25 @@ const StaffEventsView = () => {
                           </span>
                           <span>{formatDate(event.startDate)}</span>
                         </div>
+                        
+                        <h3 style={{
+                          color: '#1D3557',
+                          fontSize: '1.125rem',
+                          fontWeight: '600',
+                          marginBottom: '0.75rem',
+                          marginTop: 0,
+                          lineHeight: '1.4'
+                        }}>
+                          {event.title}
+                        </h3>
+                        
                         <div style={{
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
-                          color: '#6b7280'
+                          flexDirection: 'column',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem',
+                          flex: 1
                         }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            location_on
-                          </span>
-                          <span>{event.location}</span>
-                        </div>
-                        {event.price && (
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -933,12 +994,10 @@ const StaffEventsView = () => {
                               fontSize: '1.125rem',
                               color: '#9ca3af'
                             }}>
-                              attach_money
+                              calendar_today
                             </span>
-                            <span style={{ fontWeight: '500', color: '#059669' }}>${event.price}</span>
+                            {formatTableDate(event.startDate)}
                           </div>
-                        )}
-                        {event.capacity && (
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -950,22 +1009,17 @@ const StaffEventsView = () => {
                               fontSize: '1.125rem',
                               color: '#9ca3af'
                             }}>
-                              people
+                              location_on
                             </span>
-                            <span>{event.registeredCount || 0}/{event.capacity} registered</span>
+                            {event.location}
                           </div>
-                        )}
-                        {(event.type === 'bazaar' || event.type === 'booth') && (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.625rem',
-                            fontSize: '0.8125rem',
-                            color: '#6b7280'
-                          }}>
-                            <span className="material-symbols-outlined" style={{
-                              fontSize: '1.125rem',
-                              color: '#9ca3af'
+                          {event.capacity && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.625rem',
+                              fontSize: '0.8125rem',
+                              color: '#6b7280'
                             }}>
                               storefront
                             </span>
@@ -1007,47 +1061,99 @@ const StaffEventsView = () => {
                               marginTop: 'auto',
                               display: 'flex',
                               alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '0.5rem',
-                              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                            }}
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
-                            Registered
-                          </button>
-                        ) : (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRegisterClick(event);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '0.75rem 1rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: '#1e40af',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                              fontWeight: '600',
-                              transition: 'all 0.2s',
-                              marginTop: 'auto',
-                              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = '#1e3a8a';
-                              e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = '#1e40af';
-                              e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                            }}
-                          >
-                            Register for {event.type === 'workshop' ? 'Workshop' : 'Trip'}
-                          </button>
-                        )
-                      )}
+                              gap: '0.625rem',
+                              fontSize: '0.8125rem',
+                              color: '#6b7280'
+                            }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.125rem',
+                                color: '#9ca3af'
+                              }}>
+                                storefront
+                              </span>
+                              <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
+                            </div>
+                          )}
+                          {(event.type === 'workshop' || event.type === 'conference') && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.625rem',
+                              fontSize: '0.8125rem',
+                              color: '#6b7280'
+                            }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.125rem',
+                                color: '#9ca3af'
+                              }}>
+                                school
+                              </span>
+                              <span>
+                                {event.professors 
+                                  ? (Array.isArray(event.professors) ? event.professors.join(', ') : event.professors)
+                                  : (event.creatorName || 'Professor')
+                                }
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {(event.type === 'workshop' || event.type === 'trip') && (
+                          <div style={{ marginTop: 'auto', paddingTop: '0.75rem' }}>
+                            {isRegistered ? (
+                              <button
+                                disabled
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.625rem 1rem',
+                                  borderRadius: '0.5rem',
+                                  backgroundColor: '#10b981',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  cursor: 'not-allowed',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.5rem'
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
+                                Registered
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRegisterClick(event);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.625rem 1rem',
+                                  borderRadius: '0.5rem',
+                                  backgroundColor: '#1e40af',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.5rem',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.target.style.backgroundColor = '#1e3a8a'}
+                                onMouseLeave={(e) => e.target.style.backgroundColor = '#1e40af'}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>how_to_reg</span>
+                                Register
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -1059,7 +1165,7 @@ const StaffEventsView = () => {
         </div>
       </main>
 
-      {/* Event Modal */}
+      {/* Event Modal - Same as StudentEventsView */}
       {selectedEvent && (
         <div
           onClick={() => setSelectedEvent(null)}
@@ -1330,6 +1436,29 @@ const StaffEventsView = () => {
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Vendors</div>
                       <div style={{ color: '#374151', fontWeight: '500' }}>{(selectedEvent.vendors && selectedEvent.vendors.length) || 0} vendor{((selectedEvent.vendors && selectedEvent.vendors.length) || 0) !== 1 ? 's' : ''} participating</div>
+                    </div>
+                  </div>
+                )}
+                {(selectedEvent.type === 'workshop' || selectedEvent.type === 'conference') && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      school
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Professor</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>
+                        {selectedEvent.professors 
+                          ? (Array.isArray(selectedEvent.professors) ? selectedEvent.professors.join(', ') : selectedEvent.professors)
+                          : (selectedEvent.creatorName || 'Professor')
+                        }
+                      </div>
                     </div>
                   </div>
                 )}
