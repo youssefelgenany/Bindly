@@ -1111,43 +1111,8 @@ const StaffEventsView = () => {
                           }}>
                             {event.type}
                           </div>
-                        )}
-                      </div>
-                      
-                      <h3 style={{
-                        color: '#1D3557',
-                        fontSize: '1.125rem',
-                        fontWeight: '600',
-                        marginBottom: '0.75rem',
-                        marginTop: 0,
-                        lineHeight: '1.4'
-                      }}>
-                        {event.title}
-                      </h3>
-                      
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.5rem',
-                        marginBottom: '0.75rem',
-                        flex: 1
-                      }}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
-                          color: '#6b7280'
-                        }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            calendar_today
-                          </span>
-                          <span>{formatDate(event.startDate)}</span>
                         </div>
-                        
+                      
                         <h3 style={{
                           color: '#1D3557',
                           fontSize: '1.125rem',
@@ -1158,7 +1123,7 @@ const StaffEventsView = () => {
                         }}>
                           {event.title}
                         </h3>
-                        
+                      
                         <div style={{
                           display: 'flex',
                           flexDirection: 'column',
@@ -1179,7 +1144,7 @@ const StaffEventsView = () => {
                             }}>
                               calendar_today
                             </span>
-                            {formatTableDate(event.startDate)}
+                            <span>{formatTableDate(event.startDate)}</span>
                           </div>
                           <div style={{
                             display: 'flex',
@@ -1194,9 +1159,9 @@ const StaffEventsView = () => {
                             }}>
                               location_on
                             </span>
-                            {event.location}
+                            <span>{event.location}</span>
                           </div>
-                          {event.capacity && (
+                          {(event.type === 'bazaar' || event.type === 'booth') && event.vendors && (
                             <div style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -1210,51 +1175,6 @@ const StaffEventsView = () => {
                               <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
                             </div>
                           )}
-                      </div>
-
-                      {event.description && (
-                        <p style={{
-                          color: '#6b7280',
-                          fontSize: '0.8125rem',
-                          marginBottom: '0.75rem',
-                          marginTop: 0,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          lineHeight: '1.5'
-                        }}>
-                          {event.description}
-                        </p>
-                      )}
-
-                      {(event.type === 'workshop' || event.type === 'trip') && (
-                        isRegistered ? (
-                          <button
-                            disabled
-                            style={{
-                              width: '100%',
-                              padding: '0.75rem 1rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: '#10b981',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              cursor: 'not-allowed',
-                              fontSize: '0.875rem',
-                              fontWeight: '600',
-                              marginTop: 'auto',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '0.5rem'
-                            }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                                check_circle
-                              </span>
-                              <span>Registered</span>
-                            </button>
-                          ) : null
-                        )}
                           {(event.type === 'workshop' || event.type === 'conference') && (
                             <div style={{
                               display: 'flex',
@@ -1278,7 +1198,23 @@ const StaffEventsView = () => {
                             </div>
                           )}
                         </div>
-                        
+
+                        {event.description && (
+                          <p style={{
+                            color: '#6b7280',
+                            fontSize: '0.8125rem',
+                            marginBottom: '0.75rem',
+                            marginTop: 0,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            lineHeight: '1.5'
+                          }}>
+                            {event.description}
+                          </p>
+                        )}
+
                         {(event.type === 'workshop' || event.type === 'trip') && (
                           <div style={{ marginTop: 'auto', paddingTop: '0.75rem' }}>
                             {isRegistered ? (
