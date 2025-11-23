@@ -7,21 +7,40 @@ const StudentMyRegistrations = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRegistration, setSelectedRegistration] = useState(null);
+  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
 
   const isActiveRoute = (path) => {
-    return location.pathname === path;
+    const currentPath = location.pathname;
+    if (currentPath === path) return true;
+    if (path === '/dashboard') {
+      return currentPath === '/dashboard';
+    }
+    return currentPath.startsWith(path);
   };
 
-  const handleLogout = () => {
+  const handleLogout = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     logout();
     navigate('/login');
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
+        setShowLogoutDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLogoutDropdown]);
 
   useEffect(() => {
     if (user && user.email) {
@@ -79,6 +98,21 @@ const StudentMyRegistrations = () => {
       other: '#757575'
     };
     return colors[type?.toLowerCase()] || colors.other;
+  };
+
+  const getEventTypeImage = (type) => {
+    const imageMap = {
+      conference: '/assets/images/conference-background.jpg',
+      workshop: '/assets/images/workshop-background.jpg',
+      bazaar: '/assets/images/bazaar-background.jpg',
+      trip: '/assets/images/trip-background.png',
+      booth: '/assets/images/booth-background.jpg'
+    };
+    return imageMap[type?.toLowerCase()] || null;
+  };
+
+  const getEventTypeFallbackText = (type) => {
+    return type ? type.toUpperCase() : 'EVENT';
   };
 
   const getStatusColor = (status) => {
@@ -153,369 +187,57 @@ const StudentMyRegistrations = () => {
   return (
     <div style={{
       display: 'flex',
-      height: '100vh',
+      flexDirection: 'column',
+      minHeight: '100vh',
       fontFamily: 'Inter, sans-serif',
       backgroundColor: '#f6f7f8'
     }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: sidebarOpen ? '16rem' : '0',
-        flexShrink: 0,
-        backgroundColor: '#1D3557',
-        padding: sidebarOpen ? '1.5rem' : '0',
+      {/* Header/Navbar */}
+      <header style={{
         display: 'flex',
-        flexDirection: 'column',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        overflow: 'hidden',
-        transition: 'width 0.3s ease, padding 0.3s ease'
+        borderBottom: '1px solid #e2e8f0',
+        padding: '1rem 2.5rem',
+        backgroundColor: '#FFFFFF'
       }}>
-        {/* Top Section - Logo and Navigation */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Logo and Branding */}
-          {sidebarOpen && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                borderRadius: '50%',
-                backgroundColor: '#457B9D',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF'
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <h1 style={{
-                  color: '#FFFFFF',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Student Portal
-                </h1>
-                <p style={{
-                  color: 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: '400',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  University Portal
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation */}
-          {sidebarOpen && (
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <Link
-                to="/dashboard"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                  textDecoration: 'none',
-                  color: '#FFFFFF'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.25rem' }}>
-                  dashboard
-                </span>
-                <p style={{
-                  color: '#FFFFFF',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Dashboard
-                </p>
-              </Link>
-
-              <Link
-                to="/student/events"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/events')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/events')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
-                }}>
-                  explore
-                </span>
-                <p style={{
-                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/events') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Discover Events
-                </p>
-              </Link>
-
-              <Link
-                to="/student/my-registrations"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/my-registrations') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/my-registrations')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/my-registrations')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
-                }}>
-                  event
-                </span>
-                <p style={{
-                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/my-registrations') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  My Events
-                </p>
-              </Link>
-
-              <Link
-                to="/student/courts"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/courts') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/courts')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/courts')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  sports_tennis
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/student/courts') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    Campus Courts
-                  </p>
-                )}
-              </Link>
-
-              <Link
-                to="/gym"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/gym') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/gym')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/gym')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  sports_gymnastics
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/gym') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    Gym Sessions
-                  </p>
-                )}
-              </Link>
-            </nav>
-          )}
-        </div>
-
-        {/* Logout Button - Fixed at bottom */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <button
-            onClick={handleLogout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              width: '100%'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ color: 'rgba(241, 250, 238, 0.7)', fontSize: '1.25rem' }}>
-              logout
-            </span>
-            {sidebarOpen && (
-              <p style={{
-                color: 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Logout
-              </p>
-            )}
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
-        {/* Header */}
-        <header style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
-          padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1D3557'
-              }}
-              aria-label="Toggle sidebar"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                menu
-              </span>
-            </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+          <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
-              margin: 0
+              margin: 0,
+              cursor: 'pointer'
             }}>
               Bindly
             </h2>
+          </Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#1D3557',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              Student
+            </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#1D3557',
-                margin: 0
-              }}>
-                {displayName}
-              </p>
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                margin: 0
-              }}>
-                Student
-              </p>
-            </div>
+          <div 
+            data-profile-dropdown
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+          >
             {user?.profilePicturePath ? (
               <img
                 src={`http://localhost:5000${user.profilePicturePath}`}
@@ -542,41 +264,206 @@ const StudentMyRegistrations = () => {
                 {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
               </div>
             )}
+            {showLogoutDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                zIndex: 1000,
+                minWidth: '150px'
+              }}>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    logout
+                  </span>
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
-        </header>
+        </div>
+      </header>
+
+      {/* Horizontal Menu Bar */}
+      <nav style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '1rem 2rem',
+        backgroundColor: '#FFFFFF',
+        borderBottom: '1px solid #e2e8f0'
+      }}>
+        {/* Navigation Links */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+          <Link
+            to="/dashboard"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Dashboard
+          </Link>
+          <Link
+            to="/student/events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/student/events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Discover Events
+          </Link>
+          <Link
+            to="/student/my-registrations"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Events
+          </Link>
+          <Link
+            to="/student/courts"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Campus Courts
+          </Link>
+          <Link
+            to="/gym"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/gym') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Gym Sessions
+          </Link>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
 
         {/* Content */}
         <div style={{
           flex: 1,
-          padding: '2rem',
+          padding: '2rem 0',
           overflowY: 'auto',
           backgroundColor: '#f6f7f8'
         }}>
+          {/* Page Title Banner */}
+          {/* Content Wrapper with Margins */}
+          <div style={{
+            marginLeft: '4rem',
+            marginRight: '4rem'
+          }}>
           {/* Page Title Box */}
           <div style={{
-            backgroundColor: '#FFFFFF',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            position: 'relative',
+            height: '140px',
+            borderRadius: '0.75rem',
+            overflow: 'hidden',
             marginBottom: '1.5rem',
-            borderLeft: '4px solid #1D3557'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
           }}>
-            <h3 style={{
-              color: '#1D3557',
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              margin: 0
+            {/* Background Image */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(/assets/images/events-banner.jpeg)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
+            }}></div>
+            {/* Blue Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Content */}
+            <div style={{
+              position: 'relative',
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '2rem 2.5rem',
+              color: '#FFFFFF'
             }}>
-              My Events
-            </h3>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '1rem',
-              fontWeight: '400',
-              margin: '0.25rem 0 0 0'
-            }}>
-              View and manage your event registrations.
-            </p>
+              <h3 style={{
+                color: '#FFFFFF',
+                fontSize: '1.75rem',
+                fontWeight: '700',
+                margin: 0,
+                marginBottom: '0.5rem'
+              }}>
+                My Events
+              </h3>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '0.875rem',
+                fontWeight: '400',
+                margin: 0
+              }}>
+                View and manage your event registrations.
+              </p>
+            </div>
           </div>
 
           {error && (
@@ -671,13 +558,14 @@ const StudentMyRegistrations = () => {
                     style={{
                       backgroundColor: '#FFFFFF',
                       borderRadius: '0.75rem',
-                      padding: '1.5rem',
+                      padding: 0,
                       boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
                       border: '1px solid #e5e7eb',
                       display: 'flex',
-                      flexDirection: 'column'
+                      flexDirection: 'column',
+                      overflow: 'hidden'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'translateY(-4px)';
@@ -690,95 +578,92 @@ const StudentMyRegistrations = () => {
                       e.currentTarget.style.borderColor = '#e5e7eb';
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                    {/* Event Type Image - Top Half */}
+                    {getEventTypeImage(registration.eventType) && (
                       <div style={{
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: getEventTypeColor(registration.eventType),
-                        color: '#FFFFFF',
-                        fontSize: '0.6875rem',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
+                        width: '100%',
+                        height: '180px',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        backgroundColor: '#f3f4f6',
+                        flexShrink: 0
                       }}>
-                        {registration.eventType}
-        </div>
-                      <div style={{
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: getStatusColor(registration.status),
-                        color: '#FFFFFF',
-                        fontSize: '0.6875rem',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}>
-                        {registration.status}
-        </div>
-      </div>
-
-                    <h3 style={{
-                      color: '#1D3557',
-                      fontSize: '1.125rem',
-                      fontWeight: '600',
-                      marginBottom: '1rem',
-                      marginTop: 0,
-                      lineHeight: '1.4'
-                    }}>
-                      {registration.eventTitle}
-                    </h3>
+                        <img
+                          src={getEventTypeImage(registration.eventType)}
+                          alt={registration.eventType ? registration.eventType.charAt(0).toUpperCase() + registration.eventType.slice(1) : 'Event'}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'center'
+                          }}
+                          onError={(e) => {
+                            // Fallback if image doesn't exist
+                            e.target.style.display = 'none';
+                            e.target.parentElement.style.backgroundColor = getEventTypeColor(registration.eventType);
+                            e.target.parentElement.style.display = 'flex';
+                            e.target.parentElement.style.alignItems = 'center';
+                            e.target.parentElement.style.justifyContent = 'center';
+                            if (!e.target.parentElement.querySelector('.fallback-text')) {
+                              const fallback = document.createElement('div');
+                              fallback.className = 'fallback-text';
+                              fallback.textContent = getEventTypeFallbackText(registration.eventType);
+                              fallback.style.color = '#FFFFFF';
+                              fallback.style.fontSize = '1.5rem';
+                              fallback.style.fontWeight = '700';
+                              e.target.parentElement.appendChild(fallback);
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
                     
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.625rem',
-                      marginBottom: '1rem',
-                      flex: 1
-                    }}>
+                    <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                        <div style={{
+                          padding: '0.375rem 0.875rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: getEventTypeColor(registration.eventType),
+                          color: '#FFFFFF',
+                          fontSize: '0.6875rem',
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          {registration.eventType}
+                        </div>
+                        <div style={{
+                          padding: '0.375rem 0.875rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: getStatusColor(registration.status),
+                          color: '#FFFFFF',
+                          fontSize: '0.6875rem',
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          {registration.status}
+                        </div>
+                      </div>
+
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '0.75rem',
+                        marginTop: 0,
+                        lineHeight: '1.4'
+                      }}>
+                        {registration.eventTitle}
+                      </h3>
+                      
                       <div style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
+                        flexDirection: 'column',
+                        gap: '0.5rem',
+                        marginBottom: '0.75rem',
+                        flex: 1
                       }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
-                        }}>
-                          calendar_today
-                        </span>
-          <span>{formatDate(registration.eventDate)}</span>
-                        {getDaysUntilEvent(registration.eventDate) && (
-                          <span style={{
-                            fontSize: '0.75rem',
-                            color: '#1e40af',
-                            fontWeight: '600',
-                            backgroundColor: '#eff6ff',
-                            padding: '0.25rem 0.625rem',
-                            borderRadius: '0.375rem',
-                            marginLeft: 'auto'
-                          }}>
-                            {getDaysUntilEvent(registration.eventDate)}
-                          </span>
-                        )}
-        </div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
-                      }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
-                        }}>
-                          location_on
-                        </span>
-          <span>{registration.eventLocation}</span>
-        </div>
-        {registration.capacity && (
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -790,48 +675,94 @@ const StudentMyRegistrations = () => {
                             fontSize: '1.125rem',
                             color: '#9ca3af'
                           }}>
-                            people
+                            calendar_today
                           </span>
-                          <span>{registration.registeredCount || 0}/{registration.capacity} registered</span>
-          </div>
-        )}
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
-                      }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
+                          <span>{formatDate(registration.eventDate)}</span>
+                          {getDaysUntilEvent(registration.eventDate) && (
+                            <span style={{
+                              fontSize: '0.75rem',
+                              color: '#1e40af',
+                              fontWeight: '600',
+                              backgroundColor: '#eff6ff',
+                              padding: '0.25rem 0.625rem',
+                              borderRadius: '0.375rem',
+                              marginLeft: 'auto'
+                            }}>
+                              {getDaysUntilEvent(registration.eventDate)}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
                         }}>
-                          schedule
-                        </span>
-                        <span>Registered: {formatDate(registration.registeredAt)}</span>
-        </div>
-      </div>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            location_on
+                          </span>
+                          <span>{registration.eventLocation}</span>
+                        </div>
+                        {registration.capacity && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.625rem',
+                            fontSize: '0.8125rem',
+                            color: '#6b7280'
+                          }}>
+                            <span className="material-symbols-outlined" style={{
+                              fontSize: '1.125rem',
+                              color: '#9ca3af'
+                            }}>
+                              people
+                            </span>
+                            <span>{registration.registeredCount || 0}/{registration.capacity} registered</span>
+                          </div>
+                        )}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            schedule
+                          </span>
+                          <span>Registered: {formatDate(registration.registeredAt)}</span>
+                        </div>
+                      </div>
 
-      {registration.eventDescription && (
-                      <p style={{
-                        color: '#6b7280',
-                        fontSize: '0.8125rem',
-                        marginBottom: '1rem',
-                        marginTop: 0,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        lineHeight: '1.5'
-                      }}>
-                        {registration.eventDescription}
-                      </p>
-                    )}
+                      {registration.eventDescription && (
+                        <p style={{
+                          color: '#6b7280',
+                          fontSize: '0.8125rem',
+                          marginBottom: '0.75rem',
+                          marginTop: 0,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          lineHeight: '1.5'
+                        }}>
+                          {registration.eventDescription}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             </>
           )}
+          </div>
         </div>
       </main>
 
@@ -859,55 +790,114 @@ const StudentMyRegistrations = () => {
               maxWidth: '600px',
               width: '100%',
               maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              position: 'relative'
             }}
           >
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '1.5rem',
-              borderBottom: '1px solid #e5e7eb'
-            }}>
-              <h2 style={{
-                color: '#1D3557',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                margin: 0
-              }}>
-                {selectedRegistration.eventTitle}
-              </h2>
+            {/* Event Image at Top with Close Button Overlay */}
+            <div style={{ position: 'relative' }}>
+              {getEventTypeImage(selectedRegistration.eventType) && (
+                <div style={{
+                  width: '100%',
+                  height: '200px',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  backgroundColor: '#f3f4f6',
+                  flexShrink: 0
+                }}>
+                  <img
+                    src={getEventTypeImage(selectedRegistration.eventType)}
+                    alt={selectedRegistration.eventType ? selectedRegistration.eventType.charAt(0).toUpperCase() + selectedRegistration.eventType.slice(1) : 'Event'}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center'
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.style.backgroundColor = getEventTypeColor(selectedRegistration.eventType);
+                      e.target.parentElement.style.display = 'flex';
+                      e.target.parentElement.style.alignItems = 'center';
+                      e.target.parentElement.style.justifyContent = 'center';
+                      if (!e.target.parentElement.querySelector('.fallback-text')) {
+                        const fallback = document.createElement('div');
+                        fallback.className = 'fallback-text';
+                        fallback.textContent = getEventTypeFallbackText(selectedRegistration.eventType);
+                        fallback.style.color = '#FFFFFF';
+                        fallback.style.fontSize = '1.5rem';
+                        fallback.style.fontWeight = '700';
+                        e.target.parentElement.appendChild(fallback);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              
+              {/* Close Button - Upper Right Corner */}
               <button
                 onClick={() => setSelectedRegistration(null)}
                 style={{
-                  background: 'none',
+                  position: 'absolute',
+                  top: '0.75rem',
+                  right: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.9)',
                   border: 'none',
                   fontSize: '1.5rem',
                   cursor: 'pointer',
                   color: '#6b7280',
                   padding: '0.25rem 0.5rem',
-                  borderRadius: '0.25rem',
-                  transition: 'background-color 0.2s',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
                   lineHeight: 1,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   width: '2rem',
-                  height: '2rem'
+                  height: '2rem',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                  zIndex: 10
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.backgroundColor = '#ffffff';
+                  e.target.style.color = '#1D3557';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  e.target.style.color = '#6b7280';
                 }}
               >
                 ×
               </button>
             </div>
             
-            <div style={{ padding: '1.5rem' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                margin: 0,
+                paddingRight: '1rem'
+              }}>
+                {selectedRegistration.eventTitle}
+              </h2>
+            </div>
+            
+            <div style={{ 
+              padding: '1rem 1.5rem 1.5rem 1.5rem',
+              overflowY: 'auto',
+              flex: 1,
+              minHeight: 0
+            }}>
               <div style={{
                 display: 'flex',
                 gap: '0.5rem',

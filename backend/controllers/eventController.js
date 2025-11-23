@@ -9,6 +9,7 @@ const { sendReceiptEmail } = require("../utils/sendReceiptEmail");
 const { sendRefundEmail } = require("../utils/sendRefundEmail");
 const { sendCommentWarningEmail } = require("../utils/sendCommentWarningEmail");
 const { salesReport } = require("../scripts/test-sales-report");
+
 const { notifyNewEventCreated, notifyWorkshopSubmitted } = require("../services/notificationService");
 // Initialize Stripe if secret key is available
 let stripe = null;
@@ -37,7 +38,8 @@ exports.createEvent = async (req, res) => {
       faculty,
       professors,
       extraResources,
-      bannerFile
+      bannerFile,
+      allowedUserTypes
     } = req.body;
 
     if (!title || !type || !startDate || !endDate || !location) {
@@ -70,7 +72,10 @@ exports.createEvent = async (req, res) => {
       faculty,
       professors,
       extraResources,
-      bannerFile
+      bannerFile,
+      // User type restrictions
+      isRestricted: allowedUserTypes && allowedUserTypes.length > 0,
+      allowedUserTypes: allowedUserTypes && allowedUserTypes.length > 0 ? allowedUserTypes : []
     });
 
     await newEvent.save();
@@ -102,11 +107,15 @@ exports.createConference = async (req, res) => {
       return res.status(400).json({ msg: "Missing required conference fields" });
     }
 
+    const { allowedUserTypes, ...otherFields } = req.body;
     const newConference = new Event({
-      ...req.body,
+      ...otherFields,
       type: "conference",
       createdBy: req.user ? req.user._id : undefined,
-      status: "approved"
+      status: "approved",
+      // User type restrictions
+      isRestricted: allowedUserTypes && allowedUserTypes.length > 0,
+      allowedUserTypes: allowedUserTypes && allowedUserTypes.length > 0 ? allowedUserTypes : []
     });
 
     await newConference.save();
@@ -225,11 +234,19 @@ exports.getAllEvents = async (req, res) => {
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     const baseMatch = {
       type: { $in: validTypes }, // Only include valid event types
-      archived: false, // Exclude archived events by default
       $and: [
+        // Exclude archived events (include if archived is false or doesn't exist)
+        {
+          $or: [
+            { archived: false },
+            { archived: { $exists: false } } // Include events where archived field doesn't exist (defaults to false)
+          ]
+        },
+        // Require valid title
         { title: { $exists: true } },
         { title: { $ne: null } },
         { title: { $ne: '' } },
+        // Require valid location
         { location: { $exists: true } },
         { location: { $ne: null } },
         { location: { $ne: '' } }
@@ -268,7 +285,40 @@ exports.getAllEvents = async (req, res) => {
       console.log('🔍 Filtering by status:', status);
     }
 
-    console.log('🔍 Final baseMatch filter:', JSON.stringify(baseMatch, null, 2));
+    // Add date filter: ONLY include future events - EXCLUDE all past events
+    const now = new Date();
+    console.log('🔍 getAllEvents - Date filter - Current time:', now.toISOString());
+    
+    // SIMPLE AND DIRECT: Only show events where endDate > now OR (no endDate AND startDate > now)
+    const dateFilter = {
+      $or: [
+        // Case 1: Event has endDate and it's in the future
+        {
+          endDate: { $gt: now }
+        },
+        // Case 2: Event has no endDate but has startDate in the future
+        {
+          $and: [
+            {
+              $or: [
+                { endDate: { $exists: false } },
+                { endDate: null }
+              ]
+            },
+            { startDate: { $gt: now } }
+          ]
+        }
+      ]
+    };
+    
+    // Combine baseMatch with dateFilter
+    const finalMatch = {
+      ...baseMatch,
+      ...dateFilter
+    };
+    
+    console.log('🔍 Final baseMatch filter with date filter:', JSON.stringify(finalMatch, null, 2));
+    console.log('🔍 WILL EXCLUDE events where endDate <=', now.toISOString(), 'OR (no endDate AND startDate <=', now.toISOString(), ')');
 
     if (type) {
       const typeMap = {
@@ -279,13 +329,85 @@ exports.getAllEvents = async (req, res) => {
         confrence: 'conference',
         conference: 'conference'
       };
-      baseMatch.type = typeMap[type] || type;
+      finalMatch.type = typeMap[type] || type;
     }
 
     const pipeline = [
-      { $match: baseMatch },
+      { $match: finalMatch },
       { $lookup: { from: 'users', localField: 'createdBy', foreignField: '_id', as: 'creator' } },
       { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
+      // Lookup student registrations to get student names
+      {
+        $lookup: {
+          from: 'studentregistrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'studentRegistrations'
+        }
+      },
+      // Lookup registrations and populate user names
+      {
+        $lookup: {
+          from: 'registrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'registrations'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'registrations.user',
+          foreignField: '_id',
+          as: 'registeredUsers'
+        }
+      },
+      // Add creator name fields and student names for easier searching
+      {
+        $addFields: {
+          creatorFullName: {
+            $concat: [
+              { $ifNull: ['$creator.firstName', ''] },
+              ' ',
+              { $ifNull: ['$creator.lastName', ''] }
+            ]
+          },
+          // Create a searchable string with all student names from StudentRegistration
+          allStudentNames: {
+            $reduce: {
+              input: '$studentRegistrations',
+              initialValue: '',
+              in: {
+                $concat: [
+                  '$$value',
+                  { $cond: [{ $eq: ['$$value', ''] }, '', ' '] },
+                  { $ifNull: ['$$this.studentName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.studentEmail', ''] }
+                ]
+              }
+            }
+          },
+          // Create a searchable string with all user names from Registration
+          allRegisteredUserNames: {
+            $reduce: {
+              input: '$registeredUsers',
+              initialValue: '',
+              in: {
+                $concat: [
+                  '$$value',
+                  { $cond: [{ $eq: ['$$value', ''] }, '', ' '] },
+                  { $ifNull: ['$$this.firstName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.lastName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.email', ''] }
+                ]
+              }
+            }
+          }
+        }
+      },
     ];
 
     if (search) {
@@ -297,8 +419,15 @@ exports.getAllEvents = async (req, res) => {
             { name: nameRegex },
             { description: nameRegex },
             { location: nameRegex },
+            { faculty: nameRegex },
+            { professors: nameRegex },
             { 'creator.firstName': nameRegex },
             { 'creator.lastName': nameRegex },
+            { creatorFullName: nameRegex },
+            // Search in the concatenated student names field
+            { allStudentNames: nameRegex },
+            // Search in the concatenated registered user names field
+            { allRegisteredUserNames: nameRegex }
           ]
         }
       });
@@ -332,6 +461,12 @@ exports.getAllEvents = async (req, res) => {
           faculty: 1,
           professors: 1,
           bannerFile: 1,
+          isRestricted: 1,
+          allowedUserTypes: 1,
+          creatorFullName: 1,
+          creatorName: '$creatorFullName',
+          professorName: '$creatorFullName',
+          createdByName: '$creatorFullName',
           createdBy: {
             _id: '$creator._id',
             firstName: '$creator.firstName',
@@ -343,7 +478,59 @@ exports.getAllEvents = async (req, res) => {
       }
     );
 
-    const events = await Event.aggregate(pipeline);
+    let events = [];
+    try {
+      events = await Event.aggregate(pipeline);
+      console.log('✅ Aggregation successful, found', events.length, 'events');
+    } catch (aggError) {
+      console.error('❌ Aggregation error:', aggError);
+      console.error('❌ Aggregation error stack:', aggError.stack);
+      console.error('❌ Pipeline:', JSON.stringify(pipeline, null, 2));
+      throw aggError; // Re-throw to be caught by outer catch
+    }
+
+    // POST-FILTER: Double-check and remove ANY past events that might have slipped through
+    const nowPostFilter = new Date();
+    const initialCount = events.length;
+    events = events.filter(event => {
+      // If event has endDate, check if it's in the future
+      if (event.endDate) {
+        const endDate = new Date(event.endDate);
+        if (endDate <= nowPostFilter) {
+          console.log('🚫 getAllEvents POST-FILTER: Removing past event:', event.title, 'endDate:', event.endDate, 'now:', nowPostFilter.toISOString());
+          return false;
+        }
+      } else if (event.startDate) {
+        // If no endDate, check startDate
+        const startDate = new Date(event.startDate);
+        if (startDate <= nowPostFilter) {
+          console.log('🚫 getAllEvents POST-FILTER: Removing past event (no endDate):', event.title, 'startDate:', event.startDate, 'now:', nowPostFilter.toISOString());
+          return false;
+        }
+      } else {
+        // No dates at all - exclude it
+        console.log('🚫 getAllEvents POST-FILTER: Removing event with no dates:', event.title);
+        return false;
+      }
+      return true;
+    });
+    if (events.length < initialCount) {
+      console.log('🚫 getAllEvents POST-FILTER: Removed', (initialCount - events.length), 'past events');
+    }
+
+    // Filter by user type restrictions
+    if (req.user && req.user.userType) {
+      const userType = req.user.userType;
+      events = events.filter(event => {
+        // If event has restrictions and allowedUserTypes array
+        if (event.isRestricted && event.allowedUserTypes && event.allowedUserTypes.length > 0) {
+          // Check if user's type is in the allowed list
+          return event.allowedUserTypes.includes(userType);
+        }
+        // If no restrictions, show to all
+        return true;
+      });
+    }
 
     const workshopEvents = events.filter(e => e.type === 'workshop');
     console.log('🔍 getAllEvents - Query results:', {
@@ -362,9 +549,12 @@ exports.getAllEvents = async (req, res) => {
 
     // For bazaars and booths, get vendor information
     const eventsWithVendors = await Promise.all(events.map(async (e) => {
+      const creatorFullName = e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null;
       const baseEvent = {
         ...e,
-        creatorName: e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null,
+        creatorName: creatorFullName,
+        professorName: creatorFullName,
+        createdByName: creatorFullName,
         creatorRole: e.createdBy ? (e.createdBy.userType || null) : null,
         creatorFirstName: e.createdBy?.firstName || null,
         creatorLastName: e.createdBy?.lastName || null,
@@ -448,7 +638,13 @@ exports.getAllEvents = async (req, res) => {
     res.json(eventsWithVendors);
   } catch (err) {
     console.error("❌ Error fetching events:", err);
-    res.status(500).json({ msg: "Server error" });
+    console.error("❌ Error stack:", err.stack);
+    res.status(500).json({ 
+      success: false,
+      msg: "Server error",
+      error: err.message,
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 };
 
@@ -463,18 +659,72 @@ exports.getAllEventsForStudents = async (req, res) => {
     console.log('🔍 User ID:', req.user._id);
     console.log('🔍 Event type filter:', type);
     console.log('🔍 Status filter:', status);
-
+    
+    // Get user's registered event IDs (from both Registration and StudentRegistration)
+    const userId = req.user._id;
+    const userEmail = req.user.email;
+    
+    // Get registrations from Registration model
+    const registrations = await Registration.find({ user: userId })
+      .select('event')
+      .lean();
+    const registeredEventIds1 = registrations
+      .map(r => r.event)
+      .filter(id => id != null);
+    
+    // Get registrations from StudentRegistration model (by email)
+    const studentRegistrations = await StudentRegistration.find({ 
+      studentEmail: userEmail 
+    })
+      .select('event')
+      .lean();
+    const registeredEventIds2 = studentRegistrations
+      .map(r => r.event)
+      .filter(id => id != null);
+    
+    // Combine both sets of registered event IDs (keep as ObjectIds for MongoDB query)
+    const registeredEventIds = [...new Set([
+      ...registeredEventIds1.map(id => id.toString()),
+      ...registeredEventIds2.map(id => id.toString())
+    ])].filter(id => id);
+    
+    console.log('🔍 User registered event IDs:', registeredEventIds);
+    
     // Build filter - Event Office users can see all events, others only see approved
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+    
+    // Build date filter: ONLY include future events - EXCLUDE all past events
     const now = new Date();
-    const filter = {
-      // Show events that haven't ended yet (endDate is in the future or null)
+    console.log('🔍 Date filter - Current time:', now.toISOString());
+    console.log('🔍 Date filter - Current timestamp:', now.getTime());
+    
+    // SIMPLE AND DIRECT: Only show events where endDate > now OR (no endDate AND startDate > now)
+    const dateFilter = {
       $or: [
-        { endDate: { $gt: now } },
-        { endDate: { $exists: false } },
-        { endDate: null }
-      ],
-      type: { $in: validTypes }, // Only valid event types
+        // Case 1: Event has endDate and it's in the future
+        {
+          endDate: { $gt: now }
+        },
+        // Case 2: Event has no endDate but has startDate in the future
+        {
+          $and: [
+            {
+              $or: [
+                { endDate: { $exists: false } },
+                { endDate: null }
+              ]
+            },
+            { startDate: { $gt: now } }
+          ]
+        }
+      ]
+    };
+    
+    console.log('🔍 Date filter applied:', JSON.stringify(dateFilter, null, 2));
+    console.log('🔍 WILL EXCLUDE events where endDate <=', now.toISOString(), 'OR (no endDate AND startDate <=', now.toISOString(), ')');
+    
+    // Base filter conditions
+    const baseFilter = {
       $and: [
         { title: { $exists: true } },
         { title: { $ne: null } },
@@ -484,7 +734,65 @@ exports.getAllEventsForStudents = async (req, res) => {
         { location: { $ne: '' } }
       ]
     };
-
+    
+    // Handle type filter - apply before combining with baseFilter
+    let typeFilter = { type: { $in: validTypes } }; // Default: all valid types
+    
+    if (type && type !== 'all' && type.trim() !== '') {
+      const typeMap = {
+        workshops: 'workshop',
+        trips: 'trip',
+        bazaars: 'bazaar',
+        bazaar: 'bazaar', // Handle singular form
+        booths: 'booth',
+        booth: 'booth', // Handle singular form
+        confrence: 'conference',
+        conference: 'conference',
+        workshop: 'workshop', // Handle singular form
+        trip: 'trip' // Handle singular form
+      };
+      const normalizedType = (type || '').toString().trim().toLowerCase();
+      const mappedType = typeMap[normalizedType] || normalizedType;
+      console.log('🔍 Type filter received:', type, '-> normalized:', normalizedType, '-> mapped to:', mappedType);
+      
+      // Strictly check if mapped type is in valid types
+      if (validTypes.includes(mappedType)) {
+        // Use exact match for the specific type - ensure it's a string, not object
+        typeFilter = { type: mappedType };
+        console.log('🔍 Type filter applied (exact match):', mappedType, 'filter object:', JSON.stringify(typeFilter));
+      } else {
+        console.log('🔍 Invalid type filter, ignoring:', mappedType, '(valid types:', validTypes, ')');
+        // If invalid type, return empty results by using impossible filter
+        typeFilter = { _id: { $in: [] } }; // This will return no results
+      }
+    } else {
+      console.log('🔍 No type filter or type is "all", showing all valid types');
+    }
+    
+    const filter = {
+      ...baseFilter,
+      ...typeFilter,
+      ...dateFilter
+    };
+    
+    // Exclude events the user is already registered for from "Discover Events"
+    // Registered events should only appear in "My Events"
+    if (registeredEventIds.length > 0) {
+      const mongoose = require('mongoose');
+      const registeredObjectIds = registeredEventIds.map(id => {
+        try {
+          return mongoose.Types.ObjectId(id);
+        } catch (e) {
+          return null;
+        }
+      }).filter(id => id !== null);
+      
+      if (registeredObjectIds.length > 0) {
+        filter._id = { $nin: registeredObjectIds };
+        console.log('🔍 Excluding registered events from Discover Events:', registeredObjectIds.length, 'events');
+      }
+    }
+    
     // Only filter by status for non-Event Office users
     const isEventOffice = req.user.userType === 'Event Office' ||
       req.user.userType === 'Events Office' ||
@@ -500,22 +808,17 @@ exports.getAllEventsForStudents = async (req, res) => {
     } else {
       console.log('🔍 Event Office user - showing all statuses');
     }
-
-    if (type && type !== 'all') {
-      const typeMap = {
-        workshops: 'workshop',
-        trips: 'trip',
-        bazaars: 'bazaar',
-        booths: 'booth',
-        confrence: 'conference',
-        conference: 'conference'
-      };
-      const mappedType = typeMap[type] || type;
-      if (validTypes.includes(mappedType)) {
-        filter.type = mappedType;
-      }
-    }
-    console.log('🔍 Final filter:', filter);
+    console.log('🔍 Final filter:', JSON.stringify(filter, null, 2));
+    
+    // Log workshop events found
+    const workshopTest = await Event.find({ type: 'workshop', status: 'approved' }).limit(3).select('title status startDate endDate');
+    console.log('🔍 getAllEventsForStudents - Sample approved workshops in DB:', workshopTest.map(w => ({
+      title: w.title,
+      status: w.status,
+      startDate: w.startDate,
+      endDate: w.endDate,
+      endDateIsFuture: w.endDate ? new Date(w.endDate) > new Date() : 'no endDate'
+    })));
 
     // Get events with creator information
     const pipeline = [
@@ -529,7 +832,33 @@ exports.getAllEventsForStudents = async (req, res) => {
         }
       },
       { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
-      // Add creator name fields for easier searching
+      // Lookup student registrations to get student names
+      {
+        $lookup: {
+          from: 'studentregistrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'studentRegistrations'
+        }
+      },
+      // Lookup registrations and populate user names
+      {
+        $lookup: {
+          from: 'registrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'registrations'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'registrations.user',
+          foreignField: '_id',
+          as: 'registeredUsers'
+        }
+      },
+      // Add creator name fields and student names for easier searching
       {
         $addFields: {
           creatorFullName: {
@@ -538,10 +867,44 @@ exports.getAllEventsForStudents = async (req, res) => {
               ' ',
               { $ifNull: ['$creator.lastName', ''] }
             ]
+          },
+          // Create a searchable string with all student names from StudentRegistration
+          allStudentNames: {
+            $reduce: {
+              input: '$studentRegistrations',
+              initialValue: '',
+              in: {
+                $concat: [
+                  '$$value',
+                  { $cond: [{ $eq: ['$$value', ''] }, '', ' '] },
+                  { $ifNull: ['$$this.studentName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.studentEmail', ''] }
+                ]
+              }
+            }
+          },
+          // Create a searchable string with all user names from Registration
+          allRegisteredUserNames: {
+            $reduce: {
+              input: '$registeredUsers',
+              initialValue: '',
+              in: {
+                $concat: [
+                  '$$value',
+                  { $cond: [{ $eq: ['$$value', ''] }, '', ' '] },
+                  { $ifNull: ['$$this.firstName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.lastName', ''] },
+                  ' ',
+                  { $ifNull: ['$$this.email', ''] }
+                ]
+              }
+            }
           }
         }
       },
-      // Apply search filter after adding creator name
+      // Apply search filter after adding creator name and student registrations
       ...(q ? [{
         $match: {
           $or: [
@@ -550,7 +913,11 @@ exports.getAllEventsForStudents = async (req, res) => {
             { location: new RegExp(q, "i") },
             { faculty: new RegExp(q, "i") },
             { professors: new RegExp(q, "i") },
-            { creatorFullName: new RegExp(q, "i") }
+            { creatorFullName: new RegExp(q, "i") },
+            // Search in the concatenated student names field
+            { allStudentNames: new RegExp(q, "i") },
+            // Search in the concatenated registered user names field
+            { allRegisteredUserNames: new RegExp(q, "i") }
           ]
         }
       }] : []),
@@ -579,6 +946,12 @@ exports.getAllEventsForStudents = async (req, res) => {
           faculty: 1,
           professors: 1,
           bannerFile: 1,
+          isRestricted: 1,
+          allowedUserTypes: 1,
+          creatorFullName: 1,
+          creatorName: '$creatorFullName',
+          professorName: '$creatorFullName',
+          createdByName: '$creatorFullName',
           createdBy: {
             _id: '$creator._id',
             firstName: '$creator.firstName',
@@ -590,9 +963,52 @@ exports.getAllEventsForStudents = async (req, res) => {
       }
     ];
 
-    const events = await Event.aggregate(pipeline);
+    let events = await Event.aggregate(pipeline);
 
-    console.log('🔍 Found events:', events.length);
+    // POST-FILTER: Double-check and remove ANY past events that might have slipped through
+    const nowPostFilter = new Date();
+    const initialCount = events.length;
+    events = events.filter(event => {
+      // If event has endDate, check if it's in the future
+      if (event.endDate) {
+        const endDate = new Date(event.endDate);
+        if (endDate <= nowPostFilter) {
+          console.log('🚫 POST-FILTER: Removing past event:', event.title, 'endDate:', event.endDate, 'now:', nowPostFilter.toISOString());
+          return false;
+        }
+      } else if (event.startDate) {
+        // If no endDate, check startDate
+        const startDate = new Date(event.startDate);
+        if (startDate <= nowPostFilter) {
+          console.log('🚫 POST-FILTER: Removing past event (no endDate):', event.title, 'startDate:', event.startDate, 'now:', nowPostFilter.toISOString());
+          return false;
+        }
+      } else {
+        // No dates at all - exclude it
+        console.log('🚫 POST-FILTER: Removing event with no dates:', event.title);
+        return false;
+      }
+      return true;
+    });
+    if (events.length < initialCount) {
+      console.log('🚫 POST-FILTER: Removed', (initialCount - events.length), 'past events');
+    }
+
+    // Filter by user type restrictions
+    if (req.user && req.user.userType) {
+      const userType = req.user.userType;
+      events = events.filter(event => {
+        // If event has restrictions and allowedUserTypes array
+        if (event.isRestricted && event.allowedUserTypes && event.allowedUserTypes.length > 0) {
+          // Check if user's type is in the allowed list
+          return event.allowedUserTypes.includes(userType);
+        }
+        // If no restrictions, show to all
+        return true;
+      });
+    }
+
+    console.log('🔍 Found events after all filters:', events.length);
     if (q) {
       console.log('🔍 Search results for query "' + q + '":', events.map(e => ({
         title: e.title,
@@ -639,10 +1055,13 @@ exports.getAllEventsForStudents = async (req, res) => {
           }
         }
 
+        const creatorFullName = event.createdBy ? `${event.createdBy.firstName || ''} ${event.createdBy.lastName || ''}`.trim() : null;
         return {
           ...event,
           vendors,
-          creatorName: event.createdBy ? `${event.createdBy.firstName || ''} ${event.createdBy.lastName || ''}`.trim() : null,
+          creatorName: creatorFullName,
+          professorName: creatorFullName,
+          createdByName: creatorFullName,
           creatorRole: event.createdBy ? (event.createdBy.userType || null) : null,
           creatorFirstName: event.createdBy?.firstName || null,
           creatorLastName: event.createdBy?.lastName || null,
@@ -1344,9 +1763,18 @@ exports.registerForEvent = async (req, res) => {
       return res.status(400).json({ msg: 'Event is not available for registration' });
     }
 
-    // Check if event is restricted
-    if (event.isRestricted && !event.allowedUsers.includes(userId)) {
-      return res.status(403).json({ msg: 'You are not allowed to register for this event' });
+    // Check user type restrictions
+    if (event.isRestricted && event.allowedUserTypes && event.allowedUserTypes.length > 0) {
+      const userType = req.user.userType;
+      if (!event.allowedUserTypes.includes(userType)) {
+        return res.status(403).json({ msg: 'You are not allowed to register for this event' });
+      }
+    }
+    // Check specific user restrictions (legacy)
+    if (event.isRestricted && event.allowedUsers && event.allowedUsers.length > 0 && (!event.allowedUserTypes || event.allowedUserTypes.length === 0)) {
+      if (!event.allowedUsers.includes(userId)) {
+        return res.status(403).json({ msg: 'You are not allowed to register for this event' });
+      }
     }
 
     // Check if already registered
@@ -1368,6 +1796,327 @@ exports.registerForEvent = async (req, res) => {
     await Event.findByIdAndUpdate(eventId, { $inc: { registeredCount: 1 } });
 
     res.json({ msg: 'Successfully registered for event' });
+  } catch (err) {
+    console.error("❌ Error cancelling registration:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
+// 💳 Pay for an event (Student, Staff, TA, or Professor)
+exports.payForEvent = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const userId = req.user._id;
+    const { paymentMethod } = req.body; // 'wallet' or 'card'
+
+    // Find event
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        msg: "Event not found"
+      });
+    }
+
+    // Check if event has a price
+    const eventPrice = event.price || 0;
+    if (eventPrice <= 0) {
+      return res.status(400).json({
+        success: false,
+        msg: "This event is free and does not require payment"
+      });
+    }
+
+    // Find registration
+    let registration = await Registration.findOne({
+      user: userId,
+      event: eventId
+    });
+
+    if (!registration) {
+      // Check StudentRegistration
+      const user = await User.findById(userId);
+      if (user && user.email) {
+        registration = await StudentRegistration.findOne({
+          event: eventId,
+          studentEmail: user.email.toLowerCase()
+        });
+      }
+    }
+
+    if (!registration) {
+      return res.status(404).json({
+        success: false,
+        msg: "Registration not found. Please register for the event first."
+      });
+    }
+
+    if (registration.paid) {
+      return res.status(400).json({
+        success: false,
+        msg: "Payment already completed for this event"
+      });
+    }
+
+    // Handle wallet payment
+    if (paymentMethod === 'wallet') {
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          msg: "User not found"
+        });
+      }
+
+      if (!user.walletBalance || user.walletBalance < eventPrice) {
+        return res.status(400).json({
+          success: false,
+          msg: "Insufficient wallet balance",
+          required: eventPrice,
+          available: user.walletBalance || 0
+        });
+      }
+
+      // Deduct from wallet
+      user.walletBalance -= eventPrice;
+      if (!user.walletTransactions) {
+        user.walletTransactions = [];
+      }
+      user.walletTransactions.push({
+        amount: -eventPrice,
+        type: 'payment',
+        description: `Payment for ${event.title}`,
+        balanceAfter: user.walletBalance,
+        reference: eventId.toString(),
+        createdAt: new Date()
+      });
+      await user.save();
+
+      // Create payment record
+      const payment = new Payment({
+        user: userId,
+        event: eventId,
+        amount: eventPrice,
+        paymentMethod: 'wallet',
+        status: 'success'
+      });
+      await payment.save();
+
+      // Mark registration as paid
+      registration.paid = true;
+      await registration.save();
+
+      // Send receipt email
+      try {
+        const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
+        await sendReceiptEmail(
+          user.email,
+          userName,
+          event.title,
+          eventPrice,
+          'wallet',
+          new Date()
+        );
+      } catch (emailError) {
+        console.error('❌ Failed to send receipt email:', emailError);
+      }
+
+      return res.status(200).json({
+        success: true,
+        msg: "Payment successful",
+        paymentId: payment._id,
+        walletBalance: user.walletBalance
+      });
+    }
+
+    // Handle card payment (Stripe)
+    if (paymentMethod === 'card') {
+      if (!stripe) {
+        return res.status(500).json({
+          success: false,
+          msg: "Card payments are not available. Please use wallet payment."
+        });
+      }
+
+      // Create payment record
+      const payment = new Payment({
+        user: userId,
+        event: eventId,
+        amount: eventPrice,
+        paymentMethod: 'card',
+        status: 'pending'
+      });
+      await payment.save();
+
+      // Create Stripe checkout session
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'egp',
+              product_data: {
+                name: event.title,
+                description: `Registration fee for ${event.title}`
+              },
+              unit_amount: Math.round(eventPrice * 100) // Convert to cents
+            },
+            quantity: 1
+          }
+        ],
+        mode: 'payment',
+        success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/events/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/events/${eventId}`,
+        metadata: {
+          paymentId: payment._id.toString(),
+          userId: userId.toString(),
+          eventId: eventId.toString()
+        }
+      });
+
+      // Update payment with session ID
+      payment.stripeSessionId = session.id;
+      await payment.save();
+
+      return res.status(200).json({
+        success: true,
+        msg: "Redirect to payment",
+        sessionId: session.id,
+        url: session.url
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      msg: "Invalid payment method. Use 'wallet' or 'card'"
+    });
+
+  } catch (err) {
+    console.error("❌ Error processing payment:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message
+    });
+  }
+};
+
+// 🚫 Cancel event registration and get refund
+exports.cancelRegistration = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const userId = req.user._id;
+
+    // Find event
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        msg: "Event not found"
+      });
+    }
+
+    // Find registration
+    let registration = await Registration.findOne({
+      user: userId,
+      event: eventId
+    });
+
+    if (!registration) {
+      const user = await User.findById(userId);
+      if (user && user.email) {
+        registration = await StudentRegistration.findOne({
+          event: eventId,
+          studentEmail: user.email.toLowerCase()
+        });
+      }
+    }
+
+    if (!registration) {
+      return res.status(404).json({
+        success: false,
+        msg: "Registration not found"
+      });
+    }
+
+    // Check if event has already started
+    if (event.startDate && new Date(event.startDate) < new Date()) {
+      return res.status(400).json({
+        success: false,
+        msg: "Cannot cancel registration for an event that has already started"
+      });
+    }
+
+    // Find payment if exists
+    const payment = await Payment.findOne({
+      user: userId,
+      event: eventId,
+      status: 'success'
+    });
+
+    // Process refund if payment was made
+    if (payment && payment.paid) {
+      const eventPrice = event.price || 0;
+      
+      if (payment.paymentMethod === 'wallet' && eventPrice > 0) {
+        // Refund to wallet
+        const user = await User.findById(userId);
+        if (user) {
+          user.walletBalance = (user.walletBalance || 0) + eventPrice;
+          if (!user.walletTransactions) {
+            user.walletTransactions = [];
+          }
+          user.walletTransactions.push({
+            amount: eventPrice,
+            type: 'refund',
+            description: `Refund for cancelled registration: ${event.title}`,
+            balanceAfter: user.walletBalance,
+            reference: eventId.toString(),
+            createdAt: new Date()
+          });
+          await user.save();
+
+          // Send refund email
+          try {
+            const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
+            await sendRefundEmail(
+              user.email,
+              userName,
+              event.title,
+              eventPrice,
+              new Date()
+            );
+          } catch (emailError) {
+            console.error('❌ Failed to send refund email:', emailError);
+          }
+        }
+      } else if (payment.paymentMethod === 'card' && eventPrice > 0) {
+        // For card payments, mark for manual refund or process via Stripe
+        // For now, just log it - manual refund may be required
+        console.log(`⚠️ Card payment refund needed for payment: ${payment._id}, amount: ${eventPrice}`);
+      }
+    }
+
+    // Delete registration
+    if (registration.constructor.modelName === 'Registration') {
+      await Registration.findByIdAndDelete(registration._id);
+    } else {
+      await StudentRegistration.findByIdAndDelete(registration._id);
+    }
+
+    // Update event registered count
+    await Event.findByIdAndUpdate(eventId, { $inc: { registeredCount: -1 } });
+
+    res.status(200).json({
+      success: true,
+      msg: "Registration cancelled successfully",
+      refunded: payment && payment.paid && (payment.paymentMethod === 'wallet')
+    });
+
   } catch (err) {
     console.error("❌ Error cancelling registration:", err);
     res.status(500).json({
@@ -1864,6 +2613,126 @@ exports.getArchivedEvents = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error fetching archived events:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+// ⭐ Get user's favorite events
+exports.getFavoriteEvents = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate('favoriteEvents');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Favorite events fetched successfully',
+      events: user.favoriteEvents || []
+    });
+  } catch (err) {
+    console.error("❌ Error fetching favorite events:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+// ⭐ Add event to favorites
+exports.addToFavorites = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const userId = req.user._id;
+
+    // Verify event exists
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found"
+      });
+    }
+
+    // Get user and check if event is already in favorites
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Check if already in favorites
+    if (user.favoriteEvents && user.favoriteEvents.includes(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Event is already in favorites"
+      });
+    }
+
+    // Add to favorites
+    if (!user.favoriteEvents) {
+      user.favoriteEvents = [];
+    }
+    user.favoriteEvents.push(eventId);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Event added to favorites successfully'
+    });
+  } catch (err) {
+    console.error("❌ Error adding event to favorites:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+// ⭐ Remove event from favorites
+exports.removeFromFavorites = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const userId = req.user._id;
+
+    // Get user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Check if event is in favorites
+    if (!user.favoriteEvents || !user.favoriteEvents.includes(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Event is not in favorites"
+      });
+    }
+
+    // Remove from favorites
+    user.favoriteEvents = user.favoriteEvents.filter(
+      favId => favId.toString() !== eventId.toString()
+    );
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Event removed from favorites successfully'
+    });
+  } catch (err) {
+    console.error("❌ Error removing event from favorites:", err);
     res.status(500).json({
       success: false,
       message: "Server error"

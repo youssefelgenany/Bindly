@@ -118,16 +118,19 @@ export const eventsApiService = {
       if (filters.type) query.append('type', filters.type);
       if (filters.status) query.append('status', filters.status);
       
+      // Use the same endpoint as professors: /api/events instead of /api/events/student
       const suffix = query.toString() ? `?${query.toString()}` : '';
-      const url = `/student${suffix}`;
-      console.log('🔍 API call URL:', url);
+      const url = `/${suffix}`;
+      console.log('🔍 API call URL (using same endpoint as professors):', url);
       const response = await eventsApi.get(url);
-      return { success: true, data: response.data.events || [] };
+      // Backend returns array directly or wrapped in events property
+      const events = Array.isArray(response.data) ? response.data : (response.data?.events || []);
+      return { success: true, data: events };
     } catch (error) {
       console.error('🔍 API error:', error);
       return {
         success: false,
-        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch student events',
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch events',
         error: error.response?.data || error.message,
       };
     }

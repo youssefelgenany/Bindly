@@ -10,7 +10,6 @@ const StudentEventsView = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -22,24 +21,50 @@ const StudentEventsView = () => {
   const [showWorkshopEditModal, setShowWorkshopEditModal] = useState(false);
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
   const [registeredEventIds, setRegisteredEventIds] = useState(new Set());
-  const [expandedRows, setExpandedRows] = useState(new Set());
+  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
 
   const isActiveRoute = (path) => {
-    return location.pathname === path;
+    const currentPath = location.pathname;
+    if (currentPath === path) return true;
+    if (path === '/dashboard') {
+      return currentPath === '/dashboard';
+    }
+    return currentPath.startsWith(path);
   };
 
-  const handleLogout = () => {
+  const displayName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`
+    : user?.name || 'Student';
+
+  const handleLogout = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     logout();
     navigate('/login');
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
+        setShowLogoutDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLogoutDropdown]);
 
   const loadEvents = useCallback(async () => {
     try {
       setError('');
       setLoading(true);
+      const typeParam = filter && filter !== 'all' && filter.trim() !== '' ? filter.trim().toLowerCase() : undefined;
+      console.log('🔍 Frontend - Filter state:', filter, '-> Sending type param:', typeParam);
+      
       const result = await eventsApiService.getStudentEvents({
         q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
-        type: filter !== 'all' ? filter : undefined
+        type: typeParam
       });
       
       if (result.success) {
@@ -73,15 +98,72 @@ const StudentEventsView = () => {
           const type = (ev.type || '').toLowerCase();
           const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
           // Only keep events with valid types and non-empty title/location
-          return validTypes.includes(type) && 
-                 ev.title && ev.title.trim() !== '' && 
-                 ev.location && ev.location.trim() !== '';
+          if (!validTypes.includes(type) || !ev.title || ev.title.trim() === '' || !ev.location || ev.location.trim() === '') {
+            return false;
+          }
+          
+          // Apply type filter if not 'all' - strict matching
+          if (filter && filter !== 'all' && filter.trim() !== '') {
+            const filterType = filter.trim().toLowerCase();
+            const eventType = (type || '').toString().trim().toLowerCase();
+            if (eventType !== filterType) {
+              return false;
+            }
+          }
+          
+          // STRICT FILTER: Filter out past events - exclude any event that has ended
+          const now = new Date();
+          const nowTime = now.getTime();
+          
+          // If event has endDate, check if it's in the past (using full datetime comparison)
+          if (ev.endDate) {
+            const endDate = new Date(ev.endDate);
+            if (!isNaN(endDate.getTime())) {
+              const endTime = endDate.getTime();
+              // If endDate is before or equal to now, exclude it (event has ended)
+              if (endTime <= nowTime) {
+                console.log('🚫 Frontend: FILTERING OUT PAST EVENT:', ev.title, 'endDate:', ev.endDate, 'endTime:', endTime, 'nowTime:', nowTime, 'diff:', (nowTime - endTime) / (1000 * 60 * 60 * 24), 'days ago');
+                return false;
+              }
+            } else {
+              // Invalid endDate, exclude to be safe
+              console.log('🚫 Frontend: Invalid endDate for event:', ev.title);
+              return false;
+            }
+          } else if (ev.startDate) {
+            // If no endDate, use startDate - if startDate is in the past, exclude it
+            const startDate = new Date(ev.startDate);
+            if (!isNaN(startDate.getTime())) {
+              const startTime = startDate.getTime();
+              // If startDate is before or equal to now, exclude it (event has started/ended)
+              if (startTime <= nowTime) {
+                console.log('🚫 Frontend: FILTERING OUT PAST EVENT (no endDate):', ev.title, 'startDate:', ev.startDate, 'startTime:', startTime, 'nowTime:', nowTime, 'diff:', (nowTime - startTime) / (1000 * 60 * 60 * 24), 'days ago');
+                return false;
+              }
+            } else {
+              // Invalid startDate, exclude to be safe
+              console.log('🚫 Frontend: Invalid startDate for event:', ev.title);
+              return false;
+            }
+          } else {
+            // If event has no dates at all, exclude it to be safe
+            console.log('🚫 Frontend: FILTERING OUT event with no dates:', ev.title);
+            return false;
+          }
+          
+          return true;
         });
         
         console.log('🔍 StudentEventsView - Events loaded:', {
           totalEvents: mapped.length,
           workshopEvents: mapped.filter(e => e.type === 'workshop').length,
-          workshopTitles: mapped.filter(e => e.type === 'workshop').map(e => e.title)
+          workshopTitles: mapped.filter(e => e.type === 'workshop').map(e => e.title),
+          allWorkshops: mapped.filter(e => e.type === 'workshop').map(e => ({
+            title: e.title,
+            status: e.status,
+            startDate: e.startDate,
+            endDate: e.endDate
+          }))
         });
         
         setEvents(mapped);
@@ -207,405 +289,75 @@ const StudentEventsView = () => {
     return colors[type] || colors.other;
   };
 
-  const getEventStatus = (event) => {
-    const now = new Date();
-    const startDate = new Date(event.startDate);
-    const endDate = event.endDate ? new Date(event.endDate) : null;
-    
-    if (event.capacity && event.registeredCount >= event.capacity) {
-      return { label: 'Full', color: 'red' };
-    }
-    if (endDate && now >= startDate && now <= endDate) {
-      return { label: 'Active', color: 'green' };
-    }
-    if (now < startDate) {
-      return { label: 'Upcoming', color: 'blue' };
-    }
-    return { label: 'Past', color: 'gray' };
+  const getEventTypeImage = (type) => {
+    const imageMap = {
+      conference: '/assets/images/conference-background.jpg',
+      workshop: '/assets/images/workshop-background.jpg',
+      bazaar: '/assets/images/bazaar-background.jpg',
+      trip: '/assets/images/trip-background.png',
+      booth: '/assets/images/booth-background.jpg'
+    };
+    return imageMap[type] || null;
   };
 
-  const formatTableDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const getEventTypeFallbackText = (type) => {
+    return type ? type.toUpperCase() : 'EVENT';
   };
-
-  const toggleRowExpansion = (eventId) => {
-    const newExpanded = new Set(expandedRows);
-    if (newExpanded.has(eventId)) {
-      newExpanded.delete(eventId);
-    } else {
-      newExpanded.add(eventId);
-    }
-    setExpandedRows(newExpanded);
-  };
-
-  const displayName = user?.firstName && user?.lastName 
-    ? `${user.firstName} ${user.lastName}`
-    : user?.name || 'Student';
 
   return (
     <div style={{
       display: 'flex',
-      height: '100vh',
+      flexDirection: 'column',
+      minHeight: '100vh',
       fontFamily: 'Inter, sans-serif',
       backgroundColor: '#f6f7f8'
     }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: sidebarOpen ? '16rem' : '0',
-        flexShrink: 0,
-        backgroundColor: '#1D3557',
-        padding: sidebarOpen ? '1.5rem' : '0',
+      {/* Header/Navbar */}
+      <header style={{
         display: 'flex',
-        flexDirection: 'column',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        overflow: 'hidden',
-        transition: 'width 0.3s ease, padding 0.3s ease'
+        borderBottom: '1px solid #e2e8f0',
+        padding: '1rem 2.5rem',
+        backgroundColor: '#FFFFFF'
       }}>
-        {/* Top Section - Logo and Navigation */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Logo and Branding */}
-          {sidebarOpen && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                borderRadius: '50%',
-                backgroundColor: '#457B9D',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF'
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <h1 style={{
-                  color: '#FFFFFF',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Student Portal
-                </h1>
-                <p style={{
-                  color: 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: '400',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  University Portal
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation */}
-          {sidebarOpen && (
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <Link
-                to="/dashboard"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                  textDecoration: 'none',
-                  color: '#FFFFFF'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.25rem' }}>
-                  dashboard
-                </span>
-                <p style={{
-                  color: '#FFFFFF',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Dashboard
-                </p>
-              </Link>
-
-              <Link
-                to="/student/events"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/events')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/events')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  explore
-                </span>
-                <p style={{
-                  color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/events') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Discover Events
-                </p>
-              </Link>
-
-              <Link
-                to="/student/my-registrations"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/my-registrations') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/my-registrations')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/my-registrations')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  event
-                </span>
-                <p style={{
-                  color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/my-registrations') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  My Events
-                </p>
-              </Link>
-
-              <Link
-                to="/student/courts"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/student/courts') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/student/courts')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/student/courts')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  sports_tennis
-                </span>
-                <p style={{
-                  color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/student/courts') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Campus Courts
-                </p>
-              </Link>
-
-              <Link
-                to="/gym"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/gym') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/gym')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/gym')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  sports_gymnastics
-                </span>
-                <p style={{
-                  color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/gym') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Gym Sessions
-                </p>
-              </Link>
-            </nav>
-          )}
-        </div>
-        
-        {/* Logout Button - Fixed at bottom */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <button
-            onClick={handleLogout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              width: '100%'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ color: 'rgba(241, 250, 238, 0.7)', fontSize: '1.25rem' }}>
-              logout
-            </span>
-            {sidebarOpen && (
-              <p style={{
-                color: 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Logout
-              </p>
-            )}
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
-        {/* Header */}
-        <header style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
-          padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1D3557'
-              }}
-              aria-label="Toggle sidebar"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                menu
-              </span>
-            </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+          <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
-              margin: 0
+              margin: 0,
+              cursor: 'pointer'
             }}>
               Bindly
             </h2>
+          </Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#1D3557',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              Student
+            </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#1D3557',
-                margin: 0
-              }}>
-                {displayName}
-              </p>
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                margin: 0
-              }}>
-                Student
-              </p>
-            </div>
+          <div 
+            data-profile-dropdown
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+          >
             {user?.profilePicturePath ? (
               <img
                 src={`http://localhost:5000${user.profilePicturePath}`}
@@ -626,59 +378,225 @@ const StudentEventsView = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
+                  color: '#FFFFFF',
                 fontWeight: '600'
               }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
+            </div>
+          )}
+            {showLogoutDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                zIndex: 1000,
+                minWidth: '150px'
+              }}>
+                <button
+                  onClick={handleLogout}
+                style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                  display: 'flex',
+                  alignItems: 'center',
+                    gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    logout
+                </span>
+                  Logout
+                </button>
               </div>
             )}
           </div>
-        </header>
+        </div>
+      </header>
+
+      {/* Horizontal Menu Bar */}
+      <nav style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '1rem 2rem',
+        backgroundColor: '#FFFFFF',
+        borderBottom: '1px solid #e2e8f0'
+      }}>
+        {/* Navigation Links */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+          <Link
+            to="/dashboard"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+                  Dashboard
+              </Link>
+              <Link
+                to="/student/events"
+                style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/student/events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+                  Discover Events
+              </Link>
+              <Link
+                to="/student/my-registrations"
+                style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+                  My Events
+              </Link>
+              <Link
+                to="/student/courts"
+                style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+                  Campus Courts
+              </Link>
+              <Link
+                to="/gym"
+                style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/gym') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+                  Gym Sessions
+              </Link>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
 
         {/* Content */}
         <div style={{
           flex: 1,
-          padding: '2rem',
+          padding: '2rem 0',
           overflowY: 'auto',
           backgroundColor: '#f6f7f8'
         }}>
-          {/* Page Title Box */}
+          {/* Content Wrapper with Margins */}
           <div style={{
-            backgroundColor: '#FFFFFF',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-            marginBottom: '1.5rem',
-            borderLeft: '4px solid #1D3557'
+            marginLeft: '4rem',
+            marginRight: '4rem'
           }}>
-            <h3 style={{
-              color: '#1D3557',
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              margin: 0
+          {/* Page Title Banner */}
+          <div style={{
+            position: 'relative',
+            height: '140px',
+            borderRadius: '0.75rem',
+            overflow: 'hidden',
+            marginBottom: '1.5rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+          }}>
+            {/* Background Image */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(/assets/images/events-banner.jpeg)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
+            }}></div>
+            {/* Blue Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Content */}
+            <div style={{
+              position: 'relative',
+              zIndex: 10,
+              height: '100%',
+                display: 'flex',
+              flexDirection: 'column',
+                justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '2rem 2.5rem',
+              color: '#FFFFFF'
+            }}>
+              <h3 style={{
+                color: '#FFFFFF',
+                fontSize: '1.75rem',
+              fontWeight: '700',
+                margin: 0,
+                marginBottom: '0.5rem'
             }}>
               Discover Events
-            </h3>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '1rem',
-              fontWeight: '400',
-              margin: '0.25rem 0 0 0'
-            }}>
-              Browse and register for upcoming events.
-            </p>
-          </div>
+              </h3>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '0.875rem',
+                fontWeight: '400',
+                margin: 0
+              }}>
+                Browse and register for upcoming events.
+              </p>
+            </div>
+              </div>
 
           {/* Search and Filters */}
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '0.75rem',
-            padding: '1.5rem',
+            padding: '1rem 1.5rem',
             marginBottom: '1.5rem',
             boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
-            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', alignItems: 'center' }}>
-              <div style={{ position: 'relative', flex: 1 }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              {/* Search Input and Button - Left Side */}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: '0 1 auto' }}>
+                <div style={{ position: 'relative', width: '520px' }}>
                 <span className="material-symbols-outlined" style={{
                   position: 'absolute',
                   left: '0.75rem',
@@ -686,7 +604,8 @@ const StudentEventsView = () => {
                   transform: 'translateY(-50%)',
                   color: '#9ca3af',
                   fontSize: '1.25rem',
-                  pointerEvents: 'none'
+                    pointerEvents: 'none',
+                    zIndex: 1
                 }}>
                   search
                 </span>
@@ -701,7 +620,7 @@ const StudentEventsView = () => {
                     padding: '0.875rem 0.875rem 0.875rem 2.75rem',
                     borderRadius: '0.5rem',
                     border: '1px solid #e5e7eb',
-                    backgroundColor: '#f9fafb',
+                      backgroundColor: '#ffffff',
                     fontSize: '0.875rem',
                     outline: 'none',
                     transition: 'all 0.2s',
@@ -714,7 +633,7 @@ const StudentEventsView = () => {
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.backgroundColor = '#f9fafb';
+                      e.target.style.backgroundColor = '#ffffff';
                     e.target.style.boxShadow = 'none';
                   }}
                 />
@@ -732,7 +651,8 @@ const StudentEventsView = () => {
                   fontWeight: '600',
                   transition: 'all 0.2s',
                   whiteSpace: 'nowrap',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    flexShrink: 0
                 }}
                 onMouseEnter={(e) => {
                   e.target.style.backgroundColor = '#1e3a8a';
@@ -745,37 +665,10 @@ const StudentEventsView = () => {
               >
                 Search
               </button>
-              {searchQuery && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    loadEvents();
-                  }}
-                  style={{
-                    padding: '0.875rem 1rem',
-                    borderRadius: '0.5rem',
-                    backgroundColor: '#f3f4f6',
-                    color: '#6b7280',
-                    border: '1px solid #e5e7eb',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#e5e7eb';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }}
-                >
-                  Clear
-                </button>
-              )}
             </div>
             
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {/* Filter Buttons - Right Side */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginLeft: 'auto' }}>
               {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
                 <button
                   key={type}
@@ -809,6 +702,7 @@ const StudentEventsView = () => {
                   {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
                 </button>
               ))}
+              </div>
             </div>
           </div>
 
@@ -904,311 +798,325 @@ const StudentEventsView = () => {
               </button>
             </div>
           ) : (
-            <div style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '0.75rem',
-              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-              overflowX: 'auto'
-            }}>
-              <table style={{ width: '100%', textAlign: 'left' }}>
-                <thead style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <tr>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
+            <>
+              <div style={{
+                marginBottom: '1.5rem',
+                color: '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}>
+                Found {events.length} upcoming event{events.length !== 1 ? 's' : ''}
+                {searchQuery && ` matching "${searchQuery}"`}
+                {filter !== 'all' && ` in ${filter} category`}
+              </div>
+              
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                {events.map(event => {
+                  const isRegistered = registeredEventIds.has(String(event.id));
+                  return (
+                  <div
+                    key={event.id}
+                    onClick={() => setSelectedEvent(event)}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '0.75rem',
+                        padding: 0,
+                      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      border: '1px solid #e5e7eb',
+                      display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.borderColor = '#1e40af';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                    }}
+                  >
+                      {/* Event Type Image - Top Half */}
+                      {getEventTypeImage(event.type) && (
+                        <div style={{
+                          width: '100%',
+                          height: '180px',
+                          overflow: 'hidden',
+                          position: 'relative',
+                          backgroundColor: '#f3f4f6',
+                          flexShrink: 0
+                        }}>
+                          <img
+                            src={getEventTypeImage(event.type)}
+                            alt={event.type ? event.type.charAt(0).toUpperCase() + event.type.slice(1) : 'Event'}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              objectPosition: 'center'
+                            }}
+                            onError={(e) => {
+                              // Fallback if image doesn't exist
+                              e.target.style.display = 'none';
+                              e.target.parentElement.style.backgroundColor = getEventTypeColor(event.type);
+                              e.target.parentElement.style.display = 'flex';
+                              e.target.parentElement.style.alignItems = 'center';
+                              e.target.parentElement.style.justifyContent = 'center';
+                              if (!e.target.parentElement.querySelector('.fallback-text')) {
+                                const fallback = document.createElement('div');
+                                fallback.className = 'fallback-text';
+                                fallback.textContent = getEventTypeFallbackText(event.type);
+                                fallback.style.color = '#FFFFFF';
+                                fallback.style.fontSize = '1.5rem';
+                                fallback.style.fontWeight = '700';
+                                e.target.parentElement.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+                      
+                      <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                      <div style={{
+                        padding: '0.375rem 0.875rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: getEventTypeColor(event.type),
+                        color: '#FFFFFF',
+                        fontSize: '0.6875rem',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        {event.type}
+                      </div>
+                      {getDaysUntilEvent(event.startDate) && (
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#1e40af',
+                          fontWeight: '600',
+                          backgroundColor: '#eff6ff',
+                          padding: '0.25rem 0.625rem',
+                          borderRadius: '0.375rem'
+                        }}>
+                          {getDaysUntilEvent(event.startDate)}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <h3 style={{
+                      color: '#1D3557',
+                      fontSize: '1.125rem',
                       fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
+                          marginBottom: '0.75rem',
+                      marginTop: 0,
+                      lineHeight: '1.4'
                     }}>
-                      Event Name
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
+                      {event.title}
+                    </h3>
+                    
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem',
+                      flex: 1
                     }}>
-                      Type
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Date
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Location
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      textAlign: 'center'
-                    }}>
-                      Status
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      textAlign: 'right'
-                    }}>
-                      Actions
-                    </th>
-                    <th style={{ padding: '1rem 1.5rem', width: '48px' }}></th>
-                  </tr>
-                </thead>
-                <tbody style={{ borderTop: '1px solid #e5e7eb' }}>
-                  {events.map(event => {
-                    const statusInfo = getEventStatus(event);
-                    const isExpanded = expandedRows.has(event.id);
-                    const isRegistered = registeredEventIds.has(String(event.id));
-                    const statusColors = {
-                      blue: { bg: '#dbeafe', text: '#1e40af' },
-                      green: { bg: '#d1fae5', text: '#065f46' },
-                      red: { bg: '#fee2e2', text: '#991b1b' },
-                      gray: { bg: '#f3f4f6', text: '#4b5563' }
-                    };
-                    const statusStyle = statusColors[statusInfo.color] || statusColors.gray;
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.625rem',
+                        fontSize: '0.8125rem',
+                        color: '#6b7280'
+                      }}>
+                        <span className="material-symbols-outlined" style={{
+                          fontSize: '1.125rem',
+                          color: '#9ca3af'
+                        }}>
+                          calendar_today
+                        </span>
+                        <span>{formatDate(event.startDate)}</span>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.625rem',
+                        fontSize: '0.8125rem',
+                        color: '#6b7280'
+                      }}>
+                        <span className="material-symbols-outlined" style={{
+                          fontSize: '1.125rem',
+                          color: '#9ca3af'
+                        }}>
+                          location_on
+                        </span>
+                        <span>{event.location}</span>
+                      </div>
+                      {event.price && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            attach_money
+                          </span>
+                          <span style={{ fontWeight: '500', color: '#059669' }}>${event.price}</span>
+                        </div>
+                      )}
+                      {event.capacity && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            people
+                          </span>
+                          <span>{event.registeredCount || 0}/{event.capacity} registered</span>
+                        </div>
+                      )}
+                      {(event.type === 'bazaar' || event.type === 'booth') && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            storefront
+                          </span>
+                          <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
+                        </div>
+                      )}
+                      {(event.type === 'workshop' || event.type === 'conference') && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            school
+                          </span>
+                          <span>
+                            {event.professors 
+                              ? (Array.isArray(event.professors) ? event.professors.join(', ') : event.professors)
+                              : (event.creatorName || 'Professor')
+                            }
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
-                    return (
-                      <React.Fragment key={event.id}>
-                        <tr style={{
-                          borderBottom: '1px solid #e5e7eb',
-                          transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    {event.description && (
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.8125rem',
+                            marginBottom: '0.75rem',
+                        marginTop: 0,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        lineHeight: '1.5'
+                      }}>
+                        {event.description}
+                      </p>
+                    )}
+
+                    {(event.type === 'workshop' || event.type === 'trip') && (
+                          isRegistered ? (
+                        <button
+                          disabled
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: '#10b981',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            cursor: 'not-allowed',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            marginTop: 'auto',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                          }}
                         >
-                          <td style={{
-                            padding: '1rem 1.5rem',
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
+                          Registered
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRegisterClick(event);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: '#1e40af',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            cursor: 'pointer',
                             fontSize: '0.875rem',
-                            fontWeight: '500',
-                            color: '#111827'
-                          }}>
-                            {event.title}
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            color: '#6b7280'
-                          }}>
-                            {event.type ? event.type.charAt(0).toUpperCase() + event.type.slice(1) : 'Event'}
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            color: '#6b7280'
-                          }}>
-                            {formatTableDate(event.startDate)}
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            color: '#6b7280'
-                          }}>
-                            {event.location}
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            textAlign: 'center'
-                          }}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '0.25rem 0.75rem',
-                              borderRadius: '9999px',
-                              fontSize: '0.875rem',
-                              fontWeight: '500',
-                              backgroundColor: statusStyle.bg,
-                              color: statusStyle.text
-                            }}>
-                              {statusInfo.label}
-                            </span>
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            textAlign: 'right'
-                          }}>
-                            {isRegistered ? (
-                              <span style={{
-                                padding: '0.5rem 1rem',
-                                borderRadius: '0.5rem',
-                                backgroundColor: '#d1fae5',
-                                color: '#065f46',
-                                fontSize: '0.875rem',
-                                fontWeight: '500'
-                              }}>
-                                Registered
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => handleRegisterClick(event)}
-                                style={{
-                                  padding: '0.5rem 1rem',
-                                  borderRadius: '0.5rem',
-                                  backgroundColor: '#1e40af',
-                                  color: '#FFFFFF',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  fontSize: '0.875rem',
-                                  fontWeight: '500',
-                                  transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.target.style.backgroundColor = '#1e3a8a';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.target.style.backgroundColor = '#1e40af';
-                                }}
-                              >
-                                Register
-                              </button>
-                            )}
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            textAlign: 'right'
-                          }}>
-                            <button
-                              onClick={() => toggleRowExpansion(event.id)}
-                              style={{
-                                padding: '0.5rem',
-                                borderRadius: '0.5rem',
-                                border: 'none',
-                                backgroundColor: 'transparent',
-                                color: '#6b7280',
-                                cursor: 'pointer',
-                                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                                transition: 'transform 0.2s'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = '#f3f4f6';
-                                e.target.style.color = '#137fec';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = 'transparent';
-                                e.target.style.color = '#6b7280';
-                              }}
-                            >
-                              <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                expand_more
-                              </span>
-                            </button>
-                          </td>
-                        </tr>
-                        {/* Expanded Details Row */}
-                        {isExpanded && (
-                          <tr style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
-                            <td colSpan="7" style={{ padding: '1.5rem' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                {/* Event Description */}
-                                {event.description && (
-                                  <div>
-                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
-                                      Description
-                                    </h4>
-                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                      {event.description}
-                                    </p>
-                                  </div>
-                                )}
-
-                                {/* Event Details Grid */}
-                                <div style={{
-                                  display: 'grid',
-                                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                                  gap: '1rem'
-                                }}>
-                                  {/* Start Date */}
-                                  <div>
-                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                      Start Date & Time
-                                    </h4>
-                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                      {event.startDate ? new Date(event.startDate).toLocaleString() : 'N/A'}
-                                    </p>
-                                  </div>
-
-                                  {/* End Date */}
-                                  {event.endDate && (
-                                    <div>
-                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        End Date & Time
-                                      </h4>
-                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {new Date(event.endDate).toLocaleString()}
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Registration Deadline */}
-                                  {event.registrationDeadline && (
-                                    <div>
-                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Registration Deadline
-                                      </h4>
-                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {new Date(event.registrationDeadline).toLocaleString()}
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Capacity */}
-                                  {event.capacity && (
-                                    <div>
-                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Capacity
-                                      </h4>
-                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {event.registeredCount || 0} / {event.capacity} registered
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Price */}
-                                  {event.price && (
-                                    <div>
-                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Price
-                                      </h4>
-                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        ${event.price}
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            fontWeight: '600',
+                            transition: 'all 0.2s',
+                            marginTop: 'auto',
+                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#1e3a8a';
+                            e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = '#1e40af';
+                            e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                          }}
+                        >
+                          Register for {event.type === 'workshop' ? 'Workshop' : 'Trip'}
+                        </button>
+                      )
+                    )}
+                  </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
+          </div>
         </div>
       </main>
 
@@ -1236,55 +1144,113 @@ const StudentEventsView = () => {
               maxWidth: '600px',
               width: '100%',
               maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
             }}
           >
+            {/* Event Image at Top with Close Button Overlay */}
+            <div style={{ position: 'relative' }}>
+              {getEventTypeImage(selectedEvent.type) && (
             <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '1.5rem',
-              borderBottom: '1px solid #e5e7eb'
-            }}>
-              <h2 style={{
-                color: '#1D3557',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                margin: 0
-              }}>
-                {selectedEvent.title}
-              </h2>
+                  width: '100%',
+                  height: '200px',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  backgroundColor: '#f3f4f6',
+                  flexShrink: 0
+                }}>
+                  <img
+                    src={getEventTypeImage(selectedEvent.type)}
+                    alt={selectedEvent.type ? selectedEvent.type.charAt(0).toUpperCase() + selectedEvent.type.slice(1) : 'Event'}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center'
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.style.backgroundColor = getEventTypeColor(selectedEvent.type);
+                      e.target.parentElement.style.display = 'flex';
+                      e.target.parentElement.style.alignItems = 'center';
+                      e.target.parentElement.style.justifyContent = 'center';
+                      if (!e.target.parentElement.querySelector('.fallback-text')) {
+                        const fallback = document.createElement('div');
+                        fallback.className = 'fallback-text';
+                        fallback.textContent = getEventTypeFallbackText(selectedEvent.type);
+                        fallback.style.color = '#FFFFFF';
+                        fallback.style.fontSize = '1.5rem';
+                        fallback.style.fontWeight = '700';
+                        e.target.parentElement.appendChild(fallback);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              
+              {/* Close Button - Upper Right Corner */}
               <button
                 onClick={() => setSelectedEvent(null)}
                 style={{
-                  background: 'none',
+                  position: 'absolute',
+                  top: '0.75rem',
+                  right: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.9)',
                   border: 'none',
                   fontSize: '1.5rem',
                   cursor: 'pointer',
                   color: '#6b7280',
                   padding: '0.25rem 0.5rem',
-                  borderRadius: '0.25rem',
-                  transition: 'background-color 0.2s',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
                   lineHeight: 1,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   width: '2rem',
-                  height: '2rem'
+                  height: '2rem',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                  zIndex: 10
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.backgroundColor = '#ffffff';
+                  e.target.style.color = '#1D3557';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  e.target.style.color = '#6b7280';
                 }}
               >
                 ×
               </button>
             </div>
             
-            <div style={{ padding: '1.5rem' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                margin: 0,
+                paddingRight: '1rem'
+              }}>
+                {selectedEvent.title}
+              </h2>
+            </div>
+            
+            <div style={{ 
+              padding: '1rem 1.5rem 1.5rem 1.5rem',
+              overflowY: 'auto',
+              flex: 1,
+              minHeight: 0
+            }}>
               <div style={{
                 padding: '0.375rem 0.875rem',
                 borderRadius: '0.5rem',
@@ -1425,6 +1391,29 @@ const StudentEventsView = () => {
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Vendors</div>
                       <div style={{ color: '#374151', fontWeight: '500' }}>{(selectedEvent.vendors && selectedEvent.vendors.length) || 0} vendor{((selectedEvent.vendors && selectedEvent.vendors.length) || 0) !== 1 ? 's' : ''} participating</div>
+                    </div>
+                  </div>
+                )}
+                {(selectedEvent.type === 'workshop' || selectedEvent.type === 'conference') && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      school
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Professor</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>
+                        {selectedEvent.professors 
+                          ? (Array.isArray(selectedEvent.professors) ? selectedEvent.professors.join(', ') : selectedEvent.professors)
+                          : (selectedEvent.creatorName || 'Professor')
+                        }
+                      </div>
                     </div>
                   </div>
                 )}

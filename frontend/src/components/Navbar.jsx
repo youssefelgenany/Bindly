@@ -366,44 +366,12 @@ const Navbar = () => {
                     Vendor Requests
                   </Link>
                   <Link
-                    to="/create-bazaar"
-                    className="btn btn-primary"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    Create Bazaar
-                  </Link>
-                  <Link
-                    to="/create-trip"
-                    className="btn btn-primary"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    Create Trip
-                  </Link>
-                  <Link
-                    to="/create-conference"
-                    className="btn btn-primary"
-                    style={{ width: '100%' }}
-                    onClick={closeSidebar}
-                  >
-                    Create Conference
-                  </Link>
-                  <Link
                     to="/create-booth"
                     className="btn btn-primary"
                     style={{ width: '100%' }}
                     onClick={closeSidebar}
                   >
                     Create Booth
-                  </Link>
-                  <Link
-                    to="/create-gym-session"
-                    className="btn btn-primary"
-                    style={{ width: '100%', backgroundColor: '#28a745', borderColor: '#28a745' }}
-                    onClick={closeSidebar}
-                  >
-                    🏋️ Create Gym Session
                   </Link>
                 </>
               )}

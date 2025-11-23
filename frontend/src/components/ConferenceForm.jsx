@@ -14,7 +14,8 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {}, submitLab
     startDate: initialData.startDate || '',
     endDate: initialData.endDate || '',
     location: initialData.location || '',
-    capacity: initialData.capacity || ''
+    capacity: initialData.capacity || '',
+    allowedUserTypes: initialData.allowedUserTypes || []
   });
 
   console.log('🔹 ConferenceForm: Initialized formData:', formData);
@@ -24,6 +25,17 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {}, submitLab
     setFormData({
       ...formData,
       [e.target.name]: value
+    });
+  };
+
+  const toggleUserType = (userType) => {
+    setFormData(prev => {
+      const currentTypes = prev.allowedUserTypes || [];
+      if (currentTypes.includes(userType)) {
+        return { ...prev, allowedUserTypes: currentTypes.filter(t => t !== userType) };
+      } else {
+        return { ...prev, allowedUserTypes: [...currentTypes, userType] };
+      }
     });
   };
 
@@ -296,6 +308,34 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {}, submitLab
             e.target.style.backgroundColor = '#f3f4f6';
           }}
         />
+      </div>
+
+      <div style={formGroupStyle}>
+        <label style={labelStyle}>Restrict to User Types (optional)</label>
+        <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.75rem 0' }}>
+          Select which user types can access this conference. Leave empty for all users.
+        </p>
+        {['Student', 'Professor', 'Staff', 'TA'].map(userType => (
+          <label key={userType} style={{
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: '0.5rem',
+            cursor: 'pointer'
+          }}>
+            <input
+              type="checkbox"
+              checked={formData.allowedUserTypes?.includes(userType) || false}
+              onChange={() => toggleUserType(userType)}
+              style={{
+                width: '1.25rem',
+                height: '1.25rem',
+                marginRight: '0.75rem',
+                cursor: 'pointer'
+              }}
+            />
+            <span style={{ fontSize: '0.875rem', color: '#374151' }}>{userType}</span>
+          </label>
+        ))}
       </div>
 
       <button

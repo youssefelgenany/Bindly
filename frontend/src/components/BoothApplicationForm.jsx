@@ -84,43 +84,68 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
 
     return (
         <div
+            onClick={onClose}
             role="dialog"
             aria-modal="true"
             style={{
                 position: 'fixed',
-                inset: 0,
-                background: 'rgba(0,0,0,0.4)',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                zIndex: 1000
+                zIndex: 2000,
+                padding: '1rem'
             }}
         >
-            <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: '800px', padding: '16px' }}>
-                <div className="card" style={{
-                    backgroundColor: 'var(--white)',
-                    padding: 0,
-                    borderRadius: '10px',
-                    boxShadow: '0 10px 24px rgba(0,0,0,0.15)',
-                    overflow: 'hidden',
+            <form 
+                onSubmit={handleSubmit}
+                onClick={(e) => e.stopPropagation()}
+                style={{ 
+                    width: '100%', 
+                    maxWidth: '900px',
                     maxHeight: '90vh',
-                    overflowY: 'auto'
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column'
+                }}
+            >
+                <div style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '0.75rem',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
                 }}>
-                    {/* Header */}
-                    <div className="card-header" style={{
+                    {/* Modal Header */}
+                    <div style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        background: 'var(--light-gray)',
-                        padding: '1rem 1.25rem',
-                        borderBottom: '1px solid var(--medium-gray)'
+                        padding: '1.5rem 2rem',
+                        borderBottom: '1px solid #e2e8f0',
+                        backgroundColor: '#FFFFFF'
                     }}>
                         <div>
-                            <h2 className="card-title" style={{ margin: 0, color: '#007bff' }}>
-                                Apply for {booth.name}
+                            <h2 style={{
+                                color: '#1D3557',
+                                fontSize: '1.5rem',
+                                fontWeight: '700',
+                                margin: 0,
+                                marginBottom: '0.25rem'
+                            }}>
+                                Apply for {booth.name || booth.title}
                             </h2>
-                            <p className="card-subtitle" style={{ marginTop: '4px', color: '#6c757d' }}>
-                                {bazaar.name} • {booth.location}
+                            <p style={{
+                                color: '#6b7280',
+                                fontSize: '0.875rem',
+                                margin: 0
+                            }}>
+                                {bazaar.name || 'Bazaar'} • {booth.location || 'Location TBD'}
                             </p>
                         </div>
                         <button
@@ -128,182 +153,285 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
                             aria-label="Close"
                             onClick={onClose}
                             style={{
+                                background: 'none',
                                 border: 'none',
-                                background: 'transparent',
-                                fontSize: '1.5rem',
                                 cursor: 'pointer',
-                                color: '#6c757d'
+                                padding: '0.5rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#6b7280',
+                                borderRadius: '0.375rem',
+                                transition: 'background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = '#f3f4f6';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'transparent';
                             }}
                         >
-                            ×
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                                close
+                            </span>
                         </button>
                     </div>
 
-                    {/* Form Content */}
-                    <div style={{ padding: '1.5rem' }}>
+                    {/* Modal Content */}
+                    <div style={{
+                        flex: 1,
+                        overflowY: 'auto',
+                        padding: '2rem'
+                    }}>
                         {/* Booth Information */}
-                        <div style={{
-                            backgroundColor: '#f8f9fa',
-                            padding: '1rem',
-                            borderRadius: '8px',
-                            marginBottom: '1.5rem',
-                            border: '1px solid #e9ecef'
-                        }}>
-                            <h4 style={{ margin: '0 0 0.5rem 0', color: '#495057' }}>Booth Details</h4>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem' }}>
-                                <div><strong>Price:</strong> ${booth.price}</div>
-                                <div><strong>Capacity:</strong> {booth.capacity} people</div>
-                                <div><strong>Dates:</strong> {new Date(booth.startDate).toLocaleDateString()} - {new Date(booth.endDate).toLocaleDateString()}</div>
+                        {booth.price || booth.capacity || booth.startDate ? (
+                            <div style={{
+                                backgroundColor: '#f9fafb',
+                                padding: '1.5rem',
+                                borderRadius: '0.5rem',
+                                marginBottom: '2rem',
+                                border: '1px solid #e5e7eb'
+                            }}>
+                                <h4 style={{ 
+                                    margin: '0 0 1rem 0', 
+                                    color: '#111827',
+                                    fontSize: '0.875rem',
+                                    fontWeight: '600'
+                                }}>
+                                    Bazaar Details
+                                </h4>
+                                <div style={{ 
+                                    display: 'grid', 
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                                    gap: '1rem',
+                                    marginBottom: booth.description ? '1rem' : 0
+                                }}>
+                                    {booth.price && (
+                                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                            <strong style={{ color: '#111827' }}>Price:</strong> ${booth.price}
+                                        </div>
+                                    )}
+                                    {booth.capacity && (
+                                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                            <strong style={{ color: '#111827' }}>Capacity:</strong> {booth.capacity} people
+                                        </div>
+                                    )}
+                                    {booth.startDate && (
+                                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                            <strong style={{ color: '#111827' }}>Dates:</strong> {new Date(booth.startDate).toLocaleDateString()} {booth.endDate ? `- ${new Date(booth.endDate).toLocaleDateString()}` : ''}
+                                        </div>
+                                    )}
+                                </div>
+                                {booth.description && (
+                                    <p style={{ 
+                                        margin: 0, 
+                                        color: '#6b7280', 
+                                        fontSize: '0.875rem',
+                                        lineHeight: '1.5'
+                                    }}>
+                                        {booth.description}
+                                    </p>
+                                )}
                             </div>
-                            {booth.description && (
-                                <p style={{ margin: '0.5rem 0 0 0', color: '#6c757d', fontSize: '0.9rem' }}>
-                                    {booth.description}
-                                </p>
-                            )}
-                        </div>
+                        ) : null}
 
                         {/* Attendees Section */}
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <h4 style={{ margin: '0 0 1rem 0', color: '#495057' }}>
-                                Attendees (Maximum 5)
+                        <div style={{ marginBottom: '2rem' }}>
+                            <h4 style={{
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                color: '#111827',
+                                marginBottom: '1rem'
+                            }}>
+                                Names and Emails of Attendees (Maximum 5) <span style={{ color: '#ef4444' }}>*</span>
                             </h4>
+                            
                             {formData.attendees.map((attendee, idx) => (
                                 <div key={idx} style={{
                                     display: 'grid',
                                     gridTemplateColumns: '1fr 1fr auto',
-                                    gap: '0.5rem',
-                                    marginBottom: '0.5rem',
+                                    gap: '0.75rem',
+                                    marginBottom: '0.75rem',
                                     alignItems: 'end'
                                 }}>
-                                    <input
-                                        type="text"
-                                        placeholder="Full Name"
-                                        value={attendee.name}
-                                        onChange={(e) => setAttendee(idx, 'name', e.target.value)}
-                                        style={{
-                                            padding: '0.5rem',
-                                            border: '1px solid #ced4da',
-                                            borderRadius: '4px',
-                                            fontSize: '0.9rem'
-                                        }}
-                                        required
-                                    />
-                                    <input
-                                        type="email"
-                                        placeholder="Email Address"
-                                        value={attendee.email}
-                                        onChange={(e) => setAttendee(idx, 'email', e.target.value)}
-                                        style={{
-                                            padding: '0.5rem',
-                                            border: '1px solid #ced4da',
-                                            borderRadius: '4px',
-                                            fontSize: '0.9rem'
-                                        }}
-                                        required
-                                    />
+                                    <div>
+                                        <input
+                                            type="text"
+                                            placeholder="Full Name"
+                                            value={attendee.name}
+                                            onChange={(e) => setAttendee(idx, 'name', e.target.value)}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.75rem',
+                                                border: '1px solid #e5e7eb',
+                                                borderRadius: '0.5rem',
+                                                fontSize: '0.875rem',
+                                                backgroundColor: '#f3f4f6',
+                                                outline: 'none',
+                                                transition: 'border-color 0.2s, background-color 0.2s'
+                                            }}
+                                            onFocus={(e) => {
+                                                e.target.style.borderColor = '#3b82f6';
+                                                e.target.style.backgroundColor = '#ffffff';
+                                            }}
+                                            onBlur={(e) => {
+                                                e.target.style.borderColor = '#e5e7eb';
+                                                e.target.style.backgroundColor = '#f3f4f6';
+                                            }}
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <input
+                                            type="email"
+                                            placeholder="Email Address"
+                                            value={attendee.email}
+                                            onChange={(e) => setAttendee(idx, 'email', e.target.value)}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.75rem',
+                                                border: '1px solid #e5e7eb',
+                                                borderRadius: '0.5rem',
+                                                fontSize: '0.875rem',
+                                                backgroundColor: '#f3f4f6',
+                                                outline: 'none',
+                                                transition: 'border-color 0.2s, background-color 0.2s'
+                                            }}
+                                            onFocus={(e) => {
+                                                e.target.style.borderColor = '#3b82f6';
+                                                e.target.style.backgroundColor = '#ffffff';
+                                            }}
+                                            onBlur={(e) => {
+                                                e.target.style.borderColor = '#e5e7eb';
+                                                e.target.style.backgroundColor = '#f3f4f6';
+                                            }}
+                                            required
+                                        />
+                                    </div>
                                     {formData.attendees.length > 1 && (
                                         <button
                                             type="button"
                                             onClick={() => removeAttendee(idx)}
                                             style={{
-                                                backgroundColor: '#dc3545',
-                                                color: 'white',
+                                                padding: '0.75rem',
+                                                backgroundColor: '#ef4444',
+                                                color: '#FFFFFF',
                                                 border: 'none',
-                                                padding: '0.5rem',
-                                                borderRadius: '4px',
+                                                borderRadius: '0.5rem',
                                                 cursor: 'pointer',
-                                                fontSize: '0.8rem'
+                                                fontSize: '0.875rem',
+                                                fontWeight: '500'
                                             }}
+                                            onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
+                                            onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
                                         >
                                             Remove
                                         </button>
                                     )}
                                 </div>
                             ))}
+                            
                             {formData.attendees.length < 5 && (
                                 <button
                                     type="button"
                                     onClick={addAttendee}
                                     style={{
-                                        backgroundColor: '#28a745',
-                                        color: 'white',
-                                        border: 'none',
                                         padding: '0.5rem 1rem',
-                                        borderRadius: '4px',
+                                        backgroundColor: '#1D3557',
+                                        color: '#FFFFFF',
+                                        border: 'none',
+                                        borderRadius: '0.5rem',
                                         cursor: 'pointer',
-                                        fontSize: '0.9rem'
+                                        fontSize: '0.875rem',
+                                        fontWeight: '500'
                                     }}
+                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#152843'}
+                                    onMouseLeave={(e) => e.target.style.backgroundColor = '#1D3557'}
                                 >
                                     + Add Attendee
                                 </button>
                             )}
                         </div>
 
-                        {/* Booth Configuration */}
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <h4 style={{ margin: '0 0 1rem 0', color: '#495057' }}>Booth Configuration</h4>
-
-                            {/* Booth Size */}
-                            <div style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                                    Booth Size *
-                                </label>
-                                <select
-                                    value={formData.boothSize}
-                                    onChange={(e) => setFormData({ ...formData, boothSize: e.target.value })}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.5rem',
-                                        border: '1px solid #ced4da',
-                                        borderRadius: '4px',
-                                        fontSize: '0.9rem'
-                                    }}
-                                    required
-                                >
-                                    <option value="">Select booth size</option>
-                                    <option value="2x2">2x2 meters (Small Booth)</option>
-                                    <option value="4x4">4x4 meters (Large Booth)</option>
-                                </select>
-                                <p style={{
-                                    margin: '0.25rem 0 0 0',
-                                    color: '#6c757d',
-                                    fontSize: '0.8rem',
-                                    fontStyle: 'italic'
-                                }}>
-                                    📏 Choose the size of your booth space in meters
-                                </p>
-                            </div>
-
+                        {/* Booth Size Section */}
+                        <div style={{ marginBottom: '2rem' }}>
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '0.75rem',
+                                fontWeight: '600',
+                                color: '#111827',
+                                fontSize: '0.875rem'
+                            }}>
+                                Booth Size <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <select
+                                value={formData.boothSize}
+                                onChange={(e) => setFormData({ ...formData, boothSize: e.target.value })}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '0.5rem',
+                                    fontSize: '0.875rem',
+                                    backgroundColor: '#f3f4f6',
+                                    outline: 'none',
+                                    cursor: 'pointer',
+                                    transition: 'border-color 0.2s, background-color 0.2s'
+                                }}
+                                onFocus={(e) => {
+                                    e.target.style.borderColor = '#3b82f6';
+                                    e.target.style.backgroundColor = '#ffffff';
+                                }}
+                                onBlur={(e) => {
+                                    e.target.style.borderColor = '#e5e7eb';
+                                    e.target.style.backgroundColor = '#f3f4f6';
+                                }}
+                                required
+                            >
+                                <option value="">Select booth size</option>
+                                <option value="2x2">2x2 meters (Small Booth)</option>
+                                <option value="4x4">4x4 meters (Large Booth)</option>
+                            </select>
                         </div>
 
                         {/* Submit Message */}
                         {submitMessage.text && (
                             <div style={{
-                                padding: '0.75rem',
-                                borderRadius: '4px',
-                                marginBottom: '1rem',
-                                backgroundColor: submitMessage.type === 'success' ? '#d4edda' : '#f8d7da',
-                                color: submitMessage.type === 'success' ? '#155724' : '#721c24',
-                                border: `1px solid ${submitMessage.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`
+                                padding: '0.75rem 1rem',
+                                marginBottom: '1.5rem',
+                                borderRadius: '0.5rem',
+                                backgroundColor: submitMessage.type === 'success' ? '#d1fae5' : '#fee2e2',
+                                color: submitMessage.type === 'success' ? '#065f46' : '#991b1b',
+                                border: `1px solid ${submitMessage.type === 'success' ? '#a7f3d0' : '#fecaca'}`,
+                                fontSize: '0.875rem',
+                                whiteSpace: 'pre-line'
                             }}>
                                 {submitMessage.text}
                             </div>
                         )}
 
-                        {/* Submit Button */}
-                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                        {/* Submit Buttons */}
+                        <div style={{
+                            display: 'flex',
+                            gap: '1rem',
+                            justifyContent: 'flex-end',
+                            marginTop: '2rem'
+                        }}>
                             <button
                                 type="button"
                                 onClick={onClose}
                                 style={{
-                                    backgroundColor: '#6c757d',
-                                    color: 'white',
-                                    border: 'none',
                                     padding: '0.75rem 1.5rem',
-                                    borderRadius: '4px',
+                                    backgroundColor: '#6b7280',
+                                    color: '#FFFFFF',
+                                    border: 'none',
+                                    borderRadius: '0.5rem',
                                     cursor: 'pointer',
-                                    fontSize: '0.9rem'
+                                    fontSize: '0.875rem',
+                                    fontWeight: '500'
                                 }}
+                                onMouseEnter={(e) => e.target.style.backgroundColor = '#4b5563'}
+                                onMouseLeave={(e) => e.target.style.backgroundColor = '#6b7280'}
                             >
                                 Cancel
                             </button>
@@ -311,13 +439,25 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
                                 type="submit"
                                 disabled={submitting}
                                 style={{
-                                    backgroundColor: submitting ? '#6c757d' : '#007bff',
-                                    color: 'white',
-                                    border: 'none',
                                     padding: '0.75rem 1.5rem',
-                                    borderRadius: '4px',
+                                    backgroundColor: submitting ? '#9ca3af' : '#1D3557',
+                                    color: '#FFFFFF',
+                                    border: 'none',
+                                    borderRadius: '0.5rem',
                                     cursor: submitting ? 'not-allowed' : 'pointer',
-                                    fontSize: '0.9rem'
+                                    fontSize: '0.875rem',
+                                    fontWeight: '600',
+                                    opacity: submitting ? 0.7 : 1
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!submitting) {
+                                        e.target.style.backgroundColor = '#152843';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!submitting) {
+                                        e.target.style.backgroundColor = '#1D3557';
+                                    }
                                 }}
                             >
                                 {submitting ? 'Submitting...' : 'Submit Application'}

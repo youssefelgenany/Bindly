@@ -10,6 +10,9 @@ const AdminUsers = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchField, setSearchField] = useState('all'); // all | name | email | gucId
+  const [roleFilter, setRoleFilter] = useState('all'); // all | Admin | Event Office | TA | Staff | Professor | Student
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, userId: null });
+  const [deletingIds, setDeletingIds] = useState({}); // id -> boolean
   const [pendingRoles, setPendingRoles] = useState({}); // id -> role
   const [updatingIds, setUpdatingIds] = useState({}); // id -> boolean
   const [messageById, setMessageById] = useState({}); // id -> message
@@ -29,6 +32,19 @@ const AdminUsers = () => {
   const [sendingEmailIds, setSendingEmailIds] = useState({}); // id -> boolean
   const [emailMsgById, setEmailMsgById] = useState({}); // id -> message
 
+  // Create account modal state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    role: 'Admin'
+  });
+  const [formErrors, setFormErrors] = useState({});
+  const [isCreating, setIsCreating] = useState(false);
+  const [createMessage, setCreateMessage] = useState('');
+
   const toggleRowExpansion = (userId) => {
     const newExpanded = new Set(expandedRows);
     if (newExpanded.has(userId)) {
@@ -47,8 +63,19 @@ const AdminUsers = () => {
     users.forEach(u => {
       const userId = u._id || u.id;
       const isVerified = verificationStatusById[userId] || u.isVerified;
+      const userType = u.userType;
+      const userTypeLower = userType?.toLowerCase();
       
-      if (!isVerified && (['Staff', 'TA', 'Professor'].includes(u.userType) || !u.userType)) {
+      // Check if user is Admin or Event Office
+      const isAdmin = userType === 'Admin' || userType === 'admin' || userTypeLower === 'admin';
+      const isEventOffice = userType === 'Event Office' || userType === 'event office' || 
+                           userType === 'Event_Office' || userType === 'event_office' ||
+                           userTypeLower === 'event office';
+      
+      // Admin and Event Office accounts are always verified, other users follow normal logic
+      if (isAdmin || isEventOffice) {
+        verified.push(u);
+      } else if (!isVerified && (['Staff', 'TA', 'Professor'].includes(u.userType) || !u.userType)) {
         pending.push(u);
       } else {
         verified.push(u);
@@ -59,8 +86,29 @@ const AdminUsers = () => {
   }, [users, verificationStatusById]);
 
   const filterUsers = (userList) => {
+    let filtered = userList;
+
+    // Filter by role
+    if (roleFilter !== 'all') {
+      filtered = filtered.filter(u => {
+        const userType = u.userType;
+        const userTypeLower = userType?.toLowerCase();
+        
+        if (roleFilter === 'Admin') {
+          return userType === 'Admin' || userType === 'admin' || userTypeLower === 'admin';
+        } else if (roleFilter === 'Event Office') {
+          return userType === 'Event Office' || userType === 'event office' || 
+                 userType === 'Event_Office' || userType === 'event_office' ||
+                 userTypeLower === 'event office';
+        } else {
+          return userType === roleFilter;
+        }
+      });
+    }
+
+    // Filter by search query
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return userList;
+    if (!q) return filtered;
 
     const match = (u) => {
       const name = `${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase();
@@ -74,11 +122,11 @@ const AdminUsers = () => {
       return name.includes(q) || email.includes(q) || gucId.includes(q) || id.includes(q);
     };
 
-    return userList.filter(match);
+    return filtered.filter(match);
   };
 
-  const filteredPendingUsers = useMemo(() => filterUsers(pendingVerificationUsers), [pendingVerificationUsers, searchQuery, searchField]);
-  const filteredVerifiedUsers = useMemo(() => filterUsers(verifiedUsers), [verifiedUsers, searchQuery, searchField]);
+  const filteredPendingUsers = useMemo(() => filterUsers(pendingVerificationUsers), [pendingVerificationUsers, searchQuery, searchField, roleFilter]);
+  const filteredVerifiedUsers = useMemo(() => filterUsers(verifiedUsers), [verifiedUsers, searchQuery, searchField, roleFilter]);
 
   // Only allow assigning academic roles
   const roleOptions = [
@@ -86,6 +134,68 @@ const AdminUsers = () => {
     'TA',
     'Professor'
   ];
+
+  // Create account form handlers
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (formErrors[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!formData.firstName.trim()) errors.firstName = 'First name is required';
+    if (!formData.lastName.trim()) errors.lastName = 'Last name is required';
+    if (!formData.email.trim()) errors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Email is invalid';
+    if (!formData.password.trim()) errors.password = 'Password is required';
+    else if (formData.password.length < 6) errors.password = 'Password must be at least 6 characters';
+    if (!formData.role) errors.role = 'Role is required';
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleCreateAccount = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    setIsCreating(true);
+    setCreateMessage('');
+
+    try {
+      const result = await adminApiService.createAdminAccount({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role
+      });
+      
+      if (result.success) {
+        setCreateMessage('Account created successfully!');
+        setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'Admin' });
+        setFormErrors({});
+        // Reload users to show the new account
+        await loadUsers();
+        // Close modal after a delay
+        setTimeout(() => {
+          setShowCreateModal(false);
+          setCreateMessage('');
+        }, 1500);
+      } else {
+        setCreateMessage(result.message || 'Failed to create account. Please try again.');
+      }
+    } catch (error) {
+      setCreateMessage('Failed to create account. Please try again.');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const roleOptionsForCreate = ['Admin', 'Event Office'];
 
   // Load users on component mount
   useEffect(() => {
@@ -108,38 +218,8 @@ const AdminUsers = () => {
         console.log('🔍 Raw API response:', result);
         console.log('🔍 All users from API:', result.data.users);
         
-        // More comprehensive filtering - handle different possible variations
-        const filteredUsers = (result.data.users || []).filter(user => {
-          const userType = user.userType;
-          const userTypeLower = userType?.toLowerCase();
-          
-          // Check for various possible admin/event office variations
-          const isAdmin = userType === 'Admin' || 
-                         userType === 'admin' || 
-                         userTypeLower === 'admin';
-          
-          const isEventOffice = userType === 'Event Office' || 
-                               userType === 'event office' || 
-                               userType === 'Event_Office' ||
-                               userType === 'event_office' ||
-                               userTypeLower === 'event office';
-          
-          const shouldExclude = isAdmin || isEventOffice;
-          
-          console.log(`🔍 User: ${user.firstName} ${user.lastName}`);
-          console.log(`   - userType: "${userType}"`);
-          console.log(`   - userTypeLower: "${userTypeLower}"`);
-          console.log(`   - isAdmin: ${isAdmin}`);
-          console.log(`   - isEventOffice: ${isEventOffice}`);
-          console.log(`   - shouldExclude: ${shouldExclude}`);
-          console.log('---');
-          
-          return !shouldExclude;
-        });
-        
-        console.log('✅ Final filtered users count:', filteredUsers.length);
-        console.log('✅ Filtered users:', filteredUsers);
-        setUsers(filteredUsers);
+        // Include all users (including Admin and Event Office accounts)
+        setUsers(result.data.users || []);
       } else {
         setError(result.message);
       }
@@ -234,6 +314,33 @@ const AdminUsers = () => {
       setToggleMsgById(prev => ({ ...prev, [userId]: 'Failed to update status.' }));
     } finally {
       setTogglingIds(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  const handleDeleteClick = (userId) => {
+    setDeleteConfirm({ show: true, userId });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.userId) return;
+
+    const userId = deleteConfirm.userId;
+    setDeletingIds(prev => ({ ...prev, [userId]: true }));
+
+    try {
+      const result = await adminApiService.deleteAdminAccount(userId);
+      
+      if (result.success) {
+        // Remove user from list
+        setUsers(prev => prev.filter(u => (u._id || u.id) !== userId));
+        setDeleteConfirm({ show: false, userId: null });
+      } else {
+        alert(result.message || 'Failed to delete account');
+      }
+    } catch (error) {
+      alert('Failed to delete account. Please try again.');
+    } finally {
+      setDeletingIds(prev => ({ ...prev, [userId]: false }));
     }
   };
 
@@ -545,45 +652,6 @@ const AdminUsers = () => {
                   Platform Booths
                 </p>
               </Link>
-
-              <Link
-                to="/admin/manage"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/admin/manage') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/admin/manage')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/admin/manage')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/admin/manage') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  settings
-                </span>
-                <p style={{
-                  color: isActiveRoute('/admin/manage') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/admin/manage') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Management
-                </p>
-              </Link>
             </nav>
           )}
         </div>
@@ -722,7 +790,7 @@ const AdminUsers = () => {
         {/* Content Area */}
         <div style={{
           flex: 1,
-          padding: '2.5rem',
+          padding: '2.5rem 6rem',
           overflowY: 'auto'
         }}>
           {loading ? (
@@ -731,30 +799,97 @@ const AdminUsers = () => {
             </div>
           ) : (
             <>
-              {/* Page Name Box */}
+              {/* Page Title Banner */}
               <div style={{
-                backgroundColor: '#FFFFFF',
-                padding: '1rem 1.5rem',
-                borderRadius: '0.5rem',
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                marginBottom: '2rem',
-                borderLeft: '4px solid #1D3557'
+                position: 'relative',
+                height: '140px',
+                borderRadius: '0.75rem',
+                overflow: 'hidden',
+                marginBottom: '1.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
               }}>
-                <h3 style={{
-                  color: '#1D3557',
-                  fontSize: '1.25rem',
-                  fontWeight: '600',
-                  margin: 0
+                {/* Background Image */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: 'url(/assets/images/admin-users.jpg)',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: 'cover',
+                  filter: 'blur(2px)'
+                }}></div>
+                {/* Blue Overlay */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: 'rgba(29, 53, 87, 0.75)'
+                }}></div>
+                {/* Content */}
+                <div style={{
+                  position: 'relative',
+                  zIndex: 10,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '2rem 2.5rem',
+                  color: '#FFFFFF',
+                  width: '100%'
                 }}>
-                  Users Management
-                </h3>
-                <p style={{
-                  color: '#6b7280',
-                  fontSize: '0.875rem',
-                  margin: '0.25rem 0 0 0'
-                }}>
-                  View and manage all platform users. Assign roles and send verification emails for registration requests.
-                </p>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <h3 style={{
+                      color: '#FFFFFF',
+                      fontSize: '1.75rem',
+                      fontWeight: '700',
+                      margin: 0,
+                      marginBottom: '0.5rem'
+                    }}>
+                      Users Management
+                    </h3>
+                    <p style={{
+                      color: 'rgba(255, 255, 255, 0.9)',
+                      fontSize: '0.875rem',
+                      fontWeight: '400',
+                      margin: 0
+                    }}>
+                      View and manage all platform users. Assign roles and send verification emails for registration requests.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      backgroundColor: '#FFFFFF',
+                      color: '#1D3557',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f0f0f0';
+                      e.target.style.transform = 'translateY(-1px)';
+                      e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.15)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#FFFFFF';
+                      e.target.style.transform = 'translateY(0)';
+                      e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      add
+                    </span>
+                    Create Account
+                  </button>
+                </div>
               </div>
 
               {error && (
@@ -788,68 +923,125 @@ const AdminUsers = () => {
                 </div>
               )}
 
-              {/* Search Controls */}
+              {/* Search and Filters */}
               <div style={{
                 backgroundColor: '#FFFFFF',
-                padding: '1rem',
                 borderRadius: '0.75rem',
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                padding: '1.5rem',
                 marginBottom: '1.5rem',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                 display: 'flex',
-                gap: '0.75rem',
-                flexWrap: 'wrap',
+                flexDirection: 'column',
                 alignItems: 'center'
               }}>
-                <div style={{ flex: 1, minWidth: '260px' }}>
-                  <input
-                    type="text"
-                    placeholder="Search by name, email, or ID"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      outline: 'none'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = '#1D3557';
-                      e.target.style.backgroundColor = '#FFFFFF';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = '#e5e7eb';
-                      e.target.style.backgroundColor = '#FFFFFF';
-                    }}
-                  />
-                </div>
-                <div style={{ width: '180px' }}>
-                  <select
-                    value={searchField}
-                    onChange={(e) => setSearchField(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      outline: 'none',
-                      backgroundColor: '#FFFFFF',
-                      cursor: 'pointer'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = '#1D3557';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = '#e5e7eb';
-                    }}
-                  >
-                    <option value="all">All fields</option>
-                    <option value="name">Name</option>
-                    <option value="email">Email</option>
-                    <option value="gucId">GUC ID / Record ID</option>
-                  </select>
+                {/* Search Bar and Filters Row */}
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', width: '100%', justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+                  {/* Search Bar */}
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
+                    <div style={{ position: 'relative', width: '400px' }}>
+                      <span className="material-symbols-outlined" style={{
+                        position: 'absolute',
+                        left: '0.75rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#9ca3af',
+                        fontSize: '1.25rem',
+                        pointerEvents: 'none'
+                      }}>
+                        search
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Search by name, email, or ID..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && setSearchQuery(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid #e5e7eb',
+                          backgroundColor: '#FFFFFF',
+                          fontSize: '0.875rem',
+                          outline: 'none',
+                          transition: 'all 0.2s',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#1e40af';
+                          e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = '#e5e7eb';
+                          e.target.style.boxShadow = 'none';
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => setSearchQuery(searchQuery)}
+                      style={{
+                        padding: '0.875rem 1.75rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: '#1e40af',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        flexShrink: 0
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#1e3a8a';
+                        e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = '#1e40af';
+                        e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                      }}
+                    >
+                      Search
+                    </button>
+                  </div>
+                  
+                  {/* Filter Buttons */}
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', flexShrink: 0 }}>
+                    {['all', 'Admin', 'Event Office', 'TA', 'Staff', 'Professor', 'Student'].map((role) => (
+                      <button
+                        key={role}
+                        onClick={() => setRoleFilter(role)}
+                        style={{
+                          padding: '0.625rem 1.25rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: roleFilter === role ? '#1e40af' : '#f9fafb',
+                          color: roleFilter === role ? '#FFFFFF' : '#6b7280',
+                          border: roleFilter === role ? 'none' : '1px solid #e5e7eb',
+                          cursor: 'pointer',
+                          fontSize: '0.8125rem',
+                          fontWeight: roleFilter === role ? '600' : '500',
+                          textTransform: 'capitalize',
+                          transition: 'all 0.2s',
+                          boxShadow: roleFilter === role ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (roleFilter !== role) {
+                            e.target.style.backgroundColor = '#f3f4f6';
+                            e.target.style.borderColor = '#d1d5db';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (roleFilter !== role) {
+                            e.target.style.backgroundColor = '#f9fafb';
+                            e.target.style.borderColor = '#e5e7eb';
+                          }
+                        }}
+                      >
+                        {role === 'all' ? 'All Users' : role}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -1313,22 +1505,65 @@ const AdminUsers = () => {
                                 textAlign: 'right'
                               }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                                  <button
-                                    onClick={() => handleToggleActive(userId)}
-                                    disabled={!!togglingIds[userId]}
-                                    style={{
-                                      padding: '0.5rem 1rem',
-                                      backgroundColor: activeStatusById[userId] ? '#dc2626' : '#059669',
-                                      color: '#FFFFFF',
-                                      border: 'none',
-                                      borderRadius: '0.5rem',
-                                      fontSize: '0.875rem',
-                                      fontWeight: '500',
-                                      cursor: togglingIds[userId] ? 'not-allowed' : 'pointer'
-                                    }}
-                                  >
-                                    {togglingIds[userId] ? 'Updating...' : (activeStatusById[userId] ? 'Block' : 'Activate')}
-                                  </button>
+                                  {(() => {
+                                    const userType = u.userType;
+                                    const userTypeLower = userType?.toLowerCase();
+                                    const isAdmin = userType === 'Admin' || userType === 'admin' || userTypeLower === 'admin';
+                                    const isEventOffice = userType === 'Event Office' || userType === 'event office' || 
+                                                         userType === 'Event_Office' || userType === 'event_office' ||
+                                                         userTypeLower === 'event office';
+                                    
+                                    if (isAdmin || isEventOffice) {
+                                      return (
+                                        <button
+                                          onClick={() => handleDeleteClick(userId)}
+                                          disabled={!!deletingIds[userId]}
+                                          style={{
+                                            padding: '0.5rem 1rem',
+                                            backgroundColor: '#dc2626',
+                                            color: '#FFFFFF',
+                                            border: 'none',
+                                            borderRadius: '0.5rem',
+                                            fontSize: '0.875rem',
+                                            fontWeight: '500',
+                                            cursor: deletingIds[userId] ? 'not-allowed' : 'pointer',
+                                            transition: 'background-color 0.2s'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            if (!deletingIds[userId]) {
+                                              e.target.style.backgroundColor = '#b91c1c';
+                                            }
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            if (!deletingIds[userId]) {
+                                              e.target.style.backgroundColor = '#dc2626';
+                                            }
+                                          }}
+                                        >
+                                          {deletingIds[userId] ? 'Deleting...' : 'Delete'}
+                                        </button>
+                                      );
+                                    } else {
+                                      return (
+                                        <button
+                                          onClick={() => handleToggleActive(userId)}
+                                          disabled={!!togglingIds[userId]}
+                                          style={{
+                                            padding: '0.5rem 1rem',
+                                            backgroundColor: activeStatusById[userId] ? '#dc2626' : '#059669',
+                                            color: '#FFFFFF',
+                                            border: 'none',
+                                            borderRadius: '0.5rem',
+                                            fontSize: '0.875rem',
+                                            fontWeight: '500',
+                                            cursor: togglingIds[userId] ? 'not-allowed' : 'pointer'
+                                          }}
+                                        >
+                                          {togglingIds[userId] ? 'Updating...' : (activeStatusById[userId] ? 'Block' : 'Activate')}
+                                        </button>
+                                      );
+                                    }
+                                  })()}
                                 </div>
                               </td>
                               <td style={{
@@ -1430,6 +1665,476 @@ const AdminUsers = () => {
           )}
         </div>
       </main>
+
+      {/* Create Account Modal */}
+      {showCreateModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '2rem'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowCreateModal(false);
+            setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'Admin' });
+            setFormErrors({});
+            setCreateMessage('');
+          }
+        }}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: '2rem'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h4 style={{
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                color: '#111827',
+                margin: 0
+              }}>
+                Create New Admin/Event Office Account
+              </h4>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'Admin' });
+                  setFormErrors({});
+                  setCreateMessage('');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6b7280',
+                  borderRadius: '0.375rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#111827';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  close
+                </span>
+              </button>
+            </div>
+
+            {createMessage && (
+              <div style={{
+                padding: '0.75rem 1rem',
+                marginBottom: '1.5rem',
+                borderRadius: '0.375rem',
+                backgroundColor: createMessage.includes('successfully') ? '#d1fae5' : '#fee2e2',
+                color: createMessage.includes('successfully') ? '#065f46' : '#991b1b',
+                fontSize: '0.875rem'
+              }}>
+                {createMessage}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateAccount}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    First Name <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleFormChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      border: `1px solid ${formErrors.firstName ? '#ef4444' : '#e5e7eb'}`,
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      backgroundColor: '#FFFFFF',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#1D3557';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = formErrors.firstName ? '#ef4444' : '#e5e7eb';
+                    }}
+                    placeholder="First name"
+                    disabled={isCreating}
+                  />
+                  {formErrors.firstName && (
+                    <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '0.25rem 0 0 0' }}>
+                      {formErrors.firstName}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Last Name <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleFormChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      border: `1px solid ${formErrors.lastName ? '#ef4444' : '#e5e7eb'}`,
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      backgroundColor: '#FFFFFF',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#1D3557';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = formErrors.lastName ? '#ef4444' : '#e5e7eb';
+                    }}
+                    placeholder="Last name"
+                    disabled={isCreating}
+                  />
+                  {formErrors.lastName && (
+                    <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '0.25rem 0 0 0' }}>
+                      {formErrors.lastName}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Email Address <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleFormChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    border: `1px solid ${formErrors.email ? '#ef4444' : '#e5e7eb'}`,
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    backgroundColor: '#FFFFFF',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1D3557';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = formErrors.email ? '#ef4444' : '#e5e7eb';
+                  }}
+                  placeholder="admin@guc.edu.eg"
+                  disabled={isCreating}
+                />
+                {formErrors.email && (
+                  <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '0.25rem 0 0 0' }}>
+                    {formErrors.email}
+                  </p>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Password <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleFormChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      border: `1px solid ${formErrors.password ? '#ef4444' : '#e5e7eb'}`,
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      backgroundColor: '#FFFFFF',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#1D3557';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = formErrors.password ? '#ef4444' : '#e5e7eb';
+                    }}
+                    placeholder="Password (min 6 characters)"
+                    disabled={isCreating}
+                  />
+                  {formErrors.password && (
+                    <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '0.25rem 0 0 0' }}>
+                      {formErrors.password}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Role <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <select
+                    name="role"
+                    value={formData.role}
+                    onChange={handleFormChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      border: `1px solid ${formErrors.role ? '#ef4444' : '#e5e7eb'}`,
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      backgroundColor: '#FFFFFF',
+                      cursor: 'pointer',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#1D3557';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = formErrors.role ? '#ef4444' : '#e5e7eb';
+                    }}
+                    disabled={isCreating}
+                  >
+                    {roleOptionsForCreate.map(role => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                  </select>
+                  {formErrors.role && (
+                    <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '0.25rem 0 0 0' }}>
+                      {formErrors.role}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'Admin' });
+                    setFormErrors({});
+                    setCreateMessage('');
+                  }}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#e5e7eb';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  disabled={isCreating}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreating}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: isCreating ? '#9ca3af' : '#1D3557',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: isCreating ? 'not-allowed' : 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isCreating) {
+                      e.target.style.backgroundColor = '#0f172a';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isCreating) {
+                      e.target.style.backgroundColor = '#1D3557';
+                    }
+                  }}
+                >
+                  {isCreating ? 'Creating Account...' : 'Create Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.show && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '2rem'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setDeleteConfirm({ show: false, userId: null });
+          }
+        }}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            width: '100%',
+            maxWidth: '400px',
+            padding: '2rem'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <h4 style={{
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              color: '#111827',
+              margin: 0,
+              marginBottom: '1rem'
+            }}>
+              Delete Account
+            </h4>
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              margin: 0,
+              marginBottom: '1.5rem'
+            }}>
+              Are you sure you want to delete this account? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setDeleteConfirm({ show: false, userId: null })}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#e5e7eb';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                }}
+                disabled={!!deletingIds[deleteConfirm.userId]}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={!!deletingIds[deleteConfirm.userId]}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: deletingIds[deleteConfirm.userId] ? '#9ca3af' : '#dc2626',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: deletingIds[deleteConfirm.userId] ? 'not-allowed' : 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (!deletingIds[deleteConfirm.userId]) {
+                    e.target.style.backgroundColor = '#b91c1c';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!deletingIds[deleteConfirm.userId]) {
+                    e.target.style.backgroundColor = '#dc2626';
+                  }
+                }}
+              >
+                {deletingIds[deleteConfirm.userId] ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

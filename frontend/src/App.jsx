@@ -6,10 +6,10 @@ import AdminVendors from './pages/AdminVendors';
 import AdminEvents from './pages/AdminEvents';
 import AdminEventsView from './pages/AdminEventsView';
 import AdminPlatformBoothRequests from './pages/AdminPlatformBoothRequests';
-import AdminManagement from './pages/AdminManagement';
 import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import EventsOfficeDashboard from './pages/EventsOfficeDashboard';
 import PendingVerification from './pages/PendingVerification';
@@ -21,13 +21,9 @@ import GymSchedule from './pages/GymSchedule';
 import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
 import VendorDashboard from './pages/VendorDashboard';
-import CreateConference from './pages/CreateConfrence';
 import EditConfrences from './pages/EditConfrences';
 import EventsList from './pages/EventsList';
-import CreateBazaar from "./pages/CreateBazaar";
-import CreateTrip from './pages/CreateTrip';
 import CreateBooth from './pages/CreateBooth';
-import CreateGymSession from './pages/CreateGymSession';
 import EditBazaar from './pages/EditBazaar';
 import EditTrip from './pages/EditTrip';
 import VendorBazaars from './pages/VendorBazaars';
@@ -41,7 +37,6 @@ import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
 import CourtAvailability from './pages/CourtAvailability';
 import PlatformBoothReservation from './pages/PlatformBoothReservation';
-import PlatformBooths from './pages/PlatformBooths';
 import EventsOfficeEventsView from './pages/EventsOfficeEventsView';
 import EventsOfficeWorkshops from './pages/EventsOfficeWorkshops';
 import VendorAcceptedEvents from './pages/VendorAcceptedEvents';
@@ -250,6 +245,14 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/verify-email"
+              element={
+                <PublicRoute>
+                  <VerifyEmail />
+                </PublicRoute>
+              }
+            />
+            <Route
               path="/pending-verification"
               element={<PendingVerification />}
             />
@@ -315,7 +318,7 @@ const AppContent = () => {
               path="/vendor/platform-booths"
               element={
                 <ProtectedRoute>
-                  <PlatformBooths />
+                  <Navigate to="/vendor" replace />
                 </ProtectedRoute>
               }
             />
@@ -564,16 +567,6 @@ const AppContent = () => {
               }
             />
             <Route
-              path="/admin/manage"
-              element={
-                <ProtectedRoute>
-                  <AdminOnly>
-                    <AdminManagement />
-                  </AdminOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/admin/profile"
               element={
                 <ProtectedRoute>
@@ -584,15 +577,6 @@ const AppContent = () => {
               }
             />
             <Route
-              path="/create-conference"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <CreateConference />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>}
-            />
-            <Route
               path="/edit-conference/:id"
               element={
                 <ProtectedRoute>
@@ -601,40 +585,12 @@ const AppContent = () => {
               } />
             {/* ✅ ADD YOUR EVENT MANAGEMENT ROUTES HERE */}
             <Route
-              path="/create-bazaar"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <CreateBazaar />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/create-trip"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <CreateTrip />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/create-booth"
               element={
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <CreateBooth />
                   </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/create-gym-session"
-              element={
-                <ProtectedRoute>
-                  <CreateGymSession />
                 </ProtectedRoute>
               }
             />
