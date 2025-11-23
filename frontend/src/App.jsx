@@ -6,10 +6,10 @@ import AdminVendors from './pages/AdminVendors';
 import AdminEvents from './pages/AdminEvents';
 import AdminEventsView from './pages/AdminEventsView';
 import AdminPlatformBoothRequests from './pages/AdminPlatformBoothRequests';
-import AdminManagement from './pages/AdminManagement';
 import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import EventsOfficeDashboard from './pages/EventsOfficeDashboard';
 import PendingVerification from './pages/PendingVerification';
@@ -241,6 +241,14 @@ const AppContent = () => {
               element={
                 <PublicRoute>
                   <Signup />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/verify-email"
+              element={
+                <PublicRoute>
+                  <VerifyEmail />
                 </PublicRoute>
               }
             />
@@ -554,16 +562,6 @@ const AppContent = () => {
                 <ProtectedRoute>
                   <AdminOnly>
                     <AdminPlatformBoothRequests />
-                  </AdminOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/manage"
-              element={
-                <ProtectedRoute>
-                  <AdminOnly>
-                    <AdminManagement />
                   </AdminOnly>
                 </ProtectedRoute>
               }

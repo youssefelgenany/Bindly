@@ -15,6 +15,16 @@ const StudentCourtsView = () => {
   const [availabilityData, setAvailabilityData] = useState(null);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [bookingData, setBookingData] = useState({
+    purpose: '',
+    participants: [{ name: '', email: '' }],
+    notes: ''
+  });
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState('');
+  const [bookingSuccess, setBookingSuccess] = useState(false);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -153,6 +163,85 @@ const StudentCourtsView = () => {
     } catch {
       return timeString;
     }
+  };
+
+  const handleSlotClick = (slot) => {
+    setSelectedSlot(slot);
+    setBookingData({
+      purpose: '',
+      participants: [{ name: '', email: '' }],
+      notes: ''
+    });
+    setBookingError('');
+    setBookingSuccess(false);
+    setShowBookingForm(true);
+  };
+
+  const handleBookingSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedCourt || !selectedSlot) return;
+
+    setBookingLoading(true);
+    setBookingError('');
+    setBookingSuccess(false);
+
+    try {
+      const result = await courtsApiService.bookCourt({
+        courtId: selectedCourt._id || selectedCourt.id,
+        bookingDate: selectedDate,
+        startTime: selectedSlot.startTime,
+        endTime: selectedSlot.endTime,
+        purpose: bookingData.purpose,
+        participants: bookingData.participants.filter(p => p.name && p.email),
+        notes: bookingData.notes
+      });
+
+      if (result.success) {
+        setBookingSuccess(true);
+        setTimeout(() => {
+          setShowBookingForm(false);
+          setSelectedSlot(null);
+          setBookingData({
+            purpose: '',
+            participants: [{ name: '', email: '' }],
+            notes: ''
+          });
+          // Refresh availability
+          loadCourtAvailability(selectedCourt._id || selectedCourt.id, selectedDate);
+        }, 2000);
+      } else {
+        setBookingError(result.message || 'Failed to book court');
+      }
+    } catch (error) {
+      setBookingError('An unexpected error occurred. Please try again.');
+      console.error('Booking error:', error);
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  const addParticipant = () => {
+    setBookingData({
+      ...bookingData,
+      participants: [...bookingData.participants, { name: '', email: '' }]
+    });
+  };
+
+  const removeParticipant = (index) => {
+    const newParticipants = bookingData.participants.filter((_, i) => i !== index);
+    setBookingData({
+      ...bookingData,
+      participants: newParticipants.length > 0 ? newParticipants : [{ name: '', email: '' }]
+    });
+  };
+
+  const updateParticipant = (index, field, value) => {
+    const newParticipants = [...bookingData.participants];
+    newParticipants[index][field] = value;
+    setBookingData({
+      ...bookingData,
+      participants: newParticipants
+    });
   };
 
   const displayName = user?.firstName && user?.lastName 
@@ -1070,12 +1159,23 @@ const StudentCourtsView = () => {
                         .map((slot, index) => (
                         <div
                           key={index}
+                          onClick={() => handleSlotClick(slot)}
                           style={{
                             padding: '0.75rem',
                             borderRadius: '0.5rem',
                             backgroundColor: '#d1fae5',
                             border: '1px solid #10b981',
-                            textAlign: 'center'
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#10b981';
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#d1fae5';
+                            e.currentTarget.style.transform = 'scale(1)';
                           }}
                         >
                           <p style={{
@@ -1085,6 +1185,14 @@ const StudentCourtsView = () => {
                             margin: 0
                           }}>
                             {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                          </p>
+                          <p style={{
+                            color: '#059669',
+                            fontSize: '0.75rem',
+                            margin: '0.25rem 0 0 0',
+                            opacity: 0.8
+                          }}>
+                            Click to book
                           </p>
                         </div>
                       ))}
@@ -1163,6 +1271,482 @@ const StudentCourtsView = () => {
                     Select a date to view availability
                   </p>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Booking Form Modal */}
+      {showBookingForm && selectedSlot && selectedCourt && (
+        <div
+          onClick={() => {
+            if (!bookingLoading) {
+              setShowBookingForm(false);
+              setSelectedSlot(null);
+              setBookingError('');
+              setBookingSuccess(false);
+            }
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+              position: 'relative'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                margin: 0
+              }}>
+                Book Court
+              </h2>
+              <button
+                onClick={() => {
+                  if (!bookingLoading) {
+                    setShowBookingForm(false);
+                    setSelectedSlot(null);
+                    setBookingError('');
+                    setBookingSuccess(false);
+                  }
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: bookingLoading ? 'not-allowed' : 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s'
+                }}
+                disabled={bookingLoading}
+                onMouseEnter={(e) => {
+                  if (!bookingLoading) {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.color = '#1D3557';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!bookingLoading) {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = '#6b7280';
+                  }
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.5rem' }}>
+              {bookingSuccess ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <div style={{
+                    width: '4rem',
+                    height: '4rem',
+                    borderRadius: '50%',
+                    backgroundColor: '#d1fae5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 1rem'
+                  }}>
+                    <span style={{ fontSize: '2rem' }}>✓</span>
+                  </div>
+                  <h3 style={{
+                    color: '#059669',
+                    fontSize: '1.125rem',
+                    fontWeight: '600',
+                    margin: '0 0 0.5rem 0'
+                  }}>
+                    Booking Successful!
+                  </h3>
+                  <p style={{
+                    color: '#6b7280',
+                    fontSize: '0.875rem',
+                    margin: 0
+                  }}>
+                    Your reservation has been submitted. Your name and GUC ID have been automatically included.
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleBookingSubmit}>
+                  {/* Court and Time Info */}
+                  <div style={{
+                    backgroundColor: '#f3f4f6',
+                    padding: '1rem',
+                    borderRadius: '0.5rem',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        margin: '0 0 0.25rem 0'
+                      }}>
+                        Court
+                      </p>
+                      <p style={{
+                        color: '#1D3557',
+                        fontSize: '0.9375rem',
+                        fontWeight: '600',
+                        margin: 0
+                      }}>
+                        {selectedCourt.name}
+                      </p>
+                    </div>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        margin: '0 0 0.25rem 0'
+                      }}>
+                        Date
+                      </p>
+                      <p style={{
+                        color: '#1D3557',
+                        fontSize: '0.9375rem',
+                        fontWeight: '600',
+                        margin: 0
+                      }}>
+                        {new Date(selectedDate).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                    <div>
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        margin: '0 0 0.25rem 0'
+                      }}>
+                        Time Slot
+                      </p>
+                      <p style={{
+                        color: '#1D3557',
+                        fontSize: '0.9375rem',
+                        fontWeight: '600',
+                        margin: 0
+                      }}>
+                        {formatTime(selectedSlot.startTime)} - {formatTime(selectedSlot.endTime)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Student Info Notice */}
+                  <div style={{
+                    backgroundColor: '#dbeafe',
+                    border: '1px solid #3b82f6',
+                    borderRadius: '0.5rem',
+                    padding: '0.75rem',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <p style={{
+                      color: '#1e40af',
+                      fontSize: '0.875rem',
+                      margin: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                        info
+                      </span>
+                      Your name ({user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.name || 'N/A'}) and GUC ID ({user?.gucId || 'N/A'}) will be automatically included in the reservation.
+                    </p>
+                  </div>
+
+                  {/* Purpose */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{
+                      display: 'block',
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Purpose <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={bookingData.purpose}
+                      onChange={(e) => setBookingData({ ...bookingData, purpose: e.target.value })}
+                      placeholder="e.g., Basketball practice, Tennis match"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        outline: 'none',
+                        transition: 'border-color 0.2s',
+                        boxSizing: 'border-box'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                      onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                    />
+                  </div>
+
+                  {/* Participants */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{
+                      display: 'block',
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Participants (Optional)
+                    </label>
+                    {bookingData.participants.map((participant, index) => (
+                      <div key={index} style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <input
+                          type="text"
+                          value={participant.name}
+                          onChange={(e) => updateParticipant(index, 'name', e.target.value)}
+                          placeholder="Name"
+                          style={{
+                            flex: 1,
+                            padding: '0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            transition: 'border-color 0.2s',
+                            boxSizing: 'border-box'
+                          }}
+                          onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                          onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                        />
+                        <input
+                          type="email"
+                          value={participant.email}
+                          onChange={(e) => updateParticipant(index, 'email', e.target.value)}
+                          placeholder="Email"
+                          style={{
+                            flex: 1,
+                            padding: '0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            transition: 'border-color 0.2s',
+                            boxSizing: 'border-box'
+                          }}
+                          onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                          onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                        />
+                        {bookingData.participants.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeParticipant(index)}
+                            style={{
+                              background: '#fee2e2',
+                              border: '1px solid #f87171',
+                              color: '#dc2626',
+                              borderRadius: '0.5rem',
+                              padding: '0.75rem',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.background = '#fecaca';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.background = '#fee2e2';
+                            }}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {bookingData.participants.length < 5 && (
+                      <button
+                        type="button"
+                        onClick={addParticipant}
+                        style={{
+                          background: '#d1fae5',
+                          border: '1px solid #10b981',
+                          color: '#059669',
+                          borderRadius: '0.5rem',
+                          padding: '0.5rem 1rem',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          transition: 'all 0.2s',
+                          marginTop: '0.5rem'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = '#a7f3d0';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = '#d1fae5';
+                        }}
+                      >
+                        + Add Participant
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Notes */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{
+                      display: 'block',
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Notes (Optional)
+                    </label>
+                    <textarea
+                      value={bookingData.notes}
+                      onChange={(e) => setBookingData({ ...bookingData, notes: e.target.value })}
+                      placeholder="Any additional notes..."
+                      rows="3"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        outline: 'none',
+                        transition: 'border-color 0.2s',
+                        boxSizing: 'border-box',
+                        fontFamily: 'inherit',
+                        resize: 'vertical'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                      onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                    />
+                  </div>
+
+                  {/* Error Message */}
+                  {bookingError && (
+                    <div style={{
+                      backgroundColor: '#fee2e2',
+                      border: '1px solid #f87171',
+                      borderRadius: '0.5rem',
+                      padding: '0.75rem',
+                      marginBottom: '1.5rem'
+                    }}>
+                      <p style={{
+                        color: '#dc2626',
+                        fontSize: '0.875rem',
+                        margin: 0
+                      }}>
+                        {bookingError}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Submit Buttons */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    justifyContent: 'flex-end'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowBookingForm(false);
+                        setSelectedSlot(null);
+                        setBookingError('');
+                        setBookingSuccess(false);
+                      }}
+                      disabled={bookingLoading}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        backgroundColor: '#FFFFFF',
+                        color: '#374151',
+                        cursor: bookingLoading ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!bookingLoading) {
+                          e.target.style.backgroundColor = '#f3f4f6';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!bookingLoading) {
+                          e.target.style.backgroundColor = '#FFFFFF';
+                        }
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={bookingLoading}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        borderRadius: '0.5rem',
+                        border: 'none',
+                        backgroundColor: bookingLoading ? '#9ca3af' : '#1e40af',
+                        color: '#FFFFFF',
+                        cursor: bookingLoading ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!bookingLoading) {
+                          e.target.style.backgroundColor = '#1e3a8a';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!bookingLoading) {
+                          e.target.style.backgroundColor = '#1e40af';
+                        }
+                      }}
+                    >
+                      {bookingLoading ? 'Submitting...' : 'Submit Booking'}
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
           </div>
