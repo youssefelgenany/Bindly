@@ -59,5 +59,18 @@ export const gymSessionApi = {
       }
     });
     return await response.json();
+  },
+
+  register: async (id, registrationData) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE}/gym-sessions/${id}/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(registrationData)
+    });
+    return await response.json();
   }
 };

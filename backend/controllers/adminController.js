@@ -42,7 +42,13 @@ exports.assignRoleAndSendVerification = async (req, res) => {
 
     // Send verification email (use first + last name if available)
     const name = user.firstName ? `${user.firstName} ${user.lastName}` : user.name;
-    await sendVerificationEmail(user.email, user.verificationToken, name);
+    const emailResult = await sendVerificationEmail(user.email, user.verificationToken, name);
+    
+    if (emailResult.sent) {
+      console.log('✅ Verification email sent successfully to:', user.email);
+    } else {
+      console.error('❌ Verification email not sent:', emailResult.reason || emailResult.error);
+    }
 
     res.json({ msg: "Role assigned and verification email sent successfully.", token: user.verificationToken });
   } catch (err) {
@@ -118,8 +124,12 @@ exports.updateUserRole = async (req, res) => {
     // Send verification email
     try {
       const name = user.firstName ? `${user.firstName} ${user.lastName}` : user.name || 'User';
-      await sendVerificationEmail(user.email, user.verificationToken, name);
-      console.log('✅ Verification email sent to:', user.email);
+      const emailResult = await sendVerificationEmail(user.email, user.verificationToken, name);
+      if (emailResult.sent) {
+        console.log('✅ Verification email sent to:', user.email);
+      } else {
+        console.error('❌ Verification email not sent:', emailResult.reason || emailResult.error);
+      }
     } catch (emailError) {
       console.error('❌ Error sending verification email:', emailError);
       // Don't fail the role update if email fails, but log it
@@ -199,17 +209,45 @@ exports.updateUserStatus = async (req, res) => {
     }
 
     // Update user status
+    const previousStatus = user.status;
     user.status = isActive ? 'active' : 'blocked';
 
     console.log('📊 New status:', user.status);
 
-    await user.save();
+    // If activating a user and they are not verified, send verification email
+    // This handles the case when events office accepts/activates a user
+    if (isActive && !user.isVerified && ['Staff', 'TA', 'Professor'].includes(user.userType)) {
+      try {
+        // Generate verification token if not exists or expired
+        if (!user.verificationToken || (user.verificationExpiresAt && user.verificationExpiresAt < new Date())) {
+          user.verificationToken = crypto.randomBytes(32).toString('hex');
+          user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        }
+
+        await user.save();
+
+        // Send verification email
+        const name = user.firstName ? `${user.firstName} ${user.lastName}` : user.name || 'User';
+        const emailResult = await sendVerificationEmail(user.email, user.verificationToken, name);
+        if (emailResult.sent) {
+          console.log('✅ Verification email sent to:', user.email);
+          console.log('   User activated and verification email sent');
+        } else {
+          console.error('❌ Verification email not sent:', emailResult.reason || emailResult.error);
+        }
+      } catch (emailError) {
+        console.error('❌ Error sending verification email:', emailError);
+        // Don't fail the status update if email fails, but log it
+      }
+    } else {
+      await user.save();
+    }
 
     console.log('✅ User status updated successfully');
 
     res.status(200).json({
       success: true,
-      message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
+      message: `User ${isActive ? 'activated' : 'deactivated'} successfully${isActive && !user.isVerified && ['Staff', 'TA', 'Professor'].includes(user.userType) ? '. Verification email has been sent.' : ''}`,
       user: {
         id: user._id,
         firstName: user.firstName,
@@ -564,7 +602,12 @@ exports.sendVerificationEmail = async (req, res) => {
     console.log('📧 Sending verification email to:', user.email);
     console.log('📧 Verification token:', verificationToken);
 
-    await sendVerificationEmail(user.email, verificationToken, name);
+    const emailResult = await sendVerificationEmail(user.email, verificationToken, name);
+    if (emailResult.sent) {
+      console.log('✅ Verification email sent successfully');
+    } else {
+      console.error('❌ Verification email not sent:', emailResult.reason || emailResult.error);
+    }
 
     res.status(200).json({
       success: true,

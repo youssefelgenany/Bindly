@@ -1,6 +1,67 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import axios from 'axios';
 
 const VerifyEmail = () => {
+  const [searchParams] = useSearchParams();
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState(''); // 'success' or 'error'
+
+  // Get email from URL params or localStorage
+  useEffect(() => {
+    const emailFromUrl = searchParams.get('email');
+    const emailFromStorage = localStorage.getItem('pendingVerificationEmail');
+    
+    if (emailFromUrl) {
+      setEmail(emailFromUrl);
+      localStorage.setItem('pendingVerificationEmail', emailFromUrl);
+    } else if (emailFromStorage) {
+      setEmail(emailFromStorage);
+    }
+  }, [searchParams]);
+
+  const handleResendEmail = async () => {
+    const emailToUse = email || localStorage.getItem('pendingVerificationEmail');
+    
+    if (!emailToUse) {
+      const userEmail = prompt('Please enter your email address:');
+      if (!userEmail) {
+        setMessage('Email is required to resend verification email.');
+        setMessageType('error');
+        return;
+      }
+      setEmail(userEmail);
+      localStorage.setItem('pendingVerificationEmail', userEmail);
+    }
+
+    setLoading(true);
+    setMessage('');
+    setMessageType('');
+
+    try {
+      const emailForRequest = email || localStorage.getItem('pendingVerificationEmail');
+      const response = await axios.post('http://localhost:5000/api/auth/resend-verification', {
+        email: emailForRequest
+      });
+
+      if (response.data.success) {
+        setMessage('Verification email sent successfully! Please check your inbox.');
+        setMessageType('success');
+      } else {
+        setMessage(response.data.message || 'Failed to send verification email.');
+        setMessageType('error');
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to send verification email. Please try again.';
+      setMessage(errorMessage);
+      setMessageType('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div style={{
       position: 'relative',
@@ -139,15 +200,15 @@ const VerifyEmail = () => {
             }}>
               <svg 
                 style={{ width: '1.125rem', height: '1.125rem', color: '#1D3557', flexShrink: 0, marginTop: '0.125rem' }}
-                fill="none" 
-                stroke="currentColor" 
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth="2" 
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
               <p style={{
@@ -160,8 +221,62 @@ const VerifyEmail = () => {
               </p>
             </div>
 
+            {/* Success/Error Message */}
+            {message && (
+              <div style={{
+                width: '100%',
+                backgroundColor: messageType === 'success' ? '#D4EDDA' : '#F8D7DA',
+                border: `1px solid ${messageType === 'success' ? '#28A745' : '#DC3545'}`,
+                borderRadius: '0.5rem',
+                padding: '0.875rem',
+                display: 'flex',
+                gap: '0.75rem',
+                alignItems: 'flex-start',
+                textAlign: 'left'
+              }}>
+                <svg 
+                  style={{ 
+                    width: '1.125rem', 
+                    height: '1.125rem', 
+                    color: messageType === 'success' ? '#28A745' : '#DC3545', 
+                    flexShrink: 0, 
+                    marginTop: '0.125rem' 
+                  }}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  {messageType === 'success' ? (
+                    <path 
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  ) : (
+                    <path 
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  )}
+                </svg>
+                <p style={{
+                  fontSize: '0.8125rem',
+                  color: messageType === 'success' ? '#155724' : '#721C24',
+                  margin: 0,
+                  lineHeight: '1.4'
+                }}>
+                  {message}
+                </p>
+              </div>
+            )}
+
             {/* Resend Verification Email Button */}
             <button
+              onClick={handleResendEmail}
+              disabled={loading}
               style={{
                 display: 'flex',
                 height: '2.75rem',
@@ -169,25 +284,30 @@ const VerifyEmail = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: '0.375rem',
-                backgroundColor: '#1D3557',
+                backgroundColor: loading ? '#94A3B8' : '#1D3557',
                 padding: '0 1.5rem',
                 fontSize: '0.9375rem',
                 fontWeight: '600',
                 color: '#FFFFFF',
                 boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: loading ? 'not-allowed' : 'pointer',
                 transition: 'background-color 0.2s',
-                marginTop: '0.25rem'
+                marginTop: '0.25rem',
+                opacity: loading ? 0.7 : 1
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = 'rgba(29, 53, 87, 0.9)';
+                if (!loading) {
+                  e.target.style.backgroundColor = 'rgba(29, 53, 87, 0.9)';
+                }
               }}
               onMouseLeave={(e) => {
-                e.target.style.backgroundColor = '#1D3557';
+                if (!loading) {
+                  e.target.style.backgroundColor = '#1D3557';
+                }
               }}
             >
-              Resend Verification Email
+              {loading ? 'Sending...' : 'Resend Verification Email'}
             </button>
           </div>
         </div>

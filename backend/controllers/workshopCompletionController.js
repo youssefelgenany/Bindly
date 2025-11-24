@@ -109,7 +109,8 @@ exports.sendWorkshopCompletionEmails = async (req, res) => {
             participant.name,
             workshop.title,
             workshop.endDate,
-            workshop.location
+            workshop.location,
+            participant.userType // Pass userType to email function
           );
 
           if (emailResult.sent) {
