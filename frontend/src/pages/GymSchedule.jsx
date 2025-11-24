@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { gymApiService } from '../api/gymApi';
 import { gymSessionApi } from '../api/gymSessionApi';
+import { notificationApiService } from '../api/notificationApi';
 import GymSessionForm from '../components/GymSessionForm';
 
 const TYPES = ['yoga', 'pilates', 'aerobics', 'zumba', 'cross circuit', 'kick-boxing', 'strength', 'cardio', 'other'];
@@ -13,6 +14,10 @@ const GymSchedule = () => {
   const navigate = useNavigate();
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
   
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
@@ -91,10 +96,93 @@ const GymSchedule = () => {
       if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
+      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLogoutDropdown]);
+  }, [showLogoutDropdown, showNotificationsDropdown]);
+
+  // Load notifications (for professors)
+  const loadNotifications = useCallback(async () => {
+    if (user?.userType !== 'Professor') return;
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+      
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(notificationsResult.data.data.notifications || notificationsResult.data.data || []);
+      }
+      
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, [user]);
+
+  // Load notifications on mount and poll for updates (for professors)
+  useEffect(() => {
+    if (user?.userType === 'Professor') {
+      loadNotifications();
+      const interval = setInterval(() => {
+        loadNotifications();
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [loadNotifications, user]);
+
+  // Mark notification as read
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev => prev.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Mark all as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  // Format notification date
+  const formatNotificationDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   const load = async () => {
     setLoading(true);
@@ -291,14 +379,20 @@ const GymSchedule = () => {
   };
 
 
+  // Check if user is Professor - hide sidebar for professors
+  const isProfessor = user?.userType === 'Professor';
+  const shouldShowSidebar = !isProfessor && sidebarOpen;
+
   return (
     <div style={{
       display: 'flex',
-      height: '100vh',
+      flexDirection: 'column',
+      minHeight: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
+      backgroundColor: '#f6f7f8'
     }}>
-      {/* Left Sidebar */}
+      {/* Left Sidebar - Only for non-professors */}
+      {!isProfessor && (
       <aside style={{
         width: sidebarOpen ? '16rem' : '0',
         flexShrink: 0,
@@ -675,52 +769,297 @@ const GymSchedule = () => {
           </button>
         </div>
       </aside>
+      )}
 
       {/* Header */}
       <header style={{
-        position: 'fixed',
-        top: 0,
-        left: sidebarOpen ? '16rem' : '0',
-        right: 0,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         borderBottom: '1px solid #e2e8f0',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF',
-        zIndex: 100,
-        transition: 'left 0.3s ease'
+        backgroundColor: '#FFFFFF'
       }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1D3557'
-              }}
-              aria-label="Toggle sidebar"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                menu
-              </span>
-            </button>
-            <h2 style={{
-              color: '#1D3557',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              lineHeight: '1.25',
-              margin: 0
-            }}>
-              Bindly
-            </h2>
+            {!isProfessor && (
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#1D3557'
+                }}
+                aria-label="Toggle sidebar"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  menu
+                </span>
+              </button>
+            )}
+            <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                lineHeight: '1.25',
+                margin: 0,
+                cursor: 'pointer'
+              }}>
+                Bindly
+              </h2>
+            </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+            {/* Notifications Bell - Only for Professors */}
+            {isProfessor && (
+              <div style={{ position: 'relative' }} data-notifications-dropdown>
+                <button
+                  onClick={() => {
+                    setShowNotificationsDropdown(!showNotificationsDropdown);
+                    setShowLogoutDropdown(false);
+                    if (!showNotificationsDropdown) {
+                      loadNotifications();
+                    }
+                  }}
+                  style={{
+                    position: 'relative',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.5rem',
+                    color: '#1D3557'
+                  }}>
+                    notifications
+                  </span>
+                  {unreadCount > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '0.25rem',
+                      right: '0.25rem',
+                      backgroundColor: '#ef4444',
+                      color: '#FFFFFF',
+                      borderRadius: '50%',
+                      width: '1.125rem',
+                      height: '1.125rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.625rem',
+                      fontWeight: '700',
+                      border: '2px solid #FFFFFF'
+                    }}>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {showNotificationsDropdown && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '0.5rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                    zIndex: 1001,
+                    width: '360px',
+                    maxHeight: '500px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      padding: '1rem',
+                      borderBottom: '1px solid #e2e8f0',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <h3 style={{
+                        fontSize: '1rem',
+                        fontWeight: '600',
+                        color: '#1D3557',
+                        margin: 0
+                      }}>
+                        Notifications
+                      </h3>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllAsRead}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#1e40af',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            padding: '0.25rem 0.5rem'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.textDecoration = 'underline';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.textDecoration = 'none';
+                          }}
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+                    <div style={{
+                      overflowY: 'auto',
+                      maxHeight: '400px'
+                    }}>
+                      {loadingNotifications ? (
+                        <div style={{
+                          padding: '2rem',
+                          textAlign: 'center',
+                          color: '#6b7280',
+                          fontSize: '0.875rem'
+                        }}>
+                          Loading...
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div style={{
+                          padding: '2rem',
+                          textAlign: 'center',
+                          color: '#6b7280',
+                          fontSize: '0.875rem'
+                        }}>
+                          No notifications
+                        </div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <div
+                            key={notification._id}
+                            onClick={() => {
+                              if (!notification.isRead) {
+                                handleMarkAsRead(notification._id);
+                              }
+                              if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                            navigate(`/professor/all-events`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            (notification.type === 'event_reminder' || 
+                             notification.type === 'workshop_reminder' || 
+                             notification.type === 'trip_reminder' ||
+                             notification.type === 'gym_session_reminder') && 
+                            (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                          ) {
+                            navigate(`/professor/events`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            notification.type === 'new_loyalty_partner' || 
+                            notification.type === 'loyalty_partner_added' ||
+                            (notification.type === 'system' && notification.metadata?.vendorId)
+                          ) {
+                            // Navigate to Loyalty Partners page
+                            navigate(`/professor/loyalty-vendors`);
+                            setShowNotificationsDropdown(false);
+                          }
+                        }}
+                            style={{
+                              padding: '1rem',
+                              borderBottom: '1px solid #f3f4f6',
+                              cursor: 'pointer',
+                              backgroundColor: notification.isRead 
+                                ? '#FFFFFF' 
+                                : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                  ? '#fef2f2'
+                                  : '#eff6ff',
+                              borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
+                                ? '3px solid #ef4444'
+                                : 'none',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = notification.isRead 
+                                ? '#f9fafb' 
+                                : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                  ? '#fee2e2'
+                                  : '#dbeafe';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = notification.isRead 
+                                ? '#FFFFFF' 
+                                : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                  ? '#fef2f2'
+                                  : '#eff6ff';
+                            }}
+                          >
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              gap: '0.5rem'
+                            }}>
+                              <div style={{ flex: 1 }}>
+                                <p style={{
+                                  fontSize: '0.875rem',
+                                  fontWeight: notification.isRead ? '400' : '600',
+                                  color: '#1D3557',
+                                  margin: 0,
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  {notification.title || notification.message}
+                                </p>
+                                {notification.message && notification.message !== notification.title && (
+                                  <p style={{
+                                    fontSize: '0.75rem',
+                                    color: '#6b7280',
+                                    margin: 0
+                                  }}>
+                                    {notification.message}
+                                  </p>
+                                )}
+                                <p style={{
+                                  fontSize: '0.625rem',
+                                  color: '#9ca3af',
+                                  margin: '0.5rem 0 0 0'
+                                }}>
+                                  {formatNotificationDate(notification.createdAt)}
+                                </p>
+                              </div>
+                              {!notification.isRead && (
+                                <div style={{
+                                  width: '0.5rem',
+                                  height: '0.5rem',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#1e40af',
+                                  flexShrink: 0,
+                                  marginTop: '0.25rem'
+                                }} />
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
@@ -816,15 +1155,91 @@ const GymSchedule = () => {
           </div>
         </header>
 
+      {/* Horizontal Menu Bar - For Professors */}
+      {isProfessor && (
+        <nav style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '1rem 2rem',
+          backgroundColor: '#FFFFFF',
+          borderBottom: '1px solid #e2e8f0'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <Link
+              to="/dashboard"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              Dashboard
+            </Link>
+            <Link
+              to="/professor/all-events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              Discover Events
+            </Link>
+            <Link
+              to="/professor/events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              My Events
+            </Link>
+            <Link
+              to="/professor/my-workshops"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              My Workshops
+            </Link>
+            <Link
+              to="/professor/gym-schedule"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              View Gym Sessions
+            </Link>
+          </div>
+        </nav>
+      )}
+
       {/* Main Content */}
       <main style={{
-        marginLeft: sidebarOpen ? '16rem' : '0',
-        marginTop: '73px',
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
-        transition: 'margin-left 0.3s ease'
+        overflow: 'hidden'
       }}>
         {/* Horizontal Menu Bar - Only show for Students */}
         {user?.userType === 'Student' && (
@@ -909,9 +1324,9 @@ const GymSchedule = () => {
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '1rem',
-          paddingLeft: '6rem',
-          paddingRight: '6rem',
+          padding: isProfessor ? '2rem 0' : '1rem',
+          paddingLeft: isProfessor ? '4rem' : '6rem',
+          paddingRight: isProfessor ? '4rem' : '6rem',
           backgroundColor: '#f6f7f8'
         }}>
           {/* Page Title Banner */}
