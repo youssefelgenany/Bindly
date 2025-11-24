@@ -34,6 +34,7 @@ const ProfessorMyRegistrations = () => {
   const [hoveredRating, setHoveredRating] = useState(0);
   const [commentText, setCommentText] = useState('');
  // { eventId: { average: number, count: number } }
+// { eventId: { average: number, count: number } }
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
