@@ -100,10 +100,11 @@ async function sendWorkshopCompletionEmail(email, name, workshopTitle, endDate, 
       attachments: []
     };
 
-    // Generate and attach certificate for TAs
-    if (userType === 'TA') {
+    // Generate and attach certificate for TAs, Staff, Students, and Professors
+    const eligibleForCertificate = ['TA', 'Staff', 'Student', 'Professor'].includes(userType);
+    if (eligibleForCertificate) {
       try {
-        console.log('📜 Generating certificate for TA:', name);
+        console.log(`📜 Generating certificate for ${userType}:`, name);
         
         // Create certificates directory if it doesn't exist
         const certsDir = path.join(__dirname, '../certificates');
