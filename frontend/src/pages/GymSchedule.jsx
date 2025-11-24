@@ -55,6 +55,13 @@ const GymSchedule = () => {
     return '/event-office';
   };
 
+  const getLoyaltyRoute = () => {
+    if (user?.userType === 'TA' || user?.userType === 'Staff') return '/staff/loyalty-vendors';
+    if (user?.userType === 'Professor') return '/professor/loyalty-vendors';
+    if (user?.userType === 'Student') return '/student/loyalty-vendors';
+    return '/event-office/loyalty-program-vendors';
+  };
+
   const getDashboardRoute = () => {
     return '/dashboard';
   };
@@ -976,7 +983,7 @@ const GymSchedule = () => {
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
                             // Navigate to Loyalty Partners page
-                            navigate(`/professor/loyalty-vendors`);
+                            navigate(getLoyaltyRoute());
                             setShowNotificationsDropdown(false);
                           }
                         }}

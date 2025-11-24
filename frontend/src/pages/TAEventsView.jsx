@@ -7,7 +7,7 @@ import { notificationApiService } from '../api/notificationApi';
 import StudentRegistrationForm from '../components/StudentRegistrationForm';
 import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
 
-const StaffEventsView = () => {
+const TAEventsView = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ const StaffEventsView = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [professorFilter, setProfessorFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('date-asc');
+  const [sortBy, setSortBy] = useState('date-asc'); // date-asc, date-desc, title-asc, title-desc
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showProfessorDropdown, setShowProfessorDropdown] = useState(false);
@@ -28,22 +28,23 @@ const StaffEventsView = () => {
   const [showWorkshopEditModal, setShowWorkshopEditModal] = useState(false);
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
   const [registeredEventIds, setRegisteredEventIds] = useState(new Set());
-  const [favoriteEventIds, setFavoriteEventIds] = useState(new Set());
+  const [myRegistrations, setMyRegistrations] = useState([]); // Store student's registrations to check if they attended
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
-  const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [showRatingsCommentsModal, setShowRatingsCommentsModal] = useState(false);
   const [selectedEventForView, setSelectedEventForView] = useState(null);
   const [ratingsAndComments, setRatingsAndComments] = useState(null);
   const [loadingRatingsComments, setLoadingRatingsComments] = useState(false);
   const [eventRatings, setEventRatings] = useState({});
-  const [modalError, setModalError] = useState('');
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [commentText, setCommentText] = useState('');
-  const [ratingsLoadError, setRatingsLoadError] = useState('');
+  const [modalError, setModalError] = useState('');
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [favoriteEventIds, setFavoriteEventIds] = useState(new Set());
+
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -53,6 +54,10 @@ const StaffEventsView = () => {
     }
     return currentPath.startsWith(path);
   };
+
+  const displayName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`
+    : user?.name || 'TA';
 
   const handleLogout = (e) => {
     if (e) {
@@ -68,9 +73,6 @@ const StaffEventsView = () => {
       if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
-      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
-        setShowNotificationsDropdown(false);
-      }
       if (showFilterDropdown && !event.target.closest('[data-filter-dropdown]')) {
         setShowFilterDropdown(false);
       }
@@ -80,65 +82,21 @@ const StaffEventsView = () => {
       if (showProfessorDropdown && !event.target.closest('[data-professor-dropdown]')) {
         setShowProfessorDropdown(false);
       }
+      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLogoutDropdown, showNotificationsDropdown, showFilterDropdown, showSortDropdown, showProfessorDropdown]);
-
-  const fetchEventRatings = useCallback(async (eventsList) => {
-    if (!Array.isArray(eventsList) || eventsList.length === 0) {
-      setEventRatings({});
-      return;
-    }
-
-    const ratingsMap = {};
-    await Promise.all(eventsList.map(async (ev) => {
-      if (!ev?.id) return;
-      try {
-        const ratingResult = await eventsApiService.getRatingsAndComments(ev.id);
-        if (ratingResult.success && ratingResult.data?.ratings) {
-          ratingsMap[ev.id] = {
-            average: ratingResult.data.ratings.average || 0,
-            count: ratingResult.data.ratings.count || 0
-          };
-        }
-      } catch (err) {
-        console.error('Error loading ratings for event', ev.id, err);
-      }
-    }));
-
-    setEventRatings(ratingsMap);
-  }, []);
-
-  const sortEvents = (eventsList) => {
-    const sorted = [...eventsList];
-    switch (sortBy) {
-      case 'date-asc':
-        return sorted.sort((a, b) => {
-          const dateA = new Date(a.startDate || a.endDate || 0);
-          const dateB = new Date(b.startDate || b.endDate || 0);
-          return dateA - dateB;
-        });
-      case 'date-desc':
-        return sorted.sort((a, b) => {
-          const dateA = new Date(a.startDate || a.endDate || 0);
-          const dateB = new Date(b.startDate || b.endDate || 0);
-          return dateB - dateA;
-        });
-      case 'title-asc':
-        return sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-      case 'title-desc':
-        return sorted.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
-      default:
-        return sorted;
-    }
-  };
+  }, [showLogoutDropdown, showFilterDropdown, showSortDropdown, showProfessorDropdown, showNotificationsDropdown]);
 
   const loadEvents = useCallback(async () => {
     try {
       setError('');
       setLoading(true);
       const typeParam = filter && filter !== 'all' && filter.trim() !== '' ? filter.trim().toLowerCase() : undefined;
+      console.log('🔍 Frontend - Filter state:', filter, '-> Sending type param:', typeParam);
+      
       const result = await eventsApiService.getStudentEvents({
         q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
         type: typeParam
@@ -174,13 +132,25 @@ const StaffEventsView = () => {
         .filter(ev => {
           const type = (ev.type || '').toLowerCase();
           const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+          // Only keep events with valid types and non-empty title/location
           if (!validTypes.includes(type) || !ev.title || ev.title.trim() === '' || !ev.location || ev.location.trim() === '') {
             return false;
           }
+          
+          // Apply type filter if not 'all' - strict matching
+          if (filter && filter !== 'all' && filter.trim() !== '') {
+            const filterType = filter.trim().toLowerCase();
+            const eventType = (type || '').toString().trim().toLowerCase();
+            if (eventType !== filterType) {
+              return false;
+            }
+          }
+          
+          // Show all events including past events - no date filtering
           return true;
         });
         
-        console.log('🔍 StaffEventsView - Events loaded:', {
+        console.log('🔍 StudentEventsView - Events loaded:', {
           totalEvents: mapped.length,
           workshopEvents: mapped.filter(e => e.type === 'workshop').length,
           workshopTitles: mapped.filter(e => e.type === 'workshop').map(e => e.title),
@@ -191,7 +161,8 @@ const StaffEventsView = () => {
             endDate: e.endDate
           }))
         });
-
+        
+        // Extract unique professors from workshop/conference events
         const professorsSet = new Set();
         mapped.forEach(ev => {
           if (ev.type === 'workshop' || ev.type === 'conference') {
@@ -211,8 +182,10 @@ const StaffEventsView = () => {
             }
           }
         });
-        setAvailableProfessors(Array.from(professorsSet).sort());
-
+        const professorsList = Array.from(professorsSet).sort();
+        setAvailableProfessors(professorsList);
+        
+        // Apply professor filter if workshop/conference is selected
         let filteredEvents = mapped;
         if ((filter === 'workshop' || filter === 'conference') && professorFilter !== 'all') {
           filteredEvents = mapped.filter(ev => {
@@ -231,10 +204,29 @@ const StaffEventsView = () => {
             return eventProfessors.some(p => p === professorFilter);
           });
         }
-
+        
+        // Sort events before setting
         const sortedEvents = sortEvents(filteredEvents);
         setEvents(sortedEvents);
-        await fetchEventRatings(sortedEvents);
+        
+        // Load ratings for all events
+        const ratingsMap = {};
+        await Promise.all(sortedEvents.map(async (ev) => {
+          if (ev.id) {
+            try {
+              const ratingResult = await eventsApiService.getRatingsAndComments(ev.id);
+              if (ratingResult.success && ratingResult.data?.ratings) {
+                ratingsMap[ev.id] = {
+                  average: ratingResult.data.ratings.average || 0,
+                  count: ratingResult.data.ratings.count || 0
+                };
+              }
+            } catch (err) {
+              // Silently fail - ratings are optional
+            }
+          }
+        }));
+        setEventRatings(ratingsMap);
       } else {
         setEvents([]);
         const msg = result.message || (typeof result.error === 'string' ? result.error : 'Failed to fetch events');
@@ -245,12 +237,13 @@ const StaffEventsView = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, filter, professorFilter, sortBy, fetchEventRatings]);
+  }, [searchQuery, filter, professorFilter]);
 
   useEffect(() => {
     loadEvents();
   }, [filter, professorFilter, sortBy, loadEvents]);
-
+  
+  // Reset professor filter when filter changes away from workshop/conference
   useEffect(() => {
     if (filter !== 'workshop' && filter !== 'conference') {
       setProfessorFilter('all');
@@ -265,9 +258,12 @@ const StaffEventsView = () => {
       try {
         const result = await studentRegistrationApi.getMyRegistrations(user.email);
         if (result.success && result.data.registrations) {
-          // Extract event IDs from registrations
+          // Extract event IDs from PAID registrations only
           const registeredIds = new Set();
           result.data.registrations.forEach(reg => {
+            // Only include paid registrations
+            if (reg.paid !== true) return;
+            
             // Check for eventId in the formatted response
             if (reg.eventId) {
               registeredIds.add(String(reg.eventId));
@@ -291,10 +287,10 @@ const StaffEventsView = () => {
     loadUserRegistrations();
   }, [user]);
 
-  // Load user's favorite events (for Staff and TA users)
+  // Load user's favorite events (for Student users)
   useEffect(() => {
     const loadFavoriteEvents = async () => {
-      if (!user || (user.userType !== 'TA' && user.userType !== 'Staff')) return;
+      if (!user || user.userType !== 'Student') return;
       
       try {
         const result = await eventsApiService.getFavoriteEvents();
@@ -320,7 +316,7 @@ const StaffEventsView = () => {
   const handleToggleFavorite = async (eventId, e) => {
     e.stopPropagation(); // Prevent card click
     
-    if (!user || (user.userType !== 'TA' && user.userType !== 'Staff')) return;
+    if (!user || user.userType !== 'Student') return;
     
     const isFavorite = favoriteEventIds.has(String(eventId));
     
@@ -434,12 +430,38 @@ const StaffEventsView = () => {
 
   const handleRegistrationSuccess = (registrationData) => {
     setShowRegistrationForm(false);
-    // Add the event ID to registered set
-    if (registrationEvent?.id) {
+    // Only add to registered set if payment was completed (paid: true)
+    // For free events, registrationData will have paid: true
+    // For paid events, this will only be called after successful payment
+    if (registrationEvent?.id && registrationData?.paid !== false) {
       setRegisteredEventIds(prev => new Set([...prev, String(registrationEvent.id)]));
     }
     setRegistrationEvent(null);
     loadEvents();
+    // Reload registrations to update the registered events list
+    const loadUserRegistrations = async () => {
+      if (!user?.email) return;
+      try {
+        const result = await studentRegistrationApi.getMyRegistrations(user.email);
+        if (result.success && result.data.registrations) {
+          const registeredIds = new Set();
+          result.data.registrations.forEach(reg => {
+            if (reg.paid !== true) return;
+            if (reg.eventId) {
+              registeredIds.add(String(reg.eventId));
+            } else if (reg.event && typeof reg.event === 'object' && reg.event._id) {
+              registeredIds.add(String(reg.event._id));
+            } else if (reg.event && typeof reg.event === 'string') {
+              registeredIds.add(reg.event);
+            }
+          });
+          setRegisteredEventIds(registeredIds);
+        }
+      } catch (error) {
+        console.error('Error reloading user registrations:', error);
+      }
+    };
+    loadUserRegistrations();
   };
 
   const handleCloseRegistrationForm = () => {
@@ -510,51 +532,52 @@ const StaffEventsView = () => {
     return type ? type.toUpperCase() : 'EVENT';
   };
 
+  // Load ratings and comments for viewing (VIEW ONLY - no forms)
   const loadRatingsAndComments = async (eventId) => {
-    if (!eventId) {
-      setRatingsLoadError('Event ID is required');
-      return;
-    }
+    if (!eventId) return;
     setLoadingRatingsComments(true);
-    setRatingsLoadError('');
     try {
-      const result = await eventsApiService.getRatingsAndComments(String(eventId));
+      const eventIdStr = String(eventId);
+      const result = await eventsApiService.getRatingsAndComments(eventIdStr);
       if (result.success) {
         setRatingsAndComments(result.data);
-      } else {
-        setRatingsLoadError(result.message || result.error?.message || 'Failed to load ratings and comments');
       }
     } catch (err) {
       console.error('Error loading ratings and comments:', err);
-      setRatingsLoadError(err.response?.data?.message || err.message || 'Error loading ratings and comments');
     } finally {
       setLoadingRatingsComments(false);
     }
   };
 
+  // Check if event has passed (can rate/comment)
   const hasEventPassed = (eventDate, eventEndDate) => {
     try {
       const now = new Date();
       now.setHours(0, 0, 0, 0);
-
+      
       let checkDate = null;
       if (eventEndDate) {
-        const parsedEnd = new Date(eventEndDate);
-        if (!isNaN(parsedEnd.getTime())) {
-          parsedEnd.setHours(0, 0, 0, 0);
-          checkDate = parsedEnd;
+        checkDate = new Date(eventEndDate);
+        if (isNaN(checkDate.getTime())) {
+          checkDate = null;
+        } else {
+          checkDate.setHours(0, 0, 0, 0);
         }
       }
-
+      
       if (!checkDate && eventDate) {
-        const parsedStart = new Date(eventDate);
-        if (!isNaN(parsedStart.getTime())) {
-          parsedStart.setHours(0, 0, 0, 0);
-          checkDate = parsedStart;
+        checkDate = new Date(eventDate);
+        if (isNaN(checkDate.getTime())) {
+          return false;
+        } else {
+          checkDate.setHours(0, 0, 0, 0);
         }
       }
-
-      if (!checkDate) return false;
+      
+      if (!checkDate) {
+        return false;
+      }
+      
       return checkDate <= now;
     } catch (error) {
       console.error('Error checking if event has passed:', error);
@@ -562,28 +585,17 @@ const StaffEventsView = () => {
     }
   };
 
-  const didStaffAttend = (eventId) => {
-    if (!eventId) return false;
+  // Check if student attended this event (is registered)
+  const didStudentAttend = (eventId) => {
     return registeredEventIds.has(String(eventId));
   };
 
-  const resetFeedbackState = () => {
-    setRating(0);
-    setHoveredRating(0);
-    setCommentText('');
-    setModalError('');
-  };
-
+  // Handle rating submission
   const handleSubmitRating = async (eventId) => {
-    if (!eventId) {
-      setModalError('Event not available');
-      return;
-    }
     if (!rating || rating === 0) {
       setModalError('Please select a rating');
       return;
     }
-
     try {
       const result = await eventsApiService.submitRating(String(eventId), rating);
       if (result.success) {
@@ -591,43 +603,32 @@ const StaffEventsView = () => {
         setHoveredRating(0);
         setModalError('');
         await loadRatingsAndComments(eventId);
-        try {
-          const ratingResult = await eventsApiService.getRatingsAndComments(String(eventId));
-          if (ratingResult.success && ratingResult.data?.ratings) {
-            setEventRatings(prev => ({
-              ...prev,
-              [eventId]: {
-                average: ratingResult.data.ratings.average || 0,
-                count: ratingResult.data.ratings.count || 0
-              }
-            }));
-          }
-        } catch (err) {
-          console.error('Error refreshing event rating stats:', err);
+        // Update event ratings
+        const ratingResult = await eventsApiService.getRatingsAndComments(String(eventId));
+        if (ratingResult.success && ratingResult.data?.ratings) {
+          setEventRatings(prev => ({
+            ...prev,
+            [eventId]: {
+              average: ratingResult.data.ratings.average || 0,
+              count: ratingResult.data.ratings.count || 0
+            }
+          }));
         }
       } else {
-        setModalError(result.message || result.error?.message || 'Failed to submit rating');
+        setModalError(result.message || result.error?.message || result.error?.msg || 'Failed to submit rating');
       }
     } catch (err) {
       console.error('Error submitting rating:', err);
-      setModalError(err.response?.data?.message || err.message || 'Error submitting rating');
+      setModalError(err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting rating');
     }
   };
 
+  // Handle comment submission
   const handleSubmitComment = async (eventId) => {
-    if (!eventId) {
-      setModalError('Event not available');
-      return;
-    }
     if (!commentText.trim()) {
       setModalError('Please enter a comment');
       return;
     }
-    if (commentText.trim().length > 1000) {
-      setModalError('Comment cannot exceed 1000 characters');
-      return;
-    }
-
     try {
       const result = await eventsApiService.submitComment(String(eventId), commentText.trim());
       if (result.success) {
@@ -635,44 +636,64 @@ const StaffEventsView = () => {
         setModalError('');
         await loadRatingsAndComments(eventId);
       } else {
-        setModalError(result.message || result.error?.message || 'Failed to submit comment');
+        setModalError(result.message || result.error?.message || result.error?.msg || 'Failed to submit comment');
       }
     } catch (err) {
       console.error('Error submitting comment:', err);
-      setModalError(err.response?.data?.message || err.message || 'Error submitting comment');
+      setModalError(err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting comment');
     }
   };
 
-  const handleViewRatingsComments = async (eventData) => {
-    if (!eventData?.id) {
-      setRatingsLoadError('Event data not available');
-      return;
-    }
-    resetFeedbackState();
-    setRatingsLoadError('');
-    setSelectedEventForView({
-      eventId: String(eventData.id),
-      eventTitle: eventData.title,
-      eventDate: eventData.startDate,
-      eventEndDate: eventData.endDate,
-      eventLocation: eventData.location
+  // Handle view ratings and comments
+  const handleViewRatingsComments = async (eventId, eventTitle) => {
+    // Find the event to get dates
+    const event = events.find(e => e.id === eventId || String(e.id) === String(eventId));
+    // Also check registrations for dates
+    const registration = myRegistrations.find(r => {
+      const regEventId = r.eventId || (r.event?._id) || (r.event);
+      return String(regEventId) === String(eventId);
     });
-    setRatingsAndComments(null);
+    
+    const eventData = {
+      eventId: eventId,
+      eventDate: event?.startDate || registration?.eventDate || registration?.startDate,
+      eventEndDate: event?.endDate || registration?.eventEndDate || registration?.endDate,
+      eventTitle: eventTitle || event?.title || registration?.eventTitle
+    };
+    
+    setSelectedEventForView(eventData);
+    setRating(0);
+    setHoveredRating(0);
+    setCommentText('');
     setModalError('');
     setShowRatingsCommentsModal(true);
-    await loadRatingsAndComments(eventData.id);
+    await loadRatingsAndComments(eventId);
   };
 
-
-  const displayName = user?.firstName && user?.lastName 
-    ? `${user.firstName} ${user.lastName}`
-    : user?.name || (user?.userType === 'TA' ? 'TA' : 'Staff');
-  
-  const userRole = user?.userType === 'TA' ? 'Teaching Assistant' : 'Staff';
-  const canSubmitFeedback = selectedEventForView
-    ? hasEventPassed(selectedEventForView.eventDate, selectedEventForView.eventEndDate) &&
-      didStaffAttend(selectedEventForView.eventId)
-    : false;
+  // Sort events
+  const sortEvents = (eventsList) => {
+    const sorted = [...eventsList];
+    switch (sortBy) {
+      case 'date-asc':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.startDate || a.endDate || 0);
+          const dateB = new Date(b.startDate || b.endDate || 0);
+          return dateA - dateB;
+        });
+      case 'date-desc':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.startDate || a.endDate || 0);
+          const dateB = new Date(b.startDate || b.endDate || 0);
+          return dateB - dateA;
+        });
+      case 'title-asc':
+        return sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+      case 'title-desc':
+        return sorted.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+      default:
+        return sorted;
+    }
+  };
 
   return (
     <div style={{
@@ -847,8 +868,9 @@ const StaffEventsView = () => {
                           if (!notification.isRead) {
                             handleMarkAsRead(notification._id);
                           }
+                          // Navigate to event if it's an event notification or reminder
                           if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
-                            navigate(`/staff/events`);
+                            navigate(`/ta/events`);
                             setShowNotificationsDropdown(false);
                           } else if (
                             (notification.type === 'event_reminder' || 
@@ -857,14 +879,16 @@ const StaffEventsView = () => {
                              notification.type === 'gym_session_reminder') && 
                             (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
                           ) {
-                            navigate(`/staff/my-registrations`);
+                            // Navigate to My Events for reminders
+                            navigate(`/ta/my-registrations`);
                             setShowNotificationsDropdown(false);
                           } else if (
                             notification.type === 'new_loyalty_partner' || 
                             notification.type === 'loyalty_partner_added' ||
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
-                            navigate('/staff/loyalty-vendors');
+                            // Navigate to Loyalty Partners page
+                            navigate(`/ta/loyalty-vendors`);
                             setShowNotificationsDropdown(false);
                           }
                         }}
@@ -963,11 +987,11 @@ const StaffEventsView = () => {
               color: '#6b7280',
               margin: 0
             }}>
-              {user?.userType === 'TA' ? 'TA' : 'Staff'}
+              Student
             </p>
           </div>
 
-          {/* Profile Icon */}
+          {/* Student Profile Icon */}
           <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
@@ -999,7 +1023,7 @@ const StaffEventsView = () => {
                 color: '#FFFFFF',
                 fontWeight: '600'
               }}>
-                {(user?.firstName?.[0] || user?.name?.[0] || (user?.userType === 'TA' ? 'T' : 'S')).toUpperCase()}
+                {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
               </div>
             )}
             {showLogoutDropdown && (
@@ -1015,37 +1039,35 @@ const StaffEventsView = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
-                {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
-                  <Link
-                    to="/wallet"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      textAlign: 'left',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      color: '#1D3557',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      textDecoration: 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#f3f4f6';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'transparent';
-                    }}
-                    onClick={() => setShowLogoutDropdown(false)}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                      account_balance_wallet
-                    </span>
-                    My Wallet
-                  </Link>
-                )}
+                <Link
+                  to="/wallet"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => setShowLogoutDropdown(false)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    account_balance_wallet
+                  </span>
+                  My Wallet
+                </Link>
                 <button
                   onClick={handleLogout}
                   style={{
@@ -1100,43 +1122,43 @@ const StaffEventsView = () => {
               borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
-            Dashboard
-          </Link>
-          <Link
-            to="/staff/events"
+                  Dashboard
+              </Link>
+              <Link
+            to="/ta/events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/events') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
+              fontWeight: isActiveRoute('/ta/events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/ta/events') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             Discover Events
           </Link>
           <Link
-            to="/staff/my-registrations"
+            to="/ta/my-registrations"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/my-registrations') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
+              fontWeight: isActiveRoute('/ta/my-registrations') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/ta/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             My Events
           </Link>
           <Link
-            to="/staff/favorites"
+            to="/ta/favorites"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/favorites') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
+              fontWeight: isActiveRoute('/ta/favorites') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/ta/favorites') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             My Favorites
@@ -1154,6 +1176,19 @@ const StaffEventsView = () => {
           >
             View Gym Sessions
           </Link>
+              <Link
+                to="/gym"
+                style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/gym') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+                  Gym Sessions
+              </Link>
         </div>
       </nav>
 
@@ -1164,6 +1199,7 @@ const StaffEventsView = () => {
         flexDirection: 'column',
         overflow: 'hidden'
       }}>
+
         {/* Content */}
         <div style={{
           flex: 1,
@@ -1206,121 +1242,123 @@ const StaffEventsView = () => {
               position: 'relative',
               zIndex: 10,
               height: '100%',
-              display: 'flex',
+                display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center',
+                justifyContent: 'center',
               alignItems: 'flex-start',
-              padding: '2rem',
+              padding: '2rem 2.5rem',
               color: '#FFFFFF'
             }}>
-              <h1 style={{
-                fontSize: '2rem',
-                fontWeight: '700',
+              <h3 style={{
+                color: '#FFFFFF',
+                fontSize: '1.75rem',
+              fontWeight: '700',
                 margin: 0,
-                marginBottom: '0.5rem',
-                textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
-              }}>
-                Discover Events
-              </h1>
+                marginBottom: '0.5rem'
+            }}>
+              Discover Events
+              </h3>
               <p style={{
-                fontSize: '1rem',
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '0.875rem',
                 fontWeight: '400',
-                margin: 0,
-                opacity: 0.9,
-                textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                margin: 0
               }}>
-                Browse and register for upcoming events
+                Browse and register for upcoming events.
               </p>
             </div>
-          </div>
+              </div>
+
           {/* Search and Filters */}
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '0.75rem',
-            padding: '1.5rem',
-            marginBottom: '2rem',
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+            padding: '1rem 1.5rem',
+            marginBottom: '1.5rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              {/* Search Input and Button - Left Side */}
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: '0 1 auto' }}>
                 <div style={{ position: 'relative', width: '520px' }}>
-                  <span className="material-symbols-outlined" style={{
-                    position: 'absolute',
-                    left: '0.75rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#9ca3af',
-                    fontSize: '1.25rem',
+                <span className="material-symbols-outlined" style={{
+                  position: 'absolute',
+                  left: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#9ca3af',
+                  fontSize: '1.25rem',
                     pointerEvents: 'none',
                     zIndex: 1
-                  }}>
-                    search
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Search by event name, professor name, location, or description..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem 0.875rem 0.875rem 2.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #e5e7eb',
-                      backgroundColor: '#ffffff',
-                      fontSize: '0.875rem',
-                      outline: 'none',
-                      transition: 'all 0.2s',
-                      boxSizing: 'border-box'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = '#1e40af';
-                      e.target.style.backgroundColor = '#ffffff';
-                      e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = '#e5e7eb';
-                      e.target.style.backgroundColor = '#ffffff';
-                      e.target.style.boxShadow = 'none';
-                    }}
-                  />
-                </div>
-                <button
-                  onClick={handleSearch}
+                }}>
+                  search
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search by event name, professor name, location, or description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   style={{
-                    padding: '0.875rem 1.75rem',
+                    width: '100%',
+                    padding: '0.875rem 0.875rem 0.875rem 2.75rem',
                     borderRadius: '0.5rem',
-                    backgroundColor: '#1e40af',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    cursor: 'pointer',
+                    border: '1px solid #e5e7eb',
+                      backgroundColor: '#ffffff',
                     fontSize: '0.875rem',
-                    fontWeight: '600',
+                    outline: 'none',
                     transition: 'all 0.2s',
-                    whiteSpace: 'nowrap',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1e40af';
+                    e.target.style.backgroundColor = '#ffffff';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                      e.target.style.backgroundColor = '#ffffff';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+              <button
+                onClick={handleSearch}
+                style={{
+                  padding: '0.875rem 1.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#1e40af',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
                     boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                     flexShrink: 0
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#1e3a8a';
-                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#1e40af';
-                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                  }}
-                >
-                  Search
-                </button>
-              </div>
-
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#1e3a8a';
+                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#1e40af';
+                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                }}
+              >
+                Search
+              </button>
+            </div>
+            
+              {/* Filter and Sort Dropdowns - Right Side */}
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
+                {/* Filter Dropdown */}
                 <div style={{ position: 'relative' }} data-filter-dropdown>
                   <button
                     onClick={() => {
                       setShowFilterDropdown(!showFilterDropdown);
                       setShowSortDropdown(false);
-                      setShowProfessorDropdown(false);
                     }}
                     style={{
                       display: 'flex',
@@ -1402,12 +1440,12 @@ const StaffEventsView = () => {
                   )}
                 </div>
 
+                {/* Sort Dropdown */}
                 <div style={{ position: 'relative' }} data-sort-dropdown>
                   <button
                     onClick={() => {
                       setShowSortDropdown(!showSortDropdown);
                       setShowFilterDropdown(false);
-                      setShowProfessorDropdown(false);
                     }}
                     style={{
                       display: 'flex',
@@ -1493,6 +1531,7 @@ const StaffEventsView = () => {
                   )}
                 </div>
 
+                {/* Professor Filter Dropdown - Only show for workshop/conference */}
                 {(filter === 'workshop' || filter === 'conference') && (
                   <div style={{ position: 'relative' }} data-professor-dropdown>
                     <button
@@ -1609,15 +1648,6 @@ const StaffEventsView = () => {
                             {professor}
                           </button>
                         ))}
-                        {availableProfessors.length === 0 && (
-                          <div style={{
-                            padding: '0.75rem 1rem',
-                            fontSize: '0.8125rem',
-                            color: '#6b7280'
-                          }}>
-                            No professors found
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
@@ -1728,7 +1758,6 @@ const StaffEventsView = () => {
                 Found {events.length} upcoming event{events.length !== 1 ? 's' : ''}
                 {searchQuery && ` matching "${searchQuery}"`}
                 {filter !== 'all' && ` in ${filter} category`}
-                {(filter === 'workshop' || filter === 'conference') && professorFilter !== 'all' && ` with ${professorFilter}`}
               </div>
               
               <div style={{
@@ -1739,32 +1768,32 @@ const StaffEventsView = () => {
                 {events.map(event => {
                   const isRegistered = registeredEventIds.has(String(event.id));
                   return (
-                    <div
-                      key={event.id}
-                      onClick={() => setSelectedEvent(event)}
-                      style={{
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: '0.75rem',
+                  <div
+                    key={event.id}
+                    onClick={() => setSelectedEvent(event)}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '0.75rem',
                         padding: 0,
-                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        border: '1px solid #e5e7eb',
-                        display: 'flex',
+                      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      border: '1px solid #e5e7eb',
+                      display: 'flex',
                         flexDirection: 'column',
                         overflow: 'hidden'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
-                        e.currentTarget.style.borderColor = '#1e40af';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
-                        e.currentTarget.style.borderColor = '#e5e7eb';
-                      }}
-                    >
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.borderColor = '#1e40af';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                    }}
+                  >
                       {/* Event Type Image - Top Half */}
                       {getEventTypeImage(event.type) && (
                         <div style={{
@@ -1802,8 +1831,8 @@ const StaffEventsView = () => {
                               }
                             }}
                           />
-                          {/* Heart Icon for Staff and TA users */}
-                          {(user?.userType === 'TA' || user?.userType === 'Staff') && (
+                          {/* Heart Icon for Student users */}
+                          {user?.userType === 'Student' && (
                             <button
                               onClick={(e) => handleToggleFavorite(event.id, e)}
                               style={{
@@ -1849,43 +1878,81 @@ const StaffEventsView = () => {
                       
                       <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                          <div style={{
-                            padding: '0.375rem 0.875rem',
-                            borderRadius: '0.5rem',
-                            backgroundColor: getEventTypeColor(event.type),
-                            color: '#FFFFFF',
-                            fontSize: '0.6875rem',
-                            fontWeight: '700',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em'
-                          }}>
-                            {event.type}
-                          </div>
-                          {getDaysUntilEvent(event.startDate) && (
-                            <div style={{
-                              fontSize: '0.75rem',
-                              color: '#1e40af',
-                              fontWeight: '600',
-                              backgroundColor: '#eff6ff',
-                              padding: '0.25rem 0.625rem',
-                              borderRadius: '0.375rem'
-                            }}>
-                              {getDaysUntilEvent(event.startDate)}
-                            </div>
-                          )}
-                        </div>
-                      
-                        <h3 style={{
-                          color: '#1D3557',
-                          fontSize: '1.125rem',
+                      <div style={{
+                        padding: '0.375rem 0.875rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: getEventTypeColor(event.type),
+                        color: '#FFFFFF',
+                        fontSize: '0.6875rem',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        {event.type}
+                      </div>
+                      {getDaysUntilEvent(event.startDate) && (
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#1e40af',
                           fontWeight: '600',
-                          marginBottom: '0.75rem',
-                          marginTop: 0,
-                          lineHeight: '1.4'
+                          backgroundColor: '#eff6ff',
+                          padding: '0.25rem 0.625rem',
+                          borderRadius: '0.375rem'
                         }}>
-                          {event.title}
-                        </h3>
-                      
+                          {getDaysUntilEvent(event.startDate)}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <h3 style={{
+                      color: '#1D3557',
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                          marginBottom: '0.75rem',
+                      marginTop: 0,
+                      lineHeight: '1.4'
+                    }}>
+                      {event.title}
+                    </h3>
+                    
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem',
+                      flex: 1
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.625rem',
+                        fontSize: '0.8125rem',
+                        color: '#6b7280'
+                      }}>
+                        <span className="material-symbols-outlined" style={{
+                          fontSize: '1.125rem',
+                          color: '#9ca3af'
+                        }}>
+                          calendar_today
+                        </span>
+                        <span>{formatDate(event.startDate)}</span>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.625rem',
+                        fontSize: '0.8125rem',
+                        color: '#6b7280'
+                      }}>
+                        <span className="material-symbols-outlined" style={{
+                          fontSize: '1.125rem',
+                          color: '#9ca3af'
+                        }}>
+                          location_on
+                        </span>
+                        <span>{event.location}</span>
+                      </div>
+                      {event.price && (
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -1897,209 +1964,198 @@ const StaffEventsView = () => {
                             fontSize: '1.125rem',
                             color: '#9ca3af'
                           }}>
-                            location_on
+                            attach_money
                           </span>
-                          <span>{event.location}</span>
+                          <span style={{ fontWeight: '500', color: '#059669' }}>${event.price}</span>
                         </div>
-                        {event.price && (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.625rem',
-                            fontSize: '0.8125rem',
-                            color: '#6b7280'
-                          }}>
-                            <span className="material-symbols-outlined" style={{
-                              fontSize: '1.125rem',
-                              color: '#9ca3af'
-                            }}>
-                              attach_money
-                            </span>
-                            <span>{formatDate(event.startDate)}</span>
-                          </div>
-                        )}
-                        {event.capacity && (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.625rem',
-                            fontSize: '0.8125rem',
-                            color: '#6b7280'
-                          }}>
-                            <span className="material-symbols-outlined" style={{
-                              fontSize: '1.125rem',
-                              color: '#9ca3af'
-                            }}>
-                              people
-                            </span>
-                            <span>{event.location}</span>
-                          </div>
-                        )}
-                        {(event.type === 'bazaar' || event.type === 'booth') && event.vendors && (
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.625rem',
-                              fontSize: '0.8125rem',
-                              color: '#6b7280'
-                            }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-                                storefront
-                              </span>
-                              <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
-                            </div>
-                          )}
-                          {(event.type === 'workshop' || event.type === 'conference') && (
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.625rem',
-                              fontSize: '0.8125rem',
-                              color: '#6b7280'
-                            }}>
-                              <span className="material-symbols-outlined" style={{
-                                fontSize: '1.125rem',
-                                color: '#9ca3af'
-                              }}>
-                                school
-                              </span>
-                              <span>
-                                {event.professors 
-                                  ? (Array.isArray(event.professors) ? event.professors.join(', ') : event.professors)
-                                  : (event.creatorName || 'Professor')
-                                }
-                              </span>
-                            </div>
-                          )}
-
-                        {event.description && (
-                          <p style={{
-                            color: '#6b7280',
-                            fontSize: '0.8125rem',
-                            marginBottom: '0.75rem',
-                            marginTop: 0,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            lineHeight: '1.5'
-                          }}>
-                            {event.description}
-                          </p>
-                        )}
-
+                      )}
+                      {event.capacity && (
                         <div style={{
-                          marginTop: 'auto',
-                          paddingTop: '0.75rem',
-                          borderTop: '1px solid #e5e7eb',
                           display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.75rem'
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
                         }}>
-                          <div style={{
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            people
+                          </span>
+                          <span>{event.registeredCount || 0}/{event.capacity} registered</span>
+                        </div>
+                      )}
+                      {(event.type === 'bazaar' || event.type === 'booth') && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            storefront
+                          </span>
+                          <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
+                        </div>
+                      )}
+                      {(event.type === 'workshop' || event.type === 'conference') && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            school
+                          </span>
+                          <span>
+                            {event.professors 
+                              ? (Array.isArray(event.professors) ? event.professors.join(', ') : event.professors)
+                              : (event.creatorName || 'Professor')
+                            }
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {event.description && (
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.8125rem',
+                            marginBottom: '0.75rem',
+                        marginTop: 0,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        lineHeight: '1.5'
+                      }}>
+                        {event.description}
+                      </p>
+                    )}
+
+                    {/* Bottom Section: Rating Display */}
+                    <div style={{
+                      marginTop: 'auto',
+                      paddingTop: '0.75rem',
+                      borderTop: '1px solid #e5e7eb',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.5rem',
+                      marginBottom: '0.75rem'
+                    }}>
+                      {/* Average Rating Display - Bottom Left (Clickable to view ratings/comments for ALL events) */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewRatingsComments(event.id, event.title);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.375rem',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '0.25rem',
+                          borderRadius: '0.375rem',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f3f4f6';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                        title="View ratings and comments"
+                      >
+                        <span className="material-symbols-outlined" style={{
+                          fontSize: '1rem',
+                          color: '#fbbf24'
+                        }}>
+                          star
+                        </span>
+                        <span style={{
+                          fontSize: '0.8125rem',
+                          fontWeight: '600',
+                          color: '#374151'
+                        }}>
+                          {eventRatings[event.id]?.average > 0 
+                            ? eventRatings[event.id].average.toFixed(1)
+                            : '—'}
+                        </span>
+                      </button>
+                    </div>
+
+                    {(event.type === 'workshop' || event.type === 'trip') && (
+                          isRegistered ? (
+                        <button
+                          disabled
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: '#10b981',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            cursor: 'not-allowed',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            marginTop: 'auto',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '0.5rem'
-                          }}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewRatingsComments(event);
-                              }}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.375rem',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: '0.25rem',
-                                borderRadius: '0.375rem',
-                                transition: 'all 0.2s'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#f3f4f6';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }}
-                              title="View ratings and comments"
-                            >
-                              <span className="material-symbols-outlined" style={{
-                                fontSize: '1rem',
-                                color: '#fbbf24'
-                              }}>
-                                star
-                              </span>
-                              <span style={{
-                                fontSize: '0.8125rem',
-                                fontWeight: '600',
-                                color: '#374151'
-                              }}>
-                                {eventRatings[event.id]?.average > 0
-                                  ? eventRatings[event.id].average.toFixed(1)
-                                  : '—'}
-                              </span>
-                            </button>
-                          </div>
-
-                          {(event.type === 'workshop' || event.type === 'trip') && (
-                            isRegistered ? (
-                              <button
-                                disabled
-                                onClick={(e) => e.stopPropagation()}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.625rem 1rem',
-                                  borderRadius: '0.5rem',
-                                  backgroundColor: '#10b981',
-                                  color: '#FFFFFF',
-                                  border: 'none',
-                                  cursor: 'not-allowed',
-                                  fontSize: '0.875rem',
-                                  fontWeight: '600',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '0.5rem'
-                                }}
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
-                                Registered
-                              </button>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRegisterClick(event);
-                                }}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.625rem 1rem',
-                                  borderRadius: '0.5rem',
-                                  backgroundColor: '#1e40af',
-                                  color: '#FFFFFF',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  fontSize: '0.875rem',
-                                  fontWeight: '600',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '0.5rem',
-                                  transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => e.target.style.backgroundColor = '#1e3a8a'}
-                                onMouseLeave={(e) => e.target.style.backgroundColor = '#1e40af'}
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>how_to_reg</span>
-                                Register
-                              </button>
-                            )
-                          )}
-                        </div>
-                      </div>
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
+                          Registered
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRegisterClick(event);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: '#1e40af',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            transition: 'all 0.2s',
+                            marginTop: 'auto',
+                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#1e3a8a';
+                            e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = '#1e40af';
+                            e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                          }}
+                        >
+                          Register for {event.type === 'workshop' ? 'Workshop' : 'Trip'}
+                        </button>
+                      )
+                    )}
+                  </div>
                     </div>
                   );
                 })}
@@ -2134,55 +2190,113 @@ const StaffEventsView = () => {
               maxWidth: '600px',
               width: '100%',
               maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
             }}
           >
+            {/* Event Image at Top with Close Button Overlay */}
+            <div style={{ position: 'relative' }}>
+              {getEventTypeImage(selectedEvent.type) && (
             <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '1.5rem',
-              borderBottom: '1px solid #e5e7eb'
-            }}>
-              <h2 style={{
-                color: '#1D3557',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                margin: 0
-              }}>
-                {selectedEvent.title}
-              </h2>
+                  width: '100%',
+                  height: '200px',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  backgroundColor: '#f3f4f6',
+                  flexShrink: 0
+                }}>
+                  <img
+                    src={getEventTypeImage(selectedEvent.type)}
+                    alt={selectedEvent.type ? selectedEvent.type.charAt(0).toUpperCase() + selectedEvent.type.slice(1) : 'Event'}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center'
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.style.backgroundColor = getEventTypeColor(selectedEvent.type);
+                      e.target.parentElement.style.display = 'flex';
+                      e.target.parentElement.style.alignItems = 'center';
+                      e.target.parentElement.style.justifyContent = 'center';
+                      if (!e.target.parentElement.querySelector('.fallback-text')) {
+                        const fallback = document.createElement('div');
+                        fallback.className = 'fallback-text';
+                        fallback.textContent = getEventTypeFallbackText(selectedEvent.type);
+                        fallback.style.color = '#FFFFFF';
+                        fallback.style.fontSize = '1.5rem';
+                        fallback.style.fontWeight = '700';
+                        e.target.parentElement.appendChild(fallback);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              
+              {/* Close Button - Upper Right Corner */}
               <button
                 onClick={() => setSelectedEvent(null)}
                 style={{
-                  background: 'none',
+                  position: 'absolute',
+                  top: '0.75rem',
+                  right: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.9)',
                   border: 'none',
                   fontSize: '1.5rem',
                   cursor: 'pointer',
                   color: '#6b7280',
                   padding: '0.25rem 0.5rem',
-                  borderRadius: '0.25rem',
-                  transition: 'background-color 0.2s',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
                   lineHeight: 1,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   width: '2rem',
-                  height: '2rem'
+                  height: '2rem',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                  zIndex: 10
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.backgroundColor = '#ffffff';
+                  e.target.style.color = '#1D3557';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  e.target.style.color = '#6b7280';
                 }}
               >
                 ×
               </button>
             </div>
             
-            <div style={{ padding: '1.5rem' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                margin: 0,
+                paddingRight: '1rem'
+              }}>
+                {selectedEvent.title}
+              </h2>
+            </div>
+            
+            <div style={{ 
+              padding: '1rem 1.5rem 1.5rem 1.5rem',
+              overflowY: 'auto',
+              flex: 1,
+              minHeight: 0
+            }}>
               <div style={{
                 padding: '0.375rem 0.875rem',
                 borderRadius: '0.5rem',
@@ -2217,214 +2331,6 @@ const StaffEventsView = () => {
                   }}>
                     calendar_today
                   </span>
-                  {canSubmitFeedback && (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      style={{
-                        marginBottom: '2rem',
-                        padding: '1.5rem',
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #e5e7eb',
-                        position: 'relative',
-                        zIndex: 10
-                      }}
-                    >
-                      <h3 style={{
-                        color: '#1D3557',
-                        fontSize: '1.125rem',
-                        fontWeight: '600',
-                        marginBottom: '1rem',
-                        marginTop: 0
-                      }}>
-                        Share Your Feedback
-                      </h3>
-
-                      {modalError && (
-                        <div style={{
-                          padding: '0.75rem',
-                          marginBottom: '1rem',
-                          borderRadius: '0.5rem',
-                          backgroundColor: '#fee2e2',
-                          color: '#991b1b',
-                          fontSize: '0.875rem'
-                        }}>
-                          {modalError}
-                        </div>
-                      )}
-
-                      <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{
-                          display: 'block',
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          color: '#374151',
-                          marginBottom: '0.5rem'
-                        }}>
-                          Your Rating
-                        </label>
-                        <div style={{
-                          display: 'flex',
-                          gap: '0.5rem',
-                          marginBottom: '0.75rem'
-                        }}>
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              key={star}
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setRating(star);
-                              }}
-                              onMouseEnter={(e) => {
-                                e.stopPropagation();
-                                setHoveredRating(star);
-                              }}
-                              onMouseLeave={(e) => {
-                                e.stopPropagation();
-                                setHoveredRating(0);
-                              }}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: 0,
-                                fontSize: '2rem',
-                                color: (hoveredRating >= star || rating >= star) ? '#fbbf24' : '#d1d5db',
-                                transition: 'all 0.2s',
-                                lineHeight: 1
-                              }}
-                            >
-                              ★
-                            </button>
-                          ))}
-                        </div>
-                        {rating > 0 && (
-                          <button
-                            type="button"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              await handleSubmitRating(selectedEventForView.eventId);
-                            }}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: '#1e40af',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                              fontWeight: '600',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.stopPropagation();
-                              e.target.style.backgroundColor = '#1e3a8a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.stopPropagation();
-                              e.target.style.backgroundColor = '#1e40af';
-                            }}
-                          >
-                            Submit Rating
-                          </button>
-                        )}
-                      </div>
-
-                      <div>
-                        <label style={{
-                          display: 'block',
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          color: '#374151',
-                          marginBottom: '0.5rem'
-                        }}>
-                          Your Comment
-                        </label>
-                        <textarea
-                          value={commentText}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            setCommentText(e.target.value);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          onFocus={(e) => {
-                            e.stopPropagation();
-                            e.target.style.borderColor = '#1e40af';
-                            e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
-                          }}
-                          onBlur={(e) => {
-                            e.stopPropagation();
-                            e.target.style.borderColor = '#e5e7eb';
-                            e.target.style.boxShadow = 'none';
-                          }}
-                          placeholder="Share your thoughts about this event..."
-                          maxLength={1000}
-                          style={{
-                            width: '100%',
-                            minHeight: '100px',
-                            padding: '0.875rem',
-                            borderRadius: '0.5rem',
-                            border: '1px solid #e5e7eb',
-                            fontSize: '0.875rem',
-                            fontFamily: 'inherit',
-                            resize: 'vertical',
-                            marginBottom: '0.5rem',
-                            outline: 'none',
-                            transition: 'all 0.2s'
-                          }}
-                        />
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: '0.75rem'
-                        }}>
-                          <div style={{
-                            fontSize: '0.75rem',
-                            color: '#6b7280'
-                          }}>
-                            {commentText.length}/1000 characters
-                          </div>
-                          <button
-                            type="button"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              await handleSubmitComment(selectedEventForView.eventId);
-                            }}
-                            disabled={!commentText.trim()}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
-                              fontSize: '0.875rem',
-                              fontWeight: '600',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.stopPropagation();
-                              if (commentText.trim()) {
-                                e.target.style.backgroundColor = '#1e3a8a';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              e.stopPropagation();
-                              if (commentText.trim()) {
-                                e.target.style.backgroundColor = '#1e40af';
-                              }
-                            }}
-                          >
-                            Submit Comment
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Start Date</div>
                     <div style={{ color: '#374151', fontWeight: '500' }}>{formatDate(selectedEvent.startDate)}</div>
@@ -2531,6 +2437,29 @@ const StaffEventsView = () => {
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Vendors</div>
                       <div style={{ color: '#374151', fontWeight: '500' }}>{(selectedEvent.vendors && selectedEvent.vendors.length) || 0} vendor{((selectedEvent.vendors && selectedEvent.vendors.length) || 0) !== 1 ? 's' : ''} participating</div>
+                    </div>
+                  </div>
+                )}
+                {(selectedEvent.type === 'workshop' || selectedEvent.type === 'conference') && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      school
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Professor</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>
+                        {selectedEvent.professors 
+                          ? (Array.isArray(selectedEvent.professors) ? selectedEvent.professors.join(', ') : selectedEvent.professors)
+                          : (selectedEvent.creatorName || 'Professor')
+                        }
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2756,15 +2685,13 @@ const StaffEventsView = () => {
         />
       )}
 
-      {/* Ratings & Comments Modal */}
+      {/* View All Ratings and Comments Modal - VIEW ONLY (no forms) */}
       {showRatingsCommentsModal && selectedEventForView && (
         <div
           onClick={() => {
             setShowRatingsCommentsModal(false);
             setSelectedEventForView(null);
             setRatingsAndComments(null);
-            resetFeedbackState();
-            setRatingsLoadError('');
           }}
           style={{
             position: 'fixed',
@@ -2807,12 +2734,17 @@ const StaffEventsView = () => {
                   color: '#1D3557',
                   fontSize: '1.5rem',
                   fontWeight: '700',
-                  margin: 0
+                  margin: 0,
+                  marginBottom: '0.25rem'
                 }}>
                   Ratings & Comments
                 </h2>
-                {selectedEventForView.eventTitle && (
-                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+                {selectedEventForView?.eventTitle && (
+                  <p style={{
+                    color: '#6b7280',
+                    fontSize: '0.875rem',
+                    margin: 0
+                  }}>
                     {selectedEventForView.eventTitle}
                   </p>
                 )}
@@ -2822,8 +2754,6 @@ const StaffEventsView = () => {
                   setShowRatingsCommentsModal(false);
                   setSelectedEventForView(null);
                   setRatingsAndComments(null);
-                    resetFeedbackState();
-                    setRatingsLoadError('');
                 }}
                 style={{
                   background: 'none',
@@ -2849,7 +2779,7 @@ const StaffEventsView = () => {
               </button>
             </div>
 
-            <div
+            <div 
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               style={{
@@ -2860,19 +2790,6 @@ const StaffEventsView = () => {
                 zIndex: 10
               }}
             >
-              {ratingsLoadError && (
-                <div style={{
-                  padding: '0.75rem 1rem',
-                  marginBottom: '1rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#fee2e2',
-                  color: '#991b1b',
-                  fontSize: '0.875rem'
-                }}>
-                  {ratingsLoadError}
-                </div>
-              )}
-
               {loadingRatingsComments ? (
                 <div style={{
                   textAlign: 'center',
@@ -2883,6 +2800,7 @@ const StaffEventsView = () => {
                 </div>
               ) : ratingsAndComments ? (
                 <>
+                  {/* Ratings Section */}
                   {ratingsAndComments.ratings && (
                     <div style={{
                       marginBottom: '2rem',
@@ -2989,6 +2907,239 @@ const StaffEventsView = () => {
                     </div>
                   )}
 
+                  {/* Rate/Comment Forms - ONLY for Past Events Student Attended */}
+                  {selectedEventForView && (() => {
+                    const eventDate = selectedEventForView.eventDate;
+                    const eventEndDate = selectedEventForView.eventEndDate;
+                    const isPast = hasEventPassed(eventDate, eventEndDate);
+                    const attended = didStudentAttend(selectedEventForView.eventId);
+                    return isPast && attended;
+                  })() && (
+                    <div 
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{
+                        marginBottom: '2rem',
+                        padding: '1.5rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        position: 'relative',
+                        zIndex: 10
+                      }}
+                    >
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '1rem',
+                        marginTop: 0
+                      }}>
+                        Rate & Comment
+                      </h3>
+                      
+                      {modalError && (
+                        <div style={{
+                          padding: '0.75rem',
+                          marginBottom: '1rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: '#fee2e2',
+                          color: '#991b1b',
+                          fontSize: '0.875rem'
+                        }}>
+                          {modalError}
+                        </div>
+                      )}
+                      
+                      {/* Rating Section */}
+                      <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Your Rating
+                        </label>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'flex-start',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem'
+                        }}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                setRating(star);
+                              }}
+                              onMouseEnter={(e) => {
+                                e.stopPropagation();
+                                setHoveredRating(star);
+                              }}
+                              onMouseLeave={(e) => {
+                                e.stopPropagation();
+                                setHoveredRating(0);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontSize: '2rem',
+                                color: (hoveredRating >= star || rating >= star) ? '#fbbf24' : '#d1d5db',
+                                transition: 'all 0.2s',
+                                lineHeight: 1,
+                                zIndex: 10,
+                                position: 'relative'
+                              }}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                        {rating > 0 && (
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              await handleSubmitRating(selectedEventForView.eventId);
+                            }}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: '#1e40af',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              transition: 'all 0.2s',
+                              zIndex: 10,
+                              position: 'relative'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.stopPropagation();
+                              e.target.style.backgroundColor = '#1e3a8a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.stopPropagation();
+                              e.target.style.backgroundColor = '#1e40af';
+                            }}
+                          >
+                            Submit Rating
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Comment Section */}
+                      <div>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Your Comment
+                        </label>
+                        <textarea
+                          value={commentText}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setCommentText(e.target.value);
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onFocus={(e) => {
+                            e.stopPropagation();
+                            e.target.style.borderColor = '#1e40af';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.stopPropagation();
+                            e.target.style.borderColor = '#e5e7eb';
+                            e.target.style.boxShadow = 'none';
+                          }}
+                          placeholder="Share your thoughts about this event..."
+                          maxLength={1000}
+                          style={{
+                            width: '100%',
+                            minHeight: '100px',
+                            padding: '0.875rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            fontSize: '0.875rem',
+                            fontFamily: 'inherit',
+                            resize: 'vertical',
+                            marginBottom: '0.5rem',
+                            outline: 'none',
+                            transition: 'all 0.2s',
+                            zIndex: 10,
+                            position: 'relative',
+                            pointerEvents: 'auto'
+                          }}
+                        />
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '0.75rem'
+                        }}>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280'
+                          }}>
+                            {commentText.length}/1000 characters
+                          </div>
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              await handleSubmitComment(selectedEventForView.eventId);
+                            }}
+                            disabled={!commentText.trim()}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              transition: 'all 0.2s',
+                              zIndex: 10,
+                              position: 'relative'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.stopPropagation();
+                              if (commentText.trim()) {
+                                e.target.style.backgroundColor = '#1e3a8a';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.stopPropagation();
+                              if (commentText.trim()) {
+                                e.target.style.backgroundColor = '#1e40af';
+                              }
+                            }}
+                          >
+                            Submit Comment
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Comments Section */}
                   <div>
                     <h3 style={{
                       color: '#1D3557',
@@ -3085,4 +3236,4 @@ const StaffEventsView = () => {
   );
 };
 
-export default StaffEventsView;
+export default TAEventsView;
