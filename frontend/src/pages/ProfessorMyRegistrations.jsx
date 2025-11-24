@@ -4,7 +4,7 @@ import professorApiService from '../api/professorApi';
 import { eventsApiService } from '../api/eventsApi';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
 import { notificationApiService } from '../api/notificationApi';
-import { eventsApiService } from '../api/eventsApi';
+
 import { useAuth } from '../contexts/AuthContext';
 
 const ProfessorMyRegistrations = () => {
