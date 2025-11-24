@@ -1,4 +1,5 @@
 const Event = require('../models/eventModel');
+const { notifyNewEventCreated } = require('../services/notificationService');
 
 // Create a new Trip (33)
 exports.createTrip = async (req, res) => {
@@ -6,7 +7,7 @@ exports.createTrip = async (req, res) => {
     console.log('🔹 Trip creation request received:', req.body);
     console.log('🔹 User making request:', req.user);
     
-    const { name, location, price, startDate, endDate, description, capacity, registrationDeadline } = req.body;
+    const { name, location, price, startDate, endDate, description, capacity, registrationDeadline, allowedUserTypes } = req.body;
 
     // Validate required fields
     if (!name || !location || !startDate || !endDate) {
@@ -26,12 +27,26 @@ exports.createTrip = async (req, res) => {
       capacity,
       registrationDeadline,
       createdBy: req.user._id, // Track who created it
-      status: 'approved' // Event office creates approved events
+      status: 'approved', // Event office creates approved events
+      // User type restrictions
+      isRestricted: allowedUserTypes && allowedUserTypes.length > 0,
+      allowedUserTypes: allowedUserTypes && allowedUserTypes.length > 0 ? allowedUserTypes : []
     });
 
     console.log('🔹 Creating trip with data:', newTrip);
     await newTrip.save();
     console.log('✅ Trip created successfully:', newTrip._id);
+    
+    // Send notifications to all eligible users about the new trip
+    if (newTrip.status === 'approved') {
+      console.log(`📢 Trip ${newTrip._id} is approved, triggering notifications...`);
+      try {
+        await notifyNewEventCreated(newTrip);
+        console.log(`✅ Notifications triggered successfully for trip ${newTrip._id}`);
+      } catch (notifError) {
+        console.error(`❌ Error triggering notifications for trip ${newTrip._id}:`, notifError);
+      }
+    }
     
     res.status(201).json({ message: 'Trip created successfully', trip: newTrip });
   } catch (error) {

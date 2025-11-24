@@ -6,28 +6,25 @@ import AdminVendors from './pages/AdminVendors';
 import AdminEvents from './pages/AdminEvents';
 import AdminEventsView from './pages/AdminEventsView';
 import AdminPlatformBoothRequests from './pages/AdminPlatformBoothRequests';
-import AdminManagement from './pages/AdminManagement';
 import AdminProfile from './pages/AdminProfile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import EventsOfficeDashboard from './pages/EventsOfficeDashboard';
 import PendingVerification from './pages/PendingVerification';
 import ProfessorMyRegistrations from './pages/ProfessorMyRegistrations';
 import ProfessorEventsView from './pages/ProfessorEventsView';
+import ProfessorFavorites from './pages/ProfessorFavorites';
 import CreateWorkshop from './pages/CreateWorkshop';
 import MyWorkshops from './pages/MyWorkshops';
 import GymSchedule from './pages/GymSchedule';
 import GymManage from './pages/GymManage';
 import ProfessorProfile from './pages/ProfessorProfile';
 import VendorDashboard from './pages/VendorDashboard';
-import CreateConference from './pages/CreateConfrence';
 import EditConfrences from './pages/EditConfrences';
 import EventsList from './pages/EventsList';
-import CreateBazaar from "./pages/CreateBazaar";
-import CreateTrip from './pages/CreateTrip';
 import CreateBooth from './pages/CreateBooth';
-import CreateGymSession from './pages/CreateGymSession';
 import EditBazaar from './pages/EditBazaar';
 import EditTrip from './pages/EditTrip';
 import VendorBazaars from './pages/VendorBazaars';
@@ -36,14 +33,28 @@ import VendorAccepted from './pages/VendorAccepted';
 import VendorRequests from './pages/VendorRequests';
 import StudentEventsView from './pages/StudentEventsView';
 import StudentMyRegistrations from './pages/StudentMyRegistrations';
+import StudentFavorites from './pages/StudentFavorites';
 import StudentCourtsView from './pages/StudentCourtsView';
+import StudentLoyaltyVendorsView from './pages/StudentLoyaltyVendorsView';
+import ProfessorLoyaltyVendorsView from './pages/ProfessorLoyaltyVendorsView';
 import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
+import StaffFavorites from './pages/StaffFavorites';
+import StaffLoyaltyVendorsView from './pages/StaffLoyaltyVendorsView';
+import TAEventsView from './pages/TAEventsView';
+import TAMyRegistrations from './pages/TAMyRegistrations';
+import TAFavorites from './pages/TAFavorites';
+import TALoyaltyVendorsView from './pages/TALoyaltyVendorsView';
+import EventPayment from './pages/EventPayment';
+import PaymentSuccess from './pages/PaymentSuccess';
+import MyWallet from './pages/MyWallet';
 import CourtAvailability from './pages/CourtAvailability';
 import PlatformBoothReservation from './pages/PlatformBoothReservation';
-import PlatformBooths from './pages/PlatformBooths';
 import EventsOfficeEventsView from './pages/EventsOfficeEventsView';
 import EventsOfficeWorkshops from './pages/EventsOfficeWorkshops';
+import EventsOfficeVendors from './pages/EventsOfficeVendors';
+import AdminLoyaltyProgramVendors from './pages/AdminLoyaltyProgramVendors';
+import EventsOfficeLoyaltyProgramVendors from './pages/EventsOfficeLoyaltyProgramVendors';
 import VendorAcceptedEvents from './pages/VendorAcceptedEvents';
 import VendorMyRequests from './pages/VendorMyRequests';
 import PlatformBoothRequests from './pages/PlatformBoothRequests';
@@ -158,6 +169,28 @@ const EventsOfficeOnly = ({ children }) => {
   return (isEventsOffice || isAdmin) ? children : <Navigate to="/dashboard" />;
 };
 
+// Admin or Events Office guard
+const AdminOrEventsOfficeOnly = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
+      }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  const isAdmin = user && (user.userType === 'admin' || user.userType === 'Admin' || user.role === 'admin' || user.role === 'Admin');
+  const isEventsOffice = user && (user.userType === 'Event Office' || user.userType === 'Events Office' || user.userType === 'event_office' || user.role === 'event_office' || user.role === 'Event Office');
+  return (isAdmin || isEventsOffice) ? children : <Navigate to="/dashboard" />;
+};
+
 // Student-only guard
 const StudentOnly = ({ children }) => {
   const { user, loading } = useAuth();
@@ -250,6 +283,14 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/verify-email"
+              element={
+                <PublicRoute>
+                  <VerifyEmail />
+                </PublicRoute>
+              }
+            />
+            <Route
               path="/pending-verification"
               element={<PendingVerification />}
             />
@@ -315,7 +356,7 @@ const AppContent = () => {
               path="/vendor/platform-booths"
               element={
                 <ProtectedRoute>
-                  <PlatformBooths />
+                  <Navigate to="/vendor" replace />
                 </ProtectedRoute>
               }
             />
@@ -366,6 +407,16 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/event-office/vendors"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <EventsOfficeVendors />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/event-office/platform-booth-requests"
               element={
                 <ProtectedRoute>
@@ -404,11 +455,31 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/student/favorites"
+              element={
+                <ProtectedRoute>
+                  <StudentOnly>
+                    <StudentFavorites />
+                  </StudentOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/student/courts"
               element={
                 <ProtectedRoute>
                   <StudentOnly>
                     <StudentCourtsView />
+                  </StudentOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/loyalty-vendors"
+              element={
+                <ProtectedRoute>
+                  <StudentOnly>
+                    <StudentLoyaltyVendorsView />
                   </StudentOnly>
                 </ProtectedRoute>
               }
@@ -430,6 +501,98 @@ const AppContent = () => {
                   <StaffAndTAOnly>
                     <StaffMyRegistrations />
                   </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/favorites"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <StaffFavorites />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/loyalty-vendors"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <StaffLoyaltyVendorsView />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ta/events"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <TAEventsView />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ta/my-registrations"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <TAMyRegistrations />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ta/favorites"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <TAFavorites />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ta/loyalty-vendors"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <TALoyaltyVendorsView />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events/:id/payment"
+              element={
+                <ProtectedRoute>
+                  <EventPayment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payment-success"
+              element={
+                <ProtectedRoute>
+                  <PaymentSuccess />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events/payment-success"
+              element={
+                <ProtectedRoute>
+                  <PaymentSuccess />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/wallet"
+              element={
+                <ProtectedRoute>
+                  <MyWallet />
                 </ProtectedRoute>
               }
             />
@@ -498,6 +661,14 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/professor/favorites"
+              element={
+                <ProtectedRoute>
+                  <ProfessorFavorites />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/professor/profile"
               element={
                 <ProtectedRoute>
@@ -510,6 +681,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <GymSchedule />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/professor/loyalty-vendors"
+              element={
+                <ProtectedRoute>
+                  <ProfessorLoyaltyVendorsView />
                 </ProtectedRoute>
               }
             />
@@ -554,21 +733,31 @@ const AppContent = () => {
               }
             />
             <Route
-              path="/admin/platform-booth-requests"
+              path="/admin/loyalty-program-vendors"
               element={
                 <ProtectedRoute>
                   <AdminOnly>
-                    <AdminPlatformBoothRequests />
+                    <AdminLoyaltyProgramVendors />
                   </AdminOnly>
                 </ProtectedRoute>
               }
             />
             <Route
-              path="/admin/manage"
+              path="/event-office/loyalty-partners"
+              element={
+                <ProtectedRoute>
+                  <EventsOfficeOnly>
+                    <EventsOfficeLoyaltyProgramVendors />
+                  </EventsOfficeOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/platform-booth-requests"
               element={
                 <ProtectedRoute>
                   <AdminOnly>
-                    <AdminManagement />
+                    <AdminPlatformBoothRequests />
                   </AdminOnly>
                 </ProtectedRoute>
               }
@@ -584,15 +773,6 @@ const AppContent = () => {
               }
             />
             <Route
-              path="/create-conference"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <CreateConference />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>}
-            />
-            <Route
               path="/edit-conference/:id"
               element={
                 <ProtectedRoute>
@@ -601,40 +781,12 @@ const AppContent = () => {
               } />
             {/* ✅ ADD YOUR EVENT MANAGEMENT ROUTES HERE */}
             <Route
-              path="/create-bazaar"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <CreateBazaar />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/create-trip"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <CreateTrip />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/create-booth"
               element={
                 <ProtectedRoute>
                   <EventsOfficeOnly>
                     <CreateBooth />
                   </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/create-gym-session"
-              element={
-                <ProtectedRoute>
-                  <CreateGymSession />
                 </ProtectedRoute>
               }
             />

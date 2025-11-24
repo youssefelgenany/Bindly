@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import professorApiService from '../api/professorApi';
+import { eventsApiService } from '../api/eventsApi';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
+import { notificationApiService } from '../api/notificationApi';
 import StudentRegistrationForm from '../components/StudentRegistrationForm';
 import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
 
@@ -10,12 +12,17 @@ const ProfessorEventsView = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
+  const [professorFilter, setProfessorFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('date-asc'); // date-asc, date-desc, title-asc, title-desc
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [showProfessorDropdown, setShowProfessorDropdown] = useState(false);
+  const [availableProfessors, setAvailableProfessors] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
   const [registrationEvent, setRegistrationEvent] = useState(null);
@@ -23,14 +30,136 @@ const ProfessorEventsView = () => {
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
   const [registeredEventIds, setRegisteredEventIds] = useState(new Set());
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [showRatingsCommentsModal, setShowRatingsCommentsModal] = useState(false);
+  const [selectedEventForView, setSelectedEventForView] = useState(null);
+  const [ratingsAndComments, setRatingsAndComments] = useState(null);
+  const [loadingRatingsComments, setLoadingRatingsComments] = useState(false);
+  const [eventRatings, setEventRatings] = useState({});
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [favoriteEventIds, setFavoriteEventIds] = useState(new Set());
 
   const isActiveRoute = (path) => {
-    return location.pathname === path;
+    const currentPath = location.pathname;
+    // Exact match
+    if (currentPath === path) return true;
+    // For dashboard, check if it's exactly /dashboard (not /dashboard/something)
+    if (path === '/dashboard') {
+      return currentPath === '/dashboard';
+    }
+    // For other routes, check if current path starts with the route path
+    return currentPath.startsWith(path);
   };
 
-  const handleLogout = () => {
+  const handleLogout = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     logout();
     navigate('/login');
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
+        setShowLogoutDropdown(false);
+      }
+      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
+      if (showFilterDropdown && !event.target.closest('[data-filter-dropdown]')) {
+        setShowFilterDropdown(false);
+      }
+      if (showSortDropdown && !event.target.closest('[data-sort-dropdown]')) {
+        setShowSortDropdown(false);
+      }
+      if (showProfessorDropdown && !event.target.closest('[data-professor-dropdown]')) {
+        setShowProfessorDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLogoutDropdown, showNotificationsDropdown, showFilterDropdown, showSortDropdown, showProfessorDropdown]);
+
+  // Load notifications
+  const loadNotifications = useCallback(async () => {
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+      
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(notificationsResult.data.data.notifications || notificationsResult.data.data || []);
+      }
+      
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, []);
+
+  // Load notifications on mount and poll for updates
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
+
+  // Mark notification as read
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev => prev.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Mark all as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  // Format notification date
+  const formatNotificationDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   const loadEvents = useCallback(async () => {
@@ -74,11 +203,87 @@ const ProfessorEventsView = () => {
           const type = (ev.type || '').toLowerCase();
           const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
           // Only keep events with valid types and non-empty title/location
-          return validTypes.includes(type) && 
-                 ev.title && ev.title.trim() !== '' && 
-                 ev.location && ev.location.trim() !== '';
+          if (!validTypes.includes(type) || !ev.title || ev.title.trim() === '' || !ev.location || ev.location.trim() === '') {
+            return false;
+          }
+          
+          // Apply type filter if not 'all' - strict matching
+          if (filter && filter !== 'all' && filter.trim() !== '') {
+            const filterType = filter.trim().toLowerCase();
+            const eventType = (type || '').toString().trim().toLowerCase();
+            if (eventType !== filterType) {
+              return false;
+            }
+          }
+          
+          return true;
         });
-        setEvents(mapped);
+        
+        // Extract unique professors from workshop/conference events
+        const professorsSet = new Set();
+        mapped.forEach(ev => {
+          if (ev.type === 'workshop' || ev.type === 'conference') {
+            if (ev.professors) {
+              if (Array.isArray(ev.professors)) {
+                ev.professors.forEach(p => {
+                  if (p && typeof p === 'string') {
+                    professorsSet.add(p.trim());
+                  }
+                });
+              } else if (typeof ev.professors === 'string') {
+                professorsSet.add(ev.professors.trim());
+              }
+            }
+            if (ev.creatorName) {
+              professorsSet.add(ev.creatorName.trim());
+            }
+          }
+        });
+        const professorsList = Array.from(professorsSet).sort();
+        setAvailableProfessors(professorsList);
+        
+        // Apply professor filter if workshop/conference is selected
+        let filteredEvents = mapped;
+        if ((filter === 'workshop' || filter === 'conference') && professorFilter !== 'all') {
+          filteredEvents = mapped.filter(ev => {
+            if (ev.type !== 'workshop' && ev.type !== 'conference') return false;
+            const eventProfessors = [];
+            if (ev.professors) {
+              if (Array.isArray(ev.professors)) {
+                eventProfessors.push(...ev.professors.map(p => p?.trim()));
+              } else if (typeof ev.professors === 'string') {
+                eventProfessors.push(ev.professors.trim());
+              }
+            }
+            if (ev.creatorName) {
+              eventProfessors.push(ev.creatorName.trim());
+            }
+            return eventProfessors.some(p => p === professorFilter);
+          });
+        }
+        
+        // Sort events before setting
+        const sortedEvents = sortEvents(filteredEvents);
+        setEvents(sortedEvents);
+        
+        // Load ratings for all events
+        const ratingsMap = {};
+        await Promise.all(sortedEvents.map(async (ev) => {
+          if (ev.id) {
+            try {
+              const ratingResult = await eventsApiService.getRatingsAndComments(ev.id);
+              if (ratingResult.success && ratingResult.data?.ratings) {
+                ratingsMap[ev.id] = {
+                  average: ratingResult.data.ratings.average || 0,
+                  count: ratingResult.data.ratings.count || 0
+                };
+              }
+            } catch (err) {
+              // Silently fail - ratings are optional
+            }
+          }
+        }));
+        setEventRatings(ratingsMap);
       } else {
         setEvents([]);
         const msg = result.message || (typeof result.error === 'string' ? result.error : 'Failed to fetch events');
@@ -89,11 +294,129 @@ const ProfessorEventsView = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, filter]);
+  }, [searchQuery, filter, professorFilter, sortBy]);
 
   useEffect(() => {
     loadEvents();
-  }, [filter, loadEvents]);
+  }, [filter, professorFilter, sortBy, loadEvents]);
+
+  // Reset professor filter when filter changes away from workshop/conference
+  useEffect(() => {
+    if (filter !== 'workshop' && filter !== 'conference') {
+      setProfessorFilter('all');
+    }
+  }, [filter]);
+
+  // Load user's favorite events (for Professor users)
+  useEffect(() => {
+    const loadFavoriteEvents = async () => {
+      if (!user || user.userType !== 'Professor') return;
+      
+      try {
+        const result = await eventsApiService.getFavoriteEvents();
+        if (result.success && result.data.events) {
+          const favoriteIds = new Set();
+          result.data.events.forEach(event => {
+            if (event._id) {
+              favoriteIds.add(String(event._id));
+            } else if (event.id) {
+              favoriteIds.add(String(event.id));
+            }
+          });
+          setFavoriteEventIds(favoriteIds);
+        }
+      } catch (error) {
+        console.error('Error loading favorite events:', error);
+      }
+    };
+
+    loadFavoriteEvents();
+  }, [user]);
+
+  const handleToggleFavorite = async (eventId, e) => {
+    e.stopPropagation(); // Prevent card click
+    
+    if (!user || user.userType !== 'Professor') return;
+    
+    const isFavorite = favoriteEventIds.has(String(eventId));
+    
+    try {
+      if (isFavorite) {
+        const result = await eventsApiService.removeFromFavorites(eventId);
+        if (result.success) {
+          setFavoriteEventIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(String(eventId));
+            return newSet;
+          });
+        }
+      } else {
+        const result = await eventsApiService.addToFavorites(eventId);
+        if (result.success) {
+          setFavoriteEventIds(prev => new Set([...prev, String(eventId)]));
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
+  // Load ratings and comments for viewing (VIEW ONLY)
+  const loadRatingsAndComments = async (eventId) => {
+    try {
+      setLoadingRatingsComments(true);
+      const eventIdStr = String(eventId);
+      const result = await eventsApiService.getRatingsAndComments(eventIdStr);
+      if (result.success) {
+        setRatingsAndComments(result.data);
+      }
+    } catch (err) {
+      console.error('Error loading ratings and comments:', err);
+    } finally {
+      setLoadingRatingsComments(false);
+    }
+  };
+
+  // Handle view ratings and comments
+  const handleViewRatingsComments = async (eventId, eventTitle) => {
+    const event = events.find(e => e.id === eventId || String(e.id) === String(eventId));
+    
+    const eventData = {
+      eventId: eventId,
+      eventDate: event?.startDate,
+      eventEndDate: event?.endDate,
+      eventTitle: eventTitle || event?.title
+    };
+    
+    setSelectedEventForView(eventData);
+    setShowRatingsCommentsModal(true);
+    await loadRatingsAndComments(eventId);
+  };
+
+  // Sort events
+  const sortEvents = (eventsList) => {
+    const sorted = [...eventsList];
+    switch (sortBy) {
+      case 'date-asc':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.startDate || a.endDate || 0);
+          const dateB = new Date(b.startDate || b.endDate || 0);
+          return dateA - dateB;
+        });
+      case 'date-desc':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.startDate || a.endDate || 0);
+          const dateB = new Date(b.startDate || b.endDate || 0);
+          return dateB - dateA;
+        });
+      case 'title-asc':
+        return sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+      case 'title-desc':
+        return sorted.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+      default:
+        return sorted;
+    }
+  };
 
   // Load user's registrations to check which events they're registered for
   useEffect(() => {
@@ -105,9 +428,12 @@ const ProfessorEventsView = () => {
         // So we need to check the student registration API, not the professor registration API
         const result = await studentRegistrationApi.getMyRegistrations(user.email);
         if (result.success && result.data.registrations) {
-          // Extract event IDs from registrations
+          // Extract event IDs from PAID registrations only
           const registeredIds = new Set();
           result.data.registrations.forEach(reg => {
+            // Only include paid registrations
+            if (reg.paid !== true) return;
+            
             // Check for eventId in the formatted response
             if (reg.eventId) {
               registeredIds.add(String(reg.eventId));
@@ -204,6 +530,21 @@ const ProfessorEventsView = () => {
     return colors[type] || colors.other;
   };
 
+  const getEventTypeImage = (type) => {
+    const imageMap = {
+      conference: '/assets/images/conference-background.jpg',
+      workshop: '/assets/images/workshop-background.jpg',
+      bazaar: '/assets/images/bazaar-background.jpg',
+      trip: '/assets/images/trip-background.png',
+      booth: '/assets/images/booth-background.jpg'
+    };
+    return imageMap[type] || null;
+  };
+
+  const getEventTypeFallbackText = (type) => {
+    return type ? type.toUpperCase() : 'EVENT';
+  };
+
   const getEventStatus = (event) => {
     const now = new Date();
     const startDate = new Date(event.startDate);
@@ -239,7 +580,7 @@ const ProfessorEventsView = () => {
     });
   };
 
-  // Filter events based on type
+  // Filter events based on type (client-side filtering for past events)
   const filteredEvents = events.filter(event => {
     const title = (event.title || '').trim();
     if (!title) return false;
@@ -248,18 +589,7 @@ const ProfessorEventsView = () => {
     const startDate = new Date(event.startDate);
     if (isNaN(startDate.getTime())) return false;
     
-    // Filter out past events - use endDate to allow events that haven't ended yet
-    const now = new Date();
-    const eventEndDate = event.endDate ? new Date(event.endDate) : startDate;
-    // Only filter out if endDate is valid and has passed
-    if (event.endDate && !isNaN(eventEndDate.getTime()) && eventEndDate < now) {
-      return false;
-    }
-    // If no endDate, use startDate (for backward compatibility)
-    if (!event.endDate && startDate < now) {
-      return false;
-    }
-    
+    // Show all events including past events - no date filtering
     const typeMatch = filter === 'all' || (event.type && event.type === filter);
     return typeMatch;
   });
@@ -285,408 +615,301 @@ const ProfessorEventsView = () => {
   return (
     <div style={{
       display: 'flex',
-      height: '100vh',
+      flexDirection: 'column',
+      minHeight: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
+      backgroundColor: '#f6f7f8'
     }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: sidebarOpen ? '16rem' : '0',
-        flexShrink: 0,
-        backgroundColor: '#1D3557',
-        padding: sidebarOpen ? '1.5rem' : '0',
+      {/* Header/Navbar */}
+      <header style={{
         display: 'flex',
-        flexDirection: 'column',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        overflow: 'hidden',
-        transition: 'width 0.3s ease, padding 0.3s ease'
+        borderBottom: '1px solid #e2e8f0',
+        padding: '1rem 2.5rem',
+        backgroundColor: '#FFFFFF'
       }}>
-        {/* Top Section - Logo and Navigation */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Logo and Branding */}
-          {sidebarOpen && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                borderRadius: '50%',
-                backgroundColor: '#457B9D',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF'
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <h1 style={{
-                  color: '#FFFFFF',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Professor Portal
-                </h1>
-                <p style={{
-                  color: 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: '400',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  University Portal
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation */}
-          {sidebarOpen && (
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <Link
-                to="/dashboard"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                  textDecoration: 'none',
-                  color: '#FFFFFF'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.25rem' }}>
-                  dashboard
-                </span>
-                <p style={{
-                  color: '#FFFFFF',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Dashboard
-                </p>
-              </Link>
-
-              <Link
-                to="/professor/all-events"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/professor/all-events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/professor/all-events')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/professor/all-events')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  explore
-                </span>
-                <p style={{
-                  color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/professor/all-events') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Discover Events
-                </p>
-              </Link>
-
-                            <Link
-                                to="/professor/events"
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    padding: '0.5rem 0.75rem',
-                                    borderRadius: '0.5rem',
-                                    backgroundColor: isActiveRoute('/professor/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                                    textDecoration: 'none'
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!isActiveRoute('/professor/events')) {
-                                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!isActiveRoute('/professor/events')) {
-                                        e.target.style.backgroundColor = 'transparent';
-                                    }
-                                }}
-                            >
-                                <span className="material-symbols-outlined" style={{ 
-                                    color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                                    fontSize: '1.25rem' 
-                                }}>
-                                    event_note
-                                </span>
-                                <p style={{
-                                    color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                                    fontSize: '0.875rem',
-                                    fontWeight: isActiveRoute('/professor/events') ? '700' : '500',
-                                    lineHeight: 'normal',
-                                    margin: 0
-                                }}>
-                                    My Events
-                                </p>
-                            </Link>
-
-                            <Link
-                                to="/professor/my-workshops"
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    padding: '0.5rem 0.75rem',
-                                    borderRadius: '0.5rem',
-                                    backgroundColor: isActiveRoute('/professor/my-workshops') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                                    textDecoration: 'none'
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!isActiveRoute('/professor/my-workshops')) {
-                                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!isActiveRoute('/professor/my-workshops')) {
-                                        e.target.style.backgroundColor = 'transparent';
-                                    }
-                                }}
-                            >
-                                <span className="material-symbols-outlined" style={{ 
-                                    color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                                    fontSize: '1.25rem' 
-                                }}>
-                                    work
-                                </span>
-                                <p style={{
-                                    color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                                    fontSize: '0.875rem',
-                                    fontWeight: isActiveRoute('/professor/my-workshops') ? '700' : '500',
-                                    lineHeight: 'normal',
-                                    margin: 0
-                                }}>
-                                    My Workshops
-                                </p>
-                            </Link>
-
-                            <Link
-                                to="/gym-schedule"
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    padding: '0.5rem 0.75rem',
-                                    borderRadius: '0.5rem',
-                                    backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                                    textDecoration: 'none'
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!isActiveRoute('/gym-schedule')) {
-                                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!isActiveRoute('/gym-schedule')) {
-                                        e.target.style.backgroundColor = 'transparent';
-                                    }
-                                }}
-                            >
-                                <span className="material-symbols-outlined" style={{ 
-                                    color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                                    fontSize: '1.25rem' 
-                                }}>
-                                    calendar_month
-                                </span>
-                                {sidebarOpen && (
-                                    <p style={{
-                                        color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                                        fontSize: '0.875rem',
-                                        fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
-                                        lineHeight: 'normal',
-                                        margin: 0
-                                    }}>
-                                        View Gym Sessions
-                                    </p>
-                                )}
-                            </Link>
-
-                            <Link
-                                to="/professor/create-workshop"
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    padding: '0.5rem 0.75rem',
-                                    borderRadius: '0.5rem',
-                                    backgroundColor: isActiveRoute('/professor/create-workshop') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                                    textDecoration: 'none'
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!isActiveRoute('/professor/create-workshop')) {
-                                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!isActiveRoute('/professor/create-workshop')) {
-                                        e.target.style.backgroundColor = 'transparent';
-                                    }
-                                }}
-                            >
-                                <span className="material-symbols-outlined" style={{ 
-                                    color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                                    fontSize: '1.25rem' 
-                                }}>
-                                    add_circle
-                                </span>
-                                {sidebarOpen && (
-                                    <p style={{
-                                        color: isActiveRoute('/professor/create-workshop') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                                        fontSize: '0.875rem',
-                                        fontWeight: isActiveRoute('/professor/create-workshop') ? '700' : '500',
-                                        lineHeight: 'normal',
-                                        margin: 0
-                                    }}>
-                                        Create Workshop
-                                    </p>
-                                )}
-                            </Link>
-                        </nav>
-          )}
-        </div>
-        
-        {/* Logout Button - Fixed at bottom */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <button
-            onClick={handleLogout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              width: '100%'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ color: 'rgba(241, 250, 238, 0.7)', fontSize: '1.25rem' }}>
-              logout
-            </span>
-            {sidebarOpen && (
-              <p style={{
-                color: 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Logout
-              </p>
-            )}
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
-        {/* Header */}
-        <header style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
-          padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1D3557'
-              }}
-              aria-label="Toggle sidebar"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                menu
-              </span>
-            </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+          <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
-              margin: 0
+              margin: 0,
+              cursor: 'pointer'
             }}>
               Bindly
             </h2>
+          </Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          {/* Notifications Bell */}
+          <div style={{ position: 'relative' }} data-notifications-dropdown>
+            <button
+              onClick={() => {
+                setShowNotificationsDropdown(!showNotificationsDropdown);
+                setShowLogoutDropdown(false);
+                if (!showNotificationsDropdown) {
+                  loadNotifications();
+                }
+              }}
+              style={{
+                position: 'relative',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span className="material-symbols-outlined" style={{
+                fontSize: '1.5rem',
+                color: '#1D3557'
+              }}>
+                notifications
+              </span>
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '0.25rem',
+                  right: '0.25rem',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  borderRadius: '50%',
+                  width: '1.125rem',
+                  height: '1.125rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.625rem',
+                  fontWeight: '700',
+                  border: '2px solid #FFFFFF'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {showNotificationsDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 1001,
+                width: '360px',
+                maxHeight: '500px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  padding: '1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    margin: 0
+                  }}>
+                    Notifications
+                  </h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllAsRead}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#1e40af',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        padding: '0.25rem 0.5rem'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.textDecoration = 'underline';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.textDecoration = 'none';
+                      }}
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                <div style={{
+                  overflowY: 'auto',
+                  maxHeight: '400px'
+                }}>
+                  {loadingNotifications ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      Loading...
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification._id}
+                        onClick={() => {
+                          if (!notification.isRead) {
+                            handleMarkAsRead(notification._id);
+                          }
+                          if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                            navigate(`/professor/all-events`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            (notification.type === 'event_reminder' || 
+                             notification.type === 'workshop_reminder' || 
+                             notification.type === 'trip_reminder' ||
+                             notification.type === 'gym_session_reminder') && 
+                            (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                          ) {
+                            // Navigate to My Events for reminders
+                            navigate(`/professor/events`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            notification.type === 'new_loyalty_partner' || 
+                            notification.type === 'loyalty_partner_added' ||
+                            (notification.type === 'system' && notification.metadata?.vendorId)
+                          ) {
+                            // Navigate to Loyalty Partners page
+                            navigate(`/professor/loyalty-vendors`);
+                            setShowNotificationsDropdown(false);
+                          }
+                        }}
+                        style={{
+                          padding: '1rem',
+                          borderBottom: '1px solid #f3f4f6',
+                          cursor: 'pointer',
+                          backgroundColor: notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fef2f2'
+                              : '#eff6ff',
+                          borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
+                            ? '3px solid #ef4444'
+                            : 'none',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#f9fafb' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fee2e2'
+                              : '#dbeafe';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fef2f2'
+                              : '#eff6ff';
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{
+                              fontSize: '0.875rem',
+                              fontWeight: notification.isRead ? '400' : '600',
+                              color: '#1D3557',
+                              margin: 0,
+                              marginBottom: '0.25rem'
+                            }}>
+                              {notification.title || notification.message}
+                            </p>
+                            {notification.message && notification.message !== notification.title && (
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                margin: 0
+                              }}>
+                                {notification.message}
+                              </p>
+                            )}
+                            <p style={{
+                              fontSize: '0.625rem',
+                              color: '#9ca3af',
+                              margin: '0.5rem 0 0 0'
+                            }}>
+                              {formatNotificationDate(notification.createdAt)}
+                            </p>
+                          </div>
+                          {!notification.isRead && (
+                            <div style={{
+                              width: '0.5rem',
+                              height: '0.5rem',
+                              borderRadius: '50%',
+                              backgroundColor: '#1e40af',
+                              flexShrink: 0,
+                              marginTop: '0.25rem'
+                            }} />
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#1D3557',
-                margin: 0
-              }}>
-                {displayName}
-              </p>
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                margin: 0
-              }}>
-                Professor
-              </p>
-            </div>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#1D3557',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              Professor
+            </p>
+          </div>
+          <div 
+            data-profile-dropdown
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+          >
             {user?.profilePicturePath ? (
               <img
                 src={`http://localhost:5000${user.profilePicturePath}`}
@@ -713,158 +936,635 @@ const ProfessorEventsView = () => {
                 {(user?.firstName?.[0] || user?.name?.[0] || 'P').toUpperCase()}
               </div>
             )}
+            {showLogoutDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                zIndex: 1000,
+                minWidth: '150px'
+              }}>
+                {user?.userType === 'Professor' && (
+                  <Link
+                    to="/wallet"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#1D3557',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                    }}
+                    onClick={() => setShowLogoutDropdown(false)}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      account_balance_wallet
+                    </span>
+                    My Wallet
+                  </Link>
+                )}
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    logout
+                  </span>
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
-        </header>
+        </div>
+      </header>
+
+      {/* Horizontal Menu Bar */}
+      <nav style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '1rem 2rem',
+        backgroundColor: '#FFFFFF',
+        borderBottom: '1px solid #e2e8f0'
+      }}>
+        {/* Navigation Links */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+          <Link
+            to="/dashboard"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Dashboard
+          </Link>
+          <Link
+            to="/professor/all-events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Discover Events
+          </Link>
+          <Link
+            to="/professor/events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Events
+          </Link>
+          <Link
+            to="/professor/my-workshops"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Workshops
+          </Link>
+          <Link
+            to="/professor/favorites"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/favorites') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/favorites') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Favorites
+          </Link>
+          <Link
+            to="/gym-schedule"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/gym-schedule') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            View Gym Sessions
+          </Link>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
 
         {/* Content */}
         <div style={{
           flex: 1,
-          padding: '2rem',
+          padding: '2rem 0',
           overflowY: 'auto',
           backgroundColor: '#f6f7f8'
         }}>
-          {/* Page Title Box */}
+          {/* Content Wrapper with Margins */}
           <div style={{
-            backgroundColor: '#FFFFFF',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-            marginBottom: '1.5rem',
-            borderLeft: '4px solid #1D3557'
+            marginLeft: '4rem',
+            marginRight: '4rem'
           }}>
-            <h3 style={{
-              color: '#1D3557',
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              margin: 0
+          {/* Page Title Banner */}
+          <div style={{
+            position: 'relative',
+            height: '140px',
+            borderRadius: '0.75rem',
+            overflow: 'hidden',
+            marginBottom: '1.5rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+          }}>
+            {/* Background Image */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(/assets/images/events-banner.jpeg)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
+            }}></div>
+            {/* Blue Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Content */}
+            <div style={{
+              position: 'relative',
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '2rem 2.5rem',
+              color: '#FFFFFF'
             }}>
-              Discover Events
-            </h3>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '1rem',
-              fontWeight: '400',
-              margin: '0.25rem 0 0 0'
-            }}>
-              Browse and register for upcoming university events.
-            </p>
+              <h3 style={{
+                color: '#FFFFFF',
+                fontSize: '1.75rem',
+                fontWeight: '700',
+                margin: 0,
+                marginBottom: '0.5rem'
+              }}>
+                Discover Events
+              </h3>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '0.875rem',
+                fontWeight: '400',
+                margin: 0
+              }}>
+                Browse and register for upcoming events.
+              </p>
+            </div>
           </div>
 
           {/* Search and Filters */}
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '0.75rem',
-            padding: '1.5rem',
+            padding: '1rem 1.5rem',
             marginBottom: '1.5rem',
             boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
-            {/* Search Bar */}
-            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', alignItems: 'center' }}>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <span className="material-symbols-outlined" style={{
-                  position: 'absolute',
-                  left: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#9ca3af',
-                  fontSize: '1.25rem',
-                  pointerEvents: 'none'
-                }}>
-                  search
-                </span>
-                <input
-                  type="text"
-                  placeholder="Search by event name, professor name, location, or description..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem 0.875rem 0.875rem 2.75rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb',
-                    backgroundColor: '#FFFFFF',
-                    fontSize: '0.875rem',
-                    outline: 'none',
-                    transition: 'all 0.2s',
-                    boxSizing: 'border-box'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#1e40af';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                />
-              </div>
-              <button
-                onClick={handleSearch}
-                style={{
-                  padding: '0.875rem 1.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#1e40af',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#1e3a8a';
-                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#1e40af';
-                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                }}
-              >
-                Search
-              </button>
-            </div>
-            
-            {/* Filter Buttons */}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              {/* Search Input and Button - Left Side */}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: '0 1 auto' }}>
+                <div style={{ position: 'relative', width: '520px' }}>
+                  <span className="material-symbols-outlined" style={{
+                    position: 'absolute',
+                    left: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#9ca3af',
+                    fontSize: '1.25rem',
+                    pointerEvents: 'none',
+                    zIndex: 1
+                  }}>
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search by event name, professor name, location, or description..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: '#ffffff',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'all 0.2s',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#1e40af';
+                      e.target.style.backgroundColor = '#ffffff';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e5e7eb';
+                      e.target.style.backgroundColor = '#ffffff';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
                 <button
-                  key={type}
-                  onClick={() => {
-                    setFilter(type);
-                    handleSearch();
-                  }}
+                  onClick={handleSearch}
                   style={{
-                    padding: '0.625rem 1.25rem',
+                    padding: '0.875rem 1.75rem',
                     borderRadius: '0.5rem',
-                    backgroundColor: filter === type ? '#1e40af' : '#f9fafb',
-                    color: filter === type ? '#FFFFFF' : '#6b7280',
-                    border: filter === type ? 'none' : '1px solid #e5e7eb',
+                    backgroundColor: '#1e40af',
+                    color: '#FFFFFF',
+                    border: 'none',
                     cursor: 'pointer',
-                    fontSize: '0.8125rem',
-                    fontWeight: filter === type ? '600' : '500',
-                    textTransform: 'capitalize',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
                     transition: 'all 0.2s',
-                    boxShadow: filter === type ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    flexShrink: 0
                   }}
                   onMouseEnter={(e) => {
-                    if (filter !== type) {
-                      e.target.style.backgroundColor = '#f3f4f6';
-                      e.target.style.borderColor = '#d1d5db';
-                    }
+                    e.target.style.backgroundColor = '#1e3a8a';
+                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
                   }}
                   onMouseLeave={(e) => {
-                    if (filter !== type) {
-                      e.target.style.backgroundColor = '#f9fafb';
-                      e.target.style.borderColor = '#e5e7eb';
-                    }
+                    e.target.style.backgroundColor = '#1e40af';
+                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
                   }}
                 >
-                  {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
+                  Search
                 </button>
-              ))}
+              </div>
+              
+              {/* Filter and Sort Dropdowns - Right Side */}
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
+                {/* Filter Dropdown */}
+                <div style={{ position: 'relative' }} data-filter-dropdown>
+                  <button
+                    onClick={() => {
+                      setShowFilterDropdown(!showFilterDropdown);
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.875rem 1.25rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#1e40af',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#1e3a8a';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#1e40af';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      filter_list
+                    </span>
+                    Filter
+                  </button>
+                  {showFilterDropdown && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: '0.5rem',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '0.5rem',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      border: '1px solid #e5e7eb',
+                      zIndex: 1000,
+                      minWidth: '180px',
+                      overflow: 'hidden'
+                    }}>
+                      {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            setFilter(type);
+                            setShowFilterDropdown(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            textAlign: 'left',
+                            backgroundColor: filter === type ? '#eff6ff' : 'transparent',
+                            color: filter === type ? '#1e40af' : '#374151',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: filter === type ? '600' : '500',
+                            textTransform: 'capitalize',
+                            transition: 'all 0.2s',
+                            borderBottom: '1px solid #f3f4f6'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (filter !== type) {
+                              e.target.style.backgroundColor = '#f9fafb';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (filter !== type) {
+                              e.target.style.backgroundColor = 'transparent';
+                            }
+                          }}
+                        >
+                          {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Sort Dropdown */}
+                <div style={{ position: 'relative' }} data-sort-dropdown>
+                  <button
+                    onClick={() => {
+                      setShowSortDropdown(!showSortDropdown);
+                      setShowFilterDropdown(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.875rem 1.25rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#1e40af',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#1e3a8a';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#1e40af';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      sort
+                    </span>
+                    Sort
+                  </button>
+                  {showSortDropdown && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '0.5rem',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '0.5rem',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      border: '1px solid #e5e7eb',
+                      zIndex: 1000,
+                      minWidth: '200px',
+                      overflow: 'hidden'
+                    }}>
+                      {[
+                        { value: 'date-asc', label: 'Date (Earliest First)' },
+                        { value: 'date-desc', label: 'Date (Latest First)' },
+                        { value: 'title-asc', label: 'Title (A-Z)' },
+                        { value: 'title-desc', label: 'Title (Z-A)' }
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => {
+                            setSortBy(option.value);
+                            setShowSortDropdown(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            textAlign: 'left',
+                            backgroundColor: sortBy === option.value ? '#eff6ff' : 'transparent',
+                            color: sortBy === option.value ? '#1e40af' : '#374151',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: sortBy === option.value ? '600' : '500',
+                            transition: 'all 0.2s',
+                            borderBottom: '1px solid #f3f4f6'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (sortBy !== option.value) {
+                              e.target.style.backgroundColor = '#f9fafb';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (sortBy !== option.value) {
+                              e.target.style.backgroundColor = 'transparent';
+                            }
+                          }}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Professor Filter Dropdown - Only show for workshop/conference */}
+                {(filter === 'workshop' || filter === 'conference') && (
+                  <div style={{ position: 'relative' }} data-professor-dropdown>
+                    <button
+                      onClick={() => {
+                        setShowProfessorDropdown(!showProfessorDropdown);
+                        setShowFilterDropdown(false);
+                        setShowSortDropdown(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.875rem 1.25rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: '#1e40af',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        transition: 'all 0.2s',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#1e3a8a';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = '#1e40af';
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                        person
+                      </span>
+                      Professor
+                    </button>
+                    {showProfessorDropdown && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: '0.5rem',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '0.5rem',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        border: '1px solid #e5e7eb',
+                        zIndex: 1000,
+                        minWidth: '200px',
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                        overflow: 'hidden'
+                      }}>
+                        <button
+                          onClick={() => {
+                            setProfessorFilter('all');
+                            setShowProfessorDropdown(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            textAlign: 'left',
+                            backgroundColor: professorFilter === 'all' ? '#eff6ff' : 'transparent',
+                            color: professorFilter === 'all' ? '#1e40af' : '#374151',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: professorFilter === 'all' ? '600' : '500',
+                            transition: 'all 0.2s',
+                            borderBottom: '1px solid #f3f4f6'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (professorFilter !== 'all') {
+                              e.target.style.backgroundColor = '#f9fafb';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (professorFilter !== 'all') {
+                              e.target.style.backgroundColor = 'transparent';
+                            }
+                          }}
+                        >
+                          All Professors
+                        </button>
+                        {availableProfessors.map((professor) => (
+                          <button
+                            key={professor}
+                            onClick={() => {
+                              setProfessorFilter(professor);
+                              setShowProfessorDropdown(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 1rem',
+                              textAlign: 'left',
+                              backgroundColor: professorFilter === professor ? '#eff6ff' : 'transparent',
+                              color: professorFilter === professor ? '#1e40af' : '#374151',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: professorFilter === professor ? '600' : '500',
+                              transition: 'all 0.2s',
+                              borderBottom: '1px solid #f3f4f6'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (professorFilter !== professor) {
+                                e.target.style.backgroundColor = '#f9fafb';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (professorFilter !== professor) {
+                                e.target.style.backgroundColor = 'transparent';
+                              }
+                            }}
+                          >
+                            {professor}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -905,404 +1605,753 @@ const ProfessorEventsView = () => {
               borderRadius: '0.75rem',
               padding: '4rem 2rem',
               textAlign: 'center',
-              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
             }}>
-              <p style={{ color: '#6b7280' }}>No events found.</p>
+              <div style={{
+                fontSize: '3rem',
+                marginBottom: '1rem',
+                opacity: 0.5
+              }}>📅</div>
+              <p style={{
+                color: '#374151',
+                fontSize: '1.125rem',
+                fontWeight: '500',
+                marginBottom: '0.5rem',
+                marginTop: 0
+              }}>
+                No upcoming events found
+              </p>
+              <p style={{
+                color: '#6b7280',
+                fontSize: '0.875rem',
+                marginBottom: '1.5rem',
+                marginTop: 0
+              }}>
+                Only events that haven't started yet are shown.
+              </p>
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilter('all');
+                  loadEvents();
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#1e40af',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#1e3a8a';
+                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#1e40af';
+                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                }}
+              >
+                Show All Upcoming Events
+              </button>
             </div>
           ) : (
-            <div style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '0.75rem',
-              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-              overflowX: 'auto'
-            }}>
-              <table style={{ width: '100%', textAlign: 'left' }}>
-                <thead style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <tr>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Event Name
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Type
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Date
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Location
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      textAlign: 'center'
-                    }}>
-                      Status
-                    </th>
-                    <th style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      textAlign: 'right'
-                    }}>
-                      Actions
-                    </th>
-                    <th style={{ padding: '1rem 1.5rem', width: '48px' }}></th>
-                  </tr>
-                </thead>
-                <tbody style={{ borderTop: '1px solid #e5e7eb' }}>
-                  {filteredEvents.map(event => {
-                    const statusInfo = getEventStatus(event);
-                    const isExpanded = expandedRows.has(event.id);
-                    const statusColors = {
-                      blue: { bg: '#dbeafe', text: '#1e40af' },
-                      green: { bg: '#d1fae5', text: '#065f46' },
-                      red: { bg: '#fee2e2', text: '#991b1b' },
-                      gray: { bg: '#f3f4f6', text: '#4b5563' }
-                    };
-                    const statusStyle = statusColors[statusInfo.color] || statusColors.gray;
-                    const isRegistered = registeredEventIds.has(String(event.id));
-
-                    return (
-                      <React.Fragment key={event.id}>
-                        <tr style={{
-                          borderBottom: '1px solid #e5e7eb',
-                          transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                        >
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            fontWeight: '500',
-                            color: '#111827'
-                          }}>
-                            {event.title}
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            color: '#6b7280'
-                          }}>
-                            {event.type ? event.type.charAt(0).toUpperCase() + event.type.slice(1) : 'Event'}
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            color: '#6b7280'
-                          }}>
-                            {formatTableDate(event.startDate)}
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            fontSize: '0.875rem',
-                            color: '#6b7280'
-                          }}>
-                            {event.location}
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            textAlign: 'center'
-                          }}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '0.25rem 0.75rem',
-                              borderRadius: '9999px',
-                              fontSize: '0.875rem',
-                              fontWeight: '500',
-                              backgroundColor: statusStyle.bg,
-                              color: statusStyle.text
-                            }}>
-                              {statusInfo.label}
-                            </span>
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            textAlign: 'right'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                              {(event.type === 'workshop' || event.type === 'trip') && (
-                                isRegistered ? (
-                                  <button
-                                    disabled
-                                    style={{
-                                      padding: '0.5rem 1rem',
-                                      borderRadius: '0.5rem',
-                                      backgroundColor: '#10b981',
-                                      color: '#FFFFFF',
-                                      border: 'none',
-                                      cursor: 'not-allowed',
-                                      fontSize: '0.875rem',
-                                      fontWeight: '600',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '0.5rem'
-                                    }}
-                                  >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
-                                    Registered
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRegisterClick(event);
-                                    }}
-                                    style={{
-                                      padding: '0.5rem 1rem',
-                                      borderRadius: '0.5rem',
-                                      backgroundColor: '#137fec',
-                                      color: '#FFFFFF',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      fontSize: '0.875rem',
-                                      fontWeight: '600',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '0.5rem'
-                                    }}
-                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#0f6fd6'}
-                                    onMouseLeave={(e) => e.target.style.backgroundColor = '#137fec'}
-                                  >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>how_to_reg</span>
-                                    Register
-                                  </button>
-                                )
-                              )}
-                            </div>
-                          </td>
-                          <td style={{
-                            padding: '1rem 1.5rem',
-                            textAlign: 'right'
-                          }}>
+            <>
+              <div style={{
+                marginBottom: '1.5rem',
+                color: '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}>
+                Found {filteredEvents.length} upcoming event{filteredEvents.length !== 1 ? 's' : ''}
+                {searchQuery && ` matching "${searchQuery}"`}
+                {filter !== 'all' && ` in ${filter} category`}
+              </div>
+              
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                {filteredEvents.map(event => {
+                  const statusInfo = getEventStatus(event);
+                  const isRegistered = registeredEventIds.has(String(event.id));
+                  
+                  return (
+                    <div
+                      key={event.id}
+                      onClick={() => setSelectedEvent(event)}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '0.75rem',
+                        padding: 0,
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        border: '1px solid #e5e7eb',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-4px)';
+                        e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                        e.currentTarget.style.borderColor = '#1e40af';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                      }}
+                    >
+                      {/* Event Type Image - Top Half */}
+                      {getEventTypeImage(event.type) && (
+                        <div style={{
+                          width: '100%',
+                          height: '180px',
+                          overflow: 'hidden',
+                          position: 'relative',
+                          backgroundColor: '#f3f4f6',
+                          flexShrink: 0
+                        }}>
+                          <img
+                            src={getEventTypeImage(event.type)}
+                            alt={event.type ? event.type.charAt(0).toUpperCase() + event.type.slice(1) : 'Event'}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              objectPosition: 'center'
+                            }}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.parentElement.style.backgroundColor = getEventTypeColor(event.type);
+                              e.target.parentElement.style.display = 'flex';
+                              e.target.parentElement.style.alignItems = 'center';
+                              e.target.parentElement.style.justifyContent = 'center';
+                              if (!e.target.parentElement.querySelector('.fallback-text')) {
+                                const fallback = document.createElement('div');
+                                fallback.className = 'fallback-text';
+                                fallback.textContent = getEventTypeFallbackText(event.type);
+                                fallback.style.color = '#FFFFFF';
+                                fallback.style.fontSize = '1.5rem';
+                                fallback.style.fontWeight = '700';
+                                e.target.parentElement.appendChild(fallback);
+                              }
+                            }}
+                          />
+                          {/* Heart Icon for Professor users */}
+                          {user?.userType === 'Professor' && (
                             <button
-                              onClick={() => toggleRowExpansion(event.id)}
+                              onClick={(e) => handleToggleFavorite(event.id, e)}
                               style={{
-                                padding: '0.5rem',
-                                borderRadius: '0.5rem',
+                                position: 'absolute',
+                                top: '0.75rem',
+                                right: '0.75rem',
+                                background: 'rgba(255, 255, 255, 0.9)',
                                 border: 'none',
-                                backgroundColor: 'transparent',
-                                color: '#6b7280',
+                                borderRadius: '50%',
+                                width: '2.5rem',
+                                height: '2.5rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
                                 cursor: 'pointer',
-                                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                                transition: 'transform 0.2s'
+                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                                zIndex: 10,
+                                transition: 'all 0.2s'
                               }}
                               onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = '#f3f4f6';
-                                e.target.style.color = '#137fec';
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 1)';
+                                e.currentTarget.style.transform = 'scale(1.1)';
                               }}
                               onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = 'transparent';
-                                e.target.style.color = '#6b7280';
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                                e.currentTarget.style.transform = 'scale(1)';
                               }}
                             >
-                              <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                expand_more
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.5rem',
+                                color: favoriteEventIds.has(String(event.id)) ? '#ef4444' : '#6b7280',
+                                transition: 'color 0.2s'
+                              }}>
+                                {favoriteEventIds.has(String(event.id)) ? 'favorite' : 'favorite_border'}
                               </span>
                             </button>
-                          </td>
-                        </tr>
-                        {/* Expanded Details Row */}
-                        {isExpanded && (
-                          <tr style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
-                            <td colSpan="7" style={{ padding: '1.5rem' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                {/* Event Description */}
-                                {event.description && (
-                                  <div>
-                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
-                                      Description
-                                    </h4>
-                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                      {event.description}
-                                    </p>
-                                  </div>
-                                )}
-
-                                {/* Event Details Grid */}
-                                <div style={{
-                                  display: 'grid',
-                                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                                  gap: '1rem'
-                                }}>
-                                  {/* Start Date */}
-                                  <div>
-                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                      Start Date & Time
-                                    </h4>
-                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                      {event.startDate ? new Date(event.startDate).toLocaleString() : 'N/A'}
-                                    </p>
-                                  </div>
-
-                                  {/* End Date */}
-                                  <div>
-                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                      End Date & Time
-                                    </h4>
-                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                      {event.endDate ? new Date(event.endDate).toLocaleString() : 'N/A'}
-                                    </p>
-                                  </div>
-
-                                  {/* Registration Deadline */}
-                                  {event.registrationDeadline && (
-                                    <div>
-                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Registration Deadline
-                                      </h4>
-                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {new Date(event.registrationDeadline).toLocaleString()}
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Capacity */}
-                                  {event.capacity && (
-                                    <div>
-                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Capacity
-                                      </h4>
-                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {event.registeredCount || 0} / {event.capacity} registered
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Price (for trips) */}
-                                  {event.type === 'trip' && event.price && (
-                                    <div>
-                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Price
-                                      </h4>
-                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {event.price} EGP
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Professor (for workshops) */}
-                                  {event.type === 'workshop' && (event.creatorName || event.professors) && (
-                                    <div>
-                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Professor
-                                      </h4>
-                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {event.creatorName || event.professors}
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Faculty (for workshops) */}
-                                  {event.type === 'workshop' && event.faculty && (
-                                    <div>
-                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Faculty
-                                      </h4>
-                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {event.faculty}
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Register Button for Workshops/Trips */}
-                                {(event.type === 'workshop' || event.type === 'trip') && (
-                                  <div style={{ marginTop: '0.5rem' }}>
-                                    {isRegistered ? (
-                                      <button
-                                        disabled
-                                        style={{
-                                          padding: '0.75rem 1.5rem',
-                                          borderRadius: '0.5rem',
-                                          backgroundColor: '#10b981',
-                                          color: '#FFFFFF',
-                                          border: 'none',
-                                          cursor: 'not-allowed',
-                                          fontSize: '0.875rem',
-                                          fontWeight: '600',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '0.5rem'
-                                        }}
-                                      >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
-                                        Registered
-                                      </button>
-                                    ) : (
-                                      <button
-                                        onClick={() => handleRegisterClick(event)}
-                                        style={{
-                                          padding: '0.75rem 1.5rem',
-                                          borderRadius: '0.5rem',
-                                          backgroundColor: '#137fec',
-                                          color: '#FFFFFF',
-                                          border: 'none',
-                                          cursor: 'pointer',
-                                          fontSize: '0.875rem',
-                                          fontWeight: '600',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '0.5rem'
-                                        }}
-                                        onMouseEnter={(e) => e.target.style.backgroundColor = '#0f6fd6'}
-                                        onMouseLeave={(e) => e.target.style.backgroundColor = '#137fec'}
-                                      >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>how_to_reg</span>
-                                        Register for {event.type === 'workshop' ? 'Workshop' : 'Trip'}
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                          <div style={{
+                            padding: '0.375rem 0.875rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: getEventTypeColor(event.type),
+                            color: '#FFFFFF',
+                            fontSize: '0.6875rem',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                          }}>
+                            {event.type}
+                          </div>
+                          {statusInfo && (
+                            <div style={{
+                              fontSize: '0.75rem',
+                              color: statusInfo.color === 'blue' ? '#1e40af' : statusInfo.color === 'green' ? '#059669' : statusInfo.color === 'red' ? '#dc2626' : '#6b7280',
+                              fontWeight: '600',
+                              backgroundColor: statusInfo.color === 'blue' ? '#eff6ff' : statusInfo.color === 'green' ? '#d1fae5' : statusInfo.color === 'red' ? '#fee2e2' : '#f3f4f6',
+                              padding: '0.25rem 0.625rem',
+                              borderRadius: '0.375rem'
+                            }}>
+                              {statusInfo.label}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <h3 style={{
+                          color: '#1D3557',
+                          fontSize: '1.125rem',
+                          fontWeight: '600',
+                          marginBottom: '0.75rem',
+                          marginTop: 0,
+                          lineHeight: '1.4'
+                        }}>
+                          {event.title}
+                        </h3>
+                        
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem',
+                          flex: 1
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.625rem',
+                            fontSize: '0.8125rem',
+                            color: '#6b7280'
+                          }}>
+                            <span className="material-symbols-outlined" style={{
+                              fontSize: '1.125rem',
+                              color: '#9ca3af'
+                            }}>
+                              calendar_today
+                            </span>
+                            {formatTableDate(event.startDate)}
+                          </div>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.625rem',
+                            fontSize: '0.8125rem',
+                            color: '#6b7280'
+                          }}>
+                            <span className="material-symbols-outlined" style={{
+                              fontSize: '1.125rem',
+                              color: '#9ca3af'
+                            }}>
+                              location_on
+                            </span>
+                            {event.location}
+                          </div>
+                          {event.capacity && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.625rem',
+                              fontSize: '0.8125rem',
+                              color: '#6b7280'
+                            }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.125rem',
+                                color: '#9ca3af'
+                              }}>
+                                groups
+                              </span>
+                              {event.registeredCount || 0} / {event.capacity} registered
+                            </div>
+                          )}
+                          {(event.type === 'bazaar' || event.type === 'booth') && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.625rem',
+                              fontSize: '0.8125rem',
+                              color: '#6b7280'
+                            }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.125rem',
+                                color: '#9ca3af'
+                              }}>
+                                storefront
+                              </span>
+                              <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
+                            </div>
+                          )}
+                          {(event.type === 'workshop' || event.type === 'conference') && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.625rem',
+                              fontSize: '0.8125rem',
+                              color: '#6b7280'
+                            }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.125rem',
+                                color: '#9ca3af'
+                              }}>
+                                school
+                              </span>
+                              <span>
+                                {event.professors 
+                                  ? (Array.isArray(event.professors) ? event.professors.join(', ') : event.professors)
+                                  : (event.creatorName || 'Professor')
+                                }
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Average Rating Display - Bottom (Clickable to view ratings/comments) */}
+                        <div style={{
+                          borderTop: '1px solid #e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.5rem',
+                          marginTop: 'auto',
+                          paddingTop: '0.75rem'
+                        }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewRatingsComments(event.id, event.title);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.375rem',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '0.25rem',
+                              borderRadius: '0.375rem',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f3f4f6';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                            title="View ratings and comments"
+                          >
+                            <span className="material-symbols-outlined" style={{
+                              fontSize: '1rem',
+                              color: '#fbbf24'
+                            }}>
+                              star
+                            </span>
+                            <span style={{
+                              fontSize: '0.8125rem',
+                              fontWeight: '600',
+                              color: '#374151'
+                            }}>
+                              {eventRatings[event.id]?.average > 0 
+                                ? eventRatings[event.id].average.toFixed(1)
+                                : '—'}
+                            </span>
+                          </button>
+                          
+                          {(event.type === 'workshop' || event.type === 'trip') && (
+                            <>
+                              {isRegistered ? (
+                                <button
+                                  disabled
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    padding: '0.625rem 1rem',
+                                    borderRadius: '0.5rem',
+                                    backgroundColor: '#10b981',
+                                    color: '#FFFFFF',
+                                    border: 'none',
+                                    cursor: 'not-allowed',
+                                    fontSize: '0.875rem',
+                                    fontWeight: '600',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem',
+                                    flex: 1
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
+                                  Registered
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRegisterClick(event);
+                                  }}
+                                  style={{
+                                    padding: '0.625rem 1rem',
+                                    borderRadius: '0.5rem',
+                                    backgroundColor: '#1e40af',
+                                    color: '#FFFFFF',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '0.875rem',
+                                    fontWeight: '600',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem',
+                                    transition: 'all 0.2s',
+                                    flex: 1
+                                  }}
+                                  onMouseEnter={(e) => e.target.style.backgroundColor = '#1e3a8a'}
+                                  onMouseLeave={(e) => e.target.style.backgroundColor = '#1e40af'}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>how_to_reg</span>
+                                  Register
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
+          </div>
         </div>
       </main>
+
+      {/* View All Ratings and Comments Modal - VIEW ONLY */}
+      {showRatingsCommentsModal && selectedEventForView && (
+        <div
+          onClick={() => {
+            setShowRatingsCommentsModal(false);
+            setSelectedEventForView(null);
+            setRatingsAndComments(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1001,
+            padding: '1rem',
+            backdropFilter: 'blur(4px)'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '700px',
+              width: '100%',
+              maxHeight: '90vh',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              position: 'relative',
+              zIndex: 1002
+            }}
+          >
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h2 style={{
+                  color: '#1D3557',
+                  fontSize: '1.5rem',
+                  fontWeight: '700',
+                  margin: 0,
+                  marginBottom: '0.25rem'
+                }}>
+                  Ratings & Comments
+                </h2>
+                {selectedEventForView?.eventTitle && (
+                  <p style={{
+                    color: '#6b7280',
+                    fontSize: '0.875rem',
+                    margin: 0
+                  }}>
+                    {selectedEventForView.eventTitle}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setShowRatingsCommentsModal(false);
+                  setSelectedEventForView(null);
+                  setRatingsAndComments(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
+                  lineHeight: 1
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                padding: '1.5rem',
+                overflowY: 'auto',
+                flex: 1,
+                position: 'relative',
+                zIndex: 10
+              }}
+            >
+              {loadingRatingsComments ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: '#6b7280'
+                }}>
+                  Loading...
+                </div>
+              ) : ratingsAndComments ? (
+                <>
+                  {/* Ratings Section */}
+                  {ratingsAndComments.ratings && (
+                    <div style={{
+                      marginBottom: '2rem',
+                      padding: '1.5rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '0.5rem'
+                    }}>
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '1rem',
+                        marginTop: 0
+                      }}>
+                        Ratings
+                      </h3>
+                      {ratingsAndComments.ratings.count > 0 ? (
+                        <>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            marginBottom: '1rem'
+                          }}>
+                            <div style={{
+                              fontSize: '2.5rem',
+                              fontWeight: '700',
+                              color: '#1D3557'
+                            }}>
+                              {ratingsAndComments.ratings.average.toFixed(1)}
+                            </div>
+                            <div>
+                              <div style={{
+                                display: 'flex',
+                                gap: '0.25rem',
+                                marginBottom: '0.25rem'
+                              }}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <span
+                                    key={star}
+                                    style={{
+                                      fontSize: '1.25rem',
+                                      color: star <= Math.round(ratingsAndComments.ratings.average) ? '#fbbf24' : '#d1d5db'
+                                    }}
+                                  >
+                                    ★
+                                  </span>
+                                ))}
+                              </div>
+                              <div style={{
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                Based on {ratingsAndComments.ratings.count} rating{ratingsAndComments.ratings.count !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                          </div>
+                          {ratingsAndComments.ratings.distribution && (
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem'
+                            }}>
+                              {[5, 4, 3, 2, 1].map((star) => (
+                                <div key={star} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem'
+                                }}>
+                                  <span style={{ fontSize: '0.875rem', color: '#6b7280', minWidth: '60px' }}>
+                                    {star} star{star !== 1 ? 's' : ''}
+                                  </span>
+                                  <div style={{
+                                    flex: 1,
+                                    height: '8px',
+                                    backgroundColor: '#e5e7eb',
+                                    borderRadius: '0.25rem',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <div style={{
+                                      width: `${ratingsAndComments.ratings.count > 0 ? (ratingsAndComments.ratings.distribution[star] || 0) / ratingsAndComments.ratings.count * 100 : 0}%`,
+                                      height: '100%',
+                                      backgroundColor: '#fbbf24',
+                                      transition: 'width 0.3s'
+                                    }} />
+                                  </div>
+                                  <span style={{ fontSize: '0.875rem', color: '#6b7280', minWidth: '40px' }}>
+                                    {ratingsAndComments.ratings.distribution[star] || 0}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p style={{
+                          color: '#6b7280',
+                          fontSize: '0.875rem',
+                          margin: 0
+                        }}>
+                          No ratings yet
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Comments Section */}
+                  <div>
+                    <h3 style={{
+                      color: '#1D3557',
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      marginBottom: '1rem',
+                      marginTop: 0
+                    }}>
+                      Comments ({ratingsAndComments.comments?.length || 0})
+                    </h3>
+                    {ratingsAndComments.comments && ratingsAndComments.comments.length > 0 ? (
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem'
+                      }}>
+                        {ratingsAndComments.comments.map((comment) => (
+                          <div
+                            key={comment._id}
+                            style={{
+                              padding: '1rem',
+                              backgroundColor: '#f9fafb',
+                              borderRadius: '0.5rem',
+                              border: '1px solid #e5e7eb'
+                            }}
+                          >
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              marginBottom: '0.5rem'
+                            }}>
+                              <div>
+                                <div style={{
+                                  fontWeight: '600',
+                                  color: '#1D3557',
+                                  fontSize: '0.875rem'
+                                }}>
+                                  {comment.user?.firstName} {comment.user?.lastName}
+                                </div>
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: '#6b7280'
+                                }}>
+                                  {comment.user?.userType || 'User'}
+                                </div>
+                              </div>
+                              <div style={{
+                                fontSize: '0.75rem',
+                                color: '#9ca3af'
+                              }}>
+                                {formatDate(comment.createdAt)}
+                              </div>
+                            </div>
+                            <p style={{
+                              color: '#374151',
+                              fontSize: '0.875rem',
+                              margin: 0,
+                              lineHeight: '1.6',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {comment.text}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        margin: 0
+                      }}>
+                        No comments yet
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: '#6b7280'
+                }}>
+                  No ratings or comments available
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Event Modal - Same as StudentEventsView */}
       {selectedEvent && (
@@ -1328,55 +2377,112 @@ const ProfessorEventsView = () => {
               maxWidth: '600px',
               width: '100%',
               maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              position: 'relative'
             }}
           >
+            {/* Event Image at Top */}
+            {getEventTypeImage(selectedEvent.type) && (
+              <div style={{
+                width: '100%',
+                height: '200px',
+                overflow: 'hidden',
+                position: 'relative',
+                backgroundColor: '#f3f4f6',
+                flexShrink: 0
+              }}>
+                <img
+                  src={getEventTypeImage(selectedEvent.type)}
+                  alt={selectedEvent.type ? selectedEvent.type.charAt(0).toUpperCase() + selectedEvent.type.slice(1) : 'Event'}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center'
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.style.backgroundColor = getEventTypeColor(selectedEvent.type);
+                    e.target.parentElement.style.display = 'flex';
+                    e.target.parentElement.style.alignItems = 'center';
+                    e.target.parentElement.style.justifyContent = 'center';
+                    if (!e.target.parentElement.querySelector('.fallback-text')) {
+                      const fallback = document.createElement('div');
+                      fallback.className = 'fallback-text';
+                      fallback.textContent = getEventTypeFallbackText(selectedEvent.type);
+                      fallback.style.color = '#FFFFFF';
+                      fallback.style.fontSize = '1.5rem';
+                      fallback.style.fontWeight = '700';
+                      e.target.parentElement.appendChild(fallback);
+                    }
+                  }}
+                />
+              </div>
+            )}
+            
+            {/* Close Button - Upper Right Corner */}
+            <button
+              onClick={() => setSelectedEvent(null)}
+              style={{
+                position: 'absolute',
+                top: '0.75rem',
+                right: '0.75rem',
+                background: 'rgba(255, 255, 255, 0.9)',
+                border: 'none',
+                fontSize: '1.5rem',
+                cursor: 'pointer',
+                color: '#6b7280',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '0.375rem',
+                transition: 'all 0.2s',
+                lineHeight: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '2rem',
+                height: '2rem',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                zIndex: 10
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#ffffff';
+                e.target.style.color = '#1D3557';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                e.target.style.color = '#6b7280';
+              }}
+            >
+              ×
+            </button>
+            
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '1.5rem',
+              padding: '1rem 1.5rem',
               borderBottom: '1px solid #e5e7eb'
             }}>
               <h2 style={{
                 color: '#1D3557',
                 fontSize: '1.5rem',
                 fontWeight: '700',
-                margin: 0
+                margin: 0,
+                paddingRight: '1rem'
               }}>
                 {selectedEvent.title}
               </h2>
-              <button
-                onClick={() => setSelectedEvent(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: '#6b7280',
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: '0.25rem',
-                  transition: 'background-color 0.2s',
-                  lineHeight: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '2rem',
-                  height: '2rem'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'transparent';
-                }}
-              >
-                ×
-              </button>
             </div>
             
-            <div style={{ padding: '1.5rem' }}>
+            <div style={{ 
+              padding: '1.5rem',
+              overflowY: 'auto',
+              flex: 1,
+              minHeight: 0
+            }}>
               <div style={{
                 padding: '0.375rem 0.875rem',
                 borderRadius: '0.5rem',
@@ -1517,6 +2623,29 @@ const ProfessorEventsView = () => {
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Vendors</div>
                       <div style={{ color: '#374151', fontWeight: '500' }}>{(selectedEvent.vendors && selectedEvent.vendors.length) || 0} vendor{((selectedEvent.vendors && selectedEvent.vendors.length) || 0) !== 1 ? 's' : ''} participating</div>
+                    </div>
+                  </div>
+                )}
+                {(selectedEvent.type === 'workshop' || selectedEvent.type === 'conference') && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      school
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Professor</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>
+                        {selectedEvent.professors 
+                          ? (Array.isArray(selectedEvent.professors) ? selectedEvent.professors.join(', ') : selectedEvent.professors)
+                          : (selectedEvent.creatorName || 'Professor')
+                        }
+                      </div>
                     </div>
                   </div>
                 )}

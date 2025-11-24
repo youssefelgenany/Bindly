@@ -1,4 +1,5 @@
 const Event = require('../models/eventModel');
+const { notifyNewEventCreated } = require('../services/notificationService');
 
 // Get a single bazaar by ID
 exports.getBazaarById = async (req, res) => {
@@ -140,6 +141,7 @@ exports.createBazaar = async (req, res) => {
   try {
     const { name, startDate, endDate, location, description, registrationDeadline } = req.body;
 
+    const { allowedUserTypes } = req.body;
     const newBazaar = new Event({
       title: name, // Map name to title for Event model
       type: 'bazaar', // Set type as bazaar
@@ -149,10 +151,25 @@ exports.createBazaar = async (req, res) => {
       location,
       description,
       createdBy: req.user._id, // Track who created it
-      status: 'approved' // Event office creates approved events
+      status: 'approved', // Event office creates approved events
+      // User type restrictions
+      isRestricted: allowedUserTypes && allowedUserTypes.length > 0,
+      allowedUserTypes: allowedUserTypes && allowedUserTypes.length > 0 ? allowedUserTypes : []
     });
 
     await newBazaar.save();
+    
+    // Send notifications to all eligible users about the new bazaar
+    if (newBazaar.status === 'approved') {
+      console.log(`📢 Bazaar ${newBazaar._id} is approved, triggering notifications...`);
+      try {
+        await notifyNewEventCreated(newBazaar);
+        console.log(`✅ Notifications triggered successfully for bazaar ${newBazaar._id}`);
+      } catch (notifError) {
+        console.error(`❌ Error triggering notifications for bazaar ${newBazaar._id}:`, notifError);
+      }
+    }
+    
     res.status(201).json({ message: 'Bazaar created successfully', bazaar: newBazaar });
 
   } catch (error) {

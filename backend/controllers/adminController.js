@@ -42,7 +42,13 @@ exports.assignRoleAndSendVerification = async (req, res) => {
 
     // Send verification email (use first + last name if available)
     const name = user.firstName ? `${user.firstName} ${user.lastName}` : user.name;
-    await sendVerificationEmail(user.email, user.verificationToken, name);
+    const emailResult = await sendVerificationEmail(user.email, user.verificationToken, name);
+    
+    if (emailResult.sent) {
+      console.log('✅ Verification email sent successfully to:', user.email);
+    } else {
+      console.error('❌ Verification email not sent:', emailResult.reason || emailResult.error);
+    }
 
     res.json({ msg: "Role assigned and verification email sent successfully.", token: user.verificationToken });
   } catch (err) {
@@ -118,8 +124,12 @@ exports.updateUserRole = async (req, res) => {
     // Send verification email
     try {
       const name = user.firstName ? `${user.firstName} ${user.lastName}` : user.name || 'User';
-      await sendVerificationEmail(user.email, user.verificationToken, name);
-      console.log('✅ Verification email sent to:', user.email);
+      const emailResult = await sendVerificationEmail(user.email, user.verificationToken, name);
+      if (emailResult.sent) {
+        console.log('✅ Verification email sent to:', user.email);
+      } else {
+        console.error('❌ Verification email not sent:', emailResult.reason || emailResult.error);
+      }
     } catch (emailError) {
       console.error('❌ Error sending verification email:', emailError);
       // Don't fail the role update if email fails, but log it
@@ -199,17 +209,45 @@ exports.updateUserStatus = async (req, res) => {
     }
 
     // Update user status
+    const previousStatus = user.status;
     user.status = isActive ? 'active' : 'blocked';
 
     console.log('📊 New status:', user.status);
 
-    await user.save();
+    // If activating a user and they are not verified, send verification email
+    // This handles the case when events office accepts/activates a user
+    if (isActive && !user.isVerified && ['Staff', 'TA', 'Professor'].includes(user.userType)) {
+      try {
+        // Generate verification token if not exists or expired
+        if (!user.verificationToken || (user.verificationExpiresAt && user.verificationExpiresAt < new Date())) {
+          user.verificationToken = crypto.randomBytes(32).toString('hex');
+          user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        }
+
+        await user.save();
+
+        // Send verification email
+        const name = user.firstName ? `${user.firstName} ${user.lastName}` : user.name || 'User';
+        const emailResult = await sendVerificationEmail(user.email, user.verificationToken, name);
+        if (emailResult.sent) {
+          console.log('✅ Verification email sent to:', user.email);
+          console.log('   User activated and verification email sent');
+        } else {
+          console.error('❌ Verification email not sent:', emailResult.reason || emailResult.error);
+        }
+      } catch (emailError) {
+        console.error('❌ Error sending verification email:', emailError);
+        // Don't fail the status update if email fails, but log it
+      }
+    } else {
+      await user.save();
+    }
 
     console.log('✅ User status updated successfully');
 
     res.status(200).json({
       success: true,
-      message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
+      message: `User ${isActive ? 'activated' : 'deactivated'} successfully${isActive && !user.isVerified && ['Staff', 'TA', 'Professor'].includes(user.userType) ? '. Verification email has been sent.' : ''}`,
       user: {
         id: user._id,
         firstName: user.firstName,
@@ -564,7 +602,12 @@ exports.sendVerificationEmail = async (req, res) => {
     console.log('📧 Sending verification email to:', user.email);
     console.log('📧 Verification token:', verificationToken);
 
-    await sendVerificationEmail(user.email, verificationToken, name);
+    const emailResult = await sendVerificationEmail(user.email, verificationToken, name);
+    if (emailResult.sent) {
+      console.log('✅ Verification email sent successfully');
+    } else {
+      console.error('❌ Verification email not sent:', emailResult.reason || emailResult.error);
+    }
 
     res.status(200).json({
       success: true,
@@ -759,6 +802,158 @@ exports.getAttendeesReport = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to generate attendees report',
+      error: error.message
+    });
+  }
+};
+
+// Get sales report for Events Office/Admin
+exports.getSalesReport = async (req, res) => {
+  try {
+    console.log('💰 Generating sales report...');
+
+    // Extract filter parameters from query string
+    const { eventType, startDate, endDate, sortBy } = req.query;
+
+    console.log('🔍 Filters applied:', { eventType, startDate, endDate, sortBy });
+
+    const Payment = require('../models/paymentModel');
+    const Event = require('../models/eventModel');
+    const Trip = require('../models/tripModel');
+
+    // Build event filter object
+    const eventFilter = {};
+
+    // Filter by event type
+    if (eventType) {
+      eventFilter.type = eventType;
+    }
+
+    // Filter by date range (event dates)
+    if (startDate || endDate) {
+      if (startDate && endDate) {
+        eventFilter.$and = [
+          { startDate: { $lte: new Date(endDate) } },
+          { endDate: { $gte: new Date(startDate) } }
+        ];
+      } else if (startDate) {
+        eventFilter.endDate = { $gte: new Date(startDate) };
+      } else if (endDate) {
+        eventFilter.startDate = { $lte: new Date(endDate) };
+      }
+    }
+
+    // Get all events matching the filter
+    const events = await Event.find(eventFilter).lean();
+    const trips = await Trip.find(eventFilter).lean();
+    const allEvents = [...events, ...trips];
+    
+    const eventIds = allEvents.map(e => e._id);
+    console.log(`📅 Found ${allEvents.length} events matching filters`);
+
+    // Get successful payments for these events
+    const payments = await Payment.find({
+      event: { $in: eventIds },
+      status: 'success'
+    }).lean();
+
+    console.log(`💳 Found ${payments.length} successful payments`);
+
+    // Build report structure
+    const report = {
+      summary: {
+        totalEvents: allEvents.length,
+        totalRevenue: 0,
+        totalPayments: payments.length
+      },
+      byEventType: {},
+      byEvent: []
+    };
+
+    // Aggregate revenue by event
+    const revenueByEvent = {};
+    payments.forEach(payment => {
+      const eventId = payment.event.toString();
+      if (!revenueByEvent[eventId]) {
+        revenueByEvent[eventId] = {
+          totalRevenue: 0,
+          paymentCount: 0
+        };
+      }
+      revenueByEvent[eventId].totalRevenue += payment.amount;
+      revenueByEvent[eventId].paymentCount += 1;
+    });
+
+    // Build per-event details
+    allEvents.forEach(event => {
+      const eventId = event._id.toString();
+      const eventType = event.type || 'other';
+      const revenue = revenueByEvent[eventId] || { totalRevenue: 0, paymentCount: 0 };
+
+      // Initialize event type in report if not exists
+      if (!report.byEventType[eventType]) {
+        report.byEventType[eventType] = {
+          eventCount: 0,
+          totalRevenue: 0,
+          paymentCount: 0
+        };
+      }
+
+      // Update event type totals
+      report.byEventType[eventType].eventCount++;
+      report.byEventType[eventType].totalRevenue += revenue.totalRevenue;
+      report.byEventType[eventType].paymentCount += revenue.paymentCount;
+
+      // Add per-event details
+      report.byEvent.push({
+        eventId: eventId,
+        title: event.title || event.name,
+        type: eventType,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        location: event.location,
+        price: event.price || 0,
+        revenue: revenue.totalRevenue,
+        paymentCount: revenue.paymentCount,
+        status: event.status
+      });
+    });
+
+    // Calculate total revenue
+    report.summary.totalRevenue = payments.reduce((sum, payment) => sum + payment.amount, 0);
+
+    // Sort events by revenue
+    if (sortBy === 'revenue-asc') {
+      report.byEvent.sort((a, b) => a.revenue - b.revenue);
+    } else if (sortBy === 'revenue-desc') {
+      report.byEvent.sort((a, b) => b.revenue - a.revenue);
+    } else {
+      // Default: sort by start date (most recent first)
+      report.byEvent.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+    }
+
+    console.log('✅ Sales report generated successfully');
+    console.log(`   Total Revenue: ${report.summary.totalRevenue}`);
+    console.log(`   Total Events: ${report.summary.totalEvents}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Sales report fetched successfully',
+      report: report,
+      filters: {
+        eventType: eventType || null,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        sortBy: sortBy || null
+      },
+      generatedAt: new Date()
+    });
+
+  } catch (error) {
+    console.error('❌ Error generating sales report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate sales report',
       error: error.message
     });
   }

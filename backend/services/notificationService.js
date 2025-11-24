@@ -1,7 +1,6 @@
 const Notification = require('../models/notificationModel');
 const StudentRegistration = require('../models/studentRegistrationModel');
 const Event = require('../models/eventModel');
-const Workshop = require('../models/Workshop');
 const Trip = require('../models/tripModel');
 const GymSession = require('../models/gymSessionModel');
 const User = require('../models/userModel');
@@ -25,12 +24,14 @@ exports.createEventReminders = async () => {
       startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
     });
     
-    // Workshops
-    const workshopsIn1Day = await Workshop.find({
+    // Workshops (now in Event model with type: 'workshop')
+    const workshopsIn1Day = await Event.find({
+      type: 'workshop',
       startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
     });
     
-    const workshopsIn1Hour = await Workshop.find({
+    const workshopsIn1Hour = await Event.find({
+      type: 'workshop',
       startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
     });
     
@@ -132,12 +133,12 @@ async function processWorkshopReminders(workshops, timeframe) {
             await Notification.create({
               recipient: user._id,
               type: 'workshop_reminder',
-              title: `Reminder: ${workshop.workshopName} starts in ${timeframe}`,
-              message: `The workshop "${workshop.workshopName}" will start in ${timeframe} at ${workshop.location}`,
-              relatedWorkshop: workshop._id,
+              title: `Reminder: ${workshop.title} starts in ${timeframe}`,
+              message: `The workshop "${workshop.title}" will start in ${timeframe} at ${workshop.location}`,
+              relatedEvent: workshop._id,
               priority: timeframe === '1 hour' ? 'high' : 'medium',
               metadata: {
-                workshopName: workshop.workshopName,
+                workshopName: workshop.title,
                 workshopDate: workshop.startDate,
                 location: workshop.location,
                 studentEmail: registration.studentEmail,
@@ -251,7 +252,6 @@ exports.getUserNotifications = async (userId, options = {}) => {
     .sort({ createdAt: -1 })
     .limit(limit)
     .skip(skip)
-    .populate('relatedWorkshop', 'workshopName startDate location')
     .populate('relatedEvent', 'title startDate location')
     .populate('relatedGymSession', 'name startDate');
   
@@ -267,42 +267,82 @@ exports.getUserNotifications = async (userId, options = {}) => {
 // Notify all eligible users when a new event is created
 exports.notifyNewEventCreated = async (event) => {
   try {
+    console.log(`📢 Creating notifications for new event: ${event.title} (ID: ${event._id})`);
+    
+    if (!event || !event._id) {
+      console.error('❌ Invalid event object provided to notifyNewEventCreated');
+      throw new Error('Invalid event object');
+    }
+    
     // Find all users (Students, Staff, TAs, Professors, Events Office)
     const allUsers = await User.find({
       userType: { $in: ['Student', 'Staff', 'TA', 'Professor', 'event_office'] }
     });
     
+    console.log(`👥 Found ${allUsers.length} users to notify`);
+    
+    // Count users by type for debugging
+    const userTypeCounts = {};
+    allUsers.forEach(user => {
+      userTypeCounts[user.userType] = (userTypeCounts[user.userType] || 0) + 1;
+    });
+    console.log(`📊 User type breakdown:`, userTypeCounts);
+    
+    // Specifically log TA users found
+    const taUsers = allUsers.filter(u => u.userType === 'TA');
+    console.log(`👨‍🏫 Found ${taUsers.length} TA users:`, taUsers.map(u => `${u.email} (${u.firstName} ${u.lastName})`));
+    
+    let notificationCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    
     for (const user of allUsers) {
-      // Check if notification already exists for this user and event
-      const existingNotification = await Notification.findOne({
-        recipient: user._id,
-        type: 'event_announcement',
-        'metadata.eventId': event._id.toString()
-      });
-      
-      if (!existingNotification) {
-        await Notification.create({
+      try {
+        // Check if notification already exists for this user and event
+        const existingNotification = await Notification.findOne({
           recipient: user._id,
           type: 'event_announcement',
-          title: `New Event: ${event.title}`,
-          message: `A new event "${event.title}" has been added on ${new Date(event.startDate).toLocaleDateString()} at ${event.location}`,
-          relatedEvent: event._id,
-          priority: 'medium',
-          metadata: {
-            eventTitle: event.title,
-            eventDate: event.startDate,
-            eventType: event.type,
-            location: event.location,
-            description: event.description,
-            eventId: event._id.toString(),
-            createdBy: event.createdBy?.toString(),
-            createdAt: new Date()
-          }
+          'metadata.eventId': event._id.toString()
         });
+        
+        if (!existingNotification) {
+          await Notification.create({
+            recipient: user._id,
+            type: 'event_announcement',
+            title: `New Event: ${event.title}`,
+            message: `A new event "${event.title}" has been added on ${new Date(event.startDate).toLocaleDateString()} at ${event.location}`,
+            relatedEvent: event._id,
+            priority: 'medium',
+            metadata: {
+              eventTitle: event.title,
+              eventDate: event.startDate,
+              eventType: event.type,
+              location: event.location,
+              description: event.description,
+              eventId: event._id.toString(),
+              createdBy: event.createdBy?.toString(),
+              createdAt: new Date()
+            }
+          });
+          notificationCount++;
+          
+          // Log specifically for TA users
+          if (user.userType === 'TA') {
+            console.log(`✅ Created notification for TA user: ${user.email} (${user.firstName} ${user.lastName})`);
+          }
+        } else {
+          skippedCount++;
+        }
+      } catch (userError) {
+        errorCount++;
+        console.error(`❌ Error creating notification for user ${user.email} (${user.userType}):`, userError);
       }
     }
+    
+    console.log(`✅ Notification creation complete: ${notificationCount} created, ${skippedCount} skipped (duplicates), ${errorCount} errors`);
   } catch (error) {
-    console.error('Error notifying new event created:', error);
+    console.error('❌ Error notifying new event created:', error);
+    throw error; // Re-throw to ensure calling code knows about the error
   }
 };
 
@@ -335,5 +375,56 @@ exports.notifyWorkshopSubmitted = async (event, submitter) => {
     }
   } catch (error) {
     console.error('Error notifying workshop submission:', error);
+  }
+};
+
+// Notify Events Office users about new vendor requests
+exports.notifyVendorRequest = async (vendorRequest, vendor, event) => {
+  try {
+    // Find all events office users
+    const eventsOfficeUsers = await User.find({ 
+      $or: [
+        { userType: 'Event Office' },
+        { userType: 'Events Office' },
+        { userType: 'event_office' },
+        { role: 'Event Office' },
+        { role: 'event_office' }
+      ]
+    });
+    
+    const vendorName = vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || vendor.email;
+    const eventName = event?.title || event?.name || 'Event';
+    const eventType = vendorRequest.eventType || event?.type || 'bazaar';
+    
+    for (const eventsOfficeUser of eventsOfficeUsers) {
+      // Check if notification already exists
+      const existingNotification = await Notification.findOne({
+        recipient: eventsOfficeUser._id,
+        type: 'vendor_request',
+        'metadata.requestId': vendorRequest._id.toString()
+      });
+      
+      if (!existingNotification) {
+        await Notification.create({
+          recipient: eventsOfficeUser._id,
+          type: 'vendor_request',
+          title: `New Vendor Request: ${vendorName}`,
+          message: `${vendorName} has submitted a vendor request for "${eventName}" (${eventType})`,
+          priority: 'medium',
+          metadata: {
+            requestId: vendorRequest._id.toString(),
+            vendorId: vendor._id.toString(),
+            vendorName: vendorName,
+            eventId: event?._id?.toString() || null,
+            eventName: eventName,
+            eventType: eventType,
+            status: vendorRequest.status || 'pending',
+            createdAt: new Date()
+          }
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error notifying vendor request:', error);
   }
 };

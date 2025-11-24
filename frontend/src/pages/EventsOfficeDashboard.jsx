@@ -16,19 +16,45 @@ const EventsOfficeDashboard = () => {
   const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
+  // Close notification panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationPanelOpen && 
+          !event.target.closest('[data-notification-panel]') && 
+          !event.target.closest('[data-notification-icon]')) {
+        setNotificationPanelOpen(false);
+      }
+    };
+
+    if (notificationPanelOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [notificationPanelOpen]);
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('❌ No token found in localStorage');
+        setLoading(false);
+        return;
+      }
       const headers = { Authorization: `Bearer ${token}` };
 
       // Fetch all data in parallel
-      const [eventsRes, vendorRequestsRes] = await Promise.all([
+      const [eventsRes, vendorRequestsRes, notificationsRes, unreadCountRes] = await Promise.all([
         axios.get('http://localhost:5000/api/events', { headers }).catch(err => {
           console.error('Error fetching events:', err);
           return { data: [] };
@@ -36,6 +62,14 @@ const EventsOfficeDashboard = () => {
         axios.get('http://localhost:5000/api/vendor-requests', { headers }).catch(err => {
           console.error('Error fetching vendor requests:', err);
           return { data: { success: false, requests: [] } };
+        }),
+        axios.get('http://localhost:5000/api/notifications?limit=50', { headers }).catch(err => {
+          console.error('Error fetching notifications:', err);
+          return { data: { success: false, data: { notifications: [] } } };
+        }),
+        axios.get('http://localhost:5000/api/notifications/unread-count', { headers }).catch(err => {
+          console.error('Error fetching unread count:', err);
+          return { data: { success: false, unreadCount: 0 } };
         })
       ]);
       
@@ -59,11 +93,42 @@ const EventsOfficeDashboard = () => {
         vendorRequests = vendorRequestsRes.data.requests;
       }
       
+      // Handle notifications
+      let notificationsData = [];
+      if (notificationsRes.data?.success && notificationsRes.data.data?.notifications) {
+        notificationsData = notificationsRes.data.data.notifications;
+      }
+      
+      console.log('📬 Notifications received:', {
+        success: notificationsRes.data?.success,
+        rawResponse: notificationsRes.data,
+        notificationsCount: notificationsData.length,
+        allNotifications: notificationsData,
+        workshopNotifications: notificationsData.filter(n => n && n.type === 'workshop_submission').map(n => ({
+          id: n._id || n.id,
+          type: n.type,
+          title: n.title,
+          message: n.message,
+          metadata: n.metadata,
+          professorName: n.metadata?.professorName,
+          professorFirstName: n.metadata?.professorFirstName,
+          professorLastName: n.metadata?.professorLastName,
+          isRead: n.isRead,
+          createdAt: n.createdAt
+        }))
+      });
+      
+      setNotifications(notificationsData);
+      
+      // Handle unread count
+      const unreadCountValue = unreadCountRes.data?.success ? unreadCountRes.data.unreadCount : 0;
+      setUnreadCount(unreadCountValue);
+      
       console.log('📊 Dashboard Data:', {
         eventsCount: events.length,
         vendorRequestsCount: vendorRequests.length,
-        eventsSample: events.slice(0, 2),
-        vendorRequestsSample: vendorRequests.slice(0, 2)
+        notificationsCount: notificationsData.length,
+        unreadCount: unreadCountValue
       });
       
       const now = new Date();
@@ -160,8 +225,46 @@ const EventsOfficeDashboard = () => {
           };
         });
 
+      // 4. Workshop submission notifications
+      const workshopNotifications = notificationsData
+        .filter(notif => notif && notif.type === 'workshop_submission')
+        .map(notif => {
+          // Extract professor name from metadata or message
+          let professorName = 'Professor';
+          if (notif.metadata?.professorName) {
+            professorName = notif.metadata.professorName;
+          } else if (notif.metadata?.professorFirstName && notif.metadata?.professorLastName) {
+            professorName = `${notif.metadata.professorFirstName} ${notif.metadata.professorLastName}`;
+          } else if (notif.message) {
+            // Try to extract from message: "Professor First Last created..."
+            const match = notif.message.match(/Professor\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/);
+            if (match) {
+              professorName = match[1];
+            }
+          }
+          
+          return {
+            id: notif._id || notif.id,
+            type: 'workshop_submission',
+            eventType: 'workshop',
+            title: notif.metadata?.workshopName || notif.title?.replace('New Workshop Request: ', '') || 'Workshop',
+            timestamp: notif.createdAt,
+            icon: 'school',
+            action: 'created a new workshop',
+            professorName: professorName,
+            isRead: notif.isRead || false,
+            notificationId: notif._id || notif.id
+          };
+        });
+      
+      console.log('📋 Workshop notifications processed:', workshopNotifications.map(n => ({
+        id: n.id,
+        professorName: n.professorName,
+        title: n.title
+      })));
+
       // Combine and sort all activities by timestamp
-      const allActivities = [...recentEvents, ...startedEvents, ...recentVendorRequests]
+      const allActivities = [...workshopNotifications, ...recentEvents, ...startedEvents, ...recentVendorRequests]
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
         .slice(0, 10); // Show last 10 activities
       
@@ -229,8 +332,10 @@ const EventsOfficeDashboard = () => {
   };
 
   const formatTimeAgo = (date) => {
+    if (!date) return 'Just now';
     const now = new Date();
     const past = new Date(date);
+    if (isNaN(past.getTime())) return 'Just now';
     const diffInHours = Math.floor((now - past) / (1000 * 60 * 60));
     
     if (diffInHours < 1) return 'Just now';
@@ -392,6 +497,88 @@ const EventsOfficeDashboard = () => {
             </Link>
 
             <Link
+              to="/event-office/vendors"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.5rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: isActiveRoute('/event-office/vendors') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                textDecoration: 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActiveRoute('/event-office/vendors')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActiveRoute('/event-office/vendors')) {
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ 
+                color: isActiveRoute('/event-office/vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                fontSize: '1.25rem' 
+              }}>
+                storefront
+              </span>
+              {sidebarOpen && (
+                <p style={{
+                  color: isActiveRoute('/event-office/vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/vendors') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Vendors
+                </p>
+              )}
+            </Link>
+
+            <Link
+              to="/event-office/loyalty-partners"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.5rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: isActiveRoute('/event-office/loyalty-partners') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                textDecoration: 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActiveRoute('/event-office/loyalty-partners')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActiveRoute('/event-office/loyalty-partners')) {
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ 
+                color: isActiveRoute('/event-office/loyalty-partners') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                fontSize: '1.25rem' 
+              }}>
+                card_giftcard
+              </span>
+              {sidebarOpen && (
+                <p style={{
+                  color: isActiveRoute('/event-office/loyalty-partners') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/loyalty-partners') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Loyalty Partners
+                </p>
+              )}
+            </Link>
+
+            <Link
               to="/event-office/workshops"
               style={{
                 display: 'flex',
@@ -433,129 +620,6 @@ const EventsOfficeDashboard = () => {
             </Link>
 
             <Link
-              to="/create-bazaar"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/create-bazaar') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/create-bazaar')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/create-bazaar')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/create-bazaar') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                storefront
-              </span>
-              {sidebarOpen && (
-                <p style={{
-                  color: isActiveRoute('/create-bazaar') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/create-bazaar') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Bazaars
-                </p>
-              )}
-            </Link>
-
-            <Link
-              to="/create-trip"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/create-trip') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/create-trip')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/create-trip')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/create-trip') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                flight_takeoff
-              </span>
-              {sidebarOpen && (
-                <p style={{
-                  color: isActiveRoute('/create-trip') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/create-trip') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Trips
-                </p>
-              )}
-            </Link>
-
-            <Link
-              to="/create-conference"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/create-conference') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/create-conference')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/create-conference')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/create-conference') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                groups
-              </span>
-              {sidebarOpen && (
-                <p style={{
-                  color: isActiveRoute('/create-conference') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/create-conference') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Conferences
-                </p>
-              )}
-            </Link>
-
-            <Link
               to="/event-office/platform-booth-requests"
               style={{
                 display: 'flex',
@@ -592,47 +656,6 @@ const EventsOfficeDashboard = () => {
                   margin: 0
                 }}>
                   Platform Booths
-                </p>
-              )}
-            </Link>
-
-            <Link
-              to="/create-gym-session"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: isActiveRoute('/create-gym-session') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                textDecoration: 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActiveRoute('/create-gym-session')) {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActiveRoute('/create-gym-session')) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
-              }}>
-                fitness_center
-              </span>
-              {sidebarOpen && (
-                <p style={{
-                  color: isActiveRoute('/create-gym-session') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/create-gym-session') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Create Gym Session
                 </p>
               )}
             </Link>
@@ -767,7 +790,246 @@ const EventsOfficeDashboard = () => {
               Bindly
             </h2>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+            {/* Notification Icon */}
+            <div 
+              data-notification-icon
+              onClick={() => setNotificationPanelOpen(!notificationPanelOpen)}
+              style={{ 
+                position: 'relative', 
+                cursor: 'pointer',
+                padding: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ 
+                fontSize: '1.5rem', 
+                color: '#1D3557'
+              }}>
+                notifications
+              </span>
+              {unreadCount > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '0.25rem',
+                  right: '0.25rem',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  borderRadius: '50%',
+                  width: '1.25rem',
+                  height: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
+                  border: '2px solid #FFFFFF'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </div>
+              )}
+            </div>
+            
+            {/* Notification Panel */}
+            {notificationPanelOpen && (
+              <div 
+                data-notification-panel
+                style={{
+                  position: 'absolute',
+                  top: '3.5rem',
+                  right: '0',
+                  width: '24rem',
+                  maxHeight: '32rem',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  border: '1px solid #e2e8f0',
+                  zIndex: 1000,
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
+                <div style={{
+                  padding: '1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    margin: 0
+                  }}>
+                    Notifications
+                  </h3>
+                  <button
+                    onClick={() => setNotificationPanelOpen(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#6b7280'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      close
+                    </span>
+                  </button>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  {notifications && notifications.length > 0 ? (
+                    <ul style={{
+                      listStyle: 'none',
+                      padding: 0,
+                      margin: 0
+                    }}>
+                      {notifications.map((notif, idx) => (
+                        <li
+                          key={notif._id || notif.id || `notif-${idx}`}
+                          onClick={async () => {
+                            const notifId = notif._id || notif.id;
+                            if (!notif.isRead && notifId) {
+                              try {
+                                const token = localStorage.getItem('token');
+                                await axios.put(
+                                  `http://localhost:5000/api/notifications/${notifId}/read`,
+                                  {},
+                                  { headers: { Authorization: `Bearer ${token}` } }
+                                );
+                                setNotifications(prev => prev.map(n => 
+                                  (n._id === notifId || n.id === notifId) ? { ...n, isRead: true } : n
+                                ));
+                                setUnreadCount(prev => Math.max(0, prev - 1));
+                              } catch (err) {
+                                console.error('Error marking notification as read:', err);
+                              }
+                            }
+                          }}
+                          style={{
+                            padding: '1rem',
+                            borderBottom: '1px solid #f3f4f6',
+                            cursor: 'pointer',
+                            backgroundColor: !notif.isRead ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = !notif.isRead 
+                              ? 'rgba(59, 130, 246, 0.1)' 
+                              : 'rgba(0, 0, 0, 0.02)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = !notif.isRead 
+                              ? 'rgba(59, 130, 246, 0.05)' 
+                              : 'transparent';
+                          }}
+                        >
+                          <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            <div style={{
+                              backgroundColor: !notif.isRead ? '#dbeafe' : '#e5e7eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              borderRadius: '50%',
+                              flexShrink: 0
+                            }}>
+                              <span className="material-symbols-outlined" style={{ 
+                                color: !notif.isRead ? '#3b82f6' : '#6b7280', 
+                                fontSize: '1.25rem' 
+                              }}>
+                                {notif.type === 'workshop_submission' ? 'school' : 'notifications'}
+                              </span>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              {notif.type === 'workshop_submission' ? (
+                                <>
+                                  <p style={{
+                                    fontSize: '0.875rem',
+                                    fontWeight: !notif.isRead ? '600' : '400',
+                                    color: '#1D3557',
+                                    margin: 0,
+                                    marginBottom: '0.25rem'
+                                  }}>
+                                    Professor {notif.metadata?.professorName || 
+                                      (notif.metadata?.professorFirstName && notif.metadata?.professorLastName 
+                                        ? `${notif.metadata.professorFirstName} ${notif.metadata.professorLastName}`
+                                        : notif.message?.match(/Professor\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/)?.[1] || 'Unknown')} created a new workshop "{notif.metadata?.workshopName || notif.title?.replace('New Workshop Request: ', '') || 'Workshop'}"
+                                  </p>
+                                  <p style={{
+                                    fontSize: '0.625rem',
+                                    color: 'rgba(29, 53, 87, 0.5)',
+                                    margin: 0
+                                  }}>
+                                    {formatTimeAgo(notif.createdAt)}
+                                  </p>
+                                </>
+                              ) : (
+                                <>
+                                  <p style={{
+                                    fontSize: '0.875rem',
+                                    fontWeight: !notif.isRead ? '600' : '400',
+                                    color: '#1D3557',
+                                    margin: 0,
+                                    marginBottom: '0.25rem'
+                                  }}>
+                                    {notif.title}
+                                  </p>
+                                  <p style={{
+                                    fontSize: '0.75rem',
+                                    color: '#6b7280',
+                                    margin: 0,
+                                    marginBottom: '0.25rem'
+                                  }}>
+                                    {notif.message}
+                                  </p>
+                                  <p style={{
+                                    fontSize: '0.625rem',
+                                    color: 'rgba(29, 53, 87, 0.5)',
+                                    margin: 0
+                                  }}>
+                                    {formatTimeAgo(notif.createdAt)}
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                            {!notif.isRead && (
+                              <div style={{
+                                width: '0.5rem',
+                                height: '0.5rem',
+                                borderRadius: '50%',
+                                backgroundColor: '#3b82f6',
+                                flexShrink: 0,
+                                marginTop: '0.5rem'
+                              }}></div>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
@@ -819,7 +1081,7 @@ const EventsOfficeDashboard = () => {
         {/* Content Area */}
         <div style={{
           flex: 1,
-          padding: '2.5rem',
+          padding: '2.5rem 6rem',
           overflowY: 'auto'
         }}>
           {loading ? (
@@ -828,23 +1090,61 @@ const EventsOfficeDashboard = () => {
             </div>
           ) : (
             <>
-              {/* Page Name Box */}
+              {/* Dashboard Banner with Background Image */}
               <div style={{
-                backgroundColor: '#FFFFFF',
-                padding: '1rem 1.5rem',
-                borderRadius: '0.5rem',
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                marginBottom: '2rem',
-                borderLeft: '4px solid #1D3557'
+                position: 'relative',
+                height: '140px',
+                borderRadius: '0.75rem',
+                overflow: 'hidden',
+                marginBottom: '1.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
               }}>
-                <h3 style={{
-                  color: '#1D3557',
-                  fontSize: '1.25rem',
-                  fontWeight: '600',
-                  margin: 0
+                {/* Background Image */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: 'url(/assets/images/dashboardimage.jpg)',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: 'cover',
+                  filter: 'blur(2px)'
+                }}></div>
+                {/* Blue Overlay */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: 'rgba(29, 53, 87, 0.75)'
+                }}></div>
+                {/* Content */}
+                <div style={{
+                  position: 'relative',
+                  zIndex: 10,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'flex-start',
+                  padding: '2rem 2.5rem',
+                  color: '#FFFFFF'
                 }}>
-                  Dashboard
-                </h3>
+                  <h3 style={{
+                    color: '#FFFFFF',
+                    fontSize: '1.75rem',
+                    fontWeight: '700',
+                    margin: 0,
+                    marginBottom: '0.5rem'
+                  }}>
+                    Dashboard
+                  </h3>
+                  <p style={{
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    fontSize: '0.875rem',
+                    fontWeight: '400',
+                    margin: 0
+                  }}>
+                    Overview of your events, registrations, and upcoming deadlines.
+                  </p>
+                </div>
               </div>
               
               <div style={{
@@ -988,12 +1288,7 @@ const EventsOfficeDashboard = () => {
                 </div>
 
                 {/* Recent Activity */}
-                <div style={{
-                  backgroundColor: '#FFFFFF',
-                  padding: '1.5rem',
-                  borderRadius: '0.5rem',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                }}>
+                <div>
                   <h3 style={{
                     fontSize: '1.125rem',
                     fontWeight: '600',
@@ -1002,6 +1297,14 @@ const EventsOfficeDashboard = () => {
                   }}>
                     Recent Activity
                   </h3>
+                  <div style={{
+                    backgroundColor: '#FFFFFF',
+                    padding: '1.5rem',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    maxHeight: '400px',
+                    overflowY: 'auto'
+                  }}>
                   <ul style={{
                     listStyle: 'none',
                     padding: 0,
@@ -1014,9 +1317,28 @@ const EventsOfficeDashboard = () => {
                       <li key={`${activity.type}-${activity.id}-${index}`} style={{
                         display: 'flex',
                         alignItems: 'flex-start',
-                        gap: '1rem'
+                        gap: '1rem',
+                        padding: activity.type === 'workshop_submission' && !activity.isRead ? '0.75rem' : '0',
+                        backgroundColor: activity.type === 'workshop_submission' && !activity.isRead ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                        borderRadius: activity.type === 'workshop_submission' && !activity.isRead ? '0.5rem' : '0',
+                        borderLeft: activity.type === 'workshop_submission' && !activity.isRead ? '3px solid #3b82f6' : 'none'
                       }}>
-                        {activity.user && index === 0 ? (
+                        {activity.type === 'workshop_submission' ? (
+                          <div style={{
+                            backgroundColor: '#dbeafe',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '2.5rem',
+                            height: '2.5rem',
+                            borderRadius: '50%',
+                            flexShrink: 0
+                          }}>
+                            <span className="material-symbols-outlined" style={{ color: '#3b82f6', fontSize: '1.25rem' }}>
+                              {activity.icon}
+                            </span>
+                          </div>
+                        ) : activity.user && index === 0 ? (
                           <div style={{
                             width: '2.5rem',
                             height: '2.5rem',
@@ -1047,9 +1369,14 @@ const EventsOfficeDashboard = () => {
                           <p style={{
                             fontSize: '0.875rem',
                             color: '#1D3557',
-                            margin: 0
+                            margin: 0,
+                            fontWeight: activity.type === 'workshop_submission' && !activity.isRead ? '600' : '400'
                           }}>
-                            {activity.user ? (
+                            {activity.type === 'workshop_submission' ? (
+                              <>
+                                Professor <span style={{ fontWeight: '600', color: '#3b82f6' }}>{activity.professorName}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
+                              </>
+                            ) : activity.user ? (
                               <>
                                 <span style={{ fontWeight: '600' }}>{activity.user}</span> {activity.action} the <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
                               </>
@@ -1075,33 +1402,41 @@ const EventsOfficeDashboard = () => {
                       </li>
                     )}
                   </ul>
+                  </div>
                 </div>
               </div>
 
               {/* Right Column - Upcoming Deadlines */}
               <div style={{
                 gridColumn: 'span 12',
-                backgroundColor: '#FFFFFF',
-                padding: '1.5rem',
-                borderRadius: '0.5rem',
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.5rem'
               }} className="events-office-right-column">
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: '600',
-                  color: '#1D3557',
-                  marginBottom: '1rem'
-                }}>
-                  Upcoming Deadlines
-                </h3>
-                <ul style={{
-                  listStyle: 'none',
-                  padding: 0,
-                  margin: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem'
-                }}>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    marginBottom: '1rem'
+                  }}>
+                    Upcoming Deadlines
+                  </h3>
+                  <div style={{
+                    backgroundColor: '#FFFFFF',
+                    padding: '1.5rem',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    minHeight: '577px'
+                  }}>
+                    <ul style={{
+                      listStyle: 'none',
+                      padding: 0,
+                      margin: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem'
+                    }}>
                   {upcomingDeadlines.map((deadline) => (
                     <li key={deadline.id} style={{
                       display: 'flex',
@@ -1135,7 +1470,9 @@ const EventsOfficeDashboard = () => {
                       </div>
                     </li>
                   ))}
-                </ul>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
             </>

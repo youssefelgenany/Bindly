@@ -45,8 +45,16 @@ const eventSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected', 'cancelled'],
+    enum: ['pending', 'approved', 'rejected', 'cancelled', 'needs_edits'],
     default: 'approved',
+  },
+  rejectionReason: {
+    type: String,
+    required: false,
+  },
+  editRequests: {
+    type: String,
+    required: false,
   },
   archived: {
     type: Boolean,
@@ -59,6 +67,10 @@ const eventSchema = new mongoose.Schema({
   allowedUsers: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
+  }],
+  allowedUserTypes: [{
+    type: String,
+    enum: ['Student', 'Professor', 'Staff', 'TA', 'Admin', 'Event Office'],
   }],
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,

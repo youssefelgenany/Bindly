@@ -1,26 +1,93 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
+import { eventsApiService } from '../api/eventsApi';
+import { notificationApiService } from '../api/notificationApi';
 import { useAuth } from '../contexts/AuthContext';
 
+const getDisplayStatus = (status) => {
+  const normalized = status?.toLowerCase();
+  if (normalized === 'approved' || normalized === 'registered') return 'REGISTERED';
+  if (normalized === 'pending') return 'PENDING';
+  if (normalized === 'rejected') return 'REJECTED';
+  return status ? status.toUpperCase() : 'STATUS';
+};
+
+const canStaffCancel = (registration) => {
+  if (!registration) return false;
+  if (!registration.paid) return false;
+  if (!registration.eventDate) return false;
+  return new Date(registration.eventDate) > new Date();
+};
+
 const StaffMyRegistrations = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRegistration, setSelectedRegistration] = useState(null);
+  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelRegistrationData, setCancelRegistrationData] = useState(null);
+  const [favoriteEventIds, setFavoriteEventIds] = useState(new Set());
+  const [showCancelSuccess, setShowCancelSuccess] = useState(false);
+  const [cancelSuccessData, setCancelSuccessData] = useState(null);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+  const [showRatingsCommentsModal, setShowRatingsCommentsModal] = useState(false);
+  const [selectedEventForView, setSelectedEventForView] = useState(null); // { eventId, eventDate, eventEndDate, eventTitle }
+  const [rating, setRating] = useState(0);
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [commentText, setCommentText] = useState('');
+  const [ratingsAndComments, setRatingsAndComments] = useState(null);
+  const [loadingRatingsComments, setLoadingRatingsComments] = useState(false);
+  const [eventRatings, setEventRatings] = useState({}); // { eventId: { average: number, count: number } }
+  const [modalError, setModalError] = useState('');
+  const [modalSuccess, setModalSuccess] = useState('');
+  const [modalFocus, setModalFocus] = useState(null);
+  const ratingSectionRef = useRef(null);
+  const commentSectionRef = useRef(null);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   const isActiveRoute = (path) => {
-    return location.pathname === path;
+    const currentPath = location.pathname;
+    if (currentPath === path) return true;
+    if (path === '/dashboard') {
+      return currentPath === '/dashboard';
+    }
+    return currentPath.startsWith(path);
   };
 
-  const handleLogout = () => {
+  const displayName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`
+    : user?.name || 'Staff';
+
+  const handleLogout = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     logout();
     navigate('/login');
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
+        setShowLogoutDropdown(false);
+      }
+      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLogoutDropdown, showNotificationsDropdown]);
 
   const loadMyRegistrations = useCallback(async () => {
     if (!user?.email) {
@@ -36,7 +103,17 @@ const StaffMyRegistrations = () => {
       const result = await studentRegistrationApi.getMyRegistrations(user.email);
       
       if (result.success) {
-        setRegistrations(result.data.registrations || []);
+        // Show all registrations (both upcoming and past events)
+        // Include approved and pending registrations regardless of payment status
+        // This ensures users can see both their registered (upcoming) and past events
+        const allRegistrations = result.data.registrations || [];
+        // Show approved and pending registrations (both paid and unpaid, upcoming and past)
+        // This includes all events the user has registered for, whether they've happened or not
+        const approvedRegistrations = allRegistrations.filter(reg => {
+          const status = reg.status?.toLowerCase();
+          return status === 'approved' || status === 'pending';
+        });
+        setRegistrations(approvedRegistrations);
       } else {
         setError(result.message || 'Failed to fetch registrations');
         setRegistrations([]);
@@ -54,7 +131,146 @@ const StaffMyRegistrations = () => {
     if (user && user.email) {
       loadMyRegistrations();
     }
+    
+    // Check for payment success query param
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('payment_success') === 'true') {
+      const eventTitle = searchParams.get('event_title') || 'the event';
+      setShowPaymentSuccess(true);
+      // Store event title for display
+      sessionStorage.setItem('paymentSuccessEventTitle', eventTitle);
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, [user, loadMyRegistrations]);
+
+  // Load user's favorite events (for TA users)
+  useEffect(() => {
+    const loadFavoriteEvents = async () => {
+      if (!user || user.userType !== 'TA') return;
+      
+      try {
+        const result = await eventsApiService.getFavoriteEvents();
+        if (result.success) {
+          const favoriteIds = new Set();
+          const events = Array.isArray(result.data) ? result.data : (result.data.events || []);
+          events.forEach(event => {
+            if (event._id) favoriteIds.add(String(event._id));
+            if (event.id) favoriteIds.add(String(event.id));
+          });
+          setFavoriteEventIds(favoriteIds);
+        }
+      } catch (error) {
+        console.error('Error loading favorite events:', error);
+      }
+    };
+
+    loadFavoriteEvents();
+  }, [user]);
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(
+          notificationsResult.data.data.notifications ||
+          notificationsResult.data.data ||
+          []
+        );
+      }
+
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
+
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev =>
+          prev.map(n => (n._id === notificationId ? { ...n, isRead: true } : n))
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
+
+  const formatNotificationDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const handleToggleFavorite = async (eventId, e) => {
+    e.stopPropagation(); // Prevent card click
+    
+    if (!user || user.userType !== 'TA') return;
+    
+    const isFavorite = favoriteEventIds.has(String(eventId));
+    
+    try {
+      if (isFavorite) {
+        const result = await eventsApiService.removeFromFavorites(eventId);
+        if (result.success) {
+          setFavoriteEventIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(String(eventId));
+            return newSet;
+          });
+        }
+      } else {
+        const result = await eventsApiService.addToFavorites(eventId);
+        if (result.success) {
+          setFavoriteEventIds(prev => new Set([...prev, String(eventId)]));
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
@@ -79,6 +295,39 @@ const StaffMyRegistrations = () => {
     };
     return colors[type?.toLowerCase()] || colors.other;
   };
+
+  const getEventTypeImage = (type) => {
+    const imageMap = {
+      conference: '/assets/images/conference-background.jpg',
+      workshop: '/assets/images/workshop-background.jpg',
+      bazaar: '/assets/images/bazaar-background.jpg',
+      trip: '/assets/images/trip-background.png',
+      booth: '/assets/images/booth-background.jpg'
+    };
+    return imageMap[type?.toLowerCase()] || null;
+  };
+
+  const getEventTypeFallbackText = (type) => {
+    return type ? type.toUpperCase() : 'EVENT';
+  };
+
+  const resetModalState = () => {
+    setRating(0);
+    setHoveredRating(0);
+    setCommentText('');
+    setModalError('');
+    setModalSuccess('');
+    setModalFocus(null);
+  };
+
+  useEffect(() => {
+    if (!showRatingsCommentsModal || !modalFocus) return;
+    const target = modalFocus === 'comment' ? commentSectionRef.current : ratingSectionRef.current;
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    setModalFocus(null);
+  }, [showRatingsCommentsModal, modalFocus]);
 
   const getStatusColor = (status) => {
     const colors = {
@@ -111,11 +360,243 @@ const StaffMyRegistrations = () => {
     return `In ${diffDays} days`;
   };
 
-  const displayName = user?.firstName && user?.lastName 
-    ? `${user.firstName} ${user.lastName}`
-    : user?.name || (user?.userType === 'TA' ? 'TA' : 'Staff');
-  
-  const userRole = user?.userType === 'TA' ? 'Teaching Assistant' : 'Staff';
+  // Check if event has passed (can rate/comment)
+  const hasEventPassed = (eventDate, eventEndDate) => {
+    try {
+      const now = new Date();
+      now.setHours(23, 59, 59, 999); // Set to end of today to include events that ended today
+      
+      // Check endDate first (most accurate), then eventDate
+      let checkDate = null;
+      if (eventEndDate) {
+        checkDate = new Date(eventEndDate);
+        if (isNaN(checkDate.getTime())) {
+          checkDate = null;
+        } else {
+          // Use the full datetime, not just date
+          // If it's a date string without time, set to end of that day
+          if (checkDate.getHours() === 0 && checkDate.getMinutes() === 0 && checkDate.getSeconds() === 0) {
+            checkDate.setHours(23, 59, 59, 999);
+          }
+        }
+      }
+      
+      if (!checkDate && eventDate) {
+        checkDate = new Date(eventDate);
+        if (isNaN(checkDate.getTime())) {
+          return false;
+        } else {
+          // Use the full datetime, not just date
+          // If it's a date string without time, set to end of that day
+          if (checkDate.getHours() === 0 && checkDate.getMinutes() === 0 && checkDate.getSeconds() === 0) {
+            checkDate.setHours(23, 59, 59, 999);
+          }
+        }
+      }
+      
+      if (!checkDate) {
+        return false;
+      }
+      
+      // Event has passed if the checkDate is before or equal to now
+      return checkDate <= now;
+    } catch (error) {
+      console.error('Error checking if event has passed:', error);
+      return false;
+    }
+  };
+
+  const isMarkedAsPastEvent = (registration) => {
+    if (!registration) return false;
+    const typeString = registration.eventType || registration.eventCategory || registration.type || registration.event?.eventType || '';
+    const normalized = typeString?.toString().trim().toLowerCase();
+    if (!normalized) return false;
+    return normalized === 'past event' || normalized === 'past events' || normalized === 'past';
+  };
+
+  const isRegistrationPast = (registration) => {
+    if (!registration) return false;
+    const eventDate = registration.eventDate || registration.startDate || registration.event?.startDate || registration.event?.eventDate;
+    const eventEndDate = registration.eventEndDate || registration.endDate || registration.event?.endDate || registration.event?.eventEndDate;
+    if (eventDate) {
+      const label = getDaysUntilEvent(eventDate);
+      if (label === 'Past') {
+        return true;
+      }
+    }
+    return hasEventPassed(eventDate, eventEndDate) || isMarkedAsPastEvent(registration);
+  };
+
+  const refreshEventRatingStats = async (eventId) => {
+    try {
+      const ratingResult = await eventsApiService.getRatingsAndComments(eventId);
+      if (ratingResult.success && ratingResult.data?.ratings) {
+        setEventRatings(prev => ({
+          ...prev,
+          [eventId]: {
+            average: ratingResult.data.ratings.average || 0,
+            count: ratingResult.data.ratings.count || 0
+          }
+        }));
+      }
+    } catch (err) {
+      console.error('Error refreshing rating stats:', err);
+    }
+  };
+
+  // Handle rating submission
+  const handleSubmitRating = async () => {
+    if (!selectedEventForView?.eventId) {
+      setModalError('No event selected.');
+      return;
+    }
+    if (!rating || rating < 1 || rating > 5) {
+      setModalError('Please select a rating between 1 and 5.');
+      return;
+    }
+
+    setModalError('');
+
+    try {
+      const eventId = String(selectedEventForView.eventId);
+      const result = await eventsApiService.submitRating(eventId, rating);
+      if (result.success) {
+        setRating(0);
+        setHoveredRating(0);
+        setModalSuccess('Rating submitted successfully.');
+        await loadRatingsAndComments(eventId);
+        await refreshEventRatingStats(eventId);
+      } else {
+        setModalSuccess('');
+        setModalError(result.message || result.error?.message || 'Failed to submit rating.');
+      }
+    } catch (err) {
+      console.error('Error submitting rating:', err);
+      setModalSuccess('');
+      setModalError(err.response?.data?.message || err.message || 'Error submitting rating.');
+    }
+  };
+
+  // Handle comment submission
+  const handleSubmitComment = async () => {
+    if (!selectedEventForView?.eventId) {
+      setModalError('No event selected.');
+      return;
+    }
+    if (!commentText.trim()) {
+      setModalError('Please enter a comment.');
+      return;
+    }
+
+    if (commentText.trim().length > 1000) {
+      setModalError('Comment cannot exceed 1000 characters.');
+      return;
+    }
+
+    setModalError('');
+
+    try {
+      const eventId = String(selectedEventForView.eventId);
+      const result = await eventsApiService.submitComment(eventId, commentText.trim());
+      if (result.success) {
+        setCommentText('');
+        setModalSuccess('Comment submitted successfully.');
+        await loadRatingsAndComments(eventId);
+      } else {
+        setModalSuccess('');
+        setModalError(result.message || result.error?.message || 'Failed to submit comment.');
+      }
+    } catch (err) {
+      console.error('Error submitting comment:', err);
+      setModalSuccess('');
+      setModalError(err.response?.data?.message || err.message || 'Error submitting comment.');
+    }
+  };
+
+  // Load ratings and comments for viewing
+  const loadRatingsAndComments = async (eventId) => {
+    if (!eventId) {
+      setModalError('Event ID is required');
+      return;
+    }
+    setLoadingRatingsComments(true);
+    setModalError('');
+    try {
+      const eventIdStr = String(eventId);
+      const result = await eventsApiService.getRatingsAndComments(eventIdStr);
+      if (result.success) {
+        setRatingsAndComments(result.data);
+      } else {
+        setModalError(result.message || result.error?.message || 'Failed to load ratings and comments');
+      }
+    } catch (err) {
+      console.error('Error loading ratings and comments:', err);
+      setModalError(err.response?.data?.message || err.message || 'Error loading ratings and comments');
+    } finally {
+      setLoadingRatingsComments(false);
+    }
+  };
+
+  // Handle view ratings and comments
+  const handleViewRatingsComments = async (registrationOrEventId, options = {}) => {
+    let registration = null;
+    let eventId = null;
+
+    if (registrationOrEventId && typeof registrationOrEventId === 'object') {
+      registration = registrationOrEventId;
+      eventId = registration.eventId || registration.event?._id || registration.event?.id;
+    } else {
+      eventId = registrationOrEventId;
+      registration = registrations.find((reg) => {
+        const regId = reg.eventId || reg.event?._id || reg.event?.id;
+        return String(regId) === String(eventId);
+      });
+    }
+
+    if (!eventId) {
+      setModalError('Event ID not found');
+      return;
+    }
+
+    let eventDetails = null;
+    try {
+      const eventResult = await eventsApiService.getAllEventsAuthenticated({});
+      if (eventResult.success && Array.isArray(eventResult.data)) {
+        eventDetails = eventResult.data.find(
+          (e) => String(e._id || e.id) === String(eventId)
+        );
+      }
+    } catch (err) {
+      console.error('Error fetching event details:', err);
+    }
+
+    const eventData = {
+      eventId: String(eventId),
+      eventDate:
+        eventDetails?.startDate ||
+        eventDetails?.eventDate ||
+        registration?.eventDate ||
+        registration?.startDate,
+      eventEndDate:
+        eventDetails?.endDate ||
+        eventDetails?.eventEndDate ||
+        registration?.eventEndDate ||
+        registration?.endDate,
+      eventTitle: registration?.eventTitle || registration?.title || eventDetails?.title,
+      eventType: eventDetails?.type || eventDetails?.eventType || registration?.eventType || registration?.event?.type,
+      registration,
+      eventDetails,
+    };
+
+    setSelectedEventForView(eventData);
+    resetModalState();
+    if (options.focus) {
+      setModalFocus(options.focus);
+    }
+    setShowRatingsCommentsModal(true);
+    await loadRatingsAndComments(eventId);
+  };
+
 
   if (loading) {
     return (
@@ -141,330 +622,308 @@ const StaffMyRegistrations = () => {
   return (
     <div style={{
       display: 'flex',
-      height: '100vh',
+      flexDirection: 'column',
+      minHeight: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
+      backgroundColor: '#f6f7f8'
     }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: sidebarOpen ? '16rem' : '0',
-        flexShrink: 0,
-        backgroundColor: '#1D3557',
-        padding: sidebarOpen ? '1.5rem' : '0',
+      {/* Header/Navbar */}
+      <header style={{
         display: 'flex',
-        flexDirection: 'column',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        overflow: 'hidden',
-        transition: 'width 0.3s ease, padding 0.3s ease'
+        borderBottom: '1px solid #e2e8f0',
+        padding: '1rem 2.5rem',
+        backgroundColor: '#FFFFFF'
       }}>
-        {/* Top Section - Logo and Navigation */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Logo and Branding */}
-          {sidebarOpen && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                borderRadius: '50%',
-                backgroundColor: '#457B9D',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF'
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <h1 style={{
-                  color: '#FFFFFF',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  {user?.userType === 'TA' ? 'TA Portal' : 'Staff Portal'}
-                </h1>
-                <p style={{
-                  color: 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: '400',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  University Portal
-                </p>
-              </div>
-          </div>
-        )}
-
-          {/* Navigation */}
-          {sidebarOpen && (
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <Link
-                to="/dashboard"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/dashboard') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/dashboard')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
-                }}>
-                  dashboard
-                </span>
-                <p style={{
-                  color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/dashboard') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Dashboard
-                </p>
-              </Link>
-
-              <Link
-                to="/staff/events"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/staff/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/staff/events')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/staff/events')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/staff/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
-                }}>
-                  explore
-                </span>
-                <p style={{
-                  color: isActiveRoute('/staff/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/staff/events') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Discover Events
-                </p>
-              </Link>
-
-              <Link
-                to="/staff/my-registrations"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/staff/my-registrations') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/staff/my-registrations')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/staff/my-registrations')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{
-                  color: isActiveRoute('/staff/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '1.25rem'
-                }}>
-                  event
-                </span>
-                <p style={{
-                  color: isActiveRoute('/staff/my-registrations') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/staff/my-registrations') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  My Events
-                </p>
-              </Link>
-
-              <Link
-                to="/gym-schedule"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/gym-schedule')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/gym-schedule')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  calendar_month
-                </span>
-                {sidebarOpen && (
-                  <p style={{
-                    color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
-                    lineHeight: 'normal',
-                    margin: 0
-                  }}>
-                    View Gym Sessions
-                  </p>
-                )}
-              </Link>
-            </nav>
-          )}
-      </div>
-
-        {/* Logout Button - Fixed at bottom */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <button
-            onClick={handleLogout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              width: '100%'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ color: 'rgba(241, 250, 238, 0.7)', fontSize: '1.25rem' }}>
-              logout
-            </span>
-            {sidebarOpen && (
-              <p style={{
-                color: 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Logout
-              </p>
-            )}
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
-        {/* Header */}
-        <header style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
-          padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1D3557'
-              }}
-              aria-label="Toggle sidebar"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                menu
-              </span>
-            </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+          <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
-              margin: 0
+              margin: 0,
+              cursor: 'pointer'
             }}>
               Bindly
             </h2>
+          </Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          {/* Notifications Bell */}
+          <div style={{ position: 'relative' }} data-notifications-dropdown>
+            <button
+              onClick={() => {
+                setShowNotificationsDropdown(!showNotificationsDropdown);
+                setShowLogoutDropdown(false);
+                if (!showNotificationsDropdown) {
+                  loadNotifications();
+                }
+              }}
+              style={{
+                position: 'relative',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span className="material-symbols-outlined" style={{
+                fontSize: '1.5rem',
+                color: '#1D3557'
+              }}>
+                notifications
+              </span>
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '0.25rem',
+                  right: '0.25rem',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  borderRadius: '50%',
+                  width: '1.125rem',
+                  height: '1.125rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.625rem',
+                  fontWeight: '700',
+                  border: '2px solid #FFFFFF'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {showNotificationsDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 1001,
+                width: '360px',
+                maxHeight: '500px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  padding: '1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    margin: 0
+                  }}>
+                    Notifications
+                  </h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllAsRead}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#1e40af',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        padding: '0.25rem 0.5rem'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.textDecoration = 'underline';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.textDecoration = 'none';
+                      }}
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                <div style={{
+                  overflowY: 'auto',
+                  maxHeight: '400px'
+                }}>
+                  {loadingNotifications ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      Loading...
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification._id}
+                        onClick={() => {
+                          if (!notification.isRead) {
+                            handleMarkAsRead(notification._id);
+                          }
+                          if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                            navigate('/staff/events');
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            (notification.type === 'event_reminder' || 
+                             notification.type === 'workshop_reminder' || 
+                             notification.type === 'trip_reminder' ||
+                             notification.type === 'gym_session_reminder') && 
+                            (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                          ) {
+                            navigate('/staff/my-registrations');
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            notification.type === 'new_loyalty_partner' || 
+                            notification.type === 'loyalty_partner_added' ||
+                            (notification.type === 'system' && notification.metadata?.vendorId)
+                          ) {
+                            navigate('/staff/loyalty-vendors');
+                            setShowNotificationsDropdown(false);
+                          }
+                        }}
+                        style={{
+                          padding: '0.75rem 1rem',
+                          borderBottom: '1px solid #f1f5f9',
+                          backgroundColor: notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fff7ed'
+                              : '#f8fafc',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          gap: '0.75rem'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#f8fafc' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#ffedd5'
+                              : '#edf2ff';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fff7ed'
+                              : '#f8fafc';
+                        }}
+                      >
+                        <div style={{
+                          width: '2.5rem',
+                          height: '2.5rem',
+                          borderRadius: '0.75rem',
+                          backgroundColor: notification.priority === 'high' ? '#fef3c7' : '#e0e7ff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.25rem',
+                            color: notification.priority === 'high' ? '#b45309' : '#4338ca'
+                          }}>
+                            {notification.type === 'event_announcement' || notification.type === 'new_event' ? 'campaign'
+                              : notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder' ? 'event'
+                              : 'notifications'}
+                          </span>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{
+                            fontWeight: notification.isRead ? '400' : '600',
+                            color: '#1D3557',
+                            fontSize: '0.875rem',
+                            marginBottom: '0.25rem'
+                          }}>
+                            {notification.title || notification.message}
+                          </div>
+                          {notification.message && notification.message !== notification.title && (
+                            <div style={{
+                              fontSize: '0.8125rem',
+                              color: '#475569',
+                              marginBottom: '0.25rem'
+                            }}>
+                              {notification.message}
+                            </div>
+                          )}
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#94a3b8'
+                          }}>
+                            {formatNotificationDate(notification.createdAt)}
+                          </div>
+                        </div>
+                        {!notification.isRead && (
+                          <span style={{
+                            width: '0.5rem',
+                            height: '0.5rem',
+                            borderRadius: '50%',
+                            backgroundColor: '#2563eb',
+                            alignSelf: 'center'
+                          }} />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#1D3557',
-                margin: 0
-              }}>
-                {displayName}
-              </p>
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                margin: 0
-              }}>
-                {user?.userType === 'TA' ? 'TA' : 'Staff'}
-              </p>
-            </div>
+
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#1D3557',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              Staff
+            </p>
+          </div>
+          <div 
+            data-profile-dropdown
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+          >
             {user?.profilePicturePath ? (
               <img
                 src={`http://localhost:5000${user.profilePicturePath}`}
@@ -486,48 +945,243 @@ const StaffMyRegistrations = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#FFFFFF',
+                fontSize: '0.875rem',
                 fontWeight: '600'
               }}>
-                {(user?.firstName?.[0] || user?.name?.[0] || (user?.userType === 'TA' ? 'T' : 'S')).toUpperCase()}
-        </div>
-      )}
+                {(user?.firstName?.[0] || user?.name?.[0] || 'S').toUpperCase()}
+              </div>
+            )}
+            {showLogoutDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                zIndex: 1000,
+                minWidth: '150px'
+              }}>
+                {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
+                  <Link
+                    to="/wallet"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#1D3557',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                    }}
+                    onClick={() => setShowLogoutDropdown(false)}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      account_balance_wallet
+                    </span>
+                    My Wallet
+                  </Link>
+                )}
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    logout
+                  </span>
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
-        </header>
+        </div>
+      </header>
+
+      {/* Horizontal Menu Bar */}
+      <nav style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '1rem 2rem',
+        backgroundColor: '#FFFFFF',
+        borderBottom: '1px solid #e2e8f0'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+          <Link
+            to="/dashboard"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Dashboard
+          </Link>
+          <Link
+            to="/staff/events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Discover Events
+          </Link>
+          <Link
+            to="/staff/my-registrations"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Events
+          </Link>
+          <Link
+            to="/staff/favorites"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Favorites
+          </Link>
+          <Link
+            to="/gym-schedule"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/gym-schedule') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            View Gym Sessions
+          </Link>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
 
         {/* Content */}
         <div style={{
           flex: 1,
-          padding: '2rem',
+          padding: '2rem 0',
           overflowY: 'auto',
           backgroundColor: '#f6f7f8'
         }}>
-          {/* Page Title Box */}
+          {/* Content Wrapper with Margins */}
           <div style={{
-            backgroundColor: '#FFFFFF',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-            marginBottom: '1.5rem',
-            borderLeft: '4px solid #1D3557'
+            marginLeft: '4rem',
+            marginRight: '4rem'
           }}>
-            <h3 style={{
-              color: '#1D3557',
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              margin: 0
+          {/* Page Title Banner */}
+          <div style={{
+            position: 'relative',
+            height: '140px',
+            borderRadius: '0.75rem',
+            overflow: 'hidden',
+            marginBottom: '1.5rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+          }}>
+            {/* Background Image */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'url(/assets/images/events-banner.jpeg)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
+            }}></div>
+            {/* Blue Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Content */}
+            <div style={{
+              position: 'relative',
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '2rem 2.5rem',
+              color: '#FFFFFF'
             }}>
-              My Events
-            </h3>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '1rem',
-              fontWeight: '400',
-              margin: '0.25rem 0 0 0'
-            }}>
-              View and manage your event registrations.
-            </p>
+              <h3 style={{
+                color: '#FFFFFF',
+                fontSize: '1.75rem',
+                fontWeight: '700',
+                margin: 0,
+                marginBottom: '0.5rem'
+              }}>
+                My Events
+              </h3>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '0.875rem',
+                fontWeight: '400',
+                margin: 0
+              }}>
+                View and manage your event registrations.
+              </p>
+            </div>
           </div>
-      {error && (
+          {error && (
             <div style={{
               padding: '0.75rem 1rem',
               marginBottom: '1.5rem',
@@ -537,8 +1191,8 @@ const StaffMyRegistrations = () => {
               fontSize: '0.875rem'
             }}>
               {error}
-        </div>
-      )}
+            </div>
+          )}
 
           {!loading && registrations.length === 0 ? (
             <div style={{
@@ -619,13 +1273,14 @@ const StaffMyRegistrations = () => {
                     style={{
                       backgroundColor: '#FFFFFF',
                       borderRadius: '0.75rem',
-                      padding: '1.5rem',
+                      padding: 0,
                       boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
                       border: '1px solid #e5e7eb',
                       display: 'flex',
-                      flexDirection: 'column'
+                      flexDirection: 'column',
+                      overflow: 'hidden'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'translateY(-4px)';
@@ -638,51 +1293,160 @@ const StaffMyRegistrations = () => {
                       e.currentTarget.style.borderColor = '#e5e7eb';
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                    {/* Event Type Image - Top Half */}
+                    {getEventTypeImage(registration.eventType) && (
                       <div style={{
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: getEventTypeColor(registration.eventType),
-                        color: '#FFFFFF',
-                        fontSize: '0.6875rem',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
+                        width: '100%',
+                        height: '180px',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        backgroundColor: '#f3f4f6',
+                        flexShrink: 0
                       }}>
-                        {registration.eventType}
+                        <img
+                          src={getEventTypeImage(registration.eventType)}
+                          alt={registration.eventType ? registration.eventType.charAt(0).toUpperCase() + registration.eventType.slice(1) : 'Event'}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'center'
+                          }}
+                          onError={(e) => {
+                            // Fallback if image doesn't exist
+                            e.target.style.display = 'none';
+                            e.target.parentElement.style.backgroundColor = getEventTypeColor(registration.eventType);
+                            e.target.parentElement.style.display = 'flex';
+                            e.target.parentElement.style.alignItems = 'center';
+                            e.target.parentElement.style.justifyContent = 'center';
+                            if (!e.target.parentElement.querySelector('.fallback-text')) {
+                              const fallback = document.createElement('div');
+                              fallback.className = 'fallback-text';
+                              fallback.textContent = getEventTypeFallbackText(registration.eventType);
+                              fallback.style.color = '#FFFFFF';
+                              fallback.style.fontSize = '1.5rem';
+                              fallback.style.fontWeight = '700';
+                              e.target.parentElement.appendChild(fallback);
+                            }
+                          }}
+                        />
+                        {/* Heart Icon for TA users */}
+                        {user?.userType === 'TA' && (
+                          <button
+                            onClick={(e) => handleToggleFavorite(registration.eventId, e)}
+                            style={{
+                              position: 'absolute',
+                              top: '0.75rem',
+                              right: '0.75rem',
+                              background: 'rgba(255, 255, 255, 0.9)',
+                              border: 'none',
+                              borderRadius: '50%',
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                              transition: 'all 0.2s',
+                              zIndex: 10
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.background = '#ffffff';
+                              e.target.style.transform = 'scale(1.1)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.background = 'rgba(255, 255, 255, 0.9)';
+                              e.target.style.transform = 'scale(1)';
+                            }}
+                          >
+                            <span 
+                              className="material-symbols-outlined"
+                              style={{
+                                fontSize: '1.25rem',
+                                color: favoriteEventIds.has(String(registration.eventId)) ? '#dc2626' : '#6b7280',
+                                transition: 'color 0.2s'
+                              }}
+                            >
+                              {favoriteEventIds.has(String(registration.eventId)) ? 'favorite' : 'favorite_border'}
+                            </span>
+                          </button>
+                        )}
                       </div>
-                      <div style={{
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: getStatusColor(registration.status),
-                        color: '#FFFFFF',
-                        fontSize: '0.6875rem',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}>
-                        {getDisplayStatus(registration.status)}
-                      </div>
-                    </div>
-
-                    <h3 style={{
-                      color: '#1D3557',
-                      fontSize: '1.125rem',
-                      fontWeight: '600',
-                      marginBottom: '1rem',
-                      marginTop: 0,
-                      lineHeight: '1.4'
-                    }}>
-                      {registration.eventTitle}
-                    </h3>
+                    )}
                     
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.625rem',
-                      marginBottom: '1rem',
-                      flex: 1
-                    }}>
+                    <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                        <div style={{
+                          padding: '0.375rem 0.875rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: getEventTypeColor(registration.eventType),
+                          color: '#FFFFFF',
+                          fontSize: '0.6875rem',
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          {registration.eventType}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!canStaffCancel(registration)) {
+                              setSelectedRegistration(registration);
+                              return;
+                            }
+                            setCancelRegistrationData({
+                              eventId: registration.eventId,
+                              eventTitle: registration.eventTitle,
+                              paid: registration.paid
+                            });
+                            setShowCancelModal(true);
+                          }}
+                          style={{
+                            padding: '0.375rem 0.875rem',
+                            borderRadius: '0.5rem',
+                            border: 'none',
+                            backgroundColor: getStatusColor(registration.status),
+                            color: '#FFFFFF',
+                            fontSize: '0.6875rem',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            cursor: canStaffCancel(registration) ? 'pointer' : 'default',
+                            boxShadow: canStaffCancel(registration) ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                          }}
+                          title={canStaffCancel(registration) ? 'Tap to cancel & refund to wallet' : ''}
+                        >
+                          {getDisplayStatus(registration.status)}
+                        </button>
+                      </div>
+                      {canStaffCancel(registration) && (
+                        <div style={{ marginTop: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#dc2626', fontWeight: '600' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>info</span>
+                          Tap “Registered” to cancel & refund
+                        </div>
+                      )}
+
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '0.75rem',
+                        marginTop: 0,
+                        lineHeight: '1.4'
+                      }}>
+                        {registration.eventTitle}
+                      </h3>
+                      
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem',
+                        marginBottom: '0.75rem',
+                        flex: 1
+                      }}>
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -711,6 +1475,7 @@ const StaffMyRegistrations = () => {
                           </span>
                         )}
                       </div>
+                      
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -726,60 +1491,81 @@ const StaffMyRegistrations = () => {
                         </span>
                         <span>{registration.eventLocation}</span>
                       </div>
-                      {registration.capacity && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
+                      </div>
+
+                      {registration.eventDescription && (
+                        <p style={{
+                          color: '#6b7280',
                           fontSize: '0.8125rem',
-                          color: '#6b7280'
+                          marginBottom: '0.75rem',
+                          marginTop: 0,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          lineHeight: '1.5'
                         }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            people
-                          </span>
-                          <span>{registration.registeredCount || 0}/{registration.capacity} registered</span>
-        </div>
-      )}
+                          {registration.eventDescription}
+                        </p>
+                      )}
+
                       <div style={{
+                        marginTop: 'auto',
+                        paddingTop: '0.75rem',
+                        borderTop: '1px solid #e5e7eb',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
+                        justifyContent: 'flex-start',
+                        gap: '0.5rem'
                       }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
-                        }}>
-                          schedule
-                        </span>
-                        <span>Registered: {formatDate(registration.registeredAt)}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewRatingsComments(registration);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.375rem',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '0.25rem',
+                            borderRadius: '0.375rem',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f3f4f6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                          title="View ratings and comments"
+                        >
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#fbbf24'
+                          }}>
+                            star
+                          </span>
+                          <span style={{
+                            fontSize: '0.8125rem',
+                            fontWeight: '600',
+                            color: '#374151'
+                          }}>
+                            {eventRatings[registration.eventId]?.average > 0
+                              ? eventRatings[registration.eventId].average.toFixed(1)
+                              : '—'}
+                          </span>
+                        </button>
                       </div>
                     </div>
-
-                    {registration.eventDescription && (
-                      <p style={{
-                        color: '#6b7280',
-                        fontSize: '0.8125rem',
-                        marginBottom: '1rem',
-                        marginTop: 0,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        lineHeight: '1.5'
-                      }}>
-                        {registration.eventDescription}
-                      </p>
-                    )}
                   </div>
                 ))}
-        </div>
+              </div>
             </>
           )}
+          </div>
         </div>
       </main>
 
@@ -807,55 +1593,114 @@ const StaffMyRegistrations = () => {
               maxWidth: '600px',
               width: '100%',
               maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              position: 'relative'
             }}
           >
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '1.5rem',
-              borderBottom: '1px solid #e5e7eb'
-            }}>
-              <h2 style={{
-                color: '#1D3557',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                margin: 0
-              }}>
-                {selectedRegistration.eventTitle}
-              </h2>
+            {/* Event Image at Top with Close Button Overlay */}
+            <div style={{ position: 'relative' }}>
+              {getEventTypeImage(selectedRegistration.eventType) && (
+                <div style={{
+                  width: '100%',
+                  height: '200px',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  backgroundColor: '#f3f4f6',
+                  flexShrink: 0
+                }}>
+                  <img
+                    src={getEventTypeImage(selectedRegistration.eventType)}
+                    alt={selectedRegistration.eventType ? selectedRegistration.eventType.charAt(0).toUpperCase() + selectedRegistration.eventType.slice(1) : 'Event'}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center'
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.style.backgroundColor = getEventTypeColor(selectedRegistration.eventType);
+                      e.target.parentElement.style.display = 'flex';
+                      e.target.parentElement.style.alignItems = 'center';
+                      e.target.parentElement.style.justifyContent = 'center';
+                      if (!e.target.parentElement.querySelector('.fallback-text')) {
+                        const fallback = document.createElement('div');
+                        fallback.className = 'fallback-text';
+                        fallback.textContent = getEventTypeFallbackText(selectedRegistration.eventType);
+                        fallback.style.color = '#FFFFFF';
+                        fallback.style.fontSize = '1.5rem';
+                        fallback.style.fontWeight = '700';
+                        e.target.parentElement.appendChild(fallback);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              
+              {/* Close Button - Upper Right Corner */}
               <button
                 onClick={() => setSelectedRegistration(null)}
                 style={{
-                  background: 'none',
+                  position: 'absolute',
+                  top: '0.75rem',
+                  right: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.9)',
                   border: 'none',
                   fontSize: '1.5rem',
                   cursor: 'pointer',
                   color: '#6b7280',
                   padding: '0.25rem 0.5rem',
-                  borderRadius: '0.25rem',
-                  transition: 'background-color 0.2s',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
                   lineHeight: 1,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   width: '2rem',
-                  height: '2rem'
+                  height: '2rem',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                  zIndex: 10
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.backgroundColor = '#ffffff';
+                  e.target.style.color = '#1D3557';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  e.target.style.color = '#6b7280';
                 }}
               >
                 ×
               </button>
             </div>
             
-            <div style={{ padding: '1.5rem' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                margin: 0,
+                paddingRight: '1rem'
+              }}>
+                {selectedRegistration.eventTitle}
+              </h2>
+            </div>
+            
+            <div style={{ 
+              padding: '1rem 1.5rem 1.5rem 1.5rem',
+              overflowY: 'auto',
+              flex: 1,
+              minHeight: 0
+            }}>
               <div style={{
                 display: 'flex',
                 gap: '0.5rem',
@@ -1040,7 +1885,7 @@ const StaffMyRegistrations = () => {
                     <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentName}</div>
               </div>
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Student ID</div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>{user?.userType === 'TA' ? 'TA ID' : 'Student ID'}</div>
                     <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentId}</div>
                 </div>
                   <div>
@@ -1103,6 +1948,883 @@ const StaffMyRegistrations = () => {
                       <div style={{ color: '#374151', fontSize: '0.875rem' }}>{selectedRegistration.medicalConditions}</div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Cancel Button - Only show for paid registrations that haven't started */}
+              {selectedRegistration.paid && 
+               selectedRegistration.eventDate && 
+               new Date(selectedRegistration.eventDate) > new Date() && (
+                <div style={{
+                  marginTop: '1.5rem',
+                  paddingTop: '1.5rem',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  <button
+                    onClick={() => {
+                      setCancelRegistrationData({
+                        eventId: selectedRegistration.eventId,
+                        eventTitle: selectedRegistration.eventTitle,
+                        paid: selectedRegistration.paid
+                      });
+                      setShowCancelModal(true);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#dc2626',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#b91c1c';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#dc2626';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      cancel
+                    </span>
+                    Cancel Registration & Get Refund
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Registration Modal */}
+      {showCancelModal && cancelRegistrationData && (
+        <div
+          onClick={() => setShowCancelModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '400px',
+              width: '100%',
+              padding: '2rem',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              marginBottom: '1rem',
+              marginTop: 0
+            }}>
+              Cancel Registration
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '0.875rem',
+              marginBottom: '1.5rem'
+            }}>
+              Are you sure you want to cancel your registration for <strong>{cancelRegistrationData.eventTitle}</strong>?
+              {cancelRegistrationData.paid && ' The refund will be added to your wallet.'}
+            </p>
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}
+              >
+                Close
+              </button>
+              <button
+                onClick={async () => {
+                  setCancelling(true);
+                  try {
+                    const eventId = cancelRegistrationData.eventId;
+                    if (!eventId) {
+                      alert('Event ID not found');
+                      setCancelling(false);
+                      return;
+                    }
+                    const result = await eventsApiService.cancelRegistration(eventId);
+                    if (result.success) {
+                      setCancelSuccessData({
+                        eventTitle: cancelRegistrationData.eventTitle,
+                        refunded: result.data.refunded || false,
+                        refundAmount: result.data.refundAmount || 0
+                      });
+                      setShowCancelModal(false);
+                      setCancelRegistrationData(null);
+                      setShowCancelSuccess(true);
+                      loadMyRegistrations();
+                      // Trigger wallet refresh event for wallet page if open
+                      window.dispatchEvent(new Event('walletRefresh'));
+                      // Refresh user object to get latest wallet balance
+                      if (refreshUser) {
+                        refreshUser();
+                      }
+                    } else {
+                      alert(result.message || 'Failed to cancel registration');
+                    }
+                  } catch (err) {
+                    console.error('Cancel error:', err);
+                    alert('An error occurred while cancelling registration');
+                  } finally {
+                    setCancelling(false);
+                  }
+                }}
+                disabled={cancelling}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: cancelling ? '#9ca3af' : '#dc2626',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: cancelling ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}
+              >
+                {cancelling ? 'Cancelling...' : 'Cancel Registration'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancellation Success Modal */}
+      {showCancelSuccess && cancelSuccessData && (
+        <div
+          onClick={() => {
+            setShowCancelSuccess(false);
+            setCancelSuccessData(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '500px',
+              width: '100%',
+              padding: '3rem 2rem',
+              textAlign: 'center',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            <div style={{
+              width: '4rem',
+              height: '4rem',
+              borderRadius: '50%',
+              backgroundColor: '#d1fae5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+              fontSize: '2rem'
+            }}>
+              ✅
+            </div>
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.5rem',
+              fontWeight: '600',
+              marginBottom: '1rem',
+              marginTop: 0
+            }}>
+              Registration Cancelled!
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '0.875rem',
+              marginBottom: '0.5rem'
+            }}>
+              Your registration for <strong style={{ color: '#1D3557' }}>{cancelSuccessData.eventTitle}</strong> has been cancelled successfully.
+            </p>
+            {cancelSuccessData.refunded && (
+              <p style={{
+                color: '#059669',
+                fontSize: '1rem',
+                fontWeight: '600',
+                marginBottom: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                  account_balance_wallet
+                </span>
+                {cancelSuccessData.refundAmount > 0 
+                  ? `${cancelSuccessData.refundAmount} EGP has been refunded to your wallet.`
+                  : 'The refund has been added to your wallet.'}
+              </p>
+            )}
+            <button
+              onClick={() => {
+                setShowCancelSuccess(false);
+                setCancelSuccessData(null);
+              }}
+              style={{
+                padding: '0.75rem 2rem',
+                borderRadius: '0.5rem',
+                backgroundColor: '#1e40af',
+                color: '#FFFFFF',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#1e3a8a';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#1e40af';
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Success Modal */}
+      {showPaymentSuccess && (
+        <div
+          onClick={() => setShowPaymentSuccess(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '500px',
+              width: '100%',
+              padding: '3rem 2rem',
+              textAlign: 'center',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            <div style={{
+              width: '4rem',
+              height: '4rem',
+              borderRadius: '50%',
+              backgroundColor: '#d1fae5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+              fontSize: '2rem'
+            }}>
+              ✅
+            </div>
+            <h3 style={{
+              color: '#1D3557',
+              fontSize: '1.5rem',
+              fontWeight: '600',
+              marginBottom: '1rem',
+              marginTop: 0
+            }}>
+              Registration Successful!
+            </h3>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '0.875rem',
+              marginBottom: '0.5rem'
+            }}>
+              You have been successfully registered for <strong style={{ color: '#1D3557' }}>{sessionStorage.getItem('paymentSuccessEventTitle') || 'the event'}</strong>
+            </p>
+            <p style={{
+              color: '#6b7280',
+              fontSize: '0.875rem',
+              marginBottom: '1.5rem'
+            }}>
+              A payment confirmation email has been sent to <strong style={{ color: '#1D3557' }}>{user?.email}</strong>
+            </p>
+            <button
+              onClick={() => setShowPaymentSuccess(false)}
+              style={{
+                padding: '0.75rem 2rem',
+                borderRadius: '0.5rem',
+                backgroundColor: '#1e40af',
+                color: '#FFFFFF',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#1e3a8a';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#1e40af';
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Ratings & Comments Modal */}
+      {showRatingsCommentsModal && selectedEventForView && (
+        <div
+          onClick={() => {
+            setShowRatingsCommentsModal(false);
+            setSelectedEventForView(null);
+            setRatingsAndComments(null);
+            resetModalState();
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1001,
+            padding: '1rem',
+            backdropFilter: 'blur(4px)'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '700px',
+              width: '100%',
+              maxHeight: '90vh',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              position: 'relative',
+              zIndex: 1002
+            }}
+          >
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h2 style={{
+                  color: '#1D3557',
+                  fontSize: '1.5rem',
+                  fontWeight: '700',
+                  margin: 0
+                }}>
+                  Ratings & Comments
+                </h2>
+                {selectedEventForView?.eventTitle && (
+                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+                    {selectedEventForView.eventTitle}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setShowRatingsCommentsModal(false);
+                  setSelectedEventForView(null);
+                  setRatingsAndComments(null);
+                  resetModalState();
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
+                  lineHeight: 1
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                padding: '1.5rem',
+                overflowY: 'auto',
+                flex: 1,
+                position: 'relative',
+                zIndex: 10
+              }}
+            >
+              {loadingRatingsComments ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: '#6b7280'
+                }}>
+                  Loading...
+                </div>
+              ) : ratingsAndComments ? (
+                <>
+                  {ratingsAndComments.ratings && (
+                    <div style={{
+                      marginBottom: '2rem',
+                      padding: '1.5rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '0.5rem'
+                    }}>
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '1rem',
+                        marginTop: 0
+                      }}>
+                        Ratings
+                      </h3>
+                      {ratingsAndComments.ratings.count > 0 ? (
+                        <>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            marginBottom: '1rem'
+                          }}>
+                            <div style={{
+                              fontSize: '2.5rem',
+                              fontWeight: '700',
+                              color: '#1D3557'
+                            }}>
+                              {ratingsAndComments.ratings.average.toFixed(1)}
+                            </div>
+                            <div>
+                              <div style={{
+                                display: 'flex',
+                                gap: '0.25rem',
+                                marginBottom: '0.25rem'
+                              }}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <span
+                                    key={star}
+                                    style={{
+                                      fontSize: '1.25rem',
+                                      color: star <= Math.round(ratingsAndComments.ratings.average) ? '#fbbf24' : '#d1d5db'
+                                    }}
+                                  >
+                                    ★
+                                  </span>
+                                ))}
+                              </div>
+                              <div style={{
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                Based on {ratingsAndComments.ratings.count} rating{ratingsAndComments.ratings.count !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                          </div>
+                          {ratingsAndComments.ratings.distribution && (
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem'
+                            }}>
+                              {[5, 4, 3, 2, 1].map((star) => (
+                                <div key={star} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem'
+                                }}>
+                                  <span style={{ fontSize: '0.875rem', color: '#6b7280', minWidth: '60px' }}>
+                                    {star} star{star !== 1 ? 's' : ''}
+                                  </span>
+                                  <div style={{
+                                    flex: 1,
+                                    height: '8px',
+                                    backgroundColor: '#e5e7eb',
+                                    borderRadius: '0.25rem',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <div style={{
+                                      width: `${ratingsAndComments.ratings.count > 0 ? (ratingsAndComments.ratings.distribution[star] || 0) / ratingsAndComments.ratings.count * 100 : 0}%`,
+                                      height: '100%',
+                                      backgroundColor: '#fbbf24',
+                                      transition: 'width 0.3s'
+                                    }} />
+                                  </div>
+                                  <span style={{ fontSize: '0.875rem', color: '#6b7280', minWidth: '40px' }}>
+                                    {ratingsAndComments.ratings.distribution[star] || 0}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p style={{
+                          color: '#6b7280',
+                          fontSize: '0.875rem',
+                          margin: 0
+                        }}>
+                          No ratings yet
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedEventForView && (() => {
+                    const eventDate = selectedEventForView.eventDate || selectedEventForView.registration?.eventDate;
+                    const eventEndDate = selectedEventForView.eventEndDate || selectedEventForView.registration?.eventEndDate;
+                    const finalEventDate = eventDate;
+                    const finalEventEndDate = eventEndDate;
+                    const isPast = hasEventPassed(finalEventDate, finalEventEndDate);
+                    const isPastType = isMarkedAsPastEvent(selectedEventForView.registration);
+                    if (!finalEventDate && !finalEventEndDate && !isPastType) return false;
+                    return isPast || isPastType;
+                  })() && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{
+                        marginBottom: '2rem',
+                        padding: '1.5rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        position: 'relative',
+                        zIndex: 10
+                      }}
+                    >
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '1rem',
+                        marginTop: 0
+                      }}>
+                        Share Your Feedback
+                      </h3>
+
+                      {modalError && (
+                        <div style={{
+                          padding: '0.75rem',
+                          marginBottom: '1rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: '#fee2e2',
+                          color: '#991b1b',
+                          fontSize: '0.875rem'
+                        }}>
+                          {modalError}
+                        </div>
+                      )}
+
+                      {modalSuccess && (
+                        <div style={{
+                          padding: '0.75rem',
+                          marginBottom: '1rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: '#ecfdf5',
+                          color: '#047857',
+                          fontSize: '0.875rem'
+                        }}>
+                          {modalSuccess}
+                        </div>
+                      )}
+
+                      <div ref={ratingSectionRef} style={{ marginBottom: '1.5rem' }}>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Your Rating
+                        </label>
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem'
+                        }}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setRating(star)}
+                              onMouseEnter={() => setHoveredRating(star)}
+                              onMouseLeave={() => setHoveredRating(0)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontSize: '2rem',
+                                color: (hoveredRating >= star || rating >= star) ? '#fbbf24' : '#d1d5db',
+                                transition: 'all 0.2s',
+                                lineHeight: 1
+                              }}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                        {rating > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleSubmitRating}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: '#1e40af',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.stopPropagation();
+                              e.target.style.backgroundColor = '#1e3a8a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.stopPropagation();
+                              e.target.style.backgroundColor = '#1e40af';
+                            }}
+                          >
+                            Submit Rating
+                          </button>
+                        )}
+                      </div>
+
+                      <div ref={commentSectionRef}>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Your Comment
+                        </label>
+                        <textarea
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          placeholder="Share your thoughts about this event..."
+                          maxLength={1000}
+                          style={{
+                            width: '100%',
+                            minHeight: '100px',
+                            padding: '0.875rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            fontSize: '0.875rem',
+                            fontFamily: 'inherit',
+                            resize: 'vertical',
+                            marginBottom: '0.5rem',
+                            outline: 'none',
+                            transition: 'all 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#1e40af';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#e5e7eb';
+                            e.target.style.boxShadow = 'none';
+                          }}
+                        />
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280',
+                          textAlign: 'right',
+                          marginBottom: '0.75rem'
+                        }}>
+                          {commentText.length}/1000 characters
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleSubmitComment}
+                          disabled={!commentText.trim()}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (commentText.trim()) {
+                              e.target.style.backgroundColor = '#1e3a8a';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (commentText.trim()) {
+                              e.target.style.backgroundColor = '#1e40af';
+                            }
+                          }}
+                        >
+                          Submit Comment
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 style={{
+                      color: '#1D3557',
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      marginBottom: '1rem',
+                      marginTop: 0
+                    }}>
+                      Comments ({ratingsAndComments.comments?.length || 0})
+                    </h3>
+                    {ratingsAndComments.comments && ratingsAndComments.comments.length > 0 ? (
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem'
+                      }}>
+                        {ratingsAndComments.comments.map((comment) => (
+                          <div
+                            key={comment._id}
+                            style={{
+                              padding: '1rem',
+                              backgroundColor: '#f9fafb',
+                              borderRadius: '0.5rem',
+                              border: '1px solid #e5e7eb'
+                            }}
+                          >
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              marginBottom: '0.5rem'
+                            }}>
+                              <div>
+                                <div style={{
+                                  fontWeight: '600',
+                                  color: '#1D3557',
+                                  fontSize: '0.875rem'
+                                }}>
+                                  {comment.user?.firstName} {comment.user?.lastName}
+                                </div>
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: '#6b7280'
+                                }}>
+                                  {comment.user?.userType || 'User'}
+                                </div>
+                              </div>
+                              <div style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280'
+                              }}>
+                                {formatDate(comment.createdAt)}
+                              </div>
+                            </div>
+                            <p style={{
+                              color: '#374151',
+                              fontSize: '0.875rem',
+                              lineHeight: '1.6',
+                              margin: 0
+                            }}>
+                              {comment.text}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        margin: 0,
+                        padding: '1rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '0.5rem'
+                      }}>
+                        No comments yet
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: '#6b7280'
+                }}>
+                  No data available
                 </div>
               )}
             </div>

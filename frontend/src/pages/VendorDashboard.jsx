@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { vendorApi } from '../api/vendorApi';
+import PlatformBoothsModal from '../components/PlatformBoothsModal';
 
 const VendorDashboard = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [showPlatformBoothsModal, setShowPlatformBoothsModal] = useState(false);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [applications, setApplications] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -95,10 +97,26 @@ const VendorDashboard = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     logout();
     navigate('/login');
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showLogoutDropdown && event.target instanceof Element && !event.target.closest('[data-profile-dropdown]')) {
+        setShowLogoutDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showLogoutDropdown]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -167,7 +185,12 @@ const VendorDashboard = () => {
   };
 
   const isActiveRoute = (path) => {
-    return location.pathname === path;
+    const currentPath = location.pathname;
+    if (currentPath === path) return true;
+    if (path === '/vendor') {
+      return currentPath === '/vendor';
+    }
+    return currentPath.startsWith(path);
   };
 
   const displayName = user?.companyName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Vendor';
@@ -175,369 +198,57 @@ const VendorDashboard = () => {
   return (
     <div style={{
       display: 'flex',
-      height: '100vh',
+      flexDirection: 'column',
+      minHeight: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
+      backgroundColor: '#f6f7f8'
     }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: sidebarOpen ? '16rem' : '0',
-        flexShrink: 0,
-        backgroundColor: '#1D3557',
-        padding: sidebarOpen ? '1.5rem' : '0',
+      {/* Header/Navbar */}
+      <header style={{
         display: 'flex',
-        flexDirection: 'column',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        overflow: 'hidden',
-        transition: 'width 0.3s ease, padding 0.3s ease'
+        borderBottom: '1px solid #e2e8f0',
+        padding: '1rem 2.5rem',
+        backgroundColor: '#FFFFFF'
       }}>
-        {/* Top Section - Logo and Navigation */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Logo and Branding */}
-          {sidebarOpen && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                borderRadius: '50%',
-                backgroundColor: '#457B9D',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF'
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                  storefront
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <h1 style={{
-                  color: '#FFFFFF',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Vendor Portal
-                </h1>
-                <p style={{
-                  color: 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: '400',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  {user?.companyName || 'Company'}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation */}
-          {sidebarOpen && (
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <Link
-                to="/vendor"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/vendor') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/vendor')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/vendor')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/vendor') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  dashboard
-                </span>
-                <p style={{
-                  color: isActiveRoute('/vendor') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/vendor') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Dashboard
-                </p>
-              </Link>
-
-              <Link
-                to="/vendor/bazaars"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/vendor/bazaars') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/vendor/bazaars')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/vendor/bazaars')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/vendor/bazaars') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  explore
-                </span>
-                <p style={{
-                  color: isActiveRoute('/vendor/bazaars') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/vendor/bazaars') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Discover Bazaars
-                </p>
-              </Link>
-
-              <Link
-                to="/vendor/platform-booths"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/vendor/platform-booths') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/vendor/platform-booths')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/vendor/platform-booths')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/vendor/platform-booths') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  location_on
-                </span>
-                <p style={{
-                  color: isActiveRoute('/vendor/platform-booths') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/vendor/platform-booths') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  Platform Booths
-                </p>
-              </Link>
-
-              <Link
-                to="/vendor/accepted-events"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/vendor/accepted-events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/vendor/accepted-events')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/vendor/accepted-events')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/vendor/accepted-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  check_circle
-                </span>
-                <p style={{
-                  color: isActiveRoute('/vendor/accepted-events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/vendor/accepted-events') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  My Participations
-                </p>
-              </Link>
-
-              <Link
-                to="/vendor/my-requests"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/vendor/my-requests') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActiveRoute('/vendor/my-requests')) {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActiveRoute('/vendor/my-requests')) {
-                    e.target.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/vendor/my-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                  fontSize: '1.25rem' 
-                }}>
-                  assignment
-                </span>
-                <p style={{
-                  color: isActiveRoute('/vendor/my-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/vendor/my-requests') ? '700' : '500',
-                  lineHeight: 'normal',
-                  margin: 0
-                }}>
-                  My Applications
-                </p>
-              </Link>
-            </nav>
-          )}
-        </div>
-
-        {/* Logout Button - Fixed at bottom */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <button
-            onClick={handleLogout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              width: '100%'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ color: 'rgba(241, 250, 238, 0.7)', fontSize: '1.25rem' }}>
-              logout
-            </span>
-            {sidebarOpen && (
-              <p style={{
-                color: 'rgba(241, 250, 238, 0.7)',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                lineHeight: 'normal',
-                margin: 0
-              }}>
-                Logout
-              </p>
-            )}
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
-        {/* Header */}
-        <header style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
-          padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1D3557'
-              }}
-              aria-label="Toggle sidebar"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                menu
-              </span>
-            </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+          <Link to="/vendor" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
-              margin: 0
+              margin: 0,
+              cursor: 'pointer'
             }}>
               Bindly
             </h2>
+          </Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#1D3557',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              Vendor
+            </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#1D3557',
-                margin: 0
-              }}>
-                {displayName}
-              </p>
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                margin: 0
-              }}>
-                Vendor
-              </p>
-            </div>
+          <div 
+            data-profile-dropdown
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+          >
             {user?.profilePicturePath ? (
               <img
                 src={`http://localhost:5000${user.profilePicturePath}`}
@@ -559,45 +270,204 @@ const VendorDashboard = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#FFFFFF',
+                fontSize: '0.875rem',
                 fontWeight: '600'
               }}>
                 {(user?.companyName?.[0] || user?.firstName?.[0] || user?.name?.[0] || 'V').toUpperCase()}
               </div>
             )}
+            {showLogoutDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                zIndex: 1000,
+                minWidth: '150px'
+              }}>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    logout
+                  </span>
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
-        </header>
+        </div>
+      </header>
+
+      {/* Horizontal Menu Bar */}
+      <nav style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '1rem 2rem',
+        backgroundColor: '#FFFFFF',
+        borderBottom: '1px solid #e2e8f0'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+          <Link
+            to="/vendor"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Dashboard
+          </Link>
+          <Link
+            to="/vendor/bazaars"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/bazaars') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/bazaars') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/bazaars') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Discover Bazaars
+          </Link>
+          <Link
+            to="/vendor/accepted-events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/accepted-events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/accepted-events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/accepted-events') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Participations
+          </Link>
+          <Link
+            to="/vendor/my-requests"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/my-requests') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/my-requests') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/my-requests') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Applications
+          </Link>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
 
         {/* Content Area */}
         <div style={{
           flex: 1,
-          padding: '2.5rem',
+          padding: '2rem 0',
           overflowY: 'auto',
-          backgroundColor: '#f8f6f6'
+          backgroundColor: '#f6f7f8'
         }}>
-          {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-              <p style={{ color: '#6b7280' }}>Loading...</p>
-            </div>
-          ) : (
-            <>
-              {/* Page Name Box */}
-              <div style={{
-                backgroundColor: '#FFFFFF',
-                padding: '1rem 1.5rem',
-                borderRadius: '0.5rem',
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                marginBottom: '2rem',
-                borderLeft: '4px solid #1D3557'
-              }}>
-                <h3 style={{
-                  color: '#1D3557',
-                  fontSize: '1.25rem',
-                  fontWeight: '600',
-                  margin: 0
-                }}>
-                  Dashboard
-                </h3>
+          {/* Content Wrapper with Margins */}
+          <div style={{
+            marginLeft: '4rem',
+            marginRight: '4rem'
+          }}>
+            {loading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                <p style={{ color: '#6b7280' }}>Loading...</p>
               </div>
+            ) : (
+              <>
+                {/* Dashboard Banner with Background Image */}
+                <div style={{
+                  position: 'relative',
+                  height: '140px',
+                  borderRadius: '0.75rem',
+                  overflow: 'hidden',
+                  marginBottom: '1.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                }}>
+                  {/* Background Image */}
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    backgroundImage: 'url(/assets/images/dashboardimage.jpg)',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: 'cover',
+                    filter: 'blur(2px)'
+                  }}></div>
+                  {/* Blue Overlay */}
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    backgroundColor: 'rgba(29, 53, 87, 0.75)'
+                  }}></div>
+                  {/* Content */}
+                  <div style={{
+                    position: 'relative',
+                    zIndex: 10,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'flex-start',
+                    padding: '2rem 2.5rem',
+                    color: '#FFFFFF'
+                  }}>
+                    <h3 style={{
+                      color: '#FFFFFF',
+                      fontSize: '1.75rem',
+                      fontWeight: '700',
+                      margin: 0,
+                      marginBottom: '0.5rem'
+                    }}>
+                      Dashboard
+                    </h3>
+                    <p style={{
+                      color: 'rgba(255, 255, 255, 0.9)',
+                      fontSize: '0.875rem',
+                      fontWeight: '400',
+                      margin: 0
+                    }}>
+                      Overview of your applications, participations, and upcoming events.
+                    </p>
+                  </div>
+                </div>
               
               <div style={{
                 display: 'grid',
@@ -739,106 +609,6 @@ const VendorDashboard = () => {
                     </div>
                   </div>
 
-                  {/* Recent Activity */}
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                      <h3 style={{
-                        fontSize: '1.125rem',
-                        fontWeight: '600',
-                        color: '#1D3557',
-                        margin: 0
-                      }}>
-                        Recent Applications
-                      </h3>
-                      <Link
-                        to="/vendor/requests"
-                        style={{
-                          fontSize: '0.875rem',
-                          fontWeight: '500',
-                          color: '#1D3557',
-                          textDecoration: 'none'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.textDecoration = 'underline';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.textDecoration = 'none';
-                        }}
-                      >
-                        View All
-                      </Link>
-                    </div>
-                    <div style={{
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '0.5rem',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                      overflow: 'hidden'
-                    }}>
-                      {applications.length === 0 ? (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
-                          <p style={{ margin: 0 }}>No applications yet.</p>
-                          <Link
-                            to="/vendor/bazaars"
-                            style={{
-                              color: '#1D3557',
-                              textDecoration: 'none',
-                              fontWeight: '500'
-                            }}
-                          >
-                            Find events to apply
-                          </Link>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          {applications.map((app, index) => (
-                            <div
-                              key={app._id || index}
-                              style={{
-                                padding: '1rem 1.5rem',
-                                borderBottom: index < applications.length - 1 ? '1px solid #e5e7eb' : 'none',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '1rem'
-                              }}
-                            >
-                              <div style={{
-                                backgroundColor: '#f3f4f6',
-                                padding: '0.5rem',
-                                borderRadius: '50%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}>
-                                <span className="material-symbols-outlined" style={{ color: '#1D3557', fontSize: '1.25rem' }}>
-                                  {getEventIcon(app.type || app.eventType)}
-                                </span>
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <p style={{
-                                  fontSize: '0.875rem',
-                                  fontWeight: '600',
-                                  color: '#111827',
-                                  margin: '0 0 0.25rem 0'
-                                }}>
-                                  {app.eventName || app.name || 'Untitled Event'}
-                                </p>
-                                <p style={{
-                                  fontSize: '0.75rem',
-                                  color: '#6b7280',
-                                  margin: 0
-                                }}>
-                                  {formatTimeAgo(app.createdAt || app.dateApplied)}
-                                </p>
-                              </div>
-                              <div>
-                                {getStatusBadge(app.status)}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
 
                 {/* Right Column - Upcoming Events and Notifications */}
@@ -850,14 +620,45 @@ const VendorDashboard = () => {
                 }}>
                   {/* Upcoming Events */}
                   <div>
-                    <h3 style={{
-                      fontSize: '1.125rem',
-                      fontWeight: '600',
-                      color: '#1D3557',
-                      marginBottom: '1rem'
-                    }}>
-                      Upcoming Events
-                    </h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <h3 style={{
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        color: '#1D3557',
+                        margin: 0
+                      }}>
+                        Upcoming Events
+                      </h3>
+                      <button
+                        onClick={() => setShowPlatformBoothsModal(true)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.625rem 1rem',
+                          backgroundColor: '#1D3557',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s',
+                          height: 'fit-content'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.backgroundColor = '#152843';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.backgroundColor = '#1D3557';
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                          add
+                        </span>
+                        New Booth
+                      </button>
+                    </div>
                     <div style={{
                       display: 'flex',
                       flexDirection: 'column',
@@ -1042,10 +843,20 @@ const VendorDashboard = () => {
                   </div>
                 </div>
               </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </main>
+
+      {/* Platform Booths Modal */}
+      <PlatformBoothsModal
+        isOpen={showPlatformBoothsModal}
+        onClose={() => setShowPlatformBoothsModal(false)}
+        onSuccess={() => {
+          loadDashboardData();
+        }}
+      />
     </div>
   );
 };
