@@ -267,42 +267,82 @@ exports.getUserNotifications = async (userId, options = {}) => {
 // Notify all eligible users when a new event is created
 exports.notifyNewEventCreated = async (event) => {
   try {
+    console.log(`📢 Creating notifications for new event: ${event.title} (ID: ${event._id})`);
+    
+    if (!event || !event._id) {
+      console.error('❌ Invalid event object provided to notifyNewEventCreated');
+      throw new Error('Invalid event object');
+    }
+    
     // Find all users (Students, Staff, TAs, Professors, Events Office)
     const allUsers = await User.find({
       userType: { $in: ['Student', 'Staff', 'TA', 'Professor', 'event_office'] }
     });
     
+    console.log(`👥 Found ${allUsers.length} users to notify`);
+    
+    // Count users by type for debugging
+    const userTypeCounts = {};
+    allUsers.forEach(user => {
+      userTypeCounts[user.userType] = (userTypeCounts[user.userType] || 0) + 1;
+    });
+    console.log(`📊 User type breakdown:`, userTypeCounts);
+    
+    // Specifically log TA users found
+    const taUsers = allUsers.filter(u => u.userType === 'TA');
+    console.log(`👨‍🏫 Found ${taUsers.length} TA users:`, taUsers.map(u => `${u.email} (${u.firstName} ${u.lastName})`));
+    
+    let notificationCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    
     for (const user of allUsers) {
-      // Check if notification already exists for this user and event
-      const existingNotification = await Notification.findOne({
-        recipient: user._id,
-        type: 'event_announcement',
-        'metadata.eventId': event._id.toString()
-      });
-      
-      if (!existingNotification) {
-        await Notification.create({
+      try {
+        // Check if notification already exists for this user and event
+        const existingNotification = await Notification.findOne({
           recipient: user._id,
           type: 'event_announcement',
-          title: `New Event: ${event.title}`,
-          message: `A new event "${event.title}" has been added on ${new Date(event.startDate).toLocaleDateString()} at ${event.location}`,
-          relatedEvent: event._id,
-          priority: 'medium',
-          metadata: {
-            eventTitle: event.title,
-            eventDate: event.startDate,
-            eventType: event.type,
-            location: event.location,
-            description: event.description,
-            eventId: event._id.toString(),
-            createdBy: event.createdBy?.toString(),
-            createdAt: new Date()
-          }
+          'metadata.eventId': event._id.toString()
         });
+        
+        if (!existingNotification) {
+          await Notification.create({
+            recipient: user._id,
+            type: 'event_announcement',
+            title: `New Event: ${event.title}`,
+            message: `A new event "${event.title}" has been added on ${new Date(event.startDate).toLocaleDateString()} at ${event.location}`,
+            relatedEvent: event._id,
+            priority: 'medium',
+            metadata: {
+              eventTitle: event.title,
+              eventDate: event.startDate,
+              eventType: event.type,
+              location: event.location,
+              description: event.description,
+              eventId: event._id.toString(),
+              createdBy: event.createdBy?.toString(),
+              createdAt: new Date()
+            }
+          });
+          notificationCount++;
+          
+          // Log specifically for TA users
+          if (user.userType === 'TA') {
+            console.log(`✅ Created notification for TA user: ${user.email} (${user.firstName} ${user.lastName})`);
+          }
+        } else {
+          skippedCount++;
+        }
+      } catch (userError) {
+        errorCount++;
+        console.error(`❌ Error creating notification for user ${user.email} (${user.userType}):`, userError);
       }
     }
+    
+    console.log(`✅ Notification creation complete: ${notificationCount} created, ${skippedCount} skipped (duplicates), ${errorCount} errors`);
   } catch (error) {
-    console.error('Error notifying new event created:', error);
+    console.error('❌ Error notifying new event created:', error);
+    throw error; // Re-throw to ensure calling code knows about the error
   }
 };
 
