@@ -5,7 +5,7 @@ import { eventsApiService } from '../api/eventsApi';
 import { useAuth } from '../contexts/AuthContext';
 
 const StaffMyRegistrations = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [registrations, setRegistrations] = useState([]);
@@ -339,7 +339,7 @@ const StaffMyRegistrations = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
-                {user?.userType === 'TA' && (
+                {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
                   <Link
                     to="/wallet"
                     style={{
@@ -1281,57 +1281,41 @@ const StaffMyRegistrations = () => {
                   borderTop: '1px solid #e5e7eb'
                 }}>
                   <button
-                    onClick={async () => {
-                      if (window.confirm('Are you sure you want to cancel this registration? The refund will be added to your wallet.')) {
-                        setCancelling(true);
-                        try {
-                          const eventId = selectedRegistration.eventId;
-                          if (!eventId) {
-                            alert('Event ID not found');
-                            setCancelling(false);
-                            return;
-                          }
-                          const result = await eventsApiService.cancelRegistration(eventId);
-                          if (result.success) {
-                            alert(result.data.msg || 'Registration cancelled successfully. Refund has been added to your wallet.');
-                            setSelectedRegistration(null);
-                            loadMyRegistrations();
-                            // Reload wallet balance if on wallet page
-                            if (window.location.pathname === '/wallet') {
-                              window.location.reload();
-                            }
-                          } else {
-                            alert(result.message || 'Failed to cancel registration');
-                          }
-                        } catch (err) {
-                          console.error('Cancel error:', err);
-                          alert('An error occurred while cancelling registration');
-                        } finally {
-                          setCancelling(false);
-                        }
-                      }
+                    onClick={() => {
+                      setCancelRegistrationData({
+                        eventId: selectedRegistration.eventId,
+                        eventTitle: selectedRegistration.eventTitle,
+                        paid: selectedRegistration.paid
+                      });
+                      setShowCancelModal(true);
                     }}
-                    disabled={cancelling}
                     style={{
                       width: '100%',
                       padding: '0.75rem 1rem',
                       borderRadius: '0.5rem',
-                      backgroundColor: cancelling ? '#9ca3af' : '#dc2626',
+                      backgroundColor: '#dc2626',
                       color: '#FFFFFF',
                       border: 'none',
-                      cursor: cancelling ? 'not-allowed' : 'pointer',
+                      cursor: 'pointer',
                       fontSize: '0.875rem',
                       fontWeight: '600',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '0.5rem'
+                      gap: '0.5rem',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#b91c1c';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#dc2626';
                     }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
                       cancel
                     </span>
-                    {cancelling ? 'Cancelling...' : 'Cancel Registration & Get Refund'}
+                    Cancel Registration & Get Refund
                   </button>
                 </div>
               )}
@@ -1417,7 +1401,8 @@ const StaffMyRegistrations = () => {
                     if (result.success) {
                       setCancelSuccessData({
                         eventTitle: cancelRegistrationData.eventTitle,
-                        refunded: result.data.refunded || false
+                        refunded: result.data.refunded || false,
+                        refundAmount: result.data.refundAmount || 0
                       });
                       setShowCancelModal(false);
                       setCancelRegistrationData(null);
@@ -1425,6 +1410,10 @@ const StaffMyRegistrations = () => {
                       loadMyRegistrations();
                       // Trigger wallet refresh event for wallet page if open
                       window.dispatchEvent(new Event('walletRefresh'));
+                      // Refresh user object to get latest wallet balance
+                      if (refreshUser) {
+                        refreshUser();
+                      }
                     } else {
                       alert(result.message || 'Failed to cancel registration');
                     }
@@ -1515,11 +1504,21 @@ const StaffMyRegistrations = () => {
             </p>
             {cancelSuccessData.refunded && (
               <p style={{
-                color: '#6b7280',
-                fontSize: '0.875rem',
-                marginBottom: '1.5rem'
+                color: '#059669',
+                fontSize: '1rem',
+                fontWeight: '600',
+                marginBottom: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
               }}>
-                The refund has been added to your wallet.
+                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                  account_balance_wallet
+                </span>
+                {cancelSuccessData.refundAmount > 0 
+                  ? `${cancelSuccessData.refundAmount} EGP has been refunded to your wallet.`
+                  : 'The refund has been added to your wallet.'}
               </p>
             )}
             <button

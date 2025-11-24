@@ -34,6 +34,7 @@ const {
 const { verifyPayment } = require("../controllers/paymentVerificationController");
 const { sendWorkshopCompletionEmails } = require("../controllers/workshopCompletionController");
 const { getWorkshopParticipants } = require("../controllers/workshopController");
+const stripeSuccessController = require("../controllers/stripeSuccessController");
 
 const { protect, permit } = require("../middleware/authMiddleware");
 
@@ -99,6 +100,10 @@ router.get(
   permit("event_office", "Event Office", "Events Office", "admin"),
   getArchivedEvents
 );
+
+// ✅ Stripe payment success callback (public - no auth required, Stripe redirects don't include tokens)
+// MUST be before /:id routes to avoid route matching conflicts
+router.get("/payment-success", stripeSuccessController);
 
 // 👥 Get registrations for a specific event (for event creators)
 router.get("/:id/registrations", protect, getEventRegistrations);

@@ -140,12 +140,31 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
+  const refreshUser = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      const response = await axios.get('http://localhost:5000/api/auth/me');
+      if (response.data?.success && response.data?.user) {
+        const userData = response.data.user;
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        return userData;
+      }
+    } catch (error) {
+      console.error('Error refreshing user:', error);
+    }
+    return null;
+  };
+
   const value = {
     user,
     login,
     signup,
     logout,
     updateUser,
+    refreshUser,
     loading
   };
 

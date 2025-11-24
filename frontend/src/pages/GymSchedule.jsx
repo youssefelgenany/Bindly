@@ -186,8 +186,6 @@ const GymSchedule = () => {
     setMonth(n.getMonth());
   };
 
-  // Check if user is Events Office
-  const isEventsOffice = user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office';
 
   // Handle gym session creation
   const handleGymSessionCreate = async (formData) => {
@@ -294,14 +292,21 @@ const GymSchedule = () => {
   };
 
 
+  // Check if user is Events Office (only they get sidebar)
+  const isEventsOffice = user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office';
+  const showSidebar = isEventsOffice;
+  const showHorizontalMenu = !isEventsOffice && (user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student');
+
   return (
     <div style={{
-      display: 'flex',
+      display: showSidebar ? 'flex' : 'flex',
+      flexDirection: showSidebar ? 'row' : 'column',
       height: '100vh',
       fontFamily: 'Inter, sans-serif',
       backgroundColor: '#f8f6f6'
     }}>
-      {/* Left Sidebar */}
+      {/* Left Sidebar - Only for Events Office */}
+      {showSidebar && (
       <aside style={{
         width: sidebarOpen ? '16rem' : '0',
         flexShrink: 0,
@@ -678,12 +683,20 @@ const GymSchedule = () => {
           </button>
         </div>
       </aside>
+      )}
 
+      {/* Content Wrapper - Header and Main Content */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        flex: 1,
+        overflow: 'hidden'
+      }}>
       {/* Header */}
       <header style={{
-        position: 'fixed',
+        position: showSidebar ? 'fixed' : 'relative',
         top: 0,
-        left: sidebarOpen ? '16rem' : '0',
+        left: showSidebar ? (sidebarOpen ? '16rem' : '0') : '0',
         right: 0,
         display: 'flex',
         alignItems: 'center',
@@ -692,9 +705,10 @@ const GymSchedule = () => {
         padding: '1rem 2.5rem',
         backgroundColor: '#FFFFFF',
         zIndex: 100,
-        transition: 'left 0.3s ease'
+        transition: showSidebar ? 'left 0.3s ease' : 'none'
       }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+            {showSidebar && (
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               style={{
@@ -713,15 +727,19 @@ const GymSchedule = () => {
                 menu
               </span>
             </button>
-            <h2 style={{
-              color: '#1D3557',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              lineHeight: '1.25',
-              margin: 0
-            }}>
-              Bindly
-            </h2>
+            )}
+            <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                lineHeight: '1.25',
+                margin: 0,
+                cursor: 'pointer'
+              }}>
+                Bindly
+              </h2>
+            </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
             <div style={{ textAlign: 'right' }}>
@@ -786,6 +804,37 @@ const GymSchedule = () => {
                   zIndex: 1000,
                   minWidth: '150px'
                 }}>
+                  {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
+                    <Link
+                      to="/wallet"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        textAlign: 'left',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#1D3557',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        textDecoration: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#f3f4f6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'transparent';
+                      }}
+                      onClick={() => setShowLogoutDropdown(false)}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                        account_balance_wallet
+                      </span>
+                      My Wallet
+                    </Link>
+                  )}
                   <button
                     onClick={handleLogout}
                     style={{
@@ -821,16 +870,16 @@ const GymSchedule = () => {
 
       {/* Main Content */}
       <main style={{
-        marginLeft: sidebarOpen ? '16rem' : '0',
-        marginTop: '73px',
+        marginLeft: showSidebar ? (sidebarOpen ? '16rem' : '0') : '0',
+        marginTop: showSidebar ? '73px' : '0',
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        transition: 'margin-left 0.3s ease'
+        transition: showSidebar ? 'margin-left 0.3s ease' : 'none'
       }}>
-        {/* Horizontal Menu Bar - Only show for Students */}
-        {user?.userType === 'Student' && (
+        {/* Horizontal Menu Bar - Show for Students, Staff, and TA */}
+        {showHorizontalMenu && (
           <nav style={{
             display: 'flex',
             alignItems: 'center',
@@ -852,47 +901,106 @@ const GymSchedule = () => {
             >
               Dashboard
             </Link>
+            {(user?.userType === 'TA' || user?.userType === 'Staff') ? (
+              <>
+                <Link
+                  to="/staff/events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  Discover Events
+                </Link>
+                <Link
+                  to="/staff/my-registrations"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Events
+                </Link>
+                <Link
+                  to="/staff/favorites"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Favorites
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/student/events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  Discover Events
+                </Link>
+                <Link
+                  to="/student/my-registrations"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Events
+                </Link>
+                <Link
+                  to="/student/favorites"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/student/favorites') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/favorites') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/student/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Favorites
+                </Link>
+                <Link
+                  to="/student/courts"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  Campus Courts
+                </Link>
+              </>
+            )}
             <Link
-              to="/student/events"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/student/events') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Discover Events
-            </Link>
-            <Link
-              to="/student/my-registrations"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              My Events
-            </Link>
-            <Link
-              to="/student/courts"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Campus Courts
-            </Link>
-            <Link
-              to="/gym"
+              to="/gym-schedule"
               style={{
                 textDecoration: 'none',
                 color: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
@@ -902,7 +1010,7 @@ const GymSchedule = () => {
                 borderBottom: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
               }}
             >
-              Gym Sessions
+              View Gym Sessions
             </Link>
           </div>
         </nav>
@@ -1454,6 +1562,7 @@ const GymSchedule = () => {
           )}
         </div>
       </main>
+      </div>
 
       {/* Registration Modal */}
       {isRegistrationModalOpen && selectedSession && (

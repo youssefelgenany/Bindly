@@ -32,6 +32,7 @@ import VendorAccepted from './pages/VendorAccepted';
 import VendorRequests from './pages/VendorRequests';
 import StudentEventsView from './pages/StudentEventsView';
 import StudentMyRegistrations from './pages/StudentMyRegistrations';
+import StudentFavorites from './pages/StudentFavorites';
 import StudentCourtsView from './pages/StudentCourtsView';
 import StudentLoyaltyVendorsView from './pages/StudentLoyaltyVendorsView';
 import StaffEventsView from './pages/StaffEventsView';
@@ -442,6 +443,16 @@ const AppContent = () => {
                 <ProtectedRoute>
                   <StudentOnly>
                     <StudentMyRegistrations />
+                  </StudentOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/favorites"
+              element={
+                <ProtectedRoute>
+                  <StudentOnly>
+                    <StudentFavorites />
                   </StudentOnly>
                 </ProtectedRoute>
               }

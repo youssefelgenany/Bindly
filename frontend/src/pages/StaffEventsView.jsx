@@ -196,10 +196,10 @@ const StaffEventsView = () => {
     loadUserRegistrations();
   }, [user]);
 
-  // Load user's favorite events (for TA users)
+  // Load user's favorite events (for Staff and TA users)
   useEffect(() => {
     const loadFavoriteEvents = async () => {
-      if (!user || user.userType !== 'TA') return;
+      if (!user || (user.userType !== 'TA' && user.userType !== 'Staff')) return;
       
       try {
         const result = await eventsApiService.getFavoriteEvents();
@@ -225,7 +225,7 @@ const StaffEventsView = () => {
   const handleToggleFavorite = async (eventId, e) => {
     e.stopPropagation(); // Prevent card click
     
-    if (!user || user.userType !== 'TA') return;
+    if (!user || (user.userType !== 'TA' && user.userType !== 'Staff')) return;
     
     const isFavorite = favoriteEventIds.has(String(eventId));
     
@@ -527,7 +527,7 @@ const StaffEventsView = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
-                {user?.userType === 'TA' && (
+                {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
                   <Link
                     to="/wallet"
                     style={{
@@ -1052,8 +1052,8 @@ const StaffEventsView = () => {
                               }
                             }}
                           />
-                          {/* Heart Icon for TA users */}
-                          {user?.userType === 'TA' && (
+                          {/* Heart Icon for Staff and TA users */}
+                          {(user?.userType === 'TA' || user?.userType === 'Staff') && (
                             <button
                               onClick={(e) => handleToggleFavorite(event.id, e)}
                               style={{

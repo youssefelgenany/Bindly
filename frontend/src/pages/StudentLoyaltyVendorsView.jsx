@@ -523,6 +523,36 @@ const StudentLoyaltyVendorsView = () => {
                 minWidth: '10rem',
                 overflow: 'hidden'
               }}>
+                <Link
+                  to="/wallet"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    background: 'none',
+                    border: 'none',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    color: '#1D3557',
+                    fontSize: '0.875rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    transition: 'background-color 0.2s',
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => setShowLogoutDropdown(false)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    account_balance_wallet
+                  </span>
+                  My Wallet
+                </Link>
                 <button
                   onClick={handleLogout}
                   style={{
@@ -604,6 +634,19 @@ const StudentLoyaltyVendorsView = () => {
             }}
           >
             My Events
+          </Link>
+          <Link
+            to="/student/favorites"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/student/favorites') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/student/favorites') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/student/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Favorites
           </Link>
           <Link
             to="/student/courts"
