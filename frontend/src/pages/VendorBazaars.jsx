@@ -426,6 +426,19 @@ const VendorBazaars = () => {
           >
             My Applications
           </Link>
+          <Link
+            to="/vendor/loyalty-program"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/loyalty-program') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/loyalty-program') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/loyalty-program') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            GUC Loyalty Program
+          </Link>
         </div>
       </nav>
 
