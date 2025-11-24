@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { eventsApiService } from '../api/eventsApi';
 import { notificationApiService } from '../api/notificationApi';
 
-const StaffFavorites = () => {
+const TAFavorites = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -170,6 +170,18 @@ const StaffFavorites = () => {
     return type ? type.toUpperCase() : 'EVENT';
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return 'TBD';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   const loadRatingsAndComments = async (eventId) => {
     if (!eventId) {
       setRatingsLoadError('Event ID is required');
@@ -249,9 +261,9 @@ const StaffFavorites = () => {
     try {
       const result = await notificationApiService.markAsRead(notificationId);
       if (result.success) {
-        setNotifications(prev =>
-          prev.map(n => (n._id === notificationId ? { ...n, isRead: true } : n))
-        );
+        setNotifications(prev => prev.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
     } catch (error) {
@@ -267,43 +279,30 @@ const StaffFavorites = () => {
         setUnreadCount(0);
       }
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      console.error('Error marking all as read:', error);
     }
   };
 
   const formatNotificationDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
+    if (!dateString) return 'Just now';
     const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'TBD';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const diffInMs = now - date;
+    const diffInMins = Math.floor(diffInMs / 60000);
+    const diffInHours = Math.floor(diffInMs / 3600000);
+    const diffInDays = Math.floor(diffInMs / 86400000);
+
+    if (diffInMins < 1) return 'Just now';
+    if (diffInMins < 60) return `${diffInMins}m ago`;
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInDays === 1) return 'Yesterday';
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
-    : user?.name || (user?.userType === 'TA' ? 'TA' : 'Staff');
-
-  const userRole = user?.userType === 'TA' ? 'TA' : 'Staff';
+    : user?.name || 'TA';
 
   return (
     <div style={{
@@ -337,6 +336,23 @@ const StaffFavorites = () => {
           </Link>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#1D3557',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              TA
+            </p>
+          </div>
           {/* Notifications Bell */}
           <div style={{ position: 'relative' }} data-notifications-dropdown>
             <button
@@ -479,7 +495,7 @@ const StaffFavorites = () => {
                             handleMarkAsRead(notification._id);
                           }
                           if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
-                            navigate('/staff/events');
+                            navigate('/ta/events');
                             setShowNotificationsDropdown(false);
                           } else if (
                             (notification.type === 'event_reminder' || 
@@ -488,14 +504,14 @@ const StaffFavorites = () => {
                              notification.type === 'gym_session_reminder') && 
                             (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
                           ) {
-                            navigate('/staff/my-registrations');
+                            navigate('/ta/my-registrations');
                             setShowNotificationsDropdown(false);
                           } else if (
                             notification.type === 'new_loyalty_partner' || 
                             notification.type === 'loyalty_partner_added' ||
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
-                            navigate('/staff/loyalty-vendors');
+                            navigate('/ta/loyalty-vendors');
                             setShowNotificationsDropdown(false);
                           }
                         }}
@@ -566,18 +582,19 @@ const StaffFavorites = () => {
                           )}
                           <div style={{
                             fontSize: '0.75rem',
-                            color: '#94a3b8'
+                            color: '#9ca3af'
                           }}>
                             {formatNotificationDate(notification.createdAt)}
                           </div>
                         </div>
                         {!notification.isRead && (
-                          <span style={{
+                          <div style={{
                             width: '0.5rem',
                             height: '0.5rem',
                             borderRadius: '50%',
-                            backgroundColor: '#2563eb',
-                            alignSelf: 'center'
+                            backgroundColor: '#1e40af',
+                            flexShrink: 0,
+                            marginTop: '0.25rem'
                           }} />
                         )}
                       </div>
@@ -587,27 +604,13 @@ const StaffFavorites = () => {
               </div>
             )}
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              color: '#1D3557',
-              margin: 0
-            }}>
-              {displayName}
-            </p>
-            <p style={{
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              margin: 0
-            }}>
-              {userRole}
-            </p>
-          </div>
           <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            onClick={() => {
+              setShowLogoutDropdown(!showLogoutDropdown);
+              setShowNotificationsDropdown(false);
+            }}
           >
             {user?.profilePicturePath ? (
               <img
@@ -633,7 +636,7 @@ const StaffFavorites = () => {
                 fontSize: '0.875rem',
                 fontWeight: '600'
               }}>
-                {(user?.firstName?.[0] || user?.name?.[0] || 'S').toUpperCase()}
+                {(user?.firstName?.[0] || user?.name?.[0] || 'T').toUpperCase()}
               </div>
             )}
             {showLogoutDropdown && (
@@ -649,37 +652,35 @@ const StaffFavorites = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
-                {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
-                  <Link
-                    to="/wallet"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      textAlign: 'left',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      color: '#1D3557',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      textDecoration: 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#f3f4f6';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'transparent';
-                    }}
-                    onClick={() => setShowLogoutDropdown(false)}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                      account_balance_wallet
-                    </span>
-                    My Wallet
-                  </Link>
-                )}
+                <Link
+                  to="/wallet"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => setShowLogoutDropdown(false)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    account_balance_wallet
+                  </span>
+                  My Wallet
+                </Link>
                 <button
                   onClick={handleLogout}
                   style={{
@@ -736,43 +737,56 @@ const StaffFavorites = () => {
             Dashboard
           </Link>
           <Link
-            to="/staff/events"
+            to="/ta/events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/events') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
+              fontWeight: isActiveRoute('/ta/events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/ta/events') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             Discover Events
           </Link>
           <Link
-            to="/staff/my-registrations"
+            to="/ta/my-registrations"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/my-registrations') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
+              fontWeight: isActiveRoute('/ta/my-registrations') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/ta/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             My Events
           </Link>
           <Link
-            to="/staff/favorites"
+            to="/ta/favorites"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/favorites') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
+              fontWeight: isActiveRoute('/ta/favorites') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/ta/favorites') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             My Favorites
+          </Link>
+          <Link
+            to="/gym-schedule"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/gym-schedule') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            View Gym Sessions
           </Link>
           <Link
             to="/gym-schedule"
@@ -922,31 +936,73 @@ const StaffFavorites = () => {
                 }}>
                   Start exploring events and add them to your favorites!
                 </p>
-                <Link
-                  to="/staff/events"
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    borderRadius: '0.5rem',
-                    backgroundColor: '#1e40af',
-                    color: '#FFFFFF',
-                    textDecoration: 'none',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    display: 'inline-block',
-                    transition: 'all 0.2s',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#1e3a8a';
-                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#1e40af';
-                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                  }}
-                >
-                  Discover Events
-                </Link>
+                <div style={{
+                  display: 'flex',
+                  gap: '1rem',
+                  justifyContent: 'center',
+                  flexWrap: 'wrap'
+                }}>
+                  <Link
+                    to="/ta/events"
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#1e40af',
+                      color: '#FFFFFF',
+                      textDecoration: 'none',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#1e3a8a';
+                      e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#1e40af';
+                      e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      explore
+                    </span>
+                    Discover Events
+                  </Link>
+                  <Link
+                    to="/gym-schedule"
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#1D3557',
+                      color: '#FFFFFF',
+                      textDecoration: 'none',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#152a47';
+                      e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#1D3557';
+                      e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      sports_tennis
+                    </span>
+                    Campus Courts
+                  </Link>
+                </div>
               </div>
             ) : (
               <>
@@ -1297,11 +1353,12 @@ const StaffFavorites = () => {
               {ratingsLoadError && (
                 <div style={{
                   padding: '0.75rem 1rem',
-                  marginBottom: '1rem',
-                  borderRadius: '0.5rem',
                   backgroundColor: '#fee2e2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '0.5rem',
                   color: '#991b1b',
-                  fontSize: '0.875rem'
+                  fontSize: '0.875rem',
+                  marginBottom: '1rem'
                 }}>
                   {ratingsLoadError}
                 </div>
@@ -1309,21 +1366,17 @@ const StaffFavorites = () => {
 
               {loadingRatingsComments ? (
                 <div style={{
-                  textAlign: 'center',
                   padding: '2rem',
-                  color: '#6b7280'
+                  textAlign: 'center',
+                  color: '#6b7280',
+                  fontSize: '0.875rem'
                 }}>
-                  Loading...
+                  Loading ratings and comments...
                 </div>
               ) : ratingsAndComments ? (
                 <>
                   {ratingsAndComments.ratings && (
-                    <div style={{
-                      marginBottom: '2rem',
-                      padding: '1.5rem',
-                      backgroundColor: '#f9fafb',
-                      borderRadius: '0.5rem'
-                    }}>
+                    <div style={{ marginBottom: '2rem' }}>
                       <h3 style={{
                         color: '#1D3557',
                         fontSize: '1.125rem',
@@ -1333,107 +1386,61 @@ const StaffFavorites = () => {
                       }}>
                         Ratings
                       </h3>
-                      {ratingsAndComments.ratings.count > 0 ? (
-                        <>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '1rem',
-                            marginBottom: '1rem'
-                          }}>
-                            <div style={{
-                              fontSize: '2.5rem',
-                              fontWeight: '700',
-                              color: '#1D3557'
-                            }}>
-                              {ratingsAndComments.ratings.average.toFixed(1)}
-                            </div>
-                            <div>
-                              <div style={{
-                                display: 'flex',
-                                gap: '0.25rem',
-                                marginBottom: '0.25rem'
-                              }}>
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                  <span
-                                    key={star}
-                                    style={{
-                                      fontSize: '1.25rem',
-                                      color: star <= Math.round(ratingsAndComments.ratings.average) ? '#fbbf24' : '#d1d5db'
-                                    }}
-                                  >
-                                    ★
-                                  </span>
-                                ))}
-                              </div>
-                              <div style={{
-                                fontSize: '0.875rem',
-                                color: '#6b7280'
-                              }}>
-                                Based on {ratingsAndComments.ratings.count} rating{ratingsAndComments.ratings.count !== 1 ? 's' : ''}
-                              </div>
-                            </div>
-                          </div>
-                          {ratingsAndComments.ratings.distribution && (
-                            <div style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.5rem'
-                            }}>
-                              {[5, 4, 3, 2, 1].map((star) => (
-                                <div key={star} style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.75rem'
-                                }}>
-                                  <span style={{ fontSize: '0.875rem', color: '#6b7280', minWidth: '60px' }}>
-                                    {star} star{star !== 1 ? 's' : ''}
-                                  </span>
-                                  <div style={{
-                                    flex: 1,
-                                    height: '8px',
-                                    backgroundColor: '#e5e7eb',
-                                    borderRadius: '0.25rem',
-                                    overflow: 'hidden'
-                                  }}>
-                                    <div style={{
-                                      width: `${ratingsAndComments.ratings.count > 0 ? (ratingsAndComments.ratings.distribution[star] || 0) / ratingsAndComments.ratings.count * 100 : 0}%`,
-                                      height: '100%',
-                                      backgroundColor: '#fbbf24',
-                                      transition: 'width 0.3s'
-                                    }} />
-                                  </div>
-                                  <span style={{ fontSize: '0.875rem', color: '#6b7280', minWidth: '40px' }}>
-                                    {ratingsAndComments.ratings.distribution[star] || 0}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <p style={{
-                          color: '#6b7280',
-                          fontSize: '0.875rem',
-                          margin: 0
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem',
+                        marginBottom: '1rem'
+                      }}>
+                        <div style={{
+                          fontSize: '2rem',
+                          fontWeight: '700',
+                          color: '#1D3557'
                         }}>
-                          No ratings yet
-                        </p>
-                      )}
+                          {ratingsAndComments.ratings.average > 0
+                            ? ratingsAndComments.ratings.average.toFixed(1)
+                            : '—'}
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.25rem'
+                        }}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <span
+                              key={star}
+                              className="material-symbols-outlined"
+                              style={{
+                                fontSize: '1.5rem',
+                                color: star <= Math.round(ratingsAndComments.ratings.average)
+                                  ? '#fbbf24'
+                                  : '#d1d5db'
+                              }}
+                            >
+                              star
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{
+                          fontSize: '0.875rem',
+                          color: '#6b7280'
+                        }}>
+                          ({ratingsAndComments.ratings.count} {ratingsAndComments.ratings.count === 1 ? 'rating' : 'ratings'})
+                        </div>
+                      </div>
                     </div>
                   )}
 
-                  <div>
-                    <h3 style={{
-                      color: '#1D3557',
-                      fontSize: '1.125rem',
-                      fontWeight: '600',
-                      marginBottom: '1rem',
-                      marginTop: 0
-                    }}>
-                      Comments ({ratingsAndComments.comments?.length || 0})
-                    </h3>
-                    {ratingsAndComments.comments && ratingsAndComments.comments.length > 0 ? (
+                  {ratingsAndComments.comments && ratingsAndComments.comments.length > 0 && (
+                    <div>
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '1rem',
+                        marginTop: 0
+                      }}>
+                        Comments ({ratingsAndComments.comments.length})
+                      </h3>
                       <div style={{
                         display: 'flex',
                         flexDirection: 'column',
@@ -1441,7 +1448,7 @@ const StaffFavorites = () => {
                       }}>
                         {ratingsAndComments.comments.map((comment) => (
                           <div
-                            key={comment._id}
+                            key={comment._id || comment.id}
                             style={{
                               padding: '1rem',
                               backgroundColor: '#f9fafb',
@@ -1455,62 +1462,52 @@ const StaffFavorites = () => {
                               alignItems: 'flex-start',
                               marginBottom: '0.5rem'
                             }}>
-                              <div>
-                                <div style={{
-                                  fontWeight: '600',
-                                  color: '#1D3557',
-                                  fontSize: '0.875rem'
-                                }}>
-                                  {comment.user?.firstName} {comment.user?.lastName}
-                                </div>
-                                <div style={{
-                                  fontSize: '0.75rem',
-                                  color: '#6b7280'
-                                }}>
-                                  {comment.user?.userType || 'User'}
-                                </div>
+                              <div style={{
+                                fontWeight: '600',
+                                color: '#1D3557',
+                                fontSize: '0.875rem'
+                              }}>
+                                {comment.userName || comment.user?.name || 'Anonymous'}
                               </div>
                               <div style={{
                                 fontSize: '0.75rem',
                                 color: '#6b7280'
                               }}>
-                                {formatNotificationDate(comment.createdAt)}
+                                {comment.createdAt
+                                  ? new Date(comment.createdAt).toLocaleDateString('en-US', {
+                                      year: 'numeric',
+                                      month: 'short',
+                                      day: 'numeric'
+                                    })
+                                  : ''}
                               </div>
                             </div>
-                            <p style={{
+                            <div style={{
                               color: '#374151',
                               fontSize: '0.875rem',
-                              lineHeight: '1.6',
-                              margin: 0
+                              lineHeight: '1.5'
                             }}>
-                              {comment.text}
-                            </p>
+                              {comment.comment}
+                            </div>
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <p style={{
-                        color: '#6b7280',
-                        fontSize: '0.875rem',
-                        margin: 0,
-                        padding: '1rem',
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '0.5rem'
-                      }}>
-                        No comments yet
-                      </p>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {(!ratingsAndComments.ratings || ratingsAndComments.ratings.count === 0) &&
+                   (!ratingsAndComments.comments || ratingsAndComments.comments.length === 0) && (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No ratings or comments yet.
+                    </div>
+                  )}
                 </>
-              ) : (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '2rem',
-                  color: '#6b7280'
-                }}>
-                  No data available
-                </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -1519,5 +1516,5 @@ const StaffFavorites = () => {
   );
 };
 
-export default StaffFavorites;
+export default TAFavorites;
 
