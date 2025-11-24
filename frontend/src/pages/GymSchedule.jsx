@@ -79,6 +79,7 @@ const GymSchedule = () => {
   // User type checks
   const isEventsOffice = !user?.userType || (user.userType !== 'TA' && user.userType !== 'Staff' && user.userType !== 'Professor' && user.userType !== 'Student');
   const isProfessor = user?.userType === 'Professor';
+  const canSeeNotifications = user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA';
   const showHorizontalMenu = user?.userType === 'Student' || user?.userType === 'Staff' || user?.userType === 'TA';
 
   const isActiveRoute = (path) => {
@@ -112,9 +113,9 @@ const GymSchedule = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLogoutDropdown, showNotificationsDropdown]);
 
-  // Load notifications (for professors)
+  // Load notifications (for staff and professors)
   const loadNotifications = useCallback(async () => {
-    if (user?.userType !== 'Professor') return;
+    if (!user?.userType || (user.userType !== 'Professor' && user.userType !== 'Staff' && user.userType !== 'TA')) return;
     try {
       setLoadingNotifications(true);
       const [notificationsResult, countResult] = await Promise.all([
@@ -136,9 +137,9 @@ const GymSchedule = () => {
     }
   }, [user]);
 
-  // Load notifications on mount and poll for updates (for professors)
+  // Load notifications on mount and poll for updates (for staff/professors)
   useEffect(() => {
-    if (user?.userType === 'Professor') {
+    if (user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA') {
       loadNotifications();
       const interval = setInterval(() => {
         loadNotifications();
@@ -815,8 +816,8 @@ const GymSchedule = () => {
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
-            {/* Notifications Bell - Only for Professors */}
-            {isProfessor && (
+            {/* Notifications Bell */}
+            {canSeeNotifications && (
               <div style={{ position: 'relative' }} data-notifications-dropdown>
                 <button
                   onClick={() => {
@@ -958,18 +959,18 @@ const GymSchedule = () => {
                                 handleMarkAsRead(notification._id);
                               }
                               if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
-                            navigate(`/professor/all-events`);
-                            setShowNotificationsDropdown(false);
-                          } else if (
-                            (notification.type === 'event_reminder' || 
-                             notification.type === 'workshop_reminder' || 
-                             notification.type === 'trip_reminder' ||
-                             notification.type === 'gym_session_reminder') && 
-                            (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
-                          ) {
-                            navigate(`/professor/events`);
-                            setShowNotificationsDropdown(false);
-                          } else if (
+                                navigate(getEventsRoute());
+                                setShowNotificationsDropdown(false);
+                              } else if (
+                                (notification.type === 'event_reminder' || 
+                                 notification.type === 'workshop_reminder' || 
+                                 notification.type === 'trip_reminder' ||
+                                 notification.type === 'gym_session_reminder') && 
+                                (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                              ) {
+                                navigate(getMyEventsRoute());
+                                setShowNotificationsDropdown(false);
+                              } else if (
                             notification.type === 'new_loyalty_partner' || 
                             notification.type === 'loyalty_partner_added' ||
                             (notification.type === 'system' && notification.metadata?.vendorId)

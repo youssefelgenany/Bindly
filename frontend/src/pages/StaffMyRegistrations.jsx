@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
 import { eventsApiService } from '../api/eventsApi';
+import { notificationApiService } from '../api/notificationApi';
 import { useAuth } from '../contexts/AuthContext';
 
 const StaffMyRegistrations = () => {
@@ -20,14 +21,23 @@ const StaffMyRegistrations = () => {
   const [showCancelSuccess, setShowCancelSuccess] = useState(false);
   const [cancelSuccessData, setCancelSuccessData] = useState(null);
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
-  const [showRatingModal, setShowRatingModal] = useState(false);
-  const [showCommentModal, setShowCommentModal] = useState(false);
-  const [selectedEventForRating, setSelectedEventForRating] = useState(null);
-  const [selectedEventForComment, setSelectedEventForComment] = useState(null);
+  const [showRatingsCommentsModal, setShowRatingsCommentsModal] = useState(false);
+  const [selectedEventForView, setSelectedEventForView] = useState(null); // { eventId, eventDate, eventEndDate, eventTitle }
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [commentText, setCommentText] = useState('');
+  const [ratingsAndComments, setRatingsAndComments] = useState(null);
+  const [loadingRatingsComments, setLoadingRatingsComments] = useState(false);
   const [eventRatings, setEventRatings] = useState({}); // { eventId: { average: number, count: number } }
+  const [modalError, setModalError] = useState('');
+  const [modalSuccess, setModalSuccess] = useState('');
+  const [modalFocus, setModalFocus] = useState(null);
+  const ratingSectionRef = useRef(null);
+  const commentSectionRef = useRef(null);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -56,10 +66,13 @@ const StaffMyRegistrations = () => {
       if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
+      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLogoutDropdown]);
+  }, [showLogoutDropdown, showNotificationsDropdown]);
 
   const loadMyRegistrations = useCallback(async () => {
     if (!user?.email) {
@@ -140,6 +153,82 @@ const StaffMyRegistrations = () => {
     loadFavoriteEvents();
   }, [user]);
 
+  const loadNotifications = useCallback(async () => {
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(
+          notificationsResult.data.data.notifications ||
+          notificationsResult.data.data ||
+          []
+        );
+      }
+
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
+
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev =>
+          prev.map(n => (n._id === notificationId ? { ...n, isRead: true } : n))
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
+
+  const formatNotificationDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   const handleToggleFavorite = async (eventId, e) => {
     e.stopPropagation(); // Prevent card click
     
@@ -206,6 +295,24 @@ const StaffMyRegistrations = () => {
   const getEventTypeFallbackText = (type) => {
     return type ? type.toUpperCase() : 'EVENT';
   };
+
+  const resetModalState = () => {
+    setRating(0);
+    setHoveredRating(0);
+    setCommentText('');
+    setModalError('');
+    setModalSuccess('');
+    setModalFocus(null);
+  };
+
+  useEffect(() => {
+    if (!showRatingsCommentsModal || !modalFocus) return;
+    const target = modalFocus === 'comment' ? commentSectionRef.current : ratingSectionRef.current;
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    setModalFocus(null);
+  }, [showRatingsCommentsModal, modalFocus]);
 
   const getStatusColor = (status) => {
     const colors = {
@@ -284,66 +391,195 @@ const StaffMyRegistrations = () => {
     }
   };
 
+  const isMarkedAsPastEvent = (registration) => {
+    if (!registration) return false;
+    const typeString = registration.eventType || registration.eventCategory || registration.type || registration.event?.eventType || '';
+    const normalized = typeString?.toString().trim().toLowerCase();
+    if (!normalized) return false;
+    return normalized === 'past event' || normalized === 'past events' || normalized === 'past';
+  };
+
+  const isRegistrationPast = (registration) => {
+    if (!registration) return false;
+    const eventDate = registration.eventDate || registration.startDate || registration.event?.startDate || registration.event?.eventDate;
+    const eventEndDate = registration.eventEndDate || registration.endDate || registration.event?.endDate || registration.event?.eventEndDate;
+    if (eventDate) {
+      const label = getDaysUntilEvent(eventDate);
+      if (label === 'Past') {
+        return true;
+      }
+    }
+    return hasEventPassed(eventDate, eventEndDate) || isMarkedAsPastEvent(registration);
+  };
+
+  const refreshEventRatingStats = async (eventId) => {
+    try {
+      const ratingResult = await eventsApiService.getRatingsAndComments(eventId);
+      if (ratingResult.success && ratingResult.data?.ratings) {
+        setEventRatings(prev => ({
+          ...prev,
+          [eventId]: {
+            average: ratingResult.data.ratings.average || 0,
+            count: ratingResult.data.ratings.count || 0
+          }
+        }));
+      }
+    } catch (err) {
+      console.error('Error refreshing rating stats:', err);
+    }
+  };
+
   // Handle rating submission
   const handleSubmitRating = async () => {
-    if (!selectedEventForRating || rating === 0) {
-      setError('Please select a rating');
+    if (!selectedEventForView?.eventId) {
+      setModalError('No event selected.');
+      return;
+    }
+    if (!rating || rating < 1 || rating > 5) {
+      setModalError('Please select a rating between 1 and 5.');
       return;
     }
 
+    setModalError('');
+
     try {
-      const result = await eventsApiService.submitRating(selectedEventForRating.eventId, rating);
+      const eventId = String(selectedEventForView.eventId);
+      const result = await eventsApiService.submitRating(eventId, rating);
       if (result.success) {
-        setShowRatingModal(false);
         setRating(0);
         setHoveredRating(0);
-        // Update rating in state
-        const updatedRatings = { ...eventRatings };
-        const ratingResult = await eventsApiService.getRatingsAndComments(selectedEventForRating.eventId);
-        if (ratingResult.success && ratingResult.data?.ratings) {
-          updatedRatings[selectedEventForRating.eventId] = {
-            average: ratingResult.data.ratings.average || 0,
-            count: ratingResult.data.ratings.count || 0
-          };
-          setEventRatings(updatedRatings);
-        }
-        setSelectedEventForRating(null);
-        setError('');
+        setModalSuccess('Rating submitted successfully.');
+        await loadRatingsAndComments(eventId);
+        await refreshEventRatingStats(eventId);
       } else {
-        setError(result.message || 'Failed to submit rating');
+        setModalSuccess('');
+        setModalError(result.message || result.error?.message || 'Failed to submit rating.');
       }
     } catch (err) {
       console.error('Error submitting rating:', err);
-      setError(err.message || 'Error submitting rating');
+      setModalSuccess('');
+      setModalError(err.response?.data?.message || err.message || 'Error submitting rating.');
     }
   };
 
   // Handle comment submission
   const handleSubmitComment = async () => {
-    if (!selectedEventForComment || !commentText.trim()) {
-      setError('Please enter a comment');
+    if (!selectedEventForView?.eventId) {
+      setModalError('No event selected.');
+      return;
+    }
+    if (!commentText.trim()) {
+      setModalError('Please enter a comment.');
       return;
     }
 
     if (commentText.trim().length > 1000) {
-      setError('Comment cannot exceed 1000 characters');
+      setModalError('Comment cannot exceed 1000 characters.');
       return;
     }
 
+    setModalError('');
+
     try {
-      const result = await eventsApiService.submitComment(selectedEventForComment.eventId, commentText.trim());
+      const eventId = String(selectedEventForView.eventId);
+      const result = await eventsApiService.submitComment(eventId, commentText.trim());
       if (result.success) {
-        setShowCommentModal(false);
         setCommentText('');
-        setSelectedEventForComment(null);
-        setError('');
+        setModalSuccess('Comment submitted successfully.');
+        await loadRatingsAndComments(eventId);
       } else {
-        setError(result.message || 'Failed to submit comment');
+        setModalSuccess('');
+        setModalError(result.message || result.error?.message || 'Failed to submit comment.');
       }
     } catch (err) {
       console.error('Error submitting comment:', err);
-      setError(err.message || 'Error submitting comment');
+      setModalSuccess('');
+      setModalError(err.response?.data?.message || err.message || 'Error submitting comment.');
     }
+  };
+
+  // Load ratings and comments for viewing
+  const loadRatingsAndComments = async (eventId) => {
+    if (!eventId) {
+      setModalError('Event ID is required');
+      return;
+    }
+    setLoadingRatingsComments(true);
+    setModalError('');
+    try {
+      const eventIdStr = String(eventId);
+      const result = await eventsApiService.getRatingsAndComments(eventIdStr);
+      if (result.success) {
+        setRatingsAndComments(result.data);
+      } else {
+        setModalError(result.message || result.error?.message || 'Failed to load ratings and comments');
+      }
+    } catch (err) {
+      console.error('Error loading ratings and comments:', err);
+      setModalError(err.response?.data?.message || err.message || 'Error loading ratings and comments');
+    } finally {
+      setLoadingRatingsComments(false);
+    }
+  };
+
+  // Handle view ratings and comments
+  const handleViewRatingsComments = async (registrationOrEventId, options = {}) => {
+    let registration = null;
+    let eventId = null;
+
+    if (registrationOrEventId && typeof registrationOrEventId === 'object') {
+      registration = registrationOrEventId;
+      eventId = registration.eventId || registration.event?._id || registration.event?.id;
+    } else {
+      eventId = registrationOrEventId;
+      registration = registrations.find((reg) => {
+        const regId = reg.eventId || reg.event?._id || reg.event?.id;
+        return String(regId) === String(eventId);
+      });
+    }
+
+    if (!eventId) {
+      setModalError('Event ID not found');
+      return;
+    }
+
+    let eventDetails = null;
+    try {
+      const eventResult = await eventsApiService.getAllEventsAuthenticated({});
+      if (eventResult.success && Array.isArray(eventResult.data)) {
+        eventDetails = eventResult.data.find(
+          (e) => String(e._id || e.id) === String(eventId)
+        );
+      }
+    } catch (err) {
+      console.error('Error fetching event details:', err);
+    }
+
+    const eventData = {
+      eventId: String(eventId),
+      eventDate:
+        eventDetails?.startDate ||
+        eventDetails?.eventDate ||
+        registration?.eventDate ||
+        registration?.startDate,
+      eventEndDate:
+        eventDetails?.endDate ||
+        eventDetails?.eventEndDate ||
+        registration?.eventEndDate ||
+        registration?.endDate,
+      eventTitle: registration?.eventTitle || registration?.title || eventDetails?.title,
+      eventType: eventDetails?.type || eventDetails?.eventType || registration?.eventType || registration?.event?.type,
+      registration,
+      eventDetails,
+    };
+
+    setSelectedEventForView(eventData);
+    resetModalState();
+    if (options.focus) {
+      setModalFocus(options.focus);
+    }
+    setShowRatingsCommentsModal(true);
+    await loadRatingsAndComments(eventId);
   };
 
 
@@ -400,6 +636,250 @@ const StaffMyRegistrations = () => {
           </Link>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          {/* Notifications Bell */}
+          <div style={{ position: 'relative' }} data-notifications-dropdown>
+            <button
+              onClick={() => {
+                setShowNotificationsDropdown(!showNotificationsDropdown);
+                setShowLogoutDropdown(false);
+                if (!showNotificationsDropdown) {
+                  loadNotifications();
+                }
+              }}
+              style={{
+                position: 'relative',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span className="material-symbols-outlined" style={{
+                fontSize: '1.5rem',
+                color: '#1D3557'
+              }}>
+                notifications
+              </span>
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '0.25rem',
+                  right: '0.25rem',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  borderRadius: '50%',
+                  width: '1.125rem',
+                  height: '1.125rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.625rem',
+                  fontWeight: '700',
+                  border: '2px solid #FFFFFF'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {showNotificationsDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 1001,
+                width: '360px',
+                maxHeight: '500px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  padding: '1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    margin: 0
+                  }}>
+                    Notifications
+                  </h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllAsRead}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#1e40af',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        padding: '0.25rem 0.5rem'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.textDecoration = 'underline';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.textDecoration = 'none';
+                      }}
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                <div style={{
+                  overflowY: 'auto',
+                  maxHeight: '400px'
+                }}>
+                  {loadingNotifications ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      Loading...
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification._id}
+                        onClick={() => {
+                          if (!notification.isRead) {
+                            handleMarkAsRead(notification._id);
+                          }
+                          if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                            navigate('/staff/events');
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            (notification.type === 'event_reminder' || 
+                             notification.type === 'workshop_reminder' || 
+                             notification.type === 'trip_reminder' ||
+                             notification.type === 'gym_session_reminder') && 
+                            (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                          ) {
+                            navigate('/staff/my-registrations');
+                            setShowNotificationsDropdown(false);
+                          }
+                        }}
+                        style={{
+                          padding: '0.75rem 1rem',
+                          borderBottom: '1px solid #f1f5f9',
+                          backgroundColor: notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fff7ed'
+                              : '#f8fafc',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          gap: '0.75rem'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#f8fafc' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#ffedd5'
+                              : '#edf2ff';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fff7ed'
+                              : '#f8fafc';
+                        }}
+                      >
+                        <div style={{
+                          width: '2.5rem',
+                          height: '2.5rem',
+                          borderRadius: '0.75rem',
+                          backgroundColor: notification.priority === 'high' ? '#fef3c7' : '#e0e7ff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.25rem',
+                            color: notification.priority === 'high' ? '#b45309' : '#4338ca'
+                          }}>
+                            {notification.type === 'event_announcement' || notification.type === 'new_event' ? 'campaign'
+                              : notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder' ? 'event'
+                              : 'notifications'}
+                          </span>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{
+                            fontWeight: notification.isRead ? '400' : '600',
+                            color: '#1D3557',
+                            fontSize: '0.875rem',
+                            marginBottom: '0.25rem'
+                          }}>
+                            {notification.title || notification.message}
+                          </div>
+                          {notification.message && notification.message !== notification.title && (
+                            <div style={{
+                              fontSize: '0.8125rem',
+                              color: '#475569',
+                              marginBottom: '0.25rem'
+                            }}>
+                              {notification.message}
+                            </div>
+                          )}
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#94a3b8'
+                          }}>
+                            {formatNotificationDate(notification.createdAt)}
+                          </div>
+                        </div>
+                        {!notification.isRead && (
+                          <span style={{
+                            width: '0.5rem',
+                            height: '0.5rem',
+                            borderRadius: '50%',
+                            backgroundColor: '#2563eb',
+                            alignSelf: 'center'
+                          }} />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div style={{ textAlign: 'right' }}>
             <p style={{
               fontSize: '0.875rem',
@@ -971,96 +1451,6 @@ const StaffMyRegistrations = () => {
                         )}
                       </div>
                       
-                      {/* Rating and Comment Icons - Only for Past Events */}
-                      {hasEventPassed(registration.eventDate, registration.eventEndDate) && (
-                        <div style={{
-                          display: 'flex',
-                          gap: '0.5rem',
-                          marginTop: '0.5rem',
-                          marginBottom: '0.5rem'
-                        }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              setSelectedEventForRating({
-                                eventId: registration.eventId,
-                                eventTitle: registration.eventTitle
-                              });
-                              setShowRatingModal(true);
-                            }}
-                            style={{
-                              padding: '0.5rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: 'transparent',
-                              border: '1px solid #e5e7eb',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'all 0.2s',
-                              zIndex: 10,
-                              position: 'relative'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = '#f3f4f6';
-                              e.target.style.borderColor = '#d1d5db';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = 'transparent';
-                              e.target.style.borderColor = '#e5e7eb';
-                            }}
-                            title="Rate this event"
-                          >
-                            <span className="material-symbols-outlined" style={{
-                              fontSize: '1.25rem',
-                              color: '#1e40af'
-                            }}>
-                              star
-                            </span>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              setSelectedEventForComment({
-                                eventId: registration.eventId,
-                                eventTitle: registration.eventTitle
-                              });
-                              setShowCommentModal(true);
-                            }}
-                            style={{
-                              padding: '0.5rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: 'transparent',
-                              border: '1px solid #e5e7eb',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'all 0.2s',
-                              zIndex: 10,
-                              position: 'relative'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = '#f3f4f6';
-                              e.target.style.borderColor = '#d1d5db';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = 'transparent';
-                              e.target.style.borderColor = '#e5e7eb';
-                            }}
-                            title="Comment on this event"
-                          >
-                            <span className="material-symbols-outlined" style={{
-                              fontSize: '1.25rem',
-                              color: '#1e40af'
-                            }}>
-                              comment
-                            </span>
-                          </button>
-                        </div>
-                      )}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1093,6 +1483,57 @@ const StaffMyRegistrations = () => {
                           {registration.eventDescription}
                         </p>
                       )}
+
+                      <div style={{
+                        marginTop: 'auto',
+                        paddingTop: '0.75rem',
+                        borderTop: '1px solid #e5e7eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
+                        gap: '0.5rem'
+                      }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewRatingsComments(registration);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.375rem',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '0.25rem',
+                            borderRadius: '0.375rem',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f3f4f6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                          title="View ratings and comments"
+                        >
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#fbbf24'
+                          }}>
+                            star
+                          </span>
+                          <span style={{
+                            fontSize: '0.8125rem',
+                            fontWeight: '600',
+                            color: '#374151'
+                          }}>
+                            {eventRatings[registration.eventId]?.average > 0
+                              ? eventRatings[registration.eventId].average.toFixed(1)
+                              : '—'}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1853,14 +2294,14 @@ const StaffMyRegistrations = () => {
         </div>
       )}
 
-      {/* Rating Modal */}
-      {showRatingModal && selectedEventForRating && (
+      {/* Ratings & Comments Modal */}
+      {showRatingsCommentsModal && selectedEventForView && (
         <div
           onClick={() => {
-            setShowRatingModal(false);
-            setRating(0);
-            setHoveredRating(0);
-            setSelectedEventForRating(null);
+            setShowRatingsCommentsModal(false);
+            setSelectedEventForView(null);
+            setRatingsAndComments(null);
+            resetModalState();
           }}
           style={{
             position: 'fixed',
@@ -1876,253 +2317,491 @@ const StaffMyRegistrations = () => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
             style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '0.75rem',
-              maxWidth: '500px',
+              maxWidth: '700px',
               width: '100%',
-              padding: '2rem',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+              maxHeight: '90vh',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              position: 'relative',
+              zIndex: 1002
             }}
           >
-            <h2 style={{
-              color: '#1D3557',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              marginBottom: '1rem',
-              marginTop: 0
-            }}>
-              Rate Event: {selectedEventForRating.eventTitle}
-            </h2>
-            
             <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
               display: 'flex',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              marginBottom: '1.5rem',
-              padding: '1rem 0'
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setRating(star)}
-                  onMouseEnter={() => setHoveredRating(star)}
-                  onMouseLeave={() => setHoveredRating(0)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: 0,
-                    fontSize: '2.5rem',
-                    color: (hoveredRating >= star || rating >= star) ? '#fbbf24' : '#d1d5db',
-                    transition: 'all 0.2s',
-                    lineHeight: 1
-                  }}
-                >
-                  ★
-                </button>
-              ))}
-            </div>
-
-            <div style={{
-              display: 'flex',
-              gap: '0.75rem',
-              justifyContent: 'flex-end'
-            }}>
+              <div>
+                <h2 style={{
+                  color: '#1D3557',
+                  fontSize: '1.5rem',
+                  fontWeight: '700',
+                  margin: 0
+                }}>
+                  Ratings & Comments
+                </h2>
+                {selectedEventForView?.eventTitle && (
+                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+                    {selectedEventForView.eventTitle}
+                  </p>
+                )}
+              </div>
               <button
                 onClick={() => {
-                  setShowRatingModal(false);
-                  setRating(0);
-                  setHoveredRating(0);
-                  setSelectedEventForRating(null);
+                  setShowRatingsCommentsModal(false);
+                  setSelectedEventForView(null);
+                  setRatingsAndComments(null);
+                  resetModalState();
                 }}
                 style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#f3f4f6',
-                  color: '#6b7280',
-                  border: '1px solid #e5e7eb',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#e5e7eb';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitRating}
-                disabled={rating === 0}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: rating === 0 ? '#d1d5db' : '#1e40af',
-                  color: '#FFFFFF',
+                  background: 'none',
                   border: 'none',
-                  cursor: rating === 0 ? 'not-allowed' : 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s'
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
+                  lineHeight: 1
                 }}
                 onMouseEnter={(e) => {
-                  if (rating !== 0) {
-                    e.target.style.backgroundColor = '#1e3a8a';
-                  }
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#1D3557';
                 }}
                 onMouseLeave={(e) => {
-                  if (rating !== 0) {
-                    e.target.style.backgroundColor = '#1e40af';
-                  }
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
                 }}
               >
-                Submit Rating
+                ×
               </button>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Comment Modal */}
-      {showCommentModal && selectedEventForComment && (
-        <div
-          onClick={() => {
-            setShowCommentModal(false);
-            setCommentText('');
-            setSelectedEventForComment(null);
-          }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1001,
-            padding: '1rem',
-            backdropFilter: 'blur(4px)'
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '0.75rem',
-              maxWidth: '500px',
-              width: '100%',
-              padding: '2rem',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-            }}
-          >
-            <h2 style={{
-              color: '#1D3557',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              marginBottom: '1rem',
-              marginTop: 0
-            }}>
-              Comment on: {selectedEventForComment.eventTitle}
-            </h2>
-            
-            <textarea
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Share your thoughts about this event..."
-              maxLength={1000}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
               style={{
-                width: '100%',
-                minHeight: '150px',
-                padding: '0.875rem',
-                borderRadius: '0.5rem',
-                border: '1px solid #e5e7eb',
-                fontSize: '0.875rem',
-                fontFamily: 'inherit',
-                resize: 'vertical',
-                marginBottom: '0.5rem',
-                outline: 'none',
-                transition: 'all 0.2s'
+                padding: '1.5rem',
+                overflowY: 'auto',
+                flex: 1,
+                position: 'relative',
+                zIndex: 10
               }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#1e40af';
-                e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#e5e7eb';
-                e.target.style.boxShadow = 'none';
-              }}
-            />
-            <div style={{
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              textAlign: 'right',
-              marginBottom: '1.5rem'
-            }}>
-              {commentText.length}/1000 characters
-            </div>
+            >
+              {loadingRatingsComments ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: '#6b7280'
+                }}>
+                  Loading...
+                </div>
+              ) : ratingsAndComments ? (
+                <>
+                  {ratingsAndComments.ratings && (
+                    <div style={{
+                      marginBottom: '2rem',
+                      padding: '1.5rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '0.5rem'
+                    }}>
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '1rem',
+                        marginTop: 0
+                      }}>
+                        Ratings
+                      </h3>
+                      {ratingsAndComments.ratings.count > 0 ? (
+                        <>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            marginBottom: '1rem'
+                          }}>
+                            <div style={{
+                              fontSize: '2.5rem',
+                              fontWeight: '700',
+                              color: '#1D3557'
+                            }}>
+                              {ratingsAndComments.ratings.average.toFixed(1)}
+                            </div>
+                            <div>
+                              <div style={{
+                                display: 'flex',
+                                gap: '0.25rem',
+                                marginBottom: '0.25rem'
+                              }}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <span
+                                    key={star}
+                                    style={{
+                                      fontSize: '1.25rem',
+                                      color: star <= Math.round(ratingsAndComments.ratings.average) ? '#fbbf24' : '#d1d5db'
+                                    }}
+                                  >
+                                    ★
+                                  </span>
+                                ))}
+                              </div>
+                              <div style={{
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                Based on {ratingsAndComments.ratings.count} rating{ratingsAndComments.ratings.count !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                          </div>
+                          {ratingsAndComments.ratings.distribution && (
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem'
+                            }}>
+                              {[5, 4, 3, 2, 1].map((star) => (
+                                <div key={star} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem'
+                                }}>
+                                  <span style={{ fontSize: '0.875rem', color: '#6b7280', minWidth: '60px' }}>
+                                    {star} star{star !== 1 ? 's' : ''}
+                                  </span>
+                                  <div style={{
+                                    flex: 1,
+                                    height: '8px',
+                                    backgroundColor: '#e5e7eb',
+                                    borderRadius: '0.25rem',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <div style={{
+                                      width: `${ratingsAndComments.ratings.count > 0 ? (ratingsAndComments.ratings.distribution[star] || 0) / ratingsAndComments.ratings.count * 100 : 0}%`,
+                                      height: '100%',
+                                      backgroundColor: '#fbbf24',
+                                      transition: 'width 0.3s'
+                                    }} />
+                                  </div>
+                                  <span style={{ fontSize: '0.875rem', color: '#6b7280', minWidth: '40px' }}>
+                                    {ratingsAndComments.ratings.distribution[star] || 0}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p style={{
+                          color: '#6b7280',
+                          fontSize: '0.875rem',
+                          margin: 0
+                        }}>
+                          No ratings yet
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-            <div style={{
-              display: 'flex',
-              gap: '0.75rem',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={() => {
-                  setShowCommentModal(false);
-                  setCommentText('');
-                  setSelectedEventForComment(null);
-                }}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#f3f4f6',
-                  color: '#6b7280',
-                  border: '1px solid #e5e7eb',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#e5e7eb';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitComment}
-                disabled={!commentText.trim()}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  if (commentText.trim()) {
-                    e.target.style.backgroundColor = '#1e3a8a';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (commentText.trim()) {
-                    e.target.style.backgroundColor = '#1e40af';
-                  }
-                }}
-              >
-                Submit Comment
-              </button>
+                  {selectedEventForView && (() => {
+                    const eventDate = selectedEventForView.eventDate || selectedEventForView.registration?.eventDate;
+                    const eventEndDate = selectedEventForView.eventEndDate || selectedEventForView.registration?.eventEndDate;
+                    const finalEventDate = eventDate;
+                    const finalEventEndDate = eventEndDate;
+                    const isPast = hasEventPassed(finalEventDate, finalEventEndDate);
+                    const isPastType = isMarkedAsPastEvent(selectedEventForView.registration);
+                    if (!finalEventDate && !finalEventEndDate && !isPastType) return false;
+                    return isPast || isPastType;
+                  })() && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{
+                        marginBottom: '2rem',
+                        padding: '1.5rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        position: 'relative',
+                        zIndex: 10
+                      }}
+                    >
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '1rem',
+                        marginTop: 0
+                      }}>
+                        Share Your Feedback
+                      </h3>
+
+                      {modalError && (
+                        <div style={{
+                          padding: '0.75rem',
+                          marginBottom: '1rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: '#fee2e2',
+                          color: '#991b1b',
+                          fontSize: '0.875rem'
+                        }}>
+                          {modalError}
+                        </div>
+                      )}
+
+                      {modalSuccess && (
+                        <div style={{
+                          padding: '0.75rem',
+                          marginBottom: '1rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: '#ecfdf5',
+                          color: '#047857',
+                          fontSize: '0.875rem'
+                        }}>
+                          {modalSuccess}
+                        </div>
+                      )}
+
+                      <div ref={ratingSectionRef} style={{ marginBottom: '1.5rem' }}>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Your Rating
+                        </label>
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem'
+                        }}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setRating(star)}
+                              onMouseEnter={() => setHoveredRating(star)}
+                              onMouseLeave={() => setHoveredRating(0)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontSize: '2rem',
+                                color: (hoveredRating >= star || rating >= star) ? '#fbbf24' : '#d1d5db',
+                                transition: 'all 0.2s',
+                                lineHeight: 1
+                              }}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                        {rating > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleSubmitRating}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: '#1e40af',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.stopPropagation();
+                              e.target.style.backgroundColor = '#1e3a8a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.stopPropagation();
+                              e.target.style.backgroundColor = '#1e40af';
+                            }}
+                          >
+                            Submit Rating
+                          </button>
+                        )}
+                      </div>
+
+                      <div ref={commentSectionRef}>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Your Comment
+                        </label>
+                        <textarea
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          placeholder="Share your thoughts about this event..."
+                          maxLength={1000}
+                          style={{
+                            width: '100%',
+                            minHeight: '100px',
+                            padding: '0.875rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            fontSize: '0.875rem',
+                            fontFamily: 'inherit',
+                            resize: 'vertical',
+                            marginBottom: '0.5rem',
+                            outline: 'none',
+                            transition: 'all 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#1e40af';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#e5e7eb';
+                            e.target.style.boxShadow = 'none';
+                          }}
+                        />
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280',
+                          textAlign: 'right',
+                          marginBottom: '0.75rem'
+                        }}>
+                          {commentText.length}/1000 characters
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleSubmitComment}
+                          disabled={!commentText.trim()}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (commentText.trim()) {
+                              e.target.style.backgroundColor = '#1e3a8a';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (commentText.trim()) {
+                              e.target.style.backgroundColor = '#1e40af';
+                            }
+                          }}
+                        >
+                          Submit Comment
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 style={{
+                      color: '#1D3557',
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      marginBottom: '1rem',
+                      marginTop: 0
+                    }}>
+                      Comments ({ratingsAndComments.comments?.length || 0})
+                    </h3>
+                    {ratingsAndComments.comments && ratingsAndComments.comments.length > 0 ? (
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem'
+                      }}>
+                        {ratingsAndComments.comments.map((comment) => (
+                          <div
+                            key={comment._id}
+                            style={{
+                              padding: '1rem',
+                              backgroundColor: '#f9fafb',
+                              borderRadius: '0.5rem',
+                              border: '1px solid #e5e7eb'
+                            }}
+                          >
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              marginBottom: '0.5rem'
+                            }}>
+                              <div>
+                                <div style={{
+                                  fontWeight: '600',
+                                  color: '#1D3557',
+                                  fontSize: '0.875rem'
+                                }}>
+                                  {comment.user?.firstName} {comment.user?.lastName}
+                                </div>
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: '#6b7280'
+                                }}>
+                                  {comment.user?.userType || 'User'}
+                                </div>
+                              </div>
+                              <div style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280'
+                              }}>
+                                {formatDate(comment.createdAt)}
+                              </div>
+                            </div>
+                            <p style={{
+                              color: '#374151',
+                              fontSize: '0.875rem',
+                              lineHeight: '1.6',
+                              margin: 0
+                            }}>
+                              {comment.text}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        margin: 0,
+                        padding: '1rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '0.5rem'
+                      }}>
+                        No comments yet
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: '#6b7280'
+                }}>
+                  No data available
+                </div>
+              )}
             </div>
           </div>
         </div>
