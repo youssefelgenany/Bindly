@@ -40,6 +40,11 @@ import ProfessorLoyaltyVendorsView from './pages/ProfessorLoyaltyVendorsView';
 import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
 import StaffFavorites from './pages/StaffFavorites';
+import StaffLoyaltyVendorsView from './pages/StaffLoyaltyVendorsView';
+import TAEventsView from './pages/TAEventsView';
+import TAMyRegistrations from './pages/TAMyRegistrations';
+import TAFavorites from './pages/TAFavorites';
+import TALoyaltyVendorsView from './pages/TALoyaltyVendorsView';
 import EventPayment from './pages/EventPayment';
 import PaymentSuccess from './pages/PaymentSuccess';
 import MyWallet from './pages/MyWallet';
@@ -505,6 +510,56 @@ const AppContent = () => {
                 <ProtectedRoute>
                   <StaffAndTAOnly>
                     <StaffFavorites />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/loyalty-vendors"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <StaffLoyaltyVendorsView />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ta/events"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <TAEventsView />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ta/my-registrations"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <TAMyRegistrations />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ta/favorites"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <TAFavorites />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ta/loyalty-vendors"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <TALoyaltyVendorsView />
                   </StaffAndTAOnly>
                 </ProtectedRoute>
               }

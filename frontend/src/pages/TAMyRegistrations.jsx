@@ -5,54 +5,47 @@ import { eventsApiService } from '../api/eventsApi';
 import { notificationApiService } from '../api/notificationApi';
 import { useAuth } from '../contexts/AuthContext';
 
-const getDisplayStatus = (status) => {
-  const normalized = status?.toLowerCase();
-  if (normalized === 'approved' || normalized === 'registered') return 'REGISTERED';
-  if (normalized === 'pending') return 'PENDING';
-  if (normalized === 'rejected') return 'REJECTED';
-  return status ? status.toUpperCase() : 'STATUS';
-};
-
-const canStaffCancel = (registration) => {
-  if (!registration) return false;
-  if (!registration.paid) return false;
-  if (!registration.eventDate) return false;
-  return new Date(registration.eventDate) > new Date();
-};
-
-const StaffMyRegistrations = () => {
+const TAMyRegistrations = () => {
   const { user, logout, refreshUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [expandedRows, setExpandedRows] = useState(new Set());
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRegistration, setSelectedRegistration] = useState(null);
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelRegistrationData, setCancelRegistrationData] = useState(null);
-  const [favoriteEventIds, setFavoriteEventIds] = useState(new Set());
-  const [showCancelSuccess, setShowCancelSuccess] = useState(false);
-  const [cancelSuccessData, setCancelSuccessData] = useState(null);
-  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [showRatingsCommentsModal, setShowRatingsCommentsModal] = useState(false);
   const [selectedEventForView, setSelectedEventForView] = useState(null); // { eventId, eventDate, eventEndDate, eventTitle }
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [commentText, setCommentText] = useState('');
-  const [ratingsAndComments, setRatingsAndComments] = useState(null);
-  const [loadingRatingsComments, setLoadingRatingsComments] = useState(false);
-  const [eventRatings, setEventRatings] = useState({}); // { eventId: { average: number, count: number } }
   const [modalError, setModalError] = useState('');
   const [modalSuccess, setModalSuccess] = useState('');
   const [modalFocus, setModalFocus] = useState(null);
-  const ratingSectionRef = useRef(null);
-  const commentSectionRef = useRef(null);
+  const [ratingsAndComments, setRatingsAndComments] = useState(null);
+  const [loadingRatingsComments, setLoadingRatingsComments] = useState(false);
+  const [eventRatings, setEventRatings] = useState({}); // { eventId: { average: number, count: number } }
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelRegistrationData, setCancelRegistrationData] = useState(null);
+  const [showCancelSuccess, setShowCancelSuccess] = useState(false);
+  const [cancelSuccessData, setCancelSuccessData] = useState(null);
+  const ratingSectionRef = useRef(null);
+  const commentSectionRef = useRef(null);
+
+  const resetModalState = () => {
+    setRating(0);
+    setHoveredRating(0);
+    setCommentText('');
+    setModalError('');
+    setModalSuccess('');
+    setModalFocus(null);
+  };
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -62,10 +55,6 @@ const StaffMyRegistrations = () => {
     }
     return currentPath.startsWith(path);
   };
-
-  const displayName = user?.firstName && user?.lastName 
-    ? `${user.firstName} ${user.lastName}`
-    : user?.name || 'Staff';
 
   const handleLogout = (e) => {
     if (e) {
@@ -89,85 +78,16 @@ const StaffMyRegistrations = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLogoutDropdown, showNotificationsDropdown]);
 
-  const loadMyRegistrations = useCallback(async () => {
-    if (!user?.email) {
-      setError('User email not available');
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const result = await studentRegistrationApi.getMyRegistrations(user.email);
-      
-      if (result.success) {
-        // Show all registrations (both upcoming and past events)
-        // Include approved and pending registrations regardless of payment status
-        // This ensures users can see both their registered (upcoming) and past events
-        const allRegistrations = result.data.registrations || [];
-        // Show approved and pending registrations (both paid and unpaid, upcoming and past)
-        // This includes all events the user has registered for, whether they've happened or not
-        const approvedRegistrations = allRegistrations.filter(reg => {
-          const status = reg.status?.toLowerCase();
-          return status === 'approved' || status === 'pending';
-        });
-        setRegistrations(approvedRegistrations);
-      } else {
-        setError(result.message || 'Failed to fetch registrations');
-        setRegistrations([]);
-      }
-    } catch (err) {
-      console.error('Error loading registrations:', err);
-      setError(err.message || 'An unexpected error occurred. Please try again.');
-      setRegistrations([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
   useEffect(() => {
-    if (user && user.email) {
-      loadMyRegistrations();
+    if (!showRatingsCommentsModal || !modalFocus) return;
+    const target = modalFocus === 'comment' ? commentSectionRef.current : ratingSectionRef.current;
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-    
-    // Check for payment success query param
-    const searchParams = new URLSearchParams(window.location.search);
-    if (searchParams.get('payment_success') === 'true') {
-      const eventTitle = searchParams.get('event_title') || 'the event';
-      setShowPaymentSuccess(true);
-      // Store event title for display
-      sessionStorage.setItem('paymentSuccessEventTitle', eventTitle);
-      // Clean up URL
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, [user, loadMyRegistrations]);
+    setModalFocus(null);
+  }, [showRatingsCommentsModal, modalFocus]);
 
-  // Load user's favorite events (for TA users)
-  useEffect(() => {
-    const loadFavoriteEvents = async () => {
-      if (!user || user.userType !== 'TA') return;
-      
-      try {
-        const result = await eventsApiService.getFavoriteEvents();
-        if (result.success) {
-          const favoriteIds = new Set();
-          const events = Array.isArray(result.data) ? result.data : (result.data.events || []);
-          events.forEach(event => {
-            if (event._id) favoriteIds.add(String(event._id));
-            if (event.id) favoriteIds.add(String(event.id));
-          });
-          setFavoriteEventIds(favoriteIds);
-        }
-      } catch (error) {
-        console.error('Error loading favorite events:', error);
-      }
-    };
-
-    loadFavoriteEvents();
-  }, [user]);
-
+  // Load notifications
   const loadNotifications = useCallback(async () => {
     try {
       setLoadingNotifications(true);
@@ -175,15 +95,19 @@ const StaffMyRegistrations = () => {
         notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
         notificationApiService.getUnreadCount()
       ]);
-
-      if (notificationsResult.success && notificationsResult.data?.data) {
-        setNotifications(
-          notificationsResult.data.data.notifications ||
-          notificationsResult.data.data ||
-          []
-        );
+      
+      if (notificationsResult.success) {
+        // Handle different response structures
+        const responseData = notificationsResult.data?.data || notificationsResult.data;
+        if (responseData) {
+          // Check if it's an array directly or has a notifications property
+          const notifications = Array.isArray(responseData) 
+            ? responseData 
+            : (responseData.notifications || []);
+          setNotifications(notifications);
+        }
       }
-
+      
       if (countResult.success) {
         setUnreadCount(countResult.unreadCount || 0);
       }
@@ -194,6 +118,7 @@ const StaffMyRegistrations = () => {
     }
   }, []);
 
+  // Load notifications on mount and poll for updates
   useEffect(() => {
     loadNotifications();
     const interval = setInterval(() => {
@@ -202,13 +127,14 @@ const StaffMyRegistrations = () => {
     return () => clearInterval(interval);
   }, [loadNotifications]);
 
+  // Mark notification as read
   const handleMarkAsRead = async (notificationId) => {
     try {
       const result = await notificationApiService.markAsRead(notificationId);
       if (result.success) {
-        setNotifications(prev =>
-          prev.map(n => (n._id === notificationId ? { ...n, isRead: true } : n))
-        );
+        setNotifications(prev => prev.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
     } catch (error) {
@@ -216,6 +142,7 @@ const StaffMyRegistrations = () => {
     }
   };
 
+  // Mark all as read
   const handleMarkAllAsRead = async () => {
     try {
       const result = await notificationApiService.markAllAsRead();
@@ -224,10 +151,11 @@ const StaffMyRegistrations = () => {
         setUnreadCount(0);
       }
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      console.error('Error marking all as read:', error);
     }
   };
 
+  // Format notification date
   const formatNotificationDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -244,31 +172,57 @@ const StaffMyRegistrations = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const handleToggleFavorite = async (eventId, e) => {
-    e.stopPropagation(); // Prevent card click
-    
-    if (!user || user.userType !== 'TA') return;
-    
-    const isFavorite = favoriteEventIds.has(String(eventId));
-    
+  useEffect(() => {
+    if (user && user.email) {
+      loadMyRegistrations();
+    }
+  }, [user]);
+
+  const loadMyRegistrations = async () => {
+    if (!user?.email) {
+      setError('User email not available');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
     try {
-      if (isFavorite) {
-        const result = await eventsApiService.removeFromFavorites(eventId);
-        if (result.success) {
-          setFavoriteEventIds(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(String(eventId));
-            return newSet;
-          });
-        }
+      const result = await studentRegistrationApi.getMyRegistrations(user.email);
+      
+      if (result.success) {
+        const regs = result.data.registrations || [];
+        setRegistrations(regs);
+        
+        // Load ratings for all events
+        const ratingsMap = {};
+        await Promise.all(regs.map(async (reg) => {
+          if (reg.eventId) {
+            try {
+              const ratingResult = await eventsApiService.getRatingsAndComments(reg.eventId);
+              if (ratingResult.success && ratingResult.data?.ratings) {
+                ratingsMap[reg.eventId] = {
+                  average: ratingResult.data.ratings.average || 0,
+                  count: ratingResult.data.ratings.count || 0
+                };
+              }
+            } catch (err) {
+              console.error(`Error loading rating for event ${reg.eventId}:`, err);
+            }
+          }
+        }));
+        setEventRatings(ratingsMap);
       } else {
-        const result = await eventsApiService.addToFavorites(eventId);
-        if (result.success) {
-          setFavoriteEventIds(prev => new Set([...prev, String(eventId)]));
-        }
+        setError(result.message || 'Failed to fetch registrations');
+        setRegistrations([]);
       }
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
+    } catch (err) {
+      console.error('Error loading registrations:', err);
+      setError(err.message || 'An unexpected error occurred. Please try again.');
+      setRegistrations([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -308,76 +262,27 @@ const StaffMyRegistrations = () => {
   };
 
   const getEventTypeFallbackText = (type) => {
-    return type ? type.toUpperCase() : 'EVENT';
-  };
-
-  const resetModalState = () => {
-    setRating(0);
-    setHoveredRating(0);
-    setCommentText('');
-    setModalError('');
-    setModalSuccess('');
-    setModalFocus(null);
-  };
-
-  useEffect(() => {
-    if (!showRatingsCommentsModal || !modalFocus) return;
-    const target = modalFocus === 'comment' ? commentSectionRef.current : ratingSectionRef.current;
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-    setModalFocus(null);
-  }, [showRatingsCommentsModal, modalFocus]);
-
-  const getStatusColor = (status) => {
-    const colors = {
-      approved: '#059669',
-      registered: '#059669',
-      pending: '#f59e0b',
-      rejected: '#dc2626'
+    const texts = {
+      bazaar: 'BAZAAR',
+      trip: 'TRIP',
+      workshop: 'WORKSHOP',
+      conference: 'CONFERENCE',
+      booth: 'BOOTH',
+      other: 'EVENT'
     };
-    return colors[status?.toLowerCase()] || '#6b7280';
-  };
-
-  const getDisplayStatus = (status) => {
-    // Map "approved" to "registered" for display
-    if (status?.toLowerCase() === 'approved') {
-      return 'registered';
-    }
-    return status;
-  };
-
-  const getDaysUntilEvent = (dateString) => {
-    if (!dateString) return null;
-    const eventDate = new Date(dateString);
-    const today = new Date();
-    const diffTime = eventDate - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 0) return 'Past';
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Tomorrow';
-    return `In ${diffDays} days`;
+    return texts[type?.toLowerCase()] || texts.other;
   };
 
   // Check if event has passed (can rate/comment)
+  // Uses the same logic as getDaysUntilEvent for consistency
   const hasEventPassed = (eventDate, eventEndDate) => {
     try {
-      const now = new Date();
-      now.setHours(23, 59, 59, 999); // Set to end of today to include events that ended today
-      
       // Check endDate first (most accurate), then eventDate
       let checkDate = null;
       if (eventEndDate) {
         checkDate = new Date(eventEndDate);
         if (isNaN(checkDate.getTime())) {
           checkDate = null;
-        } else {
-          // Use the full datetime, not just date
-          // If it's a date string without time, set to end of that day
-          if (checkDate.getHours() === 0 && checkDate.getMinutes() === 0 && checkDate.getSeconds() === 0) {
-            checkDate.setHours(23, 59, 59, 999);
-          }
         }
       }
       
@@ -385,12 +290,6 @@ const StaffMyRegistrations = () => {
         checkDate = new Date(eventDate);
         if (isNaN(checkDate.getTime())) {
           return false;
-        } else {
-          // Use the full datetime, not just date
-          // If it's a date string without time, set to end of that day
-          if (checkDate.getHours() === 0 && checkDate.getMinutes() === 0 && checkDate.getSeconds() === 0) {
-            checkDate.setHours(23, 59, 59, 999);
-          }
         }
       }
       
@@ -398,33 +297,29 @@ const StaffMyRegistrations = () => {
         return false;
       }
       
-      // Event has passed if the checkDate is before or equal to now
-      return checkDate <= now;
+      // Use the same logic as getDaysUntilEvent: check if date is in the past
+      const today = new Date();
+      const diffTime = checkDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Event has passed if diffDays < 0 (same logic as getDaysUntilEvent)
+      return diffDays < 0;
     } catch (error) {
-      console.error('Error checking if event has passed:', error);
+      console.error('❌ Error checking if event has passed:', error, { eventDate, eventEndDate });
       return false;
     }
   };
 
-  const isMarkedAsPastEvent = (registration) => {
-    if (!registration) return false;
-    const typeString = registration.eventType || registration.eventCategory || registration.type || registration.event?.eventType || '';
-    const normalized = typeString?.toString().trim().toLowerCase();
-    if (!normalized) return false;
-    return normalized === 'past event' || normalized === 'past events' || normalized === 'past';
-  };
-
-  const isRegistrationPast = (registration) => {
-    if (!registration) return false;
-    const eventDate = registration.eventDate || registration.startDate || registration.event?.startDate || registration.event?.eventDate;
-    const eventEndDate = registration.eventEndDate || registration.endDate || registration.event?.endDate || registration.event?.eventEndDate;
-    if (eventDate) {
-      const label = getDaysUntilEvent(eventDate);
-      if (label === 'Past') {
-        return true;
-      }
-    }
-    return hasEventPassed(eventDate, eventEndDate) || isMarkedAsPastEvent(registration);
+  // Some legacy "Past Event" entries do not have reliable dates.
+  const isMarkedAsPastEvent = (source) => {
+    if (!source) return false;
+    const typeString = typeof source === 'string'
+      ? source
+      : source.eventType || source.eventCategory || source.type || source.eventTypeLabel || '';
+    if (!typeString) return false;
+    const normalized = typeString.toString().trim().toLowerCase();
+    const pastLabels = ['past event', 'past events', 'past'];
+    return pastLabels.includes(normalized);
   };
 
   const refreshEventRatingStats = async (eventId) => {
@@ -444,7 +339,6 @@ const StaffMyRegistrations = () => {
     }
   };
 
-  // Handle rating submission
   const handleSubmitRating = async () => {
     if (!selectedEventForView?.eventId) {
       setModalError('No event selected.');
@@ -454,9 +348,7 @@ const StaffMyRegistrations = () => {
       setModalError('Please select a rating between 1 and 5.');
       return;
     }
-
     setModalError('');
-
     try {
       const eventId = String(selectedEventForView.eventId);
       const result = await eventsApiService.submitRating(eventId, rating);
@@ -477,7 +369,6 @@ const StaffMyRegistrations = () => {
     }
   };
 
-  // Handle comment submission
   const handleSubmitComment = async () => {
     if (!selectedEventForView?.eventId) {
       setModalError('No event selected.');
@@ -487,14 +378,11 @@ const StaffMyRegistrations = () => {
       setModalError('Please enter a comment.');
       return;
     }
-
     if (commentText.trim().length > 1000) {
       setModalError('Comment cannot exceed 1000 characters.');
       return;
     }
-
     setModalError('');
-
     try {
       const eventId = String(selectedEventForView.eventId);
       const result = await eventsApiService.submitComment(eventId, commentText.trim());
@@ -539,22 +427,22 @@ const StaffMyRegistrations = () => {
 
   // Handle view ratings and comments
   const handleViewRatingsComments = async (registrationOrEventId, options = {}) => {
-    let registration = null;
     let eventId = null;
+    let registration = null;
 
     if (registrationOrEventId && typeof registrationOrEventId === 'object') {
       registration = registrationOrEventId;
-      eventId = registration.eventId || registration.event?._id || registration.event?.id;
+      eventId = registration.eventId || registration.event?._id || registration.event?._id?.toString();
     } else {
       eventId = registrationOrEventId;
-      registration = registrations.find((reg) => {
-        const regId = reg.eventId || reg.event?._id || reg.event?.id;
+      registration = registrations.find((r) => {
+        const regId = r.eventId || r.event?._id || r.event?._id?.toString();
         return String(regId) === String(eventId);
       });
     }
 
     if (!eventId) {
-      setModalError('Event ID not found');
+      setModalError('Event ID not found.');
       return;
     }
 
@@ -597,6 +485,44 @@ const StaffMyRegistrations = () => {
     await loadRatingsAndComments(eventId);
   };
 
+  const isRegistrationPast = (registration) => {
+    if (!registration) return false;
+    const eventDate = registration.eventDate || registration.startDate || registration.event?.startDate || registration.event?.eventDate;
+    const eventEndDate = registration.eventEndDate || registration.endDate || registration.event?.endDate || registration.event?.eventEndDate;
+    if (eventDate && getDaysUntilEvent(eventDate) === 'Past') {
+      return true;
+    }
+    return (
+      hasEventPassed(eventDate, eventEndDate) ||
+      isMarkedAsPastEvent(registration?.eventType || registration?.eventCategory || registration?.event?.type)
+    );
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      approved: '#059669',
+      pending: '#f59e0b',
+      rejected: '#dc2626'
+    };
+    return colors[status?.toLowerCase()] || '#6b7280';
+  };
+
+  const getDaysUntilEvent = (dateString) => {
+    if (!dateString) return null;
+    const eventDate = new Date(dateString);
+    const today = new Date();
+    const diffTime = eventDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return 'Past';
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    return `In ${diffDays} days`;
+  };
+
+  const displayName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`
+    : user?.name || 'TA';
 
   if (loading) {
     return (
@@ -605,7 +531,7 @@ const StaffMyRegistrations = () => {
         justifyContent: 'center',
         alignItems: 'center',
         height: '100vh',
-        backgroundColor: '#f8f6f6'
+        backgroundColor: '#f6f7f8'
       }}>
         <div style={{
           width: '2.5rem',
@@ -618,6 +544,28 @@ const StaffMyRegistrations = () => {
       </div>
     );
   }
+
+  const formatTableDate = (dateString) => {
+    if (!dateString) return 'TBD';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const toggleRowExpansion = (registrationId) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(registrationId)) {
+        newSet.delete(registrationId);
+      } else {
+        newSet.add(registrationId);
+      }
+      return newSet;
+    });
+  };
 
   return (
     <div style={{
@@ -793,7 +741,7 @@ const StaffMyRegistrations = () => {
                             handleMarkAsRead(notification._id);
                           }
                           if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
-                            navigate('/staff/events');
+                            navigate(`/ta/events`);
                             setShowNotificationsDropdown(false);
                           } else if (
                             (notification.type === 'event_reminder' || 
@@ -802,98 +750,91 @@ const StaffMyRegistrations = () => {
                              notification.type === 'gym_session_reminder') && 
                             (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
                           ) {
-                            navigate('/staff/my-registrations');
+                            // Already on My Events page, just close dropdown
                             setShowNotificationsDropdown(false);
                           } else if (
                             notification.type === 'new_loyalty_partner' || 
                             notification.type === 'loyalty_partner_added' ||
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
-                            navigate('/staff/loyalty-vendors');
+                            // Navigate to Loyalty Partners page
+                            navigate(`/ta/loyalty-vendors`);
                             setShowNotificationsDropdown(false);
                           }
                         }}
                         style={{
-                          padding: '0.75rem 1rem',
-                          borderBottom: '1px solid #f1f5f9',
+                          padding: '1rem',
+                          borderBottom: '1px solid #f3f4f6',
+                          cursor: 'pointer',
                           backgroundColor: notification.isRead 
                             ? '#FFFFFF' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                              ? '#fff7ed'
-                              : '#f8fafc',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          display: 'flex',
-                          gap: '0.75rem'
+                              ? '#fef2f2'
+                              : '#eff6ff',
+                          borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
+                            ? '3px solid #ef4444'
+                            : 'none',
+                          transition: 'background-color 0.2s'
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = notification.isRead 
-                            ? '#f8fafc' 
+                            ? '#f9fafb' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                              ? '#ffedd5'
-                              : '#edf2ff';
+                              ? '#fee2e2'
+                              : '#dbeafe';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = notification.isRead 
                             ? '#FFFFFF' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                              ? '#fff7ed'
-                              : '#f8fafc';
+                              ? '#fef2f2'
+                              : '#eff6ff';
                         }}
                       >
                         <div style={{
-                          width: '2.5rem',
-                          height: '2.5rem',
-                          borderRadius: '0.75rem',
-                          backgroundColor: notification.priority === 'high' ? '#fef3c7' : '#e0e7ff',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem'
                         }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.25rem',
-                            color: notification.priority === 'high' ? '#b45309' : '#4338ca'
-                          }}>
-                            {notification.type === 'event_announcement' || notification.type === 'new_event' ? 'campaign'
-                              : notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder' ? 'event'
-                              : 'notifications'}
-                          </span>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{
-                            fontWeight: notification.isRead ? '400' : '600',
-                            color: '#1D3557',
-                            fontSize: '0.875rem',
-                            marginBottom: '0.25rem'
-                          }}>
-                            {notification.title || notification.message}
-                          </div>
-                          {notification.message && notification.message !== notification.title && (
-                            <div style={{
-                              fontSize: '0.8125rem',
-                              color: '#475569',
+                          <div style={{ flex: 1 }}>
+                            <p style={{
+                              fontSize: '0.875rem',
+                              fontWeight: notification.isRead ? '400' : '600',
+                              color: '#1D3557',
+                              margin: 0,
                               marginBottom: '0.25rem'
                             }}>
-                              {notification.message}
-                            </div>
-                          )}
-                          <div style={{
-                            fontSize: '0.75rem',
-                            color: '#94a3b8'
-                          }}>
-                            {formatNotificationDate(notification.createdAt)}
+                              {notification.title || notification.message}
+                            </p>
+                            {notification.message && notification.message !== notification.title && (
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                margin: 0
+                              }}>
+                                {notification.message}
+                              </p>
+                            )}
+                            <p style={{
+                              fontSize: '0.625rem',
+                              color: '#9ca3af',
+                              margin: '0.5rem 0 0 0'
+                            }}>
+                              {formatNotificationDate(notification.createdAt)}
+                            </p>
                           </div>
+                          {!notification.isRead && (
+                            <div style={{
+                              width: '0.5rem',
+                              height: '0.5rem',
+                              borderRadius: '50%',
+                              backgroundColor: '#1e40af',
+                              flexShrink: 0,
+                              marginTop: '0.25rem'
+                            }} />
+                          )}
                         </div>
-                        {!notification.isRead && (
-                          <span style={{
-                            width: '0.5rem',
-                            height: '0.5rem',
-                            borderRadius: '50%',
-                            backgroundColor: '#2563eb',
-                            alignSelf: 'center'
-                          }} />
-                        )}
                       </div>
                     ))
                   )}
@@ -916,13 +857,18 @@ const StaffMyRegistrations = () => {
               color: '#6b7280',
               margin: 0
             }}>
-              Staff
+              TA
             </p>
           </div>
+
+          {/* Student Profile Icon */}
           <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            onClick={() => {
+              setShowLogoutDropdown(!showLogoutDropdown);
+              setShowNotificationsDropdown(false);
+            }}
           >
             {user?.profilePicturePath ? (
               <img
@@ -945,10 +891,9 @@ const StaffMyRegistrations = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#FFFFFF',
-                fontSize: '0.875rem',
                 fontWeight: '600'
               }}>
-                {(user?.firstName?.[0] || user?.name?.[0] || 'S').toUpperCase()}
+                {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
               </div>
             )}
             {showLogoutDropdown && (
@@ -964,37 +909,35 @@ const StaffMyRegistrations = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
-                {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
-                  <Link
-                    to="/wallet"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      textAlign: 'left',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      color: '#1D3557',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      textDecoration: 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#f3f4f6';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'transparent';
-                    }}
-                    onClick={() => setShowLogoutDropdown(false)}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                      account_balance_wallet
-                    </span>
-                    My Wallet
-                  </Link>
-                )}
+                <Link
+                  to="/wallet"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => setShowLogoutDropdown(false)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    account_balance_wallet
+                  </span>
+                  My Wallet
+                </Link>
                 <button
                   onClick={handleLogout}
                   style={{
@@ -1036,6 +979,7 @@ const StaffMyRegistrations = () => {
         backgroundColor: '#FFFFFF',
         borderBottom: '1px solid #e2e8f0'
       }}>
+        {/* Navigation Links */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
           <Link
             to="/dashboard"
@@ -1051,40 +995,40 @@ const StaffMyRegistrations = () => {
             Dashboard
           </Link>
           <Link
-            to="/staff/events"
+            to="/ta/events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/events') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
+              fontWeight: isActiveRoute('/ta/events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/ta/events') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             Discover Events
           </Link>
           <Link
-            to="/staff/my-registrations"
+            to="/ta/my-registrations"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/my-registrations') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
+              fontWeight: isActiveRoute('/ta/my-registrations') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/ta/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             My Events
           </Link>
           <Link
-            to="/staff/favorites"
+            to="/ta/favorites"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/favorites') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
+              fontWeight: isActiveRoute('/ta/favorites') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/ta/favorites') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             My Favorites
@@ -1101,6 +1045,19 @@ const StaffMyRegistrations = () => {
             }}
           >
             View Gym Sessions
+          </Link>
+          <Link
+            to="/gym"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/gym') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Gym Sessions
           </Link>
         </div>
       </nav>
@@ -1120,12 +1077,13 @@ const StaffMyRegistrations = () => {
           overflowY: 'auto',
           backgroundColor: '#f6f7f8'
         }}>
+          {/* Page Title Banner */}
           {/* Content Wrapper with Margins */}
           <div style={{
             marginLeft: '4rem',
             marginRight: '4rem'
           }}>
-          {/* Page Title Banner */}
+          {/* Page Title Box */}
           <div style={{
             position: 'relative',
             height: '140px',
@@ -1181,6 +1139,7 @@ const StaffMyRegistrations = () => {
               </p>
             </div>
           </div>
+
           {error && (
             <div style={{
               padding: '0.75rem 1rem',
@@ -1225,7 +1184,7 @@ const StaffMyRegistrations = () => {
                 You haven't registered for any events yet. Browse events to get started!
               </p>
               <button
-                onClick={() => navigate('/staff/events')}
+                onClick={() => navigate('/ta/events')}
                 style={{
                   padding: '0.75rem 1.5rem',
                   borderRadius: '0.5rem',
@@ -1330,48 +1289,6 @@ const StaffMyRegistrations = () => {
                             }
                           }}
                         />
-                        {/* Heart Icon for TA users */}
-                        {user?.userType === 'TA' && (
-                          <button
-                            onClick={(e) => handleToggleFavorite(registration.eventId, e)}
-                            style={{
-                              position: 'absolute',
-                              top: '0.75rem',
-                              right: '0.75rem',
-                              background: 'rgba(255, 255, 255, 0.9)',
-                              border: 'none',
-                              borderRadius: '50%',
-                              width: '2.5rem',
-                              height: '2.5rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                              transition: 'all 0.2s',
-                              zIndex: 10
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.background = '#ffffff';
-                              e.target.style.transform = 'scale(1.1)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.background = 'rgba(255, 255, 255, 0.9)';
-                              e.target.style.transform = 'scale(1)';
-                            }}
-                          >
-                            <span 
-                              className="material-symbols-outlined"
-                              style={{
-                                fontSize: '1.25rem',
-                                color: favoriteEventIds.has(String(registration.eventId)) ? '#dc2626' : '#6b7280',
-                                transition: 'color 0.2s'
-                              }}
-                            >
-                              {favoriteEventIds.has(String(registration.eventId)) ? 'favorite' : 'favorite_border'}
-                            </span>
-                          </button>
-                        )}
                       </div>
                     )}
                     
@@ -1389,45 +1306,19 @@ const StaffMyRegistrations = () => {
                         }}>
                           {registration.eventType}
                         </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!canStaffCancel(registration)) {
-                              setSelectedRegistration(registration);
-                              return;
-                            }
-                            setCancelRegistrationData({
-                              eventId: registration.eventId,
-                              eventTitle: registration.eventTitle,
-                              paid: registration.paid
-                            });
-                            setShowCancelModal(true);
-                          }}
-                          style={{
-                            padding: '0.375rem 0.875rem',
-                            borderRadius: '0.5rem',
-                            border: 'none',
-                            backgroundColor: getStatusColor(registration.status),
-                            color: '#FFFFFF',
-                            fontSize: '0.6875rem',
-                            fontWeight: '700',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
-                            cursor: canStaffCancel(registration) ? 'pointer' : 'default',
-                            boxShadow: canStaffCancel(registration) ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
-                          }}
-                          title={canStaffCancel(registration) ? 'Tap to cancel & refund to wallet' : ''}
-                        >
-                          {getDisplayStatus(registration.status)}
-                        </button>
-                      </div>
-                      {canStaffCancel(registration) && (
-                        <div style={{ marginTop: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#dc2626', fontWeight: '600' }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>info</span>
-                          Tap “Registered” to cancel & refund
+                        <div style={{
+                          padding: '0.375rem 0.875rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: getStatusColor(registration.status),
+                          color: '#FFFFFF',
+                          fontSize: '0.6875rem',
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          {registration.status}
                         </div>
-                      )}
+                      </div>
 
                       <h3 style={{
                         color: '#1D3557',
@@ -1447,50 +1338,81 @@ const StaffMyRegistrations = () => {
                         marginBottom: '0.75rem',
                         flex: 1
                       }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
-                      }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
                         }}>
-                          calendar_today
-                        </span>
-                        <span>{formatDate(registration.eventDate)}</span>
-                        {getDaysUntilEvent(registration.eventDate) && (
-                          <span style={{
-                            fontSize: '0.75rem',
-                            color: '#1e40af',
-                            fontWeight: '600',
-                            backgroundColor: '#eff6ff',
-                            padding: '0.25rem 0.625rem',
-                            borderRadius: '0.375rem',
-                            marginLeft: 'auto'
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
                           }}>
-                            {getDaysUntilEvent(registration.eventDate)}
+                            calendar_today
                           </span>
-                        )}
-                      </div>
-                      
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.625rem',
-                        fontSize: '0.8125rem',
-                        color: '#6b7280'
-                      }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1.125rem',
-                          color: '#9ca3af'
+                          <span>{formatDate(registration.eventDate)}</span>
+                          {getDaysUntilEvent(registration.eventDate) && (
+                            <span style={{
+                              fontSize: '0.75rem',
+                              color: '#1e40af',
+                              fontWeight: '600',
+                              backgroundColor: '#eff6ff',
+                              padding: '0.25rem 0.625rem',
+                              borderRadius: '0.375rem',
+                              marginLeft: 'auto'
+                            }}>
+                              {getDaysUntilEvent(registration.eventDate)}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
                         }}>
-                          location_on
-                        </span>
-                        <span>{registration.eventLocation}</span>
-                      </div>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            location_on
+                          </span>
+                          <span>{registration.eventLocation}</span>
+                        </div>
+                        {registration.capacity && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.625rem',
+                            fontSize: '0.8125rem',
+                            color: '#6b7280'
+                          }}>
+                            <span className="material-symbols-outlined" style={{
+                              fontSize: '1.125rem',
+                              color: '#9ca3af'
+                            }}>
+                              people
+                            </span>
+                            <span>{registration.registeredCount || 0}/{registration.capacity} registered</span>
+                          </div>
+                        )}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            schedule
+                          </span>
+                          <span>Registered: {formatDate(registration.registeredAt)}</span>
+                        </div>
                       </div>
 
                       {registration.eventDescription && (
@@ -1509,20 +1431,22 @@ const StaffMyRegistrations = () => {
                         </p>
                       )}
 
+                      {/* Bottom Section: Rating Display and Action Buttons */}
                       <div style={{
                         marginTop: 'auto',
                         paddingTop: '0.75rem',
                         borderTop: '1px solid #e5e7eb',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'flex-start',
+                        justifyContent: 'space-between',
                         gap: '0.5rem'
                       }}>
+                        {/* Average Rating Display - Bottom Left (Clickable to view ratings/comments for ALL events) */}
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewRatingsComments(registration);
-                          }}
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             handleViewRatingsComments(registration);
+                           }}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1553,11 +1477,91 @@ const StaffMyRegistrations = () => {
                             fontWeight: '600',
                             color: '#374151'
                           }}>
-                            {eventRatings[registration.eventId]?.average > 0
+                            {eventRatings[registration.eventId]?.average > 0 
                               ? eventRatings[registration.eventId].average.toFixed(1)
                               : '—'}
                           </span>
                         </button>
+
+                        {/* Rating and Comment Icons - Only for Past Events */}
+                         {isRegistrationPast(registration) && (
+                          <div style={{
+                            display: 'flex',
+                            gap: '0.5rem',
+                            marginLeft: 'auto'
+                          }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                 handleViewRatingsComments(registration, { focus: 'rating' });
+                              }}
+                              style={{
+                                padding: '0.5rem',
+                                borderRadius: '0.5rem',
+                                backgroundColor: 'transparent',
+                                border: '1px solid #e5e7eb',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s',
+                                zIndex: 10,
+                                position: 'relative'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = '#f3f4f6';
+                                e.target.style.borderColor = '#d1d5db';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'transparent';
+                                e.target.style.borderColor = '#e5e7eb';
+                              }}
+                              title="Rate this event"
+                            >
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.25rem',
+                                color: '#1e40af'
+                              }}>
+                                star
+                              </span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                 handleViewRatingsComments(registration, { focus: 'comment' });
+                              }}
+                              style={{
+                                padding: '0.5rem',
+                                borderRadius: '0.5rem',
+                                backgroundColor: 'transparent',
+                                border: '1px solid #e5e7eb',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s',
+                                zIndex: 10,
+                                position: 'relative'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = '#f3f4f6';
+                                e.target.style.borderColor = '#d1d5db';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'transparent';
+                                e.target.style.borderColor = '#e5e7eb';
+                              }}
+                              title="Comment on this event"
+                            >
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.25rem',
+                                color: '#1e40af'
+                              }}>
+                                comment
+                              </span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1728,10 +1732,10 @@ const StaffMyRegistrations = () => {
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em'
                 }}>
-                  {getDisplayStatus(selectedRegistration.status)}
+                  {selectedRegistration.status}
                 </div>
               </div>
-
+              
               <div style={{
                 display: 'grid',
                 gap: '1rem',
@@ -1754,7 +1758,7 @@ const StaffMyRegistrations = () => {
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Event Date</div>
                     <div style={{ color: '#374151', fontWeight: '500' }}>{formatDate(selectedRegistration.eventDate)}</div>
-                </div>
+                  </div>
                 </div>
                 {selectedRegistration.eventEndDate && (
                   <div style={{
@@ -1771,7 +1775,7 @@ const StaffMyRegistrations = () => {
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>End Date</div>
                       <div style={{ color: '#374151', fontWeight: '500' }}>{formatDate(selectedRegistration.eventEndDate)}</div>
-                </div>
+                    </div>
                   </div>
                 )}
                 <div style={{
@@ -1851,8 +1855,8 @@ const StaffMyRegistrations = () => {
                   }}>
                     {selectedRegistration.eventDescription}
                   </p>
-                  </div>
-                )}
+                </div>
+              )}
 
               <div style={{
                 marginBottom: '1.5rem',
@@ -1883,17 +1887,17 @@ const StaffMyRegistrations = () => {
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Name</div>
                     <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentName}</div>
-              </div>
+                  </div>
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>{user?.userType === 'TA' ? 'TA ID' : 'Student ID'}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Student ID</div>
                     <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentId}</div>
-                </div>
+          </div>
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Email</div>
                     <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentEmail}</div>
-                </div>
-                </div>
-              </div>
+          </div>
+          </div>
+        </div>
 
               {selectedRegistration.eventType === 'trip' && (
                 <div style={{
@@ -1915,7 +1919,7 @@ const StaffMyRegistrations = () => {
                   }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
                       flight_takeoff
-                      </span>
+                    </span>
                     Trip Information
                   </div>
                   {selectedRegistration.emergencyContact && (
@@ -1927,29 +1931,29 @@ const StaffMyRegistrations = () => {
                       <div>
                         <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Emergency Contact</div>
                         <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.emergencyContact.name}</div>
-                      </div>
+                </div>
                       {selectedRegistration.emergencyContact.phone && (
                         <div>
                           <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Contact Phone</div>
                           <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.emergencyContact.phone}</div>
-                        </div>
-                      )}
+                  </div>
+                )}
                     </div>
                   )}
                   {selectedRegistration.dietaryRequirements && (
                     <div style={{ marginBottom: '0.75rem' }}>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Dietary Requirements</div>
                       <div style={{ color: '#374151', fontSize: '0.875rem' }}>{selectedRegistration.dietaryRequirements}</div>
-                    </div>
-                  )}
+              </div>
+            )}
                   {selectedRegistration.medicalConditions && (
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Medical Conditions</div>
                       <div style={{ color: '#374151', fontSize: '0.875rem' }}>{selectedRegistration.medicalConditions}</div>
-                    </div>
-                  )}
-                </div>
-              )}
+              </div>
+            )}
+          </div>
+        )}
 
               {/* Cancel Button - Only show for paid registrations that haven't started */}
               {selectedRegistration.paid && 
@@ -1964,8 +1968,7 @@ const StaffMyRegistrations = () => {
                     onClick={() => {
                       setCancelRegistrationData({
                         eventId: selectedRegistration.eventId,
-                        eventTitle: selectedRegistration.eventTitle,
-                        paid: selectedRegistration.paid
+                        eventTitle: selectedRegistration.eventTitle
                       });
                       setShowCancelModal(true);
                     }}
@@ -1982,14 +1985,7 @@ const StaffMyRegistrations = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '0.5rem',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#b91c1c';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#dc2626';
+                      gap: '0.5rem'
                     }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
@@ -1999,8 +1995,8 @@ const StaffMyRegistrations = () => {
                   </button>
                 </div>
               )}
-            </div>
-          </div>
+      </div>
+    </div>
         </div>
       )}
 
@@ -2044,8 +2040,7 @@ const StaffMyRegistrations = () => {
               fontSize: '0.875rem',
               marginBottom: '1.5rem'
             }}>
-              Are you sure you want to cancel your registration for <strong>{cancelRegistrationData.eventTitle}</strong>?
-              {cancelRegistrationData.paid && ' The refund will be added to your wallet.'}
+              Are you sure you want to cancel your registration for <strong>{cancelRegistrationData.eventTitle}</strong>? The refund will be added to your wallet.
             </p>
             <div style={{
               display: 'flex',
@@ -2230,96 +2225,7 @@ const StaffMyRegistrations = () => {
         </div>
       )}
 
-      {/* Payment Success Modal */}
-      {showPaymentSuccess && (
-        <div
-          onClick={() => setShowPaymentSuccess(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem'
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '0.75rem',
-              maxWidth: '500px',
-              width: '100%',
-              padding: '3rem 2rem',
-              textAlign: 'center',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-            }}
-          >
-            <div style={{
-              width: '4rem',
-              height: '4rem',
-              borderRadius: '50%',
-              backgroundColor: '#d1fae5',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1.5rem',
-              fontSize: '2rem'
-            }}>
-              ✅
-            </div>
-            <h3 style={{
-              color: '#1D3557',
-              fontSize: '1.5rem',
-              fontWeight: '600',
-              marginBottom: '1rem',
-              marginTop: 0
-            }}>
-              Registration Successful!
-            </h3>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '0.875rem',
-              marginBottom: '0.5rem'
-            }}>
-              You have been successfully registered for <strong style={{ color: '#1D3557' }}>{sessionStorage.getItem('paymentSuccessEventTitle') || 'the event'}</strong>
-            </p>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '0.875rem',
-              marginBottom: '1.5rem'
-            }}>
-              A payment confirmation email has been sent to <strong style={{ color: '#1D3557' }}>{user?.email}</strong>
-            </p>
-            <button
-              onClick={() => setShowPaymentSuccess(false)}
-              style={{
-                padding: '0.75rem 2rem',
-                borderRadius: '0.5rem',
-                backgroundColor: '#1e40af',
-                color: '#FFFFFF',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#1e3a8a';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = '#1e40af';
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Ratings & Comments Modal */}
+      {/* View All Ratings and Comments Modal */}
       {showRatingsCommentsModal && selectedEventForView && (
         <div
           onClick={() => {
@@ -2364,28 +2270,21 @@ const StaffMyRegistrations = () => {
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
-              <div>
-                <h2 style={{
-                  color: '#1D3557',
-                  fontSize: '1.5rem',
-                  fontWeight: '700',
-                  margin: 0
-                }}>
-                  Ratings & Comments
-                </h2>
-                {selectedEventForView?.eventTitle && (
-                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
-                    {selectedEventForView.eventTitle}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => {
-                  setShowRatingsCommentsModal(false);
-                  setSelectedEventForView(null);
-                  setRatingsAndComments(null);
-                  resetModalState();
-                }}
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                margin: 0
+              }}>
+                Ratings & Comments
+              </h2>
+                <button
+                 onClick={() => {
+                   setShowRatingsCommentsModal(false);
+                   setSelectedEventForView(null);
+                   setRatingsAndComments(null);
+                   resetModalState();
+                 }}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -2410,7 +2309,7 @@ const StaffMyRegistrations = () => {
               </button>
             </div>
 
-            <div
+            <div 
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               style={{
@@ -2431,6 +2330,7 @@ const StaffMyRegistrations = () => {
                 </div>
               ) : ratingsAndComments ? (
                 <>
+                  {/* Ratings Section */}
                   {ratingsAndComments.ratings && (
                     <div style={{
                       marginBottom: '2rem',
@@ -2537,17 +2437,47 @@ const StaffMyRegistrations = () => {
                     </div>
                   )}
 
+                  {/* Rate/Comment Forms - ONLY for Past Events in My Registrations */}
                   {selectedEventForView && (() => {
-                    const eventDate = selectedEventForView.eventDate || selectedEventForView.registration?.eventDate;
-                    const eventEndDate = selectedEventForView.eventEndDate || selectedEventForView.registration?.eventEndDate;
-                    const finalEventDate = eventDate;
-                    const finalEventEndDate = eventEndDate;
+                    // Get dates - registration object has eventDate and eventEndDate directly
+                    const eventDate = selectedEventForView.eventDate;
+                    const eventEndDate = selectedEventForView.eventEndDate;
+                    
+                    // If no dates in selectedEventForView, try registration object
+                    const regDate = selectedEventForView.registration?.eventDate;
+                    const regEndDate = selectedEventForView.registration?.eventEndDate;
+                    
+                    const finalEventDate = eventDate || regDate;
+                    const finalEventEndDate = eventEndDate || regEndDate;
+                    
+                    // Check if event is past
                     const isPast = hasEventPassed(finalEventDate, finalEventEndDate);
-                    const isPastType = isMarkedAsPastEvent(selectedEventForView.registration);
-                    if (!finalEventDate && !finalEventEndDate && !isPastType) return false;
+                    const isPastType = isMarkedAsPastEvent(selectedEventForView?.eventType || selectedEventForView?.registration);
+                    
+                    // Debug logging
+                    console.log('🔍 Forms visibility check:', {
+                      selectedEventForView,
+                      eventDate,
+                      eventEndDate,
+                      regDate,
+                      regEndDate,
+                      finalEventDate,
+                      finalEventEndDate,
+                      registration: selectedEventForView.registration,
+                      isPast,
+                      now: new Date()
+                    });
+                    
+                    // If we can't determine dates, don't show forms (be safe)
+                    if (!finalEventDate && !finalEventEndDate && !isPastType) {
+                      console.warn('⚠️ No dates found, hiding forms');
+                      return false;
+                    }
+                    
                     return isPast || isPastType;
                   })() && (
-                    <div
+                    <div 
+                      ref={ratingSectionRef}
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                       style={{
@@ -2567,9 +2497,9 @@ const StaffMyRegistrations = () => {
                         marginBottom: '1rem',
                         marginTop: 0
                       }}>
-                        Share Your Feedback
+                        Rate & Comment
                       </h3>
-
+                      
                       {modalError && (
                         <div style={{
                           padding: '0.75rem',
@@ -2582,7 +2512,7 @@ const StaffMyRegistrations = () => {
                           {modalError}
                         </div>
                       )}
-
+                      
                       {modalSuccess && (
                         <div style={{
                           padding: '0.75rem',
@@ -2595,8 +2525,9 @@ const StaffMyRegistrations = () => {
                           {modalSuccess}
                         </div>
                       )}
-
-                      <div ref={ratingSectionRef} style={{ marginBottom: '1.5rem' }}>
+                      
+                      {/* Rating Section */}
+                      <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{
                           display: 'block',
                           fontSize: '0.875rem',
@@ -2608,6 +2539,7 @@ const StaffMyRegistrations = () => {
                         </label>
                         <div style={{
                           display: 'flex',
+                          justifyContent: 'flex-start',
                           gap: '0.5rem',
                           marginBottom: '0.75rem'
                         }}>
@@ -2615,9 +2547,19 @@ const StaffMyRegistrations = () => {
                             <button
                               key={star}
                               type="button"
-                              onClick={() => setRating(star)}
-                              onMouseEnter={() => setHoveredRating(star)}
-                              onMouseLeave={() => setHoveredRating(0)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                setRating(star);
+                              }}
+                              onMouseEnter={(e) => {
+                                e.stopPropagation();
+                                setHoveredRating(star);
+                              }}
+                              onMouseLeave={(e) => {
+                                e.stopPropagation();
+                                setHoveredRating(0);
+                              }}
                               style={{
                                 background: 'none',
                                 border: 'none',
@@ -2626,7 +2568,9 @@ const StaffMyRegistrations = () => {
                                 fontSize: '2rem',
                                 color: (hoveredRating >= star || rating >= star) ? '#fbbf24' : '#d1d5db',
                                 transition: 'all 0.2s',
-                                lineHeight: 1
+                                lineHeight: 1,
+                                zIndex: 10,
+                                position: 'relative'
                               }}
                             >
                               ★
@@ -2636,7 +2580,48 @@ const StaffMyRegistrations = () => {
                         {rating > 0 && (
                           <button
                             type="button"
-                            onClick={handleSubmitRating}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              if (rating > 0 && selectedEventForView?.eventId) {
+                                try {
+                                  const eventId = String(selectedEventForView.eventId);
+                                  console.log('🚀 Submitting rating:', { eventId, rating, selectedEventForView });
+                                  setError(''); // Clear previous errors
+                                  const result = await eventsApiService.submitRating(eventId, rating);
+                                  console.log('📊 Rating submission result:', result);
+                                  if (result.success) {
+                                    setRating(0);
+                                    setHoveredRating(0);
+                                    setError('');
+                                    // Reload ratings and comments
+                                    await loadRatingsAndComments(eventId);
+                                    // Update event ratings
+                                    const ratingResult = await eventsApiService.getRatingsAndComments(eventId);
+                                    if (ratingResult.success && ratingResult.data?.ratings) {
+                                      setEventRatings(prev => ({
+                                        ...prev,
+                                        [eventId]: {
+                                          average: ratingResult.data.ratings.average || 0,
+                                          count: ratingResult.data.ratings.count || 0
+                                        }
+                                      }));
+                                    }
+                                  } else {
+                                    const errorMsg = result.message || result.error?.message || result.error?.msg || 'Failed to submit rating';
+                                    console.error('❌ Rating submission failed:', errorMsg, result);
+                                    setError(errorMsg);
+                                  }
+                                } catch (err) {
+                                  console.error('❌ Error submitting rating:', err);
+                                  const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting rating';
+                                  setError(errorMsg);
+                                }
+                              } else {
+                                console.warn('⚠️ Cannot submit rating:', { rating, eventId: selectedEventForView?.eventId });
+                                setError('Please select a rating and ensure event is selected');
+                              }
+                            }}
                             style={{
                               padding: '0.5rem 1rem',
                               borderRadius: '0.5rem',
@@ -2646,7 +2631,9 @@ const StaffMyRegistrations = () => {
                               cursor: 'pointer',
                               fontSize: '0.875rem',
                               fontWeight: '600',
-                              transition: 'all 0.2s'
+                              transition: 'all 0.2s',
+                              zIndex: 10,
+                              position: 'relative'
                             }}
                             onMouseEnter={(e) => {
                               e.stopPropagation();
@@ -2662,6 +2649,7 @@ const StaffMyRegistrations = () => {
                         )}
                       </div>
 
+                      {/* Comment Section */}
                       <div ref={commentSectionRef}>
                         <label style={{
                           display: 'block',
@@ -2674,7 +2662,23 @@ const StaffMyRegistrations = () => {
                         </label>
                         <textarea
                           value={commentText}
-                          onChange={(e) => setCommentText(e.target.value)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setCommentText(e.target.value);
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onFocus={(e) => {
+                            e.stopPropagation();
+                            e.target.style.borderColor = '#1e40af';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.stopPropagation();
+                            e.target.style.borderColor = '#e5e7eb';
+                            e.target.style.boxShadow = 'none';
+                          }}
                           placeholder="Share your thoughts about this event..."
                           maxLength={1000}
                           style={{
@@ -2688,57 +2692,91 @@ const StaffMyRegistrations = () => {
                             resize: 'vertical',
                             marginBottom: '0.5rem',
                             outline: 'none',
-                            transition: 'all 0.2s'
-                          }}
-                          onFocus={(e) => {
-                            e.target.style.borderColor = '#1e40af';
-                            e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.borderColor = '#e5e7eb';
-                            e.target.style.boxShadow = 'none';
+                            transition: 'all 0.2s',
+                            zIndex: 10,
+                            position: 'relative',
+                            pointerEvents: 'auto'
                           }}
                         />
                         <div style={{
-                          fontSize: '0.75rem',
-                          color: '#6b7280',
-                          textAlign: 'right',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
                           marginBottom: '0.75rem'
                         }}>
-                          {commentText.length}/1000 characters
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280'
+                          }}>
+                            {commentText.length}/1000 characters
+                          </div>
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              if (commentText.trim() && selectedEventForView?.eventId) {
+                                try {
+                                  const eventId = String(selectedEventForView.eventId);
+                                  console.log('🚀 Submitting comment:', { eventId, commentLength: commentText.trim().length, selectedEventForView });
+                                  setError(''); // Clear previous errors
+                                  const result = await eventsApiService.submitComment(eventId, commentText.trim());
+                                  console.log('📊 Comment submission result:', result);
+                                  if (result.success) {
+                                    setCommentText('');
+                                    setError('');
+                                    // Reload ratings and comments
+                                    await loadRatingsAndComments(eventId);
+                                  } else {
+                                    const errorMsg = result.message || result.error?.message || result.error?.msg || 'Failed to submit comment';
+                                    console.error('❌ Comment submission failed:', errorMsg, result);
+                                    setError(errorMsg);
+                                  }
+                                } catch (err) {
+                                  console.error('❌ Error submitting comment:', err);
+                                  const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting comment';
+                                  setError(errorMsg);
+                                }
+                              } else {
+                                console.warn('⚠️ Cannot submit comment:', { hasText: !!commentText.trim(), eventId: selectedEventForView?.eventId });
+                                setError('Please enter a comment and ensure event is selected');
+                              }
+                            }}
+                            disabled={!commentText.trim()}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              transition: 'all 0.2s',
+                              zIndex: 10,
+                              position: 'relative'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.stopPropagation();
+                              if (commentText.trim()) {
+                                e.target.style.backgroundColor = '#1e3a8a';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.stopPropagation();
+                              if (commentText.trim()) {
+                                e.target.style.backgroundColor = '#1e40af';
+                              }
+                            }}
+                          >
+                            Submit Comment
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleSubmitComment}
-                          disabled={!commentText.trim()}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            borderRadius: '0.5rem',
-                            backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            if (commentText.trim()) {
-                              e.target.style.backgroundColor = '#1e3a8a';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (commentText.trim()) {
-                              e.target.style.backgroundColor = '#1e40af';
-                            }
-                          }}
-                        >
-                          Submit Comment
-                        </button>
                       </div>
                     </div>
                   )}
 
+                  {/* Comments Section */}
                   <div>
                     <h3 style={{
                       color: '#1D3557',
@@ -2755,54 +2793,131 @@ const StaffMyRegistrations = () => {
                         flexDirection: 'column',
                         gap: '1rem'
                       }}>
-                        {ratingsAndComments.comments.map((comment) => (
-                          <div
-                            key={comment._id}
-                            style={{
-                              padding: '1rem',
-                              backgroundColor: '#f9fafb',
-                              borderRadius: '0.5rem',
-                              border: '1px solid #e5e7eb'
-                            }}
-                          >
-                            <div style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'flex-start',
-                              marginBottom: '0.5rem'
-                            }}>
-                              <div>
-                                <div style={{
-                                  fontWeight: '600',
-                                  color: '#1D3557',
-                                  fontSize: '0.875rem'
-                                }}>
-                                  {comment.user?.firstName} {comment.user?.lastName}
-                                </div>
-                                <div style={{
-                                  fontSize: '0.75rem',
-                                  color: '#6b7280'
-                                }}>
-                                  {comment.user?.userType || 'User'}
-                                </div>
-                              </div>
+                        {ratingsAndComments.comments.map((comment) => {
+                          const isOwnComment = user && (
+                            comment.user?._id === user._id || 
+                            comment.user?._id?.toString() === user._id?.toString() ||
+                            comment.user?.email?.toLowerCase() === user.email?.toLowerCase()
+                          );
+                          
+                          return (
+                            <div
+                              key={comment._id}
+                              style={{
+                                padding: '1rem',
+                                backgroundColor: '#f9fafb',
+                                borderRadius: '0.5rem',
+                                border: '1px solid #e5e7eb',
+                                position: 'relative'
+                              }}
+                            >
                               <div style={{
-                                fontSize: '0.75rem',
-                                color: '#6b7280'
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'flex-start',
+                                marginBottom: '0.5rem'
                               }}>
-                                {formatDate(comment.createdAt)}
+                                <div>
+                                  <div style={{
+                                    fontWeight: '600',
+                                    color: '#1D3557',
+                                    fontSize: '0.875rem'
+                                  }}>
+                                    {comment.user?.firstName} {comment.user?.lastName}
+                                  </div>
+                                  <div style={{
+                                    fontSize: '0.75rem',
+                                    color: '#6b7280'
+                                  }}>
+                                    {comment.user?.userType || 'User'}
+                                  </div>
+                                </div>
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem'
+                                }}>
+                                  <div style={{
+                                    fontSize: '0.75rem',
+                                    color: '#6b7280'
+                                  }}>
+                                    {formatDate(comment.createdAt)}
+                                  </div>
+                                  {isOwnComment && (
+                                    <button
+                                      type="button"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        if (window.confirm('Are you sure you want to delete this comment?')) {
+                                          try {
+                                            const eventId = String(selectedEventForView.eventId);
+                                            const result = await eventsApiService.deleteComment(
+                                              eventId,
+                                              comment._id
+                                            );
+                                            if (result.success) {
+                                              setError(''); // Clear any previous errors
+                                              // Reload ratings and comments
+                                              await loadRatingsAndComments(eventId);
+                                            } else {
+                                              setError(result.message || result.error?.message || 'Failed to delete comment');
+                                            }
+                                          } catch (err) {
+                                            console.error('Error deleting comment:', err);
+                                            setError(err.response?.data?.message || err.message || 'Error deleting comment');
+                                          }
+                                        }
+                                      }}
+                                      style={{
+                                        padding: '0.25rem 0.5rem',
+                                        borderRadius: '0.375rem',
+                                        backgroundColor: 'transparent',
+                                        border: '1px solid #ef4444',
+                                        color: '#ef4444',
+                                        cursor: 'pointer',
+                                        fontSize: '0.75rem',
+                                        fontWeight: '600',
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem'
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.stopPropagation();
+                                        e.target.style.backgroundColor = '#fee2e2';
+                                        e.target.style.borderColor = '#dc2626';
+                                        e.target.style.color = '#dc2626';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.stopPropagation();
+                                        e.target.style.backgroundColor = 'transparent';
+                                        e.target.style.borderColor = '#ef4444';
+                                        e.target.style.color = '#ef4444';
+                                      }}
+                                      title="Delete comment"
+                                    >
+                                      <span className="material-symbols-outlined" style={{
+                                        fontSize: '0.875rem'
+                                      }}>
+                                        delete
+                                      </span>
+                                      Delete
+                                    </button>
+                                  )}
+                                </div>
                               </div>
+                              <p style={{
+                                color: '#374151',
+                                fontSize: '0.875rem',
+                                lineHeight: '1.6',
+                                margin: 0
+                              }}>
+                                {comment.text}
+                              </p>
                             </div>
-                            <p style={{
-                              color: '#374151',
-                              fontSize: '0.875rem',
-                              lineHeight: '1.6',
-                              margin: 0
-                            }}>
-                              {comment.text}
-                            </p>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <p style={{
@@ -2835,4 +2950,4 @@ const StaffMyRegistrations = () => {
   );
 };
 
-export default StaffMyRegistrations;
+export default TAMyRegistrations;

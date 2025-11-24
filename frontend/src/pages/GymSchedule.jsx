@@ -55,6 +55,13 @@ const GymSchedule = () => {
     return '/event-office';
   };
 
+  const getLoyaltyRoute = () => {
+    if (user?.userType === 'TA' || user?.userType === 'Staff') return '/staff/loyalty-vendors';
+    if (user?.userType === 'Professor') return '/professor/loyalty-vendors';
+    if (user?.userType === 'Student') return '/student/loyalty-vendors';
+    return '/event-office/loyalty-program-vendors';
+  };
+
   const getDashboardRoute = () => {
     return '/dashboard';
   };
@@ -79,9 +86,7 @@ const GymSchedule = () => {
   // User type checks
   const isEventsOffice = !user?.userType || (user.userType !== 'TA' && user.userType !== 'Staff' && user.userType !== 'Professor' && user.userType !== 'Student');
   const isProfessor = user?.userType === 'Professor';
-  const showSidebar = isEventsOffice;
-  const useFixedHeader = showSidebar;
-  const showHorizontalMenu = !isEventsOffice && (user?.userType === 'Student' || user?.userType === 'Staff' || user?.userType === 'TA' || user?.userType === 'Professor');
+  const showHorizontalMenu = user?.userType === 'Student' || user?.userType === 'Staff' || user?.userType === 'TA';
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -114,9 +119,9 @@ const GymSchedule = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLogoutDropdown, showNotificationsDropdown]);
 
-  // Load notifications (for professors)
+  // Load notifications (for staff and professors)
   const loadNotifications = useCallback(async () => {
-    if (user?.userType !== 'Professor') return;
+    if (!user?.userType || (user.userType !== 'Professor' && user.userType !== 'Staff' && user.userType !== 'TA')) return;
     try {
       setLoadingNotifications(true);
       const [notificationsResult, countResult] = await Promise.all([
@@ -138,9 +143,9 @@ const GymSchedule = () => {
     }
   }, [user]);
 
-  // Load notifications on mount and poll for updates (for professors)
+  // Load notifications on mount and poll for updates (for staff/professors)
   useEffect(() => {
-    if (user?.userType === 'Professor') {
+    if (user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA') {
       loadNotifications();
       const interval = setInterval(() => {
         loadNotifications();
@@ -395,7 +400,6 @@ const GymSchedule = () => {
       backgroundColor: '#f6f7f8'
     }}>
       {/* Left Sidebar */}
-      {showSidebar && (
       <aside style={{
         width: sidebarOpen ? '16rem' : '0',
         flexShrink: 0,
@@ -777,10 +781,10 @@ const GymSchedule = () => {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <header style={{
-        position: useFixedHeader ? 'fixed' : 'relative',
-        top: useFixedHeader ? 0 : 'auto',
-        left: useFixedHeader ? (showSidebar ? (sidebarOpen ? '16rem' : '0') : '0') : 'auto',
-        right: useFixedHeader ? 0 : 'auto',
+        position: 'fixed',
+        top: 0,
+        left: sidebarOpen ? '16rem' : '0',
+        right: 0,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -791,26 +795,24 @@ const GymSchedule = () => {
         transition: useFixedHeader ? 'left 0.3s ease' : 'none'
       }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            {showSidebar && (
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '0.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#1D3557'
-                }}
-                aria-label="Toggle sidebar"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-                  menu
-                </span>
-              </button>
-            )}
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#1D3557'
+              }}
+              aria-label="Toggle sidebar"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                menu
+              </span>
+            </button>
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
@@ -822,8 +824,8 @@ const GymSchedule = () => {
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
-            {/* Notifications Bell - Only for Professors */}
-            {isProfessor && (
+            {/* Notifications Bell */}
+            {canSeeNotifications && (
               <div style={{ position: 'relative' }} data-notifications-dropdown>
                 <button
                   onClick={() => {
@@ -965,24 +967,24 @@ const GymSchedule = () => {
                                 handleMarkAsRead(notification._id);
                               }
                               if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
-                            navigate(`/professor/all-events`);
-                            setShowNotificationsDropdown(false);
-                          } else if (
-                            (notification.type === 'event_reminder' || 
-                             notification.type === 'workshop_reminder' || 
-                             notification.type === 'trip_reminder' ||
-                             notification.type === 'gym_session_reminder') && 
-                            (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
-                          ) {
-                            navigate(`/professor/events`);
-                            setShowNotificationsDropdown(false);
-                          } else if (
+                                navigate(getEventsRoute());
+                                setShowNotificationsDropdown(false);
+                              } else if (
+                                (notification.type === 'event_reminder' || 
+                                 notification.type === 'workshop_reminder' || 
+                                 notification.type === 'trip_reminder' ||
+                                 notification.type === 'gym_session_reminder') && 
+                                (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                              ) {
+                                navigate(getMyEventsRoute());
+                                setShowNotificationsDropdown(false);
+                              } else if (
                             notification.type === 'new_loyalty_partner' || 
                             notification.type === 'loyalty_partner_added' ||
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
                             // Navigate to Loyalty Partners page
-                            navigate(`/professor/loyalty-vendors`);
+                            navigate(getLoyaltyRoute());
                             setShowNotificationsDropdown(false);
                           }
                         }}
@@ -1226,62 +1228,96 @@ const GymSchedule = () => {
             >
               Dashboard
             </Link>
-            {user?.userType === 'Professor' ? (
-              <>
-                <Link
-                  to="/professor/all-events"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  Discover Events
-                </Link>
-                <Link
-                  to="/professor/events"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  My Events
-                </Link>
-                <Link
-                  to="/professor/my-workshops"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  My Workshops
-                </Link>
-                <Link
-                  to="/professor/favorites"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/professor/favorites') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/professor/favorites') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/professor/favorites') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  My Favorites
-                </Link>
-              </>
-            ) : (user?.userType === 'TA' || user?.userType === 'Staff') ? (
+            <Link
+              to="/professor/all-events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              Discover Events
+            </Link>
+            <Link
+              to="/professor/events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              My Events
+            </Link>
+            <Link
+              to="/professor/my-workshops"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              My Workshops
+            </Link>
+            <Link
+              to="/professor/gym-schedule"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              View Gym Sessions
+            </Link>
+          </div>
+        </nav>
+      )}
+
+      {/* Main Content */}
+      <main style={{
+        marginLeft: sidebarOpen ? '16rem' : '0',
+        marginTop: '73px',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        transition: 'margin-left 0.3s ease'
+      }}>
+        {/* Horizontal Menu Bar - Show for Students, Staff, and TA */}
+        {showHorizontalMenu && (
+          <nav style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '1rem 2rem',
+            backgroundColor: '#FFFFFF',
+            borderBottom: '1px solid #e2e8f0'
+          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <Link
+              to="/dashboard"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              Dashboard
+            </Link>
+            {(user?.userType === 'TA' || user?.userType === 'Staff') ? (
               <>
                 <Link
                   to="/staff/events"
