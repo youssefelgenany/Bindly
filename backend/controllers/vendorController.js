@@ -239,7 +239,19 @@ module.exports.applyToEvent = async (req, res) => {
     }
 
     const vendorId = req.user._id || req.user.id;
-    const { eventId, attendees, boothSize, durationWeeks, boothLocation, message, eventType, isStandalone } = req.body;
+    const { eventId, attendees: rawAttendees, boothSize, durationWeeks, boothLocation, message, eventType, isStandalone } = req.body;
+
+    // Parse attendees when sent as JSON string (multipart/form-data) or ensure it's an array
+    let attendees = rawAttendees;
+    if (typeof attendees === 'string') {
+      try {
+        attendees = JSON.parse(attendees);
+      } catch (e) {
+        // If parse fails, fallback to empty array
+        attendees = [];
+      }
+    }
+    if (!Array.isArray(attendees)) attendees = [];
 
     // Validate vendor role
     const vendor = await User.findById(vendorId);
@@ -316,6 +328,10 @@ module.exports.applyToEvent = async (req, res) => {
       // Update existing application instead of rejecting duplicates
       existingRequest.attendees = attendees;
       existingRequest.boothSize = boothSize;
+      // Handle uploaded attendee IDs files (multiple)
+      if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        existingRequest.individualIdsPaths = req.files.map(f => '/uploads/' + f.filename);
+      }
       if (eventType === 'booth' || eventType === 'standaloneBooth') {
         existingRequest.durationWeeks = durationWeeks;
         if (eventType === 'booth') {
@@ -338,6 +354,11 @@ module.exports.applyToEvent = async (req, res) => {
       eventName: event.title || event.name,
       eventType: eventType, // Use the eventType from the request, not the event's type
     };
+
+    // If attendee IDs files were uploaded, include their paths
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      requestData.individualIdsPaths = req.files.map(f => '/uploads/' + f.filename);
+    }
 
     // Set the correct reference field based on event type and source
     if (event.type === 'bazaar') {
@@ -530,6 +551,8 @@ module.exports.getMyRequests = async (req, res) => {
             type: 'bazaar',
             requestId: r._id,
             status: r.status,
+            paymentStatus: r.paymentStatus || 'pending',
+            paidAt: r.paidAt || null,
             attendees: r.attendees || [],
             boothSize: r.boothSize || undefined
           }));
@@ -551,6 +574,8 @@ module.exports.getMyRequests = async (req, res) => {
             type: r.eventType || 'booth',
             requestId: r._id,
             status: r.status,
+            paymentStatus: r.paymentStatus || 'pending',
+            paidAt: r.paidAt || null,
             attendees: r.attendees || [],
             durationWeeks: r.durationWeeks || undefined,
             boothLocation: r.boothLocation || undefined
@@ -579,6 +604,8 @@ module.exports.getMyRequests = async (req, res) => {
         eventType: 'platformBooth',
         requestId: r._id,
         status: r.status,
+        paymentStatus: r.paymentStatus || 'pending',
+        paidAt: r.paidAt || null,
         attendees: r.attendees || [],
         boothSize: r.boothSize || undefined,
         durationWeeks: r.durationWeeks || undefined,

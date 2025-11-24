@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
     const [formData, setFormData] = useState({
         attendees: [{ name: '', email: '' }],
+        attendeeFiles: [null],
         boothSize: ''
     });
     const [submitting, setSubmitting] = useState(false);
@@ -15,12 +16,17 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
 
     const addAttendee = () => {
         if (formData.attendees.length >= 5) return;
-        setFormData({ ...formData, attendees: [...formData.attendees, { name: '', email: '' }] });
+        setFormData({
+            ...formData,
+            attendees: [...formData.attendees, { name: '', email: '' }],
+            attendeeFiles: [...(formData.attendeeFiles || []), null]
+        });
     };
 
     const removeAttendee = (idx) => {
         const next = formData.attendees.filter((_, i) => i !== idx);
-        setFormData({ ...formData, attendees: next.length ? next : [{ name: '', email: '' }] });
+        const nextFiles = (formData.attendeeFiles || []).filter((_, i) => i !== idx);
+        setFormData({ ...formData, attendees: next.length ? next : [{ name: '', email: '' }], attendeeFiles: nextFiles.length ? nextFiles : [null] });
     };
 
     const handleSubmit = async (e) => {
@@ -51,12 +57,31 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
 
         try {
             setSubmitting(true);
-            const result = await onSubmit({
-                eventType: booth.type === 'standaloneBooth' ? 'standaloneBooth' : 'bazaar',
-                eventId: booth._id,
-                attendees: cleanAttendees,
-                boothSize: formData.boothSize
-            });
+
+                // Build payload as FormData because per-attendee files are required (if provided)
+                let payload;
+                const files = formData.attendeeFiles || [];
+
+                // Ensure files are present for each attendee
+                const missingFileIndex = cleanAttendees.findIndex((_, i) => !files[i]);
+                if (missingFileIndex !== -1) {
+                    setSubmitMessage({ type: 'error', text: `Please upload an ID for attendee #${missingFileIndex + 1}.` });
+                    setSubmitting(false);
+                    return;
+                }
+
+                payload = new FormData();
+                payload.append('eventType', booth.type === 'standaloneBooth' ? 'standaloneBooth' : 'bazaar');
+                payload.append('eventId', booth._id);
+                payload.append('attendees', JSON.stringify(cleanAttendees));
+                payload.append('boothSize', formData.boothSize);
+
+                // Append each attendee file in the same order as attendees
+                files.slice(0, cleanAttendees.length).forEach((file) => {
+                    if (file) payload.append('individualIds', file);
+                });
+
+            const result = await onSubmit(payload);
 
             const successText = result?.message || 'Booth application submitted successfully!';
             setSubmitMessage({ type: 'success', text: successText });
@@ -64,6 +89,7 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
             // Reset form
             setFormData({
                 attendees: [{ name: '', email: '' }],
+                attendeeFiles: [null],
                 boothSize: ''
             });
 
@@ -80,6 +106,13 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const handleFileChange = (e, idx) => {
+        const file = e.target.files && e.target.files[0];
+        const nextFiles = [...(formData.attendeeFiles || [])];
+        nextFiles[idx] = file || null;
+        setFormData(prev => ({ ...prev, attendeeFiles: nextFiles }));
     };
 
     return (
@@ -243,13 +276,13 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
                                 color: '#111827',
                                 marginBottom: '1rem'
                             }}>
-                                Names and Emails of Attendees (Maximum 5) <span style={{ color: '#ef4444' }}>*</span>
+                                Names, Emails and IDs of Attendees (Maximum 5) <span style={{ color: '#ef4444' }}>*</span>
                             </h4>
                             
                             {formData.attendees.map((attendee, idx) => (
                                 <div key={idx} style={{
                                     display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr auto',
+                                    gridTemplateColumns: '1fr 1fr 1fr auto',
                                     gap: '0.75rem',
                                     marginBottom: '0.75rem',
                                     alignItems: 'end'
@@ -308,6 +341,31 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
                                             required
                                         />
                                     </div>
+                                        <div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*,application/pdf"
+                                                    onChange={(e) => handleFileChange(e, idx)}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '0.5rem',
+                                                        border: '1px solid #e5e7eb',
+                                                        borderRadius: '0.5rem',
+                                                        fontSize: '0.875rem',
+                                                        backgroundColor: '#f3f4f6'
+                                                    }}
+                                                    required
+                                                    aria-label={`Attendee ${idx + 1} ID file`}
+                                                />
+                                                <span style={{ color: '#6b7280', fontSize: '0.8125rem' }}>(select ID file)</span>
+                                            </div>
+                                            {formData.attendeeFiles && formData.attendeeFiles[idx] && (
+                                                <div style={{ marginTop: '0.25rem', color: '#374151', fontSize: '0.75rem' }}>
+                                                    {formData.attendeeFiles[idx].name}
+                                                </div>
+                                            )}
+                                        </div>
                                     {formData.attendees.length > 1 && (
                                         <button
                                             type="button"
@@ -393,6 +451,8 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
                                 <option value="4x4">4x4 meters (Large Booth)</option>
                             </select>
                         </div>
+
+                        {/* Individual IDs are uploaded per-attendee next to each attendee row */}
 
                         {/* Submit Message */}
                         {submitMessage.text && (

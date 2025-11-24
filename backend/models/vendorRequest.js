@@ -65,10 +65,10 @@ const vendorRequestSchema = new mongoose.Schema({
   message: {
     type: String,
   },
-  // Path to uploaded individual IDs document (PDF or image)
-  individualIdsPath: {
-    type: String,
-    default: null
+  // Paths to uploaded individual IDs documents (one per attendee)
+  individualIdsPaths: {
+    type: [String],
+    default: []
   },
   // Payment information
   participationFee: {

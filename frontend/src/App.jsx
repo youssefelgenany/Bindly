@@ -58,6 +58,7 @@ import EventsOfficeLoyaltyProgramVendors from './pages/EventsOfficeLoyaltyProgra
 import VendorAcceptedEvents from './pages/VendorAcceptedEvents';
 import VendorMyRequests from './pages/VendorMyRequests';
 import PlatformBoothRequests from './pages/PlatformBoothRequests';
+import VendorLoyaltyProgram from './pages/VendorLoyaltyProgram';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -373,6 +374,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <VendorMyRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vendor/loyalty-program"
+              element={
+                <ProtectedRoute>
+                  <VendorLoyaltyProgram />
                 </ProtectedRoute>
               }
             />
