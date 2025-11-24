@@ -175,8 +175,13 @@ exports.registerStudentForEvent = async (req, res) => {
     // Only send verification email if user is not already verified
     if (!user.isVerified) {
       // Use the existing email sending infrastructure
-      const apiBase = process.env.API_BASE_URL || process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
-      const verifyUrl = `${apiBase}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+      const apiBase =
+        process.env.VERIFICATION_BASE_URL ||
+        process.env.PUBLIC_BACKEND_URL ||
+        process.env.BACKEND_URL ||
+        process.env.API_BASE_URL ||
+        `http://localhost:${process.env.PORT || 5000}`;
+      const verifyUrl = `${apiBase.replace(/\/+$/, '')}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const loginUrl = `${frontendUrl}/login`;
       
