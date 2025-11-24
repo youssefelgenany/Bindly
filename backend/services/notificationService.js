@@ -252,7 +252,6 @@ exports.getUserNotifications = async (userId, options = {}) => {
     .sort({ createdAt: -1 })
     .limit(limit)
     .skip(skip)
-    .populate('relatedWorkshop', 'workshopName startDate location')
     .populate('relatedEvent', 'title startDate location')
     .populate('relatedGymSession', 'name startDate');
   
