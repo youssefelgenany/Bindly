@@ -5,6 +5,21 @@ import { eventsApiService } from '../api/eventsApi';
 import { notificationApiService } from '../api/notificationApi';
 import { useAuth } from '../contexts/AuthContext';
 
+const getDisplayStatus = (status) => {
+  const normalized = status?.toLowerCase();
+  if (normalized === 'approved' || normalized === 'registered') return 'REGISTERED';
+  if (normalized === 'pending') return 'PENDING';
+  if (normalized === 'rejected') return 'REJECTED';
+  return status ? status.toUpperCase() : 'STATUS';
+};
+
+const canStudentCancel = (registration) => {
+  if (!registration) return false;
+  if (!registration.paid) return false;
+  if (!registration.eventDate) return false;
+  return new Date(registration.eventDate) > new Date();
+};
+
 const StudentMyRegistrations = () => {
   const { user, logout, refreshUser } = useAuth();
   const location = useLocation();
@@ -1223,19 +1238,45 @@ const StudentMyRegistrations = () => {
                         }}>
                           {registration.eventType}
                         </div>
-                        <div style={{
-                          padding: '0.375rem 0.875rem',
-                          borderRadius: '0.5rem',
-                          backgroundColor: getStatusColor(registration.status),
-                          color: '#FFFFFF',
-                          fontSize: '0.6875rem',
-                          fontWeight: '700',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
-                          {registration.status}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!canStudentCancel(registration)) {
+                              setSelectedRegistration(registration);
+                              return;
+                            }
+                            setCancelRegistrationData({
+                              eventId: registration.eventId,
+                              eventTitle: registration.eventTitle,
+                              paid: registration.paid
+                            });
+                            setShowCancelModal(true);
+                          }}
+                          style={{
+                            padding: '0.375rem 0.875rem',
+                            borderRadius: '0.5rem',
+                            border: 'none',
+                            backgroundColor: getStatusColor(registration.status),
+                            color: '#FFFFFF',
+                            fontSize: '0.6875rem',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            cursor: canStudentCancel(registration) ? 'pointer' : 'default',
+                            boxShadow: canStudentCancel(registration) ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                          }}
+                          title={canStudentCancel(registration) ? 'Tap to cancel & refund to wallet' : ''}
+                        >
+                          {getDisplayStatus(registration.status)}
+                        </button>
                       </div>
+                      {canStudentCancel(registration) && (
+                        <div style={{ marginTop: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#dc2626', fontWeight: '600' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>info</span>
+                          Tap “Registered” to cancel & refund
+                        </div>
+                      )}
 
                       <h3 style={{
                         color: '#1D3557',

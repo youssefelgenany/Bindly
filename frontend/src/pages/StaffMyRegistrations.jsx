@@ -4,6 +4,21 @@ import { studentRegistrationApi } from '../api/studentRegistrationApi';
 import { eventsApiService } from '../api/eventsApi';
 import { useAuth } from '../contexts/AuthContext';
 
+const getDisplayStatus = (status) => {
+  const normalized = status?.toLowerCase();
+  if (normalized === 'approved' || normalized === 'registered') return 'REGISTERED';
+  if (normalized === 'pending') return 'PENDING';
+  if (normalized === 'rejected') return 'REJECTED';
+  return status ? status.toUpperCase() : 'STATUS';
+};
+
+const canStaffCancel = (registration) => {
+  if (!registration) return false;
+  if (!registration.paid) return false;
+  if (!registration.eventDate) return false;
+  return new Date(registration.eventDate) > new Date();
+};
+
 const StaffMyRegistrations = () => {
   const { user, logout, refreshUser } = useAuth();
   const location = useLocation();
@@ -887,42 +902,45 @@ const StaffMyRegistrations = () => {
                         }}>
                           {registration.eventType}
                         </div>
-                        <div
+                        <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (registration.status?.toLowerCase() === 'approved') {
-                              setCancelRegistrationData(registration);
-                              setShowCancelModal(true);
+                            if (!canStaffCancel(registration)) {
+                              setSelectedRegistration(registration);
+                              return;
                             }
+                            setCancelRegistrationData({
+                              eventId: registration.eventId,
+                              eventTitle: registration.eventTitle,
+                              paid: registration.paid
+                            });
+                            setShowCancelModal(true);
                           }}
                           style={{
                             padding: '0.375rem 0.875rem',
                             borderRadius: '0.5rem',
+                            border: 'none',
                             backgroundColor: getStatusColor(registration.status),
                             color: '#FFFFFF',
                             fontSize: '0.6875rem',
                             fontWeight: '700',
                             textTransform: 'uppercase',
                             letterSpacing: '0.05em',
-                            cursor: registration.status?.toLowerCase() === 'approved' ? 'pointer' : 'default',
-                            transition: registration.status?.toLowerCase() === 'approved' ? 'all 0.2s' : 'none'
+                            cursor: canStaffCancel(registration) ? 'pointer' : 'default',
+                            boxShadow: canStaffCancel(registration) ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
                           }}
-                          onMouseEnter={(e) => {
-                            if (registration.status?.toLowerCase() === 'approved') {
-                              e.target.style.opacity = '0.9';
-                              e.target.style.transform = 'scale(1.05)';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (registration.status?.toLowerCase() === 'approved') {
-                              e.target.style.opacity = '1';
-                              e.target.style.transform = 'scale(1)';
-                            }
-                          }}
+                          title={canStaffCancel(registration) ? 'Tap to cancel & refund to wallet' : ''}
                         >
                           {getDisplayStatus(registration.status)}
-                        </div>
+                        </button>
                       </div>
+                      {canStaffCancel(registration) && (
+                        <div style={{ marginTop: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#dc2626', fontWeight: '600' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>info</span>
+                          Tap “Registered” to cancel & refund
+                        </div>
+                      )}
 
                       <h3 style={{
                         color: '#1D3557',
