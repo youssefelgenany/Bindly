@@ -7,8 +7,15 @@ import { notificationApiService } from '../api/notificationApi';
 
 import { useAuth } from '../contexts/AuthContext';
 
+const canCancelRegistration = (registration) => {
+  if (!registration) return false;
+  if (!registration.paid) return false;
+  if (!registration.eventDate) return false;
+  return new Date(registration.eventDate) > new Date();
+};
+
 const ProfessorMyRegistrations = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
@@ -29,6 +36,15 @@ const ProfessorMyRegistrations = () => {
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [commentText, setCommentText] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelRegistrationData, setCancelRegistrationData] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [showCancelSuccess, setShowCancelSuccess] = useState(false);
+  const [cancelSuccessData, setCancelSuccessData] = useState({
+    eventTitle: '',
+    refunded: false,
+    refundAmount: 0
+  });
   const [modalError, setModalError] = useState('');
   const [modalSuccess, setModalSuccess] = useState('');
   const [modalFocus, setModalFocus] = useState(null);
@@ -52,6 +68,8 @@ const ProfessorMyRegistrations = () => {
     }
     setModalFocus(null);
   }, [showRatingsCommentsModal, modalFocus]);
+
+  const canCancelSelectedRegistration = canCancelRegistration(selectedRegistration);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -198,6 +216,8 @@ const ProfessorMyRegistrations = () => {
           eventDescription: reg.eventDescription || '',
           capacity: reg.capacity || null,
           registeredCount: reg.registeredCount || 0,
+          paid: reg.paid || false,
+          price: reg.price || reg.eventPrice || 0,
           studentName: reg.studentName || (user?.firstName && user?.lastName 
             ? `${user.firstName} ${user.lastName}` 
             : user?.name || 'Professor'),
@@ -207,7 +227,7 @@ const ProfessorMyRegistrations = () => {
           studentId: reg.studentId || user?.gucId || null,
           studentEmail: reg.studentEmail || user?.email || '',
           professorEmail: reg.studentEmail || user?.email || '',
-          status: reg.status || 'approved',
+          status: reg.status || reg.registrationStatus || 'registered',
           registeredAt: reg.registeredAt || new Date(),
           emergencyContact: reg.emergencyContact || null,
           dietaryRequirements: reg.dietaryRequirements || null,
@@ -337,7 +357,7 @@ const ProfessorMyRegistrations = () => {
     await loadRatingsAndComments(eventId);
   };
 
-  const formatDate = (dateString) => {
+const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -348,6 +368,7 @@ const ProfessorMyRegistrations = () => {
       minute: '2-digit'
     });
   };
+
 
   const getEventTypeColor = (type) => {
     const colors = {
@@ -386,13 +407,19 @@ const ProfessorMyRegistrations = () => {
     return colors[status?.toLowerCase()] || '#6b7280';
   };
 
-  const getDisplayStatus = (status) => {
-    // Map "approved" to "registered" for display
-    if (status?.toLowerCase() === 'approved') {
-      return 'registered';
-    }
-    return status;
-  };
+const getDisplayStatus = (status) => {
+  const normalized = status?.toLowerCase();
+  if (normalized === 'approved' || normalized === 'registered') {
+    return 'REGISTERED';
+  }
+  if (normalized === 'pending') {
+    return 'PENDING';
+  }
+  if (normalized === 'rejected') {
+    return 'REJECTED';
+  }
+  return status ? status.toUpperCase() : 'STATUS';
+};
 
   const getDaysUntilEvent = (dateString) => {
     if (!dateString) return null;
@@ -939,6 +966,35 @@ const ProfessorMyRegistrations = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
+                <Link
+                  to="/wallet"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => setShowLogoutDropdown(false)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    account_balance_wallet
+                  </span>
+                  My Wallet
+                </Link>
                 <button
                   onClick={handleLogout}
                   style={{
@@ -1035,14 +1091,27 @@ const ProfessorMyRegistrations = () => {
             My Workshops
           </Link>
           <Link
-            to="/gym-schedule"
+            to="/professor/favorites"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/professor/favorites') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/gym-schedule') ? '600' : '500',
+              fontWeight: isActiveRoute('/professor/favorites') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/professor/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Favorites
+          </Link>
+          <Link
+            to="/professor/gym-schedule"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             View Gym Sessions
@@ -1212,7 +1281,9 @@ const ProfessorMyRegistrations = () => {
                 gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
                 gap: '1.5rem'
               }}>
-                {registrations.map(registration => (
+                {registrations.map(registration => {
+                  const cardCanCancel = canCancelRegistration(registration);
+                  return (
                   <div
                     key={registration.id}
                     onClick={() => setSelectedRegistration(registration)}
@@ -1292,19 +1363,47 @@ const ProfessorMyRegistrations = () => {
                         }}>
                           {registration.eventType}
                         </div>
-                        <div style={{
-                          padding: '0.375rem 0.875rem',
-                          borderRadius: '0.5rem',
-                          backgroundColor: getStatusColor(registration.status),
-                          color: '#FFFFFF',
-                          fontSize: '0.6875rem',
-                          fontWeight: '700',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
-                          {registration.status}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!cardCanCancel) {
+                              setSelectedRegistration(registration);
+                              return;
+                            }
+                            setCancelRegistrationData({
+                              eventId: registration.eventId || registration.id,
+                              eventTitle: registration.eventTitle,
+                              paid: registration.paid
+                            });
+                            setShowCancelModal(true);
+                          }}
+                          style={{
+                            padding: '0.375rem 0.875rem',
+                            borderRadius: '0.5rem',
+                            border: 'none',
+                            backgroundColor: getStatusColor(registration.status),
+                            color: '#FFFFFF',
+                            fontSize: '0.6875rem',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            cursor: cardCanCancel ? 'pointer' : 'default',
+                            boxShadow: cardCanCancel ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                            transition: 'transform 0.1s ease'
+                          }}
+                          title={cardCanCancel ? 'Click to cancel registration & refund wallet' : ''}
+                        >
+                          {getDisplayStatus(registration.status)}
+                        </button>
                       </div>
+
+                      {cardCanCancel && (
+                        <div style={{ marginTop: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#dc2626', fontWeight: '600' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>info</span>
+                          Tap “Registered” to cancel & refund
+                        </div>
+                      )}
 
                       <h3 style={{
                         color: '#1D3557',
@@ -1425,7 +1524,7 @@ const ProfessorMyRegistrations = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             </>
           )}
@@ -2102,19 +2201,73 @@ const ProfessorMyRegistrations = () => {
                 }}>
                   {selectedRegistration.eventType}
                 </div>
-                <div style={{
-                  padding: '0.375rem 0.875rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: getStatusColor(selectedRegistration.status),
-                  color: '#FFFFFF',
-                  fontSize: '0.6875rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}>
+                <div
+                  style={{
+                    padding: '0.375rem 0.875rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: getStatusColor(selectedRegistration.status),
+                    color: '#FFFFFF',
+                    fontSize: '0.6875rem',
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    cursor: canCancelSelectedRegistration ? 'pointer' : 'default',
+                    boxShadow: canCancelSelectedRegistration ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                  }}
+                  onClick={() => {
+                    if (!canCancelSelectedRegistration) return;
+                    setCancelRegistrationData({
+                      eventId: selectedRegistration.eventId || selectedRegistration.id,
+                      eventTitle: selectedRegistration.eventTitle,
+                      paid: selectedRegistration.paid
+                    });
+                    setShowCancelModal(true);
+                  }}
+                  title={canCancelSelectedRegistration ? 'Click to cancel registration & refund wallet' : ''}
+                >
                   {getDisplayStatus(selectedRegistration.status)}
                 </div>
               </div>
+              {canCancelSelectedRegistration && (
+                <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-start' }}>
+                  <button
+                    onClick={() => {
+                      setCancelRegistrationData({
+                        eventId: selectedRegistration.eventId || selectedRegistration.id,
+                        eventTitle: selectedRegistration.eventTitle,
+                        paid: selectedRegistration.paid
+                      });
+                      setShowCancelModal(true);
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.65rem 1.25rem',
+                      borderRadius: '0.5rem',
+                      border: 'none',
+                      backgroundColor: '#dc2626',
+                      color: '#FFFFFF',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#b91c1c';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#dc2626';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      refund
+                    </span>
+                    Cancel & Refund
+                  </button>
+                </div>
+              )}
               
               <div style={{
                 display: 'grid',
@@ -2336,11 +2489,172 @@ const ProfessorMyRegistrations = () => {
                   )}
                 </div>
               )}
+
             </div>
           </div>
         </div>
       )}
 
+      {/* Cancel Registration Modal */}
+      {showCancelModal && cancelRegistrationData && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            maxWidth: '32rem',
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 10px 10px -5px rgba(15, 23, 42, 0.04)',
+            padding: '2rem'
+          }}>
+            <h3 style={{ margin: 0, marginBottom: '0.75rem', color: '#1D3557', fontSize: '1.25rem' }}>
+              Cancel Registration?
+            </h3>
+            <p style={{ margin: 0, marginBottom: '1rem', color: '#4b5563', lineHeight: 1.6 }}>
+              You are about to cancel your registration for <strong>{cancelRegistrationData.eventTitle}</strong>.
+              If this event was paid, the amount will be refunded immediately to your wallet.
+            </p>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.75rem'
+            }}>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: '#fff',
+                  color: '#374151',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Keep Registration
+              </button>
+              <button
+                onClick={async () => {
+                  if (!cancelRegistrationData?.eventId) {
+                    alert('Event ID not found');
+                    return;
+                  }
+                  setCancelling(true);
+                  try {
+                    const result = await eventsApiService.cancelRegistration(cancelRegistrationData.eventId);
+                    if (result.success) {
+                      setCancelSuccessData({
+                        eventTitle: cancelRegistrationData.eventTitle,
+                        refunded: result.data?.refunded || false,
+                        refundAmount: result.data?.refundAmount || 0
+                      });
+                      setShowCancelModal(false);
+                      setCancelRegistrationData(null);
+                      setShowCancelSuccess(true);
+                      setSelectedRegistration(null);
+                      await loadMyRegistrations();
+                      window.dispatchEvent(new Event('walletRefresh'));
+                      if (refreshUser) {
+                        await refreshUser();
+                      }
+                    } else {
+                      alert(result.message || 'Failed to cancel registration');
+                    }
+                  } catch (err) {
+                    console.error('Cancel error:', err);
+                    alert('An error occurred while cancelling registration');
+                  } finally {
+                    setCancelling(false);
+                  }
+                }}
+                disabled={cancelling}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  backgroundColor: '#dc2626',
+                  color: '#fff',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  opacity: cancelling ? 0.7 : 1
+                }}
+              >
+                {cancelling ? 'Cancelling...' : 'Yes, Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCancelSuccess && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            maxWidth: '26rem',
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 10px 10px -5px rgba(15, 23, 42, 0.04)',
+            padding: '2rem',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '3rem',
+              height: '3rem',
+              borderRadius: '50%',
+              backgroundColor: '#dcfce7',
+              margin: '0 auto 1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#15803d',
+              fontSize: '1.5rem'
+            }}>
+              ✓
+            </div>
+            <h3 style={{ margin: 0, color: '#1D3557', fontSize: '1.25rem' }}>
+              Registration Cancelled
+            </h3>
+            <p style={{ margin: '0.75rem 0', color: '#4b5563', lineHeight: 1.6 }}>
+              {cancelSuccessData.eventTitle} has been cancelled successfully.
+              {cancelSuccessData.refunded && (
+                <> {cancelSuccessData.refundAmount} EGP was refunded to your wallet.</>
+              )}
+            </p>
+            <button
+              onClick={() => setShowCancelSuccess(false)}
+              style={{
+                marginTop: '1rem',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                backgroundColor: '#1e40af',
+                color: '#fff',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -86,7 +86,6 @@ const GymSchedule = () => {
   // User type checks
   const isEventsOffice = !user?.userType || (user.userType !== 'TA' && user.userType !== 'Staff' && user.userType !== 'Professor' && user.userType !== 'Student');
   const isProfessor = user?.userType === 'Professor';
-  const canSeeNotifications = user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA';
   const showHorizontalMenu = user?.userType === 'Student' || user?.userType === 'Staff' || user?.userType === 'TA';
 
   const isActiveRoute = (path) => {
@@ -401,7 +400,6 @@ const GymSchedule = () => {
       backgroundColor: '#f6f7f8'
     }}>
       {/* Left Sidebar */}
-      {user?.userType !== 'TA' && (
       <aside style={{
         width: sidebarOpen ? '16rem' : '0',
         flexShrink: 0,
@@ -780,11 +778,12 @@ const GymSchedule = () => {
       </aside>
       )}
 
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <header style={{
         position: 'fixed',
         top: 0,
-        left: user?.userType === 'TA' ? '0' : (sidebarOpen ? '16rem' : '0'),
+        left: sidebarOpen ? '16rem' : '0',
         right: 0,
         display: 'flex',
         alignItems: 'center',
@@ -792,11 +791,10 @@ const GymSchedule = () => {
         borderBottom: '1px solid #e2e8f0',
         padding: '1rem 2.5rem',
         backgroundColor: '#FFFFFF',
-        zIndex: 100,
-        transition: 'left 0.3s ease'
+        zIndex: useFixedHeader ? 100 : 'auto',
+        transition: useFixedHeader ? 'left 0.3s ease' : 'none'
       }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            {user?.userType !== 'TA' && (
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               style={{
@@ -815,7 +813,6 @@ const GymSchedule = () => {
                 menu
               </span>
             </button>
-            )}
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
@@ -1198,15 +1195,25 @@ const GymSchedule = () => {
           </div>
         </header>
 
-      {/* Horizontal Menu Bar - For Professors */}
-      {isProfessor && (
-        <nav style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '1rem 2rem',
-          backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid #e2e8f0'
-        }}>
+      {/* Main Content */}
+      <main style={{
+        marginLeft: showSidebar ? (sidebarOpen ? '16rem' : '0') : '0',
+        marginTop: useFixedHeader ? '73px' : '0',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        transition: showSidebar ? 'margin-left 0.3s ease' : 'none'
+      }}>
+        {/* Horizontal Menu Bar - Show for Students, Staff, and TA */}
+        {showHorizontalMenu && (
+          <nav style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '1rem 2rem',
+            backgroundColor: '#FFFFFF',
+            borderBottom: '1px solid #e2e8f0'
+          }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
             <Link
               to="/dashboard"
@@ -1279,7 +1286,7 @@ const GymSchedule = () => {
 
       {/* Main Content */}
       <main style={{
-        marginLeft: user?.userType === 'TA' ? '0' : (sidebarOpen ? '16rem' : '0'),
+        marginLeft: sidebarOpen ? '16rem' : '0',
         marginTop: '73px',
         flex: 1,
         display: 'flex',
@@ -1971,6 +1978,7 @@ const GymSchedule = () => {
           )}
         </div>
       </main>
+      </div>
 
       {/* Registration Modal */}
       {isRegistrationModalOpen && selectedSession && (
