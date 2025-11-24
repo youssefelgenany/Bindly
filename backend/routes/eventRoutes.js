@@ -116,6 +116,29 @@ router.get("/:id/ratings", protect, getEventRatingsAndComments);
 router.get("/:id/comments", protect, getEventRatingsAndComments);
 router.get("/:id/feedback", protect, getEventRatingsAndComments);
 
+// ⭐ Submit a rating for an event (Student, Staff, TA, Professor)
+router.post(
+  "/:id/ratings",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  submitRating
+);
+
+// 💬 Submit a comment on an event (Student, Staff, TA, Professor)
+router.post(
+  "/:id/comments",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  submitComment
+);
+
+// 🗑️ Delete a comment (owner or admin) - permissions checked in controller
+router.delete(
+  "/:id/comments/:commentId",
+  protect,
+  deleteComment
+);
+
 // 🔍 Get a specific event by its ID (must be last)
 router.get("/:id", protect, getEventById);
 

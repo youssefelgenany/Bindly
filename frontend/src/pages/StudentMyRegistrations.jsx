@@ -242,59 +242,36 @@ const StudentMyRegistrations = () => {
   };
 
   // Check if event has passed (can rate/comment)
+  // Uses the same logic as getDaysUntilEvent for consistency
   const hasEventPassed = (eventDate, eventEndDate) => {
     try {
-      const now = new Date();
-      now.setHours(23, 59, 59, 999); // Set to end of today to include events that ended today
-      
       // Check endDate first (most accurate), then eventDate
       let checkDate = null;
       if (eventEndDate) {
         checkDate = new Date(eventEndDate);
         if (isNaN(checkDate.getTime())) {
           checkDate = null;
-        } else {
-          // Use the full datetime, not just date
-          // If it's a date string without time, set to end of that day
-          if (checkDate.getHours() === 0 && checkDate.getMinutes() === 0 && checkDate.getSeconds() === 0) {
-            checkDate.setHours(23, 59, 59, 999);
-          }
         }
       }
       
       if (!checkDate && eventDate) {
         checkDate = new Date(eventDate);
         if (isNaN(checkDate.getTime())) {
-          console.warn('⚠️ Invalid eventDate:', eventDate);
           return false;
-        } else {
-          // Use the full datetime, not just date
-          // If it's a date string without time, set to end of that day
-          if (checkDate.getHours() === 0 && checkDate.getMinutes() === 0 && checkDate.getSeconds() === 0) {
-            checkDate.setHours(23, 59, 59, 999);
-          }
         }
       }
       
       if (!checkDate) {
-        console.warn('⚠️ No valid date found for event:', { eventDate, eventEndDate });
         return false;
       }
       
-      // Event has passed if the checkDate is before or equal to now
-      const hasPassed = checkDate <= now;
-      console.log('📅 Date comparison:', {
-        eventDate,
-        eventEndDate,
-        checkDate: checkDate.toISOString(),
-        checkDateValue: checkDate.getTime(),
-        now: now.toISOString(),
-        nowValue: now.getTime(),
-        hasPassed,
-        diffMs: now.getTime() - checkDate.getTime(),
-        diffDays: Math.floor((now.getTime() - checkDate.getTime()) / (1000 * 60 * 60 * 24))
-      });
-      return hasPassed;
+      // Use the same logic as getDaysUntilEvent: check if date is in the past
+      const today = new Date();
+      const diffTime = checkDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Event has passed if diffDays < 0 (same logic as getDaysUntilEvent)
+      return diffDays < 0;
     } catch (error) {
       console.error('❌ Error checking if event has passed:', error, { eventDate, eventEndDate });
       return false;
@@ -313,6 +290,7 @@ const StudentMyRegistrations = () => {
       if (result.success) {
         setShowRatingModal(false);
         setRating(0);
+        setHoveredRating(0);
         // Update rating in state
         const updatedRatings = { ...eventRatings };
         const ratingResult = await eventsApiService.getRatingsAndComments(selectedEventForRating.eventId);
@@ -324,10 +302,12 @@ const StudentMyRegistrations = () => {
           setEventRatings(updatedRatings);
         }
         setSelectedEventForRating(null);
+        setError('');
       } else {
         setError(result.message || 'Failed to submit rating');
       }
     } catch (err) {
+      console.error('Error submitting rating:', err);
       setError(err.message || 'Error submitting rating');
     }
   };
@@ -350,12 +330,12 @@ const StudentMyRegistrations = () => {
         setShowCommentModal(false);
         setCommentText('');
         setSelectedEventForComment(null);
-        // Reload registrations
-        loadMyRegistrations();
+        setError('');
       } else {
         setError(result.message || 'Failed to submit comment');
       }
     } catch (err) {
+      console.error('Error submitting comment:', err);
       setError(err.message || 'Error submitting comment');
     }
   };
@@ -1374,7 +1354,13 @@ const StudentMyRegistrations = () => {
                         </button>
 
                         {/* Rating and Comment Icons - Only for Past Events */}
-                        {hasEventPassed(registration.eventDate, registration.eventEndDate) && (
+                        {(() => {
+                          // Try multiple possible date property names
+                          const eventDate = registration.eventDate || registration.startDate || registration.event?.startDate || registration.event?.eventDate;
+                          const eventEndDate = registration.eventEndDate || registration.endDate || registration.event?.endDate || registration.event?.eventEndDate;
+                          const isPast = hasEventPassed(eventDate, eventEndDate);
+                          return isPast;
+                        })() && (
                           <div style={{
                             display: 'flex',
                             gap: '0.5rem',
