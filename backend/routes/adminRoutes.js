@@ -3,7 +3,7 @@ const router = express.Router();
 
 const { createGymSession, viewGymScheduleMonth } = require("../controllers/gymController");
 const { protect, permit } = require("../middleware/authMiddleware");
-const { getAllUsers, updateUserRole, updateUserStatus, changePassword, updateProfile, getAllVendors, updateVendorVerification, updateVendorStatus, updateUserVerification, sendVerificationEmail, getAttendeesReport, assignRoleAndSendVerification, blockUser, unblockUser } = require('../controllers/adminController');
+const { getAllUsers, updateUserRole, updateUserStatus, changePassword, updateProfile, getAllVendors, updateVendorVerification, updateVendorStatus, updateUserVerification, sendVerificationEmail, getAttendeesReport, getSalesReport, assignRoleAndSendVerification, blockUser, unblockUser } = require('../controllers/adminController');
 const { createAdminOrEventOffice, deleteAdminOrEventOffice } = require('../controllers/adminAccountsController');
 
 // Admin routes
@@ -46,5 +46,6 @@ router.get("/gym-schedule/month", protect, permit("student", "staff", "ta", "pro
 
 // Events Office/Admin report routes
 router.get("/reports/attendees", protect, permit("event_office", "admin"), getAttendeesReport);
+router.get("/reports/sales", protect, permit("event_office", "admin"), getSalesReport);
 
 module.exports = router;

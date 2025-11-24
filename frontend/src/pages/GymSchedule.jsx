@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { gymApiService } from '../api/gymApi';
 import { gymSessionApi } from '../api/gymSessionApi';
+import { notificationApiService } from '../api/notificationApi';
 import GymSessionForm from '../components/GymSessionForm';
+import GymSessionRegistrationForm from '../components/GymSessionRegistrationForm';
 
 const TYPES = ['yoga', 'pilates', 'aerobics', 'zumba', 'cross circuit', 'kick-boxing', 'strength', 'cardio', 'other'];
 
@@ -12,6 +14,11 @@ const GymSchedule = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
   
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
@@ -48,6 +55,13 @@ const GymSchedule = () => {
     return '/event-office';
   };
 
+  const getLoyaltyRoute = () => {
+    if (user?.userType === 'TA' || user?.userType === 'Staff') return '/staff/loyalty-vendors';
+    if (user?.userType === 'Professor') return '/professor/loyalty-vendors';
+    if (user?.userType === 'Student') return '/student/loyalty-vendors';
+    return '/event-office/loyalty-program-vendors';
+  };
+
   const getDashboardRoute = () => {
     return '/dashboard';
   };
@@ -60,6 +74,19 @@ const GymSchedule = () => {
   const [typeFilter, setTypeFilter] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingSession, setEditingSession] = useState(null);
+  const [updating, setUpdating] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancellingSession, setCancellingSession] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+
+  // User type checks
+  const isEventsOffice = !user?.userType || (user.userType !== 'TA' && user.userType !== 'Staff' && user.userType !== 'Professor' && user.userType !== 'Student');
+  const isProfessor = user?.userType === 'Professor';
+  const showHorizontalMenu = user?.userType === 'Student' || user?.userType === 'Staff' || user?.userType === 'TA';
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -84,10 +111,93 @@ const GymSchedule = () => {
       if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
+      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLogoutDropdown]);
+  }, [showLogoutDropdown, showNotificationsDropdown]);
+
+  // Load notifications (for staff and professors)
+  const loadNotifications = useCallback(async () => {
+    if (!user?.userType || (user.userType !== 'Professor' && user.userType !== 'Staff' && user.userType !== 'TA')) return;
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+      
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(notificationsResult.data.data.notifications || notificationsResult.data.data || []);
+      }
+      
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, [user]);
+
+  // Load notifications on mount and poll for updates (for staff/professors)
+  useEffect(() => {
+    if (user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA') {
+      loadNotifications();
+      const interval = setInterval(() => {
+        loadNotifications();
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [loadNotifications, user]);
+
+  // Mark notification as read
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev => prev.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Mark all as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  // Format notification date
+  const formatNotificationDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   const load = async () => {
     setLoading(true);
@@ -176,8 +286,6 @@ const GymSchedule = () => {
     setMonth(n.getMonth());
   };
 
-  // Check if user is Events Office
-  const isEventsOffice = user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office';
 
   // Handle gym session creation
   const handleGymSessionCreate = async (formData) => {
@@ -198,45 +306,769 @@ const GymSchedule = () => {
     }
   };
 
+  // Handle edit button click
+  const handleEditClick = (session) => {
+    // Format date for input (YYYY-MM-DD)
+    const sessionDate = new Date(session.date);
+    const formattedDate = sessionDate.toISOString().split('T')[0];
+    
+    // Format time for input (HH:MM)
+    let formattedTime = '';
+    if (session.time) {
+      const timeStr = String(session.time);
+      if (timeStr.includes(':')) {
+        const [hours, minutes] = timeStr.split(':');
+        formattedTime = `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
+      } else {
+        formattedTime = timeStr;
+      }
+    }
+
+    setEditingSession({
+      ...session,
+      date: formattedDate,
+      time: formattedTime,
+      duration: session.duration || session.durationMinutes || 60
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Handle edit submission
+  const handleGymSessionUpdate = async (formData) => {
+    if (!editingSession) return;
+    
+    try {
+      setUpdating(true);
+      const updateData = {
+        date: formData.date,
+        time: formData.time,
+        duration: parseInt(formData.duration) || editingSession.duration
+      };
+      
+      const response = await gymSessionApi.update(editingSession._id || editingSession.id, updateData);
+      if (response.success) {
+        await load(); // Reload sessions
+        setIsEditModalOpen(false);
+        setEditingSession(null);
+      } else {
+        alert(response.message || 'Failed to update gym session. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to update gym session:', error);
+      alert('Failed to update gym session. Please try again.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // Handle cancel button click
+  const handleCancelClick = (session) => {
+    setCancellingSession(session);
+    setIsCancelModalOpen(true);
+  };
+
+  // Handle cancel confirmation
+  const handleGymSessionCancel = async () => {
+    if (!cancellingSession) return;
+    
+    try {
+      setCancelling(true);
+      const response = await gymSessionApi.update(cancellingSession._id || cancellingSession.id, {
+        status: 'cancelled'
+      });
+      if (response.success) {
+        await load(); // Reload sessions
+        setIsCancelModalOpen(false);
+        setCancellingSession(null);
+      } else {
+        alert(response.message || 'Failed to cancel gym session. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to cancel gym session:', error);
+      alert('Failed to cancel gym session. Please try again.');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
 
   return (
     <div style={{
       display: 'flex',
       height: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
+      backgroundColor: '#f6f7f8'
     }}>
-      {/* Main Content */}
-      <main style={{
-        flex: 1,
+      {/* Left Sidebar */}
+      <aside style={{
+        width: sidebarOpen ? '16rem' : '0',
+        flexShrink: 0,
+        backgroundColor: '#1D3557',
+        padding: sidebarOpen ? '1.5rem' : '0',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden'
+        justifyContent: 'space-between',
+        overflow: 'hidden',
+        transition: 'width 0.3s ease, padding 0.3s ease',
+        minWidth: sidebarOpen ? '16rem' : '0'
       }}>
-        {/* Header */}
-        <header style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
-          padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <h2 style={{
-                color: '#1D3557',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                lineHeight: '1.25',
-                margin: 0,
-                cursor: 'pointer'
+        {/* Top Section - Logo and Navigation */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {/* Logo and Branding */}
+          {sidebarOpen && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                borderRadius: '50%',
+                backgroundColor: '#457B9D',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF'
               }}>
-                Bindly
-              </h2>
-            </Link>
+                {isEventsOffice ? (
+                  <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
+                  </svg>
+                ) : (
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>school</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <h1 style={{
+                  color: '#FFFFFF',
+                  fontSize: '1rem',
+                  fontWeight: '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  {isEventsOffice ? 'Events Office' : getPortalBranding()}
+                </h1>
+                <p style={{
+                  color: 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: '400',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  University Portal
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation */}
+          {sidebarOpen && (
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <Link
+                to="/event-office"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office') ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                  textDecoration: 'none',
+                  color: '#FFFFFF'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.25rem' }}>
+                  dashboard
+                </span>
+                <p style={{
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Dashboard
+                </p>
+              </Link>
+
+              <Link
+                to="/event-office/events"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/events') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/events')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/events')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  explore
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/events') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/events') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Discover Events
+                </p>
+              </Link>
+
+              <Link
+                to="/event-office/workshops"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/workshops') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/workshops')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/workshops')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  school
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/workshops') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/workshops') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Professor Workshops
+                </p>
+              </Link>
+
+              <Link
+                to="/event-office/vendors"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/vendors') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/vendors')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/vendors')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  storefront
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/vendors') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Vendors
+                </p>
+              </Link>
+
+              <Link
+                to="/event-office/loyalty-program-vendors"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/loyalty-program-vendors') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/loyalty-program-vendors')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/loyalty-program-vendors')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/loyalty-program-vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  card_giftcard
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/loyalty-program-vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/loyalty-program-vendors') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Loyalty Partners
+                </p>
+              </Link>
+
+              <Link
+                to="/event-office/platform-booth-requests"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/event-office/platform-booth-requests') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/event-office/platform-booth-requests')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/event-office/platform-booth-requests')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  location_on
+                </span>
+                <p style={{
+                  color: isActiveRoute('/event-office/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/event-office/platform-booth-requests') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Platform Booths
+                </p>
+              </Link>
+
+              <Link
+                to="/gym-schedule"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/gym-schedule') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/gym-schedule')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/gym-schedule')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  calendar_month
+                </span>
+                <p style={{
+                  color: isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/gym-schedule') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  View Gym Sessions
+                </p>
+              </Link>
+            </nav>
+          )}
+        </div>
+
+
+        {/* Logout Button - Fixed at bottom */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textAlign: 'left',
+              width: '100%'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ color: 'rgba(241, 250, 238, 0.7)', fontSize: '1.25rem' }}>
+              logout
+            </span>
+            {sidebarOpen && (
+              <p style={{
+                color: 'rgba(241, 250, 238, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                lineHeight: 'normal',
+                margin: 0
+              }}>
+                Logout
+              </p>
+            )}
+          </button>
+        </div>
+      </aside>
+      )}
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <header style={{
+        position: 'fixed',
+        top: 0,
+        left: sidebarOpen ? '16rem' : '0',
+        right: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottom: '1px solid #e2e8f0',
+        padding: '1rem 2.5rem',
+        backgroundColor: '#FFFFFF',
+        zIndex: useFixedHeader ? 100 : 'auto',
+        transition: useFixedHeader ? 'left 0.3s ease' : 'none'
+      }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#1D3557'
+              }}
+              aria-label="Toggle sidebar"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                menu
+              </span>
+            </button>
+            <h2 style={{
+              color: '#1D3557',
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              lineHeight: '1.25',
+              margin: 0
+            }}>
+              Bindly
+            </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+            {/* Notifications Bell */}
+            {canSeeNotifications && (
+              <div style={{ position: 'relative' }} data-notifications-dropdown>
+                <button
+                  onClick={() => {
+                    setShowNotificationsDropdown(!showNotificationsDropdown);
+                    setShowLogoutDropdown(false);
+                    if (!showNotificationsDropdown) {
+                      loadNotifications();
+                    }
+                  }}
+                  style={{
+                    position: 'relative',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.5rem',
+                    color: '#1D3557'
+                  }}>
+                    notifications
+                  </span>
+                  {unreadCount > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '0.25rem',
+                      right: '0.25rem',
+                      backgroundColor: '#ef4444',
+                      color: '#FFFFFF',
+                      borderRadius: '50%',
+                      width: '1.125rem',
+                      height: '1.125rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.625rem',
+                      fontWeight: '700',
+                      border: '2px solid #FFFFFF'
+                    }}>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {showNotificationsDropdown && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '0.5rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                    zIndex: 1001,
+                    width: '360px',
+                    maxHeight: '500px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      padding: '1rem',
+                      borderBottom: '1px solid #e2e8f0',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <h3 style={{
+                        fontSize: '1rem',
+                        fontWeight: '600',
+                        color: '#1D3557',
+                        margin: 0
+                      }}>
+                        Notifications
+                      </h3>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllAsRead}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#1e40af',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            padding: '0.25rem 0.5rem'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.textDecoration = 'underline';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.textDecoration = 'none';
+                          }}
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+                    <div style={{
+                      overflowY: 'auto',
+                      maxHeight: '400px'
+                    }}>
+                      {loadingNotifications ? (
+                        <div style={{
+                          padding: '2rem',
+                          textAlign: 'center',
+                          color: '#6b7280',
+                          fontSize: '0.875rem'
+                        }}>
+                          Loading...
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div style={{
+                          padding: '2rem',
+                          textAlign: 'center',
+                          color: '#6b7280',
+                          fontSize: '0.875rem'
+                        }}>
+                          No notifications
+                        </div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <div
+                            key={notification._id}
+                            onClick={() => {
+                              if (!notification.isRead) {
+                                handleMarkAsRead(notification._id);
+                              }
+                              if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                                navigate(getEventsRoute());
+                                setShowNotificationsDropdown(false);
+                              } else if (
+                                (notification.type === 'event_reminder' || 
+                                 notification.type === 'workshop_reminder' || 
+                                 notification.type === 'trip_reminder' ||
+                                 notification.type === 'gym_session_reminder') && 
+                                (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                              ) {
+                                navigate(getMyEventsRoute());
+                                setShowNotificationsDropdown(false);
+                              } else if (
+                            notification.type === 'new_loyalty_partner' || 
+                            notification.type === 'loyalty_partner_added' ||
+                            (notification.type === 'system' && notification.metadata?.vendorId)
+                          ) {
+                            // Navigate to Loyalty Partners page
+                            navigate(getLoyaltyRoute());
+                            setShowNotificationsDropdown(false);
+                          }
+                        }}
+                            style={{
+                              padding: '1rem',
+                              borderBottom: '1px solid #f3f4f6',
+                              cursor: 'pointer',
+                              backgroundColor: notification.isRead 
+                                ? '#FFFFFF' 
+                                : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                  ? '#fef2f2'
+                                  : '#eff6ff',
+                              borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
+                                ? '3px solid #ef4444'
+                                : 'none',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = notification.isRead 
+                                ? '#f9fafb' 
+                                : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                  ? '#fee2e2'
+                                  : '#dbeafe';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = notification.isRead 
+                                ? '#FFFFFF' 
+                                : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                  ? '#fef2f2'
+                                  : '#eff6ff';
+                            }}
+                          >
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              gap: '0.5rem'
+                            }}>
+                              <div style={{ flex: 1 }}>
+                                <p style={{
+                                  fontSize: '0.875rem',
+                                  fontWeight: notification.isRead ? '400' : '600',
+                                  color: '#1D3557',
+                                  margin: 0,
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  {notification.title || notification.message}
+                                </p>
+                                {notification.message && notification.message !== notification.title && (
+                                  <p style={{
+                                    fontSize: '0.75rem',
+                                    color: '#6b7280',
+                                    margin: 0
+                                  }}>
+                                    {notification.message}
+                                  </p>
+                                )}
+                                <p style={{
+                                  fontSize: '0.625rem',
+                                  color: '#9ca3af',
+                                  margin: '0.5rem 0 0 0'
+                                }}>
+                                  {formatNotificationDate(notification.createdAt)}
+                                </p>
+                              </div>
+                              {!notification.isRead && (
+                                <div style={{
+                                  width: '0.5rem',
+                                  height: '0.5rem',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#1e40af',
+                                  flexShrink: 0,
+                                  marginTop: '0.25rem'
+                                }} />
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
@@ -251,7 +1083,7 @@ const GymSchedule = () => {
                 color: '#6b7280',
                 margin: 0
               }}>
-                {getUserRole()}
+                {isEventsOffice ? 'Events Office' : getUserRole()}
               </p>
             </div>
             <div 
@@ -299,6 +1131,37 @@ const GymSchedule = () => {
                   zIndex: 1000,
                   minWidth: '150px'
                 }}>
+                  {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
+                    <Link
+                      to="/wallet"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        textAlign: 'left',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#1D3557',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        textDecoration: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#f3f4f6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'transparent';
+                      }}
+                      onClick={() => setShowLogoutDropdown(false)}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                        account_balance_wallet
+                      </span>
+                      My Wallet
+                    </Link>
+                  )}
                   <button
                     onClick={handleLogout}
                     style={{
@@ -332,8 +1195,18 @@ const GymSchedule = () => {
           </div>
         </header>
 
-        {/* Horizontal Menu Bar - Show for Students, Professors, Staff, and TA */}
-        {(user?.userType === 'Student' || user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA') && (
+      {/* Main Content */}
+      <main style={{
+        marginLeft: showSidebar ? (sidebarOpen ? '16rem' : '0') : '0',
+        marginTop: useFixedHeader ? '73px' : '0',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        transition: showSidebar ? 'margin-left 0.3s ease' : 'none'
+      }}>
+        {/* Horizontal Menu Bar - Show for Students, Staff, and TA */}
+        {showHorizontalMenu && (
           <nav style={{
             display: 'flex',
             alignItems: 'center',
@@ -355,7 +1228,138 @@ const GymSchedule = () => {
             >
               Dashboard
             </Link>
-            {user?.userType === 'Student' ? (
+            <Link
+              to="/professor/all-events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              Discover Events
+            </Link>
+            <Link
+              to="/professor/events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              My Events
+            </Link>
+            <Link
+              to="/professor/my-workshops"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              My Workshops
+            </Link>
+            <Link
+              to="/professor/gym-schedule"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              View Gym Sessions
+            </Link>
+          </div>
+        </nav>
+      )}
+
+      {/* Main Content */}
+      <main style={{
+        marginLeft: sidebarOpen ? '16rem' : '0',
+        marginTop: '73px',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        transition: 'margin-left 0.3s ease'
+      }}>
+        {/* Horizontal Menu Bar - Show for Students, Staff, and TA */}
+        {showHorizontalMenu && (
+          <nav style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '1rem 2rem',
+            backgroundColor: '#FFFFFF',
+            borderBottom: '1px solid #e2e8f0'
+          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <Link
+              to="/dashboard"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              Dashboard
+            </Link>
+            {(user?.userType === 'TA' || user?.userType === 'Staff') ? (
+              <>
+                <Link
+                  to="/staff/events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  Discover Events
+                </Link>
+                <Link
+                  to="/staff/my-registrations"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Events
+                </Link>
+                <Link
+                  to="/staff/favorites"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Favorites
+                </Link>
+              </>
+            ) : (
               <>
                 <Link
                   to="/student/events"
@@ -384,6 +1388,19 @@ const GymSchedule = () => {
                   My Events
                 </Link>
                 <Link
+                  to="/student/favorites"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/student/favorites') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/favorites') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/student/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Favorites
+                </Link>
+                <Link
                   to="/student/courts"
                   style={{
                     textDecoration: 'none',
@@ -397,78 +1414,7 @@ const GymSchedule = () => {
                   Campus Courts
                 </Link>
               </>
-            ) : user?.userType === 'Professor' ? (
-              <>
-                <Link
-                  to="/professor/all-events"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  Discover Events
-                </Link>
-                <Link
-                  to="/professor/events"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  My Events
-                </Link>
-                <Link
-                  to="/professor/my-workshops"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  My Workshops
-                </Link>
-              </>
-            ) : (user?.userType === 'Staff' || user?.userType === 'TA') ? (
-              <>
-                <Link
-                  to="/staff/events"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  Discover Events
-                </Link>
-                <Link
-                  to="/staff/my-registrations"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  My Events
-                </Link>
-              </>
-            ) : null}
+            )}
             <Link
               to="/gym-schedule"
               style={{
@@ -490,9 +1436,9 @@ const GymSchedule = () => {
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '1rem',
-          paddingLeft: '6rem',
-          paddingRight: '6rem',
+          padding: isProfessor ? '2rem 0' : '1rem',
+          paddingLeft: isProfessor ? '4rem' : '6rem',
+          paddingRight: isProfessor ? '4rem' : '6rem',
           backgroundColor: '#f6f7f8'
         }}>
           {/* Page Title Banner */}
@@ -893,28 +1839,52 @@ const GymSchedule = () => {
                               const sessionType = s.type || 'other';
                               const sessionColor = getSessionTypeColor(sessionType);
 
+                              // Check if user can register (not Events Office)
+                              const canRegister = user?.userType && ['Student', 'Staff', 'TA', 'Professor'].includes(user.userType);
+                              // Check if session is active and not in the past
+                              const sessionDate = new Date(s.date);
+                              const [hh = '0', mm = '0'] = String(s.time || '00:00').split(':');
+                              const sessionDateTime = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate(), parseInt(hh, 10) || 0, parseInt(mm, 10) || 0);
+                              const isFuture = sessionDateTime > new Date();
+                              const isActive = s.status === 'active';
+                              const isCancelled = s.status === 'cancelled';
                               return (
                                 <div
                                   key={s._id || s.id || sessionIdx}
                                   style={{
-                                    backgroundColor: sessionColor,
-                                    color: '#1D3557',
+                                    backgroundColor: isCancelled ? '#f3f4f6' : sessionColor,
+                                    color: isCancelled ? '#9ca3af' : '#1D3557',
                                     borderRadius: '0.25rem',
                                     padding: '0.25rem 0.375rem',
                                     fontSize: '0.625rem',
-                                    cursor: 'pointer',
+                                    cursor: (canRegister && isActive && isFuture && !isCancelled && !isEventsOffice) ? 'pointer' : 'default',
                                     transition: 'opacity 0.2s, transform 0.2s',
-                                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                    position: 'relative',
+                                    opacity: isCancelled ? 0.6 : 1
+                                  }}
+                                  onClick={() => {
+                                    if (canRegister && isActive && isFuture) {
+                                      setSelectedSession(s);
+                                      setIsRegistrationModalOpen(true);
+                                    }
                                   }}
                                   onMouseEnter={(e) => {
-                                    e.target.style.opacity = '0.9';
-                                    e.target.style.transform = 'scale(1.02)';
+                                    if (canRegister && isActive && isFuture && !isCancelled && !isEventsOffice) {
+                                      e.target.style.opacity = '0.9';
+                                      e.target.style.transform = 'scale(1.02)';
+                                    }
                                   }}
                                   onMouseLeave={(e) => {
-                                    e.target.style.opacity = '1';
-                                    e.target.style.transform = 'scale(1)';
+                                    if (canRegister && isActive && isFuture && !isCancelled && !isEventsOffice) {
+                                      e.target.style.opacity = '1';
+                                      e.target.style.transform = 'scale(1)';
+                                    } else if (!isEventsOffice && isCancelled) {
+                                      e.target.style.opacity = '0.6';
+                                      e.target.style.transform = 'scale(1)';
+                                    }
                                   }}
-                                  title={`${typeLabel} at ${timeStr}`}
+                                  title={canRegister && isActive && isFuture && !isCancelled ? `Click to register for ${typeLabel} at ${timeStr}` : `${typeLabel} at ${timeStr}${isCancelled ? ' (Cancelled)' : ''}`}
                                 >
                                   <div style={{
                                     fontWeight: '600',
@@ -934,6 +1904,63 @@ const GymSchedule = () => {
                                   }}>
                                     {timeStr}
                                   </div>
+                                  {isEventsOffice && !isCancelled && (
+                                    <div style={{
+                                      display: 'flex',
+                                      gap: '0.125rem',
+                                      marginTop: '0.125rem',
+                                      justifyContent: 'flex-end'
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEditClick(s);
+                                        }}
+                                        style={{
+                                          background: '#1e40af',
+                                          border: 'none',
+                                          borderRadius: '0.125rem',
+                                          padding: '0.0625rem 0.25rem',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: '#FFFFFF',
+                                          fontSize: '0.5rem'
+                                        }}
+                                        title="Edit session"
+                                      >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '0.625rem' }}>
+                                          edit
+                                        </span>
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleCancelClick(s);
+                                        }}
+                                        style={{
+                                          background: '#dc2626',
+                                          border: 'none',
+                                          borderRadius: '0.125rem',
+                                          padding: '0.0625rem 0.25rem',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: '#FFFFFF',
+                                          fontSize: '0.5rem'
+                                        }}
+                                        title="Cancel session"
+                                      >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '0.625rem' }}>
+                                          cancel
+                                        </span>
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             } catch (error) {
@@ -951,6 +1978,23 @@ const GymSchedule = () => {
           )}
         </div>
       </main>
+      </div>
+
+      {/* Registration Modal */}
+      {isRegistrationModalOpen && selectedSession && (
+        <GymSessionRegistrationForm
+          gymSession={selectedSession}
+          onClose={() => {
+            setIsRegistrationModalOpen(false);
+            setSelectedSession(null);
+          }}
+          onSuccess={(result) => {
+            console.log('Registration successful:', result);
+            // Reload sessions to update the display
+            load();
+          }}
+        />
+      )}
 
       {/* Create Gym Session Modal */}
       {isCreateModalOpen && isEventsOffice && (
@@ -1039,8 +2083,420 @@ const GymSchedule = () => {
                 loading={creating}
                 submitLabel="Create Gym Session"
                 loadingLabel="Creating..."
-              />  
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Gym Session Modal */}
+      {isEditModalOpen && editingSession && isEventsOffice && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000
+        }}
+        onClick={() => {
+          setIsEditModalOpen(false);
+          setEditingSession(null);
+        }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              width: '90%',
+              maxWidth: '500px',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              margin: '0 1rem'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <h2 style={{
+                fontSize: '1.25rem',
+                fontWeight: '700',
+                color: '#1D3557',
+                margin: 0
+              }}>
+                Edit Gym Session
+              </h2>
+              <button
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingSession(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6b7280',
+                  transition: 'color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.color = '#6b7280';
+                }}
+                aria-label="Close modal"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  close
+                </span>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.5rem'
+            }}>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                handleGymSessionUpdate({
+                  date: formData.get('date'),
+                  time: formData.get('time'),
+                  duration: formData.get('duration')
+                });
+              }}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    name="date"
+                    defaultValue={editingSession.date}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.625rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.875rem',
+                      color: '#1D3557'
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Time *
+                  </label>
+                  <input
+                    type="time"
+                    name="time"
+                    defaultValue={editingSession.time}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.625rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.875rem',
+                      color: '#1D3557'
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Duration (minutes) *
+                  </label>
+                  <input
+                    type="number"
+                    name="duration"
+                    defaultValue={editingSession.duration}
+                    min="1"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.625rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.875rem',
+                      color: '#1D3557'
+                    }}
+                  />
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  gap: '0.75rem',
+                  justifyContent: 'flex-end'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditModalOpen(false);
+                      setEditingSession(null);
+                    }}
+                    style={{
+                      padding: '0.625rem 1.25rem',
+                      borderRadius: '0.375rem',
+                      border: '1px solid #d1d5db',
+                      backgroundColor: '#FFFFFF',
+                      color: '#374151',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f9fafb';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#FFFFFF';
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updating}
+                    style={{
+                      padding: '0.625rem 1.25rem',
+                      borderRadius: '0.375rem',
+                      border: 'none',
+                      backgroundColor: '#1e40af',
+                      color: '#FFFFFF',
+                      cursor: updating ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      opacity: updating ? 0.6 : 1,
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!updating) {
+                        e.target.style.backgroundColor = '#1e3a8a';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!updating) {
+                        e.target.style.backgroundColor = '#1e40af';
+                      }
+                    }}
+                  >
+                    {updating ? 'Updating...' : 'Update Session'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Gym Session Confirmation Modal */}
+      {isCancelModalOpen && cancellingSession && isEventsOffice && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000
+        }}
+        onClick={() => {
+          setIsCancelModalOpen(false);
+          setCancellingSession(null);
+        }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              width: '90%',
+              maxWidth: '500px',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              margin: '0 1rem'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header - Warning */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              backgroundColor: '#fef3c7',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem'
+            }}>
+              <span className="material-symbols-outlined" style={{ 
+                fontSize: '1.5rem',
+                color: '#d97706'
+              }}>
+                warning
+              </span>
+              <h2 style={{
+                fontSize: '1.25rem',
+                fontWeight: '700',
+                color: '#92400e',
+                margin: 0
+              }}>
+                Cancel Gym Session
+              </h2>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{
+              flex: 1,
+              padding: '1.5rem'
+            }}>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#374151',
+                marginBottom: '1rem',
+                lineHeight: '1.5'
+              }}>
+                Are you sure you want to cancel this gym session? All registered participants will be notified via email.
+              </p>
               
+              <div style={{
+                backgroundColor: '#f9fafb',
+                borderRadius: '0.5rem',
+                padding: '1rem',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#1D3557',
+                  marginBottom: '0.5rem'
+                }}>
+                  {cancellingSession.title || (cancellingSession.type ? cancellingSession.type.charAt(0).toUpperCase() + cancellingSession.type.slice(1) : 'Gym Session')}
+                </div>
+                <div style={{
+                  fontSize: '0.75rem',
+                  color: '#6b7280'
+                }}>
+                  Date: {new Date(cancellingSession.date).toLocaleDateString()}
+                </div>
+                {cancellingSession.time && (
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#6b7280'
+                  }}>
+                    Time: {String(cancellingSession.time).substring(0, 5)}
+                  </div>
+                )}
+              </div>
+
+              <div style={{
+                display: 'flex',
+                gap: '0.75rem',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCancelModalOpen(false);
+                    setCancellingSession(null);
+                  }}
+                  disabled={cancelling}
+                  style={{
+                    padding: '0.625rem 1.25rem',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#FFFFFF',
+                    color: '#374151',
+                    cursor: cancelling ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    opacity: cancelling ? 0.6 : 1,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!cancelling) {
+                      e.target.style.backgroundColor = '#f9fafb';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!cancelling) {
+                      e.target.style.backgroundColor = '#FFFFFF';
+                    }
+                  }}
+                >
+                  Keep Session
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGymSessionCancel}
+                  disabled={cancelling}
+                  style={{
+                    padding: '0.625rem 1.25rem',
+                    borderRadius: '0.375rem',
+                    border: 'none',
+                    backgroundColor: '#dc2626',
+                    color: '#FFFFFF',
+                    cursor: cancelling ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    opacity: cancelling ? 0.6 : 1,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!cancelling) {
+                      e.target.style.backgroundColor = '#b91c1c';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!cancelling) {
+                      e.target.style.backgroundColor = '#dc2626';
+                    }
+                  }}
+                >
+                  {cancelling ? 'Cancelling...' : 'Cancel Session'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1049,7 +2505,7 @@ const GymSchedule = () => {
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }n
+          100% { transform: rotate(360deg); }
         }
       `}</style>
     </div>

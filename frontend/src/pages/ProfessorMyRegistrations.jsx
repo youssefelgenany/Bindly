@@ -1,11 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import professorApiService from '../api/professorApi';
+import { eventsApiService } from '../api/eventsApi';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
+import { notificationApiService } from '../api/notificationApi';
+
 import { useAuth } from '../contexts/AuthContext';
 
+const canCancelRegistration = (registration) => {
+  if (!registration) return false;
+  if (!registration.paid) return false;
+  if (!registration.eventDate) return false;
+  return new Date(registration.eventDate) > new Date();
+};
+
 const ProfessorMyRegistrations = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
@@ -14,6 +24,52 @@ const ProfessorMyRegistrations = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRegistration, setSelectedRegistration] = useState(null);
+  const [showRatingsCommentsModal, setShowRatingsCommentsModal] = useState(false);
+  const [selectedEventForView, setSelectedEventForView] = useState(null);
+  const [ratingsAndComments, setRatingsAndComments] = useState(null);
+  const [loadingRatingsComments, setLoadingRatingsComments] = useState(false);
+  const [eventRatings, setEventRatings] = useState({});
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [commentText, setCommentText] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelRegistrationData, setCancelRegistrationData] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [showCancelSuccess, setShowCancelSuccess] = useState(false);
+  const [cancelSuccessData, setCancelSuccessData] = useState({
+    eventTitle: '',
+    refunded: false,
+    refundAmount: 0
+  });
+  const [modalError, setModalError] = useState('');
+  const [modalSuccess, setModalSuccess] = useState('');
+  const [modalFocus, setModalFocus] = useState(null);
+  const ratingSectionRef = useRef(null);
+  const commentSectionRef = useRef(null);
+
+  const resetModalState = () => {
+    setRating(0);
+    setHoveredRating(0);
+    setCommentText('');
+    setModalError('');
+    setModalSuccess('');
+    setModalFocus(null);
+  };
+
+  useEffect(() => {
+    if (!showRatingsCommentsModal || !modalFocus) return;
+    const target = modalFocus === 'comment' ? commentSectionRef.current : ratingSectionRef.current;
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    setModalFocus(null);
+  }, [showRatingsCommentsModal, modalFocus]);
+
+  const canCancelSelectedRegistration = canCancelRegistration(selectedRegistration);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -32,10 +88,90 @@ const ProfessorMyRegistrations = () => {
       if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
+      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLogoutDropdown]);
+  }, [showLogoutDropdown, showNotificationsDropdown]);
+
+  // Load notifications
+  const loadNotifications = useCallback(async () => {
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+      
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(notificationsResult.data.data.notifications || notificationsResult.data.data || []);
+      }
+      
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, []);
+
+  // Load notifications on mount and poll for updates
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
+
+  // Mark notification as read
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev => prev.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Mark all as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  // Format notification date
+  const formatNotificationDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   const handleLogout = () => {
     logout();
@@ -80,6 +216,8 @@ const ProfessorMyRegistrations = () => {
           eventDescription: reg.eventDescription || '',
           capacity: reg.capacity || null,
           registeredCount: reg.registeredCount || 0,
+          paid: reg.paid || false,
+          price: reg.price || reg.eventPrice || 0,
           studentName: reg.studentName || (user?.firstName && user?.lastName 
             ? `${user.firstName} ${user.lastName}` 
             : user?.name || 'Professor'),
@@ -89,7 +227,7 @@ const ProfessorMyRegistrations = () => {
           studentId: reg.studentId || user?.gucId || null,
           studentEmail: reg.studentEmail || user?.email || '',
           professorEmail: reg.studentEmail || user?.email || '',
-          status: reg.status || 'approved',
+          status: reg.status || reg.registrationStatus || 'registered',
           registeredAt: reg.registeredAt || new Date(),
           emergencyContact: reg.emergencyContact || null,
           dietaryRequirements: reg.dietaryRequirements || null,
@@ -99,6 +237,25 @@ const ProfessorMyRegistrations = () => {
         console.log('✨ Final formatted registrations:', formattedRegistrations);
         console.log('📊 Final count:', formattedRegistrations.length);
         setRegistrations(formattedRegistrations);
+        
+        // Load ratings for all events
+        const ratingsMap = {};
+        await Promise.all(formattedRegistrations.map(async (reg) => {
+          if (reg.eventId) {
+            try {
+              const ratingResult = await eventsApiService.getRatingsAndComments(reg.eventId);
+              if (ratingResult.success && ratingResult.data?.ratings) {
+                ratingsMap[reg.eventId] = {
+                  average: ratingResult.data.ratings.average || 0,
+                  count: ratingResult.data.ratings.count || 0
+                };
+              }
+            } catch (err) {
+              // Silently fail - ratings are optional
+            }
+          }
+        }));
+        setEventRatings(ratingsMap);
       } else {
         console.error('❌ API returned error:', result.message);
         setError(result.message || 'Failed to fetch registrations');
@@ -127,7 +284,80 @@ const ProfessorMyRegistrations = () => {
     }
   }, [location.pathname, user, loadMyRegistrations]);
 
-  const formatDate = (dateString) => {
+  // Load ratings and comments for viewing
+  const loadRatingsAndComments = async (eventId) => {
+    if (!eventId) {
+      setModalError('Event ID is required');
+      return;
+    }
+    setLoadingRatingsComments(true);
+    setModalError('');
+    try {
+      const eventIdStr = String(eventId);
+      const result = await eventsApiService.getRatingsAndComments(eventIdStr);
+      if (result.success) {
+        setRatingsAndComments(result.data);
+      } else {
+        setModalError(result.message || result.error?.message || 'Failed to load ratings and comments');
+      }
+    } catch (err) {
+      console.error('Error loading ratings and comments:', err);
+      setModalError(err.response?.data?.message || err.message || 'Error loading ratings and comments');
+    } finally {
+      setLoadingRatingsComments(false);
+    }
+  };
+
+  // Handle view ratings and comments
+  const handleViewRatingsComments = async (registrationOrEventId, options = {}) => {
+    let registration = null;
+    let eventId = null;
+
+    if (registrationOrEventId && typeof registrationOrEventId === 'object') {
+      registration = registrationOrEventId;
+      eventId = registration.eventId || registration.event?._id || registration.event?.id;
+    } else {
+      eventId = registrationOrEventId;
+      registration = registrations.find(r => {
+        const regId = r.eventId || r.event?._id || r.event?.id;
+        return String(regId) === String(eventId);
+      });
+    }
+
+    if (!eventId) {
+      setModalError('Event data not available.');
+      return;
+    }
+
+    let eventDetails = null;
+    try {
+      const eventResult = await eventsApiService.getAllEventsAuthenticated({});
+      if (eventResult.success && Array.isArray(eventResult.data)) {
+        eventDetails = eventResult.data.find(e => String(e._id || e.id) === String(eventId));
+      }
+    } catch (err) {
+      console.error('Error fetching event details:', err);
+    }
+
+    const eventData = {
+      eventId: String(eventId),
+      eventDate: eventDetails?.startDate || eventDetails?.eventDate || registration?.eventDate || registration?.startDate,
+      eventEndDate: eventDetails?.endDate || eventDetails?.eventEndDate || registration?.eventEndDate || registration?.endDate,
+      eventTitle: registration?.eventTitle || registration?.title || eventDetails?.title,
+      registration,
+      eventDetails
+    };
+
+    setSelectedEventForView(eventData);
+    resetModalState();
+    if (options.focus) {
+      setModalFocus(options.focus);
+    }
+    setShowRatingsCommentsModal(true);
+    await loadRatingsAndComments(eventId);
+  };
+
+const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -138,6 +368,7 @@ const ProfessorMyRegistrations = () => {
       minute: '2-digit'
     });
   };
+
 
   const getEventTypeColor = (type) => {
     const colors = {
@@ -176,13 +407,19 @@ const ProfessorMyRegistrations = () => {
     return colors[status?.toLowerCase()] || '#6b7280';
   };
 
-  const getDisplayStatus = (status) => {
-    // Map "approved" to "registered" for display
-    if (status?.toLowerCase() === 'approved') {
-      return 'registered';
-    }
-    return status;
-  };
+const getDisplayStatus = (status) => {
+  const normalized = status?.toLowerCase();
+  if (normalized === 'approved' || normalized === 'registered') {
+    return 'REGISTERED';
+  }
+  if (normalized === 'pending') {
+    return 'PENDING';
+  }
+  if (normalized === 'rejected') {
+    return 'REJECTED';
+  }
+  return status ? status.toUpperCase() : 'STATUS';
+};
 
   const getDaysUntilEvent = (dateString) => {
     if (!dateString) return null;
@@ -195,6 +432,24 @@ const ProfessorMyRegistrations = () => {
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Tomorrow';
     return `In ${diffDays} days`;
+  };
+
+  const isMarkedAsPastEvent = (registration) => {
+    if (!registration) return false;
+    const typeString = registration.eventType || registration.eventCategory || registration.type || registration.event?.type || '';
+    const normalized = typeString?.toString().trim().toLowerCase();
+    if (!normalized) return false;
+    return normalized === 'past event' || normalized === 'past events' || normalized === 'past';
+  };
+
+  const isRegistrationPast = (registration) => {
+    if (!registration) return false;
+    const eventDate = registration.eventDate || registration.startDate || registration.event?.startDate || registration.event?.eventDate;
+    const eventEndDate = registration.eventEndDate || registration.endDate || registration.event?.endDate || registration.event?.eventEndDate;
+    if (eventDate && getDaysUntilEvent(eventDate) === 'Past') {
+      return true;
+    }
+    return hasEventPassed(eventDate, eventEndDate) || isMarkedAsPastEvent(registration);
   };
 
   const formatTableDate = (dateString) => {
@@ -222,6 +477,136 @@ const ProfessorMyRegistrations = () => {
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
     : user?.name || 'Professor';
+
+  // Check if event has passed (can rate/comment)
+  const hasEventPassed = (eventDate, eventEndDate) => {
+    try {
+      const now = new Date();
+      now.setHours(23, 59, 59, 999); // Set to end of today to include events that ended today
+      
+      // Check endDate first (most accurate), then eventDate
+      let checkDate = null;
+      if (eventEndDate) {
+        checkDate = new Date(eventEndDate);
+        if (isNaN(checkDate.getTime())) {
+          checkDate = null;
+        } else {
+          // Use the full datetime, not just date
+          // If it's a date string without time, set to end of that day
+          if (checkDate.getHours() === 0 && checkDate.getMinutes() === 0 && checkDate.getSeconds() === 0) {
+            checkDate.setHours(23, 59, 59, 999);
+          }
+        }
+      }
+      
+      if (!checkDate && eventDate) {
+        checkDate = new Date(eventDate);
+        if (isNaN(checkDate.getTime())) {
+          return false;
+        } else {
+          // Use the full datetime, not just date
+          // If it's a date string without time, set to end of that day
+          if (checkDate.getHours() === 0 && checkDate.getMinutes() === 0 && checkDate.getSeconds() === 0) {
+            checkDate.setHours(23, 59, 59, 999);
+          }
+        }
+      }
+      
+      if (!checkDate) {
+        return false;
+      }
+      
+      // Event has passed if the checkDate is before or equal to now
+      return checkDate <= now;
+    } catch (error) {
+      console.error('Error checking if event has passed:', error);
+      return false;
+    }
+  };
+
+  // Handle rating submission
+  const refreshEventRatingStats = async (eventId) => {
+    try {
+      const ratingResult = await eventsApiService.getRatingsAndComments(eventId);
+      if (ratingResult.success && ratingResult.data?.ratings) {
+        setEventRatings(prev => ({
+          ...prev,
+          [eventId]: {
+            average: ratingResult.data.ratings.average || 0,
+            count: ratingResult.data.ratings.count || 0
+          }
+        }));
+      }
+    } catch (err) {
+      console.error('Error refreshing rating stats:', err);
+    }
+  };
+
+  const handleSubmitRating = async () => {
+    if (!selectedEventForView?.eventId) {
+      setModalError('No event selected.');
+      return;
+    }
+    if (!rating || rating < 1) {
+      setModalError('Please select a rating between 1 and 5.');
+      return;
+    }
+    setModalError('');
+    try {
+      const eventId = String(selectedEventForView.eventId);
+      const result = await eventsApiService.submitRating(eventId, rating);
+      if (result.success) {
+        setRating(0);
+        setHoveredRating(0);
+        setModalSuccess('Rating submitted successfully.');
+        await loadRatingsAndComments(eventId);
+        await refreshEventRatingStats(eventId);
+      } else {
+        setModalSuccess('');
+        setModalError(result.message || result.error?.message || 'Failed to submit rating.');
+      }
+    } catch (err) {
+      console.error('Error submitting rating:', err);
+      setModalSuccess('');
+      setModalError(err.response?.data?.message || err.message || 'Error submitting rating.');
+    }
+  };
+
+  // Handle comment submission
+  const handleSubmitComment = async () => {
+    if (!selectedEventForView?.eventId) {
+      setModalError('No event selected.');
+      return;
+    }
+    if (!commentText.trim()) {
+      setModalError('Please enter a comment.');
+      return;
+    }
+
+    if (commentText.trim().length > 1000) {
+      setModalError('Comment cannot exceed 1000 characters.');
+      return;
+    }
+
+    setModalError('');
+
+    try {
+      const eventId = String(selectedEventForView.eventId);
+      const result = await eventsApiService.submitComment(eventId, commentText.trim());
+      if (result.success) {
+        setCommentText('');
+        setModalSuccess('Comment submitted successfully.');
+        await loadRatingsAndComments(eventId);
+      } else {
+        setModalSuccess('');
+        setModalError(result.message || result.error?.message || 'Failed to submit comment.');
+      }
+    } catch (err) {
+      console.error('Error submitting comment:', err);
+      setModalSuccess('');
+      setModalError(err.response?.data?.message || err.message || 'Error submitting comment.');
+    }
+  };
 
   if (loading) {
     return (
@@ -276,6 +661,250 @@ const ProfessorMyRegistrations = () => {
           </Link>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          {/* Notifications Bell */}
+          <div style={{ position: 'relative' }} data-notifications-dropdown>
+            <button
+              onClick={() => {
+                setShowNotificationsDropdown(!showNotificationsDropdown);
+                setShowLogoutDropdown(false);
+                if (!showNotificationsDropdown) {
+                  loadNotifications();
+                }
+              }}
+              style={{
+                position: 'relative',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span className="material-symbols-outlined" style={{
+                fontSize: '1.5rem',
+                color: '#1D3557'
+              }}>
+                notifications
+              </span>
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '0.25rem',
+                  right: '0.25rem',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  borderRadius: '50%',
+                  width: '1.125rem',
+                  height: '1.125rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.625rem',
+                  fontWeight: '700',
+                  border: '2px solid #FFFFFF'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {showNotificationsDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 1001,
+                width: '360px',
+                maxHeight: '500px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  padding: '1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    margin: 0
+                  }}>
+                    Notifications
+                  </h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllAsRead}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#1e40af',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        padding: '0.25rem 0.5rem'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.textDecoration = 'underline';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.textDecoration = 'none';
+                      }}
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                <div style={{
+                  overflowY: 'auto',
+                  maxHeight: '400px'
+                }}>
+                  {loadingNotifications ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      Loading...
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification._id}
+                        onClick={() => {
+                          if (!notification.isRead) {
+                            handleMarkAsRead(notification._id);
+                          }
+                          if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                            navigate(`/professor/all-events`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            (notification.type === 'event_reminder' || 
+                             notification.type === 'workshop_reminder' || 
+                             notification.type === 'trip_reminder' ||
+                             notification.type === 'gym_session_reminder') && 
+                            (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                          ) {
+                            // Navigate to My Events for reminders
+                            navigate(`/professor/events`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            notification.type === 'new_loyalty_partner' || 
+                            notification.type === 'loyalty_partner_added' ||
+                            (notification.type === 'system' && notification.metadata?.vendorId)
+                          ) {
+                            // Navigate to Loyalty Partners page
+                            navigate(`/professor/loyalty-vendors`);
+                            setShowNotificationsDropdown(false);
+                          }
+                        }}
+                        style={{
+                          padding: '1rem',
+                          borderBottom: '1px solid #f3f4f6',
+                          cursor: 'pointer',
+                          backgroundColor: notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fef2f2'
+                              : '#eff6ff',
+                          borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
+                            ? '3px solid #ef4444'
+                            : 'none',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#f9fafb' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fee2e2'
+                              : '#dbeafe';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fef2f2'
+                              : '#eff6ff';
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{
+                              fontSize: '0.875rem',
+                              fontWeight: notification.isRead ? '400' : '600',
+                              color: '#1D3557',
+                              margin: 0,
+                              marginBottom: '0.25rem'
+                            }}>
+                              {notification.title || notification.message}
+                            </p>
+                            {notification.message && notification.message !== notification.title && (
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                margin: 0
+                              }}>
+                                {notification.message}
+                              </p>
+                            )}
+                            <p style={{
+                              fontSize: '0.625rem',
+                              color: '#9ca3af',
+                              margin: '0.5rem 0 0 0'
+                            }}>
+                              {formatNotificationDate(notification.createdAt)}
+                            </p>
+                          </div>
+                          {!notification.isRead && (
+                            <div style={{
+                              width: '0.5rem',
+                              height: '0.5rem',
+                              borderRadius: '50%',
+                              backgroundColor: '#1e40af',
+                              flexShrink: 0,
+                              marginTop: '0.25rem'
+                            }} />
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <div style={{ textAlign: 'right' }}>
             <p style={{
               fontSize: '0.875rem',
@@ -337,6 +966,35 @@ const ProfessorMyRegistrations = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
+                <Link
+                  to="/wallet"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => setShowLogoutDropdown(false)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    account_balance_wallet
+                  </span>
+                  My Wallet
+                </Link>
                 <button
                   onClick={handleLogout}
                   style={{
@@ -433,14 +1091,27 @@ const ProfessorMyRegistrations = () => {
             My Workshops
           </Link>
           <Link
-            to="/gym-schedule"
+            to="/professor/favorites"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/professor/favorites') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/gym-schedule') ? '600' : '500',
+              fontWeight: isActiveRoute('/professor/favorites') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/professor/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Favorites
+          </Link>
+          <Link
+            to="/professor/gym-schedule"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             View Gym Sessions
@@ -610,7 +1281,9 @@ const ProfessorMyRegistrations = () => {
                 gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
                 gap: '1.5rem'
               }}>
-                {registrations.map(registration => (
+                {registrations.map(registration => {
+                  const cardCanCancel = canCancelRegistration(registration);
+                  return (
                   <div
                     key={registration.id}
                     onClick={() => setSelectedRegistration(registration)}
@@ -690,19 +1363,47 @@ const ProfessorMyRegistrations = () => {
                         }}>
                           {registration.eventType}
                         </div>
-                        <div style={{
-                          padding: '0.375rem 0.875rem',
-                          borderRadius: '0.5rem',
-                          backgroundColor: getStatusColor(registration.status),
-                          color: '#FFFFFF',
-                          fontSize: '0.6875rem',
-                          fontWeight: '700',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
-                          {registration.status}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!cardCanCancel) {
+                              setSelectedRegistration(registration);
+                              return;
+                            }
+                            setCancelRegistrationData({
+                              eventId: registration.eventId || registration.id,
+                              eventTitle: registration.eventTitle,
+                              paid: registration.paid
+                            });
+                            setShowCancelModal(true);
+                          }}
+                          style={{
+                            padding: '0.375rem 0.875rem',
+                            borderRadius: '0.5rem',
+                            border: 'none',
+                            backgroundColor: getStatusColor(registration.status),
+                            color: '#FFFFFF',
+                            fontSize: '0.6875rem',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            cursor: cardCanCancel ? 'pointer' : 'default',
+                            boxShadow: cardCanCancel ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                            transition: 'transform 0.1s ease'
+                          }}
+                          title={cardCanCancel ? 'Click to cancel registration & refund wallet' : ''}
+                        >
+                          {getDisplayStatus(registration.status)}
+                        </button>
                       </div>
+
+                      {cardCanCancel && (
+                        <div style={{ marginTop: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#dc2626', fontWeight: '600' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>info</span>
+                          Tap “Registered” to cancel & refund
+                        </div>
+                      )}
 
                       <h3 style={{
                         color: '#1D3557',
@@ -750,6 +1451,8 @@ const ProfessorMyRegistrations = () => {
                             </span>
                           )}
                         </div>
+                        
+                        {/* Rating and Comment Actions removed per design */}
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -766,15 +1469,590 @@ const ProfessorMyRegistrations = () => {
                           <span>{registration.eventLocation}</span>
                         </div>
                       </div>
+
+                      {/* Bottom Section: Rating Display */}
+                      <div style={{
+                        marginTop: 'auto',
+                        paddingTop: '0.75rem',
+                        borderTop: '1px solid #e5e7eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
+                        gap: '0.5rem'
+                      }}>
+                        {/* Average Rating Display - Bottom Left (Clickable to view ratings/comments for ALL events) */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewRatingsComments(registration);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.375rem',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '0.25rem',
+                            borderRadius: '0.375rem',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f3f4f6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                          title="View ratings and comments"
+                        >
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#fbbf24'
+                          }}>
+                            star
+                          </span>
+                          <span style={{
+                            fontSize: '0.8125rem',
+                            fontWeight: '600',
+                            color: '#374151'
+                          }}>
+                            {eventRatings[registration.eventId]?.average > 0 
+                              ? eventRatings[registration.eventId].average.toFixed(1)
+                              : '—'}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             </>
           )}
           </div>
         </div>
       </main>
+
+      {/* Ratings & Comments Modal */}
+      {showRatingsCommentsModal && selectedEventForView && (
+        <div
+          onClick={() => {
+            setShowRatingsCommentsModal(false);
+            setSelectedEventForView(null);
+            setRatingsAndComments(null);
+            resetModalState();
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1001,
+            padding: '1rem',
+            backdropFilter: 'blur(4px)'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '700px',
+              width: '100%',
+              maxHeight: '90vh',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              position: 'relative',
+              zIndex: 1002
+            }}
+          >
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h2 style={{
+                  color: '#1D3557',
+                  fontSize: '1.5rem',
+                  fontWeight: '700',
+                  margin: 0,
+                  marginBottom: '0.25rem'
+                }}>
+                  Ratings & Comments
+                </h2>
+                {selectedEventForView?.eventTitle && (
+                  <p style={{
+                    color: '#6b7280',
+                    fontSize: '0.875rem',
+                    margin: 0
+                  }}>
+                    {selectedEventForView.eventTitle}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setShowRatingsCommentsModal(false);
+                  setSelectedEventForView(null);
+                  setRatingsAndComments(null);
+                  resetModalState();
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
+                  lineHeight: 1
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                padding: '1.5rem',
+                overflowY: 'auto',
+                flex: 1,
+                position: 'relative',
+                zIndex: 10
+              }}
+            >
+              {modalError && (
+                <div style={{
+                  padding: '0.75rem',
+                  marginBottom: '1rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#fee2e2',
+                  color: '#991b1b',
+                  fontSize: '0.875rem'
+                }}>
+                  {modalError}
+                </div>
+              )}
+
+              {modalSuccess && (
+                <div style={{
+                  padding: '0.75rem',
+                  marginBottom: '1rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#ecfdf5',
+                  color: '#047857',
+                  fontSize: '0.875rem'
+                }}>
+                  {modalSuccess}
+                </div>
+              )}
+
+              {loadingRatingsComments ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: '#6b7280'
+                }}>
+                  Loading...
+                </div>
+              ) : ratingsAndComments ? (
+                <>
+                  {/* Ratings Section */}
+                  {ratingsAndComments.ratings && (
+                    <div style={{
+                      marginBottom: '2rem',
+                      padding: '1.5rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '0.5rem'
+                    }}>
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '1rem',
+                        marginTop: 0
+                      }}>
+                        Ratings
+                      </h3>
+                      {ratingsAndComments.ratings.count > 0 ? (
+                        <>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            marginBottom: '1rem'
+                          }}>
+                            <div style={{
+                              fontSize: '2.5rem',
+                              fontWeight: '700',
+                              color: '#1D3557'
+                            }}>
+                              {ratingsAndComments.ratings.average.toFixed(1)}
+                            </div>
+                            <div>
+                              <div style={{
+                                display: 'flex',
+                                gap: '0.25rem',
+                                marginBottom: '0.25rem'
+                              }}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <span
+                                    key={star}
+                                    style={{
+                                      fontSize: '1.25rem',
+                                      color: star <= Math.round(ratingsAndComments.ratings.average) ? '#fbbf24' : '#d1d5db'
+                                    }}
+                                  >
+                                    ★
+                                  </span>
+                                ))}
+                              </div>
+                              <div style={{
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                Based on {ratingsAndComments.ratings.count} rating{ratingsAndComments.ratings.count !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                          </div>
+                          {ratingsAndComments.ratings.distribution && (
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem'
+                            }}>
+                              {[5, 4, 3, 2, 1].map((star) => (
+                                <div key={star} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem'
+                                }}>
+                                  <span style={{ fontSize: '0.875rem', color: '#6b7280', minWidth: '60px' }}>
+                                    {star} star{star !== 1 ? 's' : ''}
+                                  </span>
+                                  <div style={{
+                                    flex: 1,
+                                    height: '8px',
+                                    backgroundColor: '#e5e7eb',
+                                    borderRadius: '0.25rem',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <div style={{
+                                      width: `${ratingsAndComments.ratings.count > 0 ? (ratingsAndComments.ratings.distribution[star] || 0) / ratingsAndComments.ratings.count * 100 : 0}%`,
+                                      height: '100%',
+                                      backgroundColor: '#fbbf24',
+                                      transition: 'width 0.3s'
+                                    }} />
+                                  </div>
+                                  <span style={{ fontSize: '0.875rem', color: '#6b7280', minWidth: '40px' }}>
+                                    {ratingsAndComments.ratings.distribution[star] || 0}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p style={{
+                          color: '#6b7280',
+                          fontSize: '0.875rem',
+                          margin: 0
+                        }}>
+                          No ratings yet
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Comments Section */}
+                  {selectedEventForView && (() => {
+                    const eventDate = selectedEventForView.eventDate || selectedEventForView.registration?.eventDate;
+                    const eventEndDate = selectedEventForView.eventEndDate || selectedEventForView.registration?.eventEndDate;
+                    const finalEventDate = eventDate || selectedEventForView.registration?.eventDate;
+                    const finalEventEndDate = eventEndDate || selectedEventForView.registration?.eventEndDate;
+                    const isPast = hasEventPassed(finalEventDate, finalEventEndDate);
+                    const isPastType = isMarkedAsPastEvent(selectedEventForView.registration);
+                    if (!finalEventDate && !finalEventEndDate && !isPastType) {
+                      return false;
+                    }
+                    return isPast || isPastType;
+                  })() && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{
+                        marginBottom: '2rem',
+                        padding: '1.5rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        position: 'relative',
+                        zIndex: 10
+                      }}
+                    >
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '1rem',
+                        marginTop: 0
+                      }}>
+                        Share Your Feedback
+                      </h3>
+
+                      <div ref={ratingSectionRef} style={{ marginBottom: '1.5rem' }}>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Your Rating
+                        </label>
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem'
+                        }}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setRating(star)}
+                              onMouseEnter={() => setHoveredRating(star)}
+                              onMouseLeave={() => setHoveredRating(0)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontSize: '2rem',
+                                color: (hoveredRating >= star || rating >= star) ? '#fbbf24' : '#d1d5db',
+                                transition: 'all 0.2s',
+                                lineHeight: 1
+                              }}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                        {rating > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleSubmitRating}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: '#1e40af',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.stopPropagation();
+                              e.target.style.backgroundColor = '#1e3a8a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.stopPropagation();
+                              e.target.style.backgroundColor = '#1e40af';
+                            }}
+                          >
+                            Submit Rating
+                          </button>
+                        )}
+                      </div>
+
+                      <div ref={commentSectionRef}>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Your Comment
+                        </label>
+                        <textarea
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          placeholder="Share your thoughts about this event..."
+                          maxLength={1000}
+                          style={{
+                            width: '100%',
+                            minHeight: '100px',
+                            padding: '0.875rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            fontSize: '0.875rem',
+                            fontFamily: 'inherit',
+                            resize: 'vertical',
+                            marginBottom: '0.5rem',
+                            outline: 'none',
+                            transition: 'all 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#1e40af';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#e5e7eb';
+                            e.target.style.boxShadow = 'none';
+                          }}
+                        />
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280',
+                          textAlign: 'right',
+                          marginBottom: '0.75rem'
+                        }}>
+                          {commentText.length}/1000 characters
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleSubmitComment}
+                          disabled={!commentText.trim()}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (commentText.trim()) {
+                              e.stopPropagation();
+                              e.target.style.backgroundColor = '#1e3a8a';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (commentText.trim()) {
+                              e.stopPropagation();
+                              e.target.style.backgroundColor = '#1e40af';
+                            }
+                          }}
+                        >
+                          Submit Comment
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 style={{
+                      color: '#1D3557',
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      marginBottom: '1rem',
+                      marginTop: 0
+                    }}>
+                      Comments ({ratingsAndComments.comments?.length || 0})
+                    </h3>
+                    {ratingsAndComments.comments && ratingsAndComments.comments.length > 0 ? (
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem'
+                      }}>
+                        {ratingsAndComments.comments.map((comment) => (
+                          <div
+                            key={comment._id}
+                            style={{
+                              padding: '1rem',
+                              backgroundColor: '#f9fafb',
+                              borderRadius: '0.5rem',
+                              border: '1px solid #e5e7eb'
+                            }}
+                          >
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              marginBottom: '0.5rem'
+                            }}>
+                              <div>
+                                <div style={{
+                                  fontWeight: '600',
+                                  color: '#1D3557',
+                                  fontSize: '0.875rem'
+                                }}>
+                                  {comment.user?.firstName} {comment.user?.lastName}
+                                </div>
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: '#6b7280'
+                                }}>
+                                  {comment.user?.userType || 'User'}
+                                </div>
+                              </div>
+                              <div style={{
+                                fontSize: '0.75rem',
+                                color: '#9ca3af'
+                              }}>
+                                {formatDate(comment.createdAt)}
+                              </div>
+                            </div>
+                            <p style={{
+                              color: '#374151',
+                              fontSize: '0.875rem',
+                              margin: 0,
+                              lineHeight: '1.6',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {comment.text}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        margin: 0
+                      }}>
+                        No comments yet
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: '#6b7280'
+                }}>
+                  No ratings or comments available
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Registration Detail Modal */}
       {selectedRegistration && (
@@ -923,19 +2201,73 @@ const ProfessorMyRegistrations = () => {
                 }}>
                   {selectedRegistration.eventType}
                 </div>
-                <div style={{
-                  padding: '0.375rem 0.875rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: getStatusColor(selectedRegistration.status),
-                  color: '#FFFFFF',
-                  fontSize: '0.6875rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}>
+                <div
+                  style={{
+                    padding: '0.375rem 0.875rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: getStatusColor(selectedRegistration.status),
+                    color: '#FFFFFF',
+                    fontSize: '0.6875rem',
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    cursor: canCancelSelectedRegistration ? 'pointer' : 'default',
+                    boxShadow: canCancelSelectedRegistration ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                  }}
+                  onClick={() => {
+                    if (!canCancelSelectedRegistration) return;
+                    setCancelRegistrationData({
+                      eventId: selectedRegistration.eventId || selectedRegistration.id,
+                      eventTitle: selectedRegistration.eventTitle,
+                      paid: selectedRegistration.paid
+                    });
+                    setShowCancelModal(true);
+                  }}
+                  title={canCancelSelectedRegistration ? 'Click to cancel registration & refund wallet' : ''}
+                >
                   {getDisplayStatus(selectedRegistration.status)}
                 </div>
               </div>
+              {canCancelSelectedRegistration && (
+                <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-start' }}>
+                  <button
+                    onClick={() => {
+                      setCancelRegistrationData({
+                        eventId: selectedRegistration.eventId || selectedRegistration.id,
+                        eventTitle: selectedRegistration.eventTitle,
+                        paid: selectedRegistration.paid
+                      });
+                      setShowCancelModal(true);
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.65rem 1.25rem',
+                      borderRadius: '0.5rem',
+                      border: 'none',
+                      backgroundColor: '#dc2626',
+                      color: '#FFFFFF',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#b91c1c';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#dc2626';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      refund
+                    </span>
+                    Cancel & Refund
+                  </button>
+                </div>
+              )}
               
               <div style={{
                 display: 'grid',
@@ -1157,11 +2489,173 @@ const ProfessorMyRegistrations = () => {
                   )}
                 </div>
               )}
+
             </div>
           </div>
         </div>
-        )}
-      </div>
+      )}
+
+      {/* Cancel Registration Modal */}
+      {showCancelModal && cancelRegistrationData && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            maxWidth: '32rem',
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 10px 10px -5px rgba(15, 23, 42, 0.04)',
+            padding: '2rem'
+          }}>
+            <h3 style={{ margin: 0, marginBottom: '0.75rem', color: '#1D3557', fontSize: '1.25rem' }}>
+              Cancel Registration?
+            </h3>
+            <p style={{ margin: 0, marginBottom: '1rem', color: '#4b5563', lineHeight: 1.6 }}>
+              You are about to cancel your registration for <strong>{cancelRegistrationData.eventTitle}</strong>.
+              If this event was paid, the amount will be refunded immediately to your wallet.
+            </p>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.75rem'
+            }}>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: '#fff',
+                  color: '#374151',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Keep Registration
+              </button>
+              <button
+                onClick={async () => {
+                  if (!cancelRegistrationData?.eventId) {
+                    alert('Event ID not found');
+                    return;
+                  }
+                  setCancelling(true);
+                  try {
+                    const result = await eventsApiService.cancelRegistration(cancelRegistrationData.eventId);
+                    if (result.success) {
+                      setCancelSuccessData({
+                        eventTitle: cancelRegistrationData.eventTitle,
+                        refunded: result.data?.refunded || false,
+                        refundAmount: result.data?.refundAmount || 0
+                      });
+                      setShowCancelModal(false);
+                      setCancelRegistrationData(null);
+                      setShowCancelSuccess(true);
+                      setSelectedRegistration(null);
+                      await loadMyRegistrations();
+                      window.dispatchEvent(new Event('walletRefresh'));
+                      if (refreshUser) {
+                        await refreshUser();
+                      }
+                    } else {
+                      alert(result.message || 'Failed to cancel registration');
+                    }
+                  } catch (err) {
+                    console.error('Cancel error:', err);
+                    alert('An error occurred while cancelling registration');
+                  } finally {
+                    setCancelling(false);
+                  }
+                }}
+                disabled={cancelling}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  backgroundColor: '#dc2626',
+                  color: '#fff',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  opacity: cancelling ? 0.7 : 1
+                }}
+              >
+                {cancelling ? 'Cancelling...' : 'Yes, Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCancelSuccess && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            maxWidth: '26rem',
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 10px 10px -5px rgba(15, 23, 42, 0.04)',
+            padding: '2rem',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '3rem',
+              height: '3rem',
+              borderRadius: '50%',
+              backgroundColor: '#dcfce7',
+              margin: '0 auto 1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#15803d',
+              fontSize: '1.5rem'
+            }}>
+              ✓
+            </div>
+            <h3 style={{ margin: 0, color: '#1D3557', fontSize: '1.25rem' }}>
+              Registration Cancelled
+            </h3>
+            <p style={{ margin: '0.75rem 0', color: '#4b5563', lineHeight: 1.6 }}>
+              {cancelSuccessData.eventTitle} has been cancelled successfully.
+              {cancelSuccessData.refunded && (
+                <> {cancelSuccessData.refundAmount} EGP was refunded to your wallet.</>
+              )}
+            </p>
+            <button
+              onClick={() => setShowCancelSuccess(false)}
+              style={{
+                marginTop: '1rem',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                backgroundColor: '#1e40af',
+                color: '#fff',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

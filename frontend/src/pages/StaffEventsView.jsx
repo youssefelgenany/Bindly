@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { eventsApiService } from '../api/eventsApi';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
+import { notificationApiService } from '../api/notificationApi';
 import StudentRegistrationForm from '../components/StudentRegistrationForm';
 import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
 
@@ -15,24 +16,41 @@ const StaffEventsView = () => {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
+  const [professorFilter, setProfessorFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('date-asc');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [showProfessorDropdown, setShowProfessorDropdown] = useState(false);
+  const [availableProfessors, setAvailableProfessors] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
   const [registrationEvent, setRegistrationEvent] = useState(null);
   const [showWorkshopEditModal, setShowWorkshopEditModal] = useState(false);
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
   const [registeredEventIds, setRegisteredEventIds] = useState(new Set());
-  const [expandedRows, setExpandedRows] = useState(new Set());
+  const [favoriteEventIds, setFavoriteEventIds] = useState(new Set());
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [showRatingsCommentsModal, setShowRatingsCommentsModal] = useState(false);
+  const [selectedEventForView, setSelectedEventForView] = useState(null);
+  const [ratingsAndComments, setRatingsAndComments] = useState(null);
+  const [loadingRatingsComments, setLoadingRatingsComments] = useState(false);
+  const [eventRatings, setEventRatings] = useState({});
+  const [modalError, setModalError] = useState('');
+  const [rating, setRating] = useState(0);
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [commentText, setCommentText] = useState('');
+  const [ratingsLoadError, setRatingsLoadError] = useState('');
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
-    // Exact match
     if (currentPath === path) return true;
-    // For dashboard, check if it's exactly /dashboard (not /dashboard/something)
     if (path === '/dashboard') {
       return currentPath === '/dashboard';
     }
-    // For other routes, check if current path starts with the route path
     return currentPath.startsWith(path);
   };
 
@@ -50,26 +68,84 @@ const StaffEventsView = () => {
       if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
+      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
+      if (showFilterDropdown && !event.target.closest('[data-filter-dropdown]')) {
+        setShowFilterDropdown(false);
+      }
+      if (showSortDropdown && !event.target.closest('[data-sort-dropdown]')) {
+        setShowSortDropdown(false);
+      }
+      if (showProfessorDropdown && !event.target.closest('[data-professor-dropdown]')) {
+        setShowProfessorDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLogoutDropdown]);
+  }, [showLogoutDropdown, showNotificationsDropdown, showFilterDropdown, showSortDropdown, showProfessorDropdown]);
+
+  const fetchEventRatings = useCallback(async (eventsList) => {
+    if (!Array.isArray(eventsList) || eventsList.length === 0) {
+      setEventRatings({});
+      return;
+    }
+
+    const ratingsMap = {};
+    await Promise.all(eventsList.map(async (ev) => {
+      if (!ev?.id) return;
+      try {
+        const ratingResult = await eventsApiService.getRatingsAndComments(ev.id);
+        if (ratingResult.success && ratingResult.data?.ratings) {
+          ratingsMap[ev.id] = {
+            average: ratingResult.data.ratings.average || 0,
+            count: ratingResult.data.ratings.count || 0
+          };
+        }
+      } catch (err) {
+        console.error('Error loading ratings for event', ev.id, err);
+      }
+    }));
+
+    setEventRatings(ratingsMap);
+  }, []);
+
+  const sortEvents = (eventsList) => {
+    const sorted = [...eventsList];
+    switch (sortBy) {
+      case 'date-asc':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.startDate || a.endDate || 0);
+          const dateB = new Date(b.startDate || b.endDate || 0);
+          return dateA - dateB;
+        });
+      case 'date-desc':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.startDate || a.endDate || 0);
+          const dateB = new Date(b.startDate || b.endDate || 0);
+          return dateB - dateA;
+        });
+      case 'title-asc':
+        return sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+      case 'title-desc':
+        return sorted.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+      default:
+        return sorted;
+    }
+  };
 
   const loadEvents = useCallback(async () => {
     try {
       setError('');
       setLoading(true);
       const typeParam = filter && filter !== 'all' && filter.trim() !== '' ? filter.trim().toLowerCase() : undefined;
-      console.log('🔍 Frontend - Filter state:', filter, '-> Sending type param:', typeParam);
-      
       const result = await eventsApiService.getStudentEvents({
         q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
         type: typeParam
       });
       
       if (result.success) {
-        const eventsList = Array.isArray(result.data) ? result.data : (result.data.events || []);
-        const mapped = eventsList.map(ev => ({
+        const mapped = (result.data || []).map(ev => ({
           id: ev._id || ev.id,
           title: ev.title,
           type: ev.type,
@@ -98,35 +174,9 @@ const StaffEventsView = () => {
         .filter(ev => {
           const type = (ev.type || '').toLowerCase();
           const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
-          // Only keep events with valid types and non-empty title/location
           if (!validTypes.includes(type) || !ev.title || ev.title.trim() === '' || !ev.location || ev.location.trim() === '') {
             return false;
           }
-          
-          // Apply type filter if not 'all' - strict matching
-          if (filter && filter !== 'all' && filter.trim() !== '') {
-            const filterType = filter.trim().toLowerCase();
-            const eventType = (type || '').toString().trim().toLowerCase();
-            if (eventType !== filterType) {
-              return false;
-            }
-          }
-          
-          // Filter out past events - use endDate to allow events that haven't ended yet
-          const now = new Date();
-          if (ev.endDate) {
-            const endDate = new Date(ev.endDate);
-            if (!isNaN(endDate.getTime()) && endDate < now) {
-              return false;
-            }
-          } else if (ev.startDate) {
-            // If no endDate, use startDate (for backward compatibility)
-            const startDate = new Date(ev.startDate);
-            if (!isNaN(startDate.getTime()) && startDate < now) {
-              return false;
-            }
-          }
-          
           return true;
         });
         
@@ -141,7 +191,50 @@ const StaffEventsView = () => {
             endDate: e.endDate
           }))
         });
-        setEvents(mapped);
+
+        const professorsSet = new Set();
+        mapped.forEach(ev => {
+          if (ev.type === 'workshop' || ev.type === 'conference') {
+            if (ev.professors) {
+              if (Array.isArray(ev.professors)) {
+                ev.professors.forEach(p => {
+                  if (p && typeof p === 'string') {
+                    professorsSet.add(p.trim());
+                  }
+                });
+              } else if (typeof ev.professors === 'string') {
+                professorsSet.add(ev.professors.trim());
+              }
+            }
+            if (ev.creatorName) {
+              professorsSet.add(ev.creatorName.trim());
+            }
+          }
+        });
+        setAvailableProfessors(Array.from(professorsSet).sort());
+
+        let filteredEvents = mapped;
+        if ((filter === 'workshop' || filter === 'conference') && professorFilter !== 'all') {
+          filteredEvents = mapped.filter(ev => {
+            if (ev.type !== 'workshop' && ev.type !== 'conference') return false;
+            const eventProfessors = [];
+            if (ev.professors) {
+              if (Array.isArray(ev.professors)) {
+                eventProfessors.push(...ev.professors.map(p => p?.trim()));
+              } else if (typeof ev.professors === 'string') {
+                eventProfessors.push(ev.professors.trim());
+              }
+            }
+            if (ev.creatorName) {
+              eventProfessors.push(ev.creatorName.trim());
+            }
+            return eventProfessors.some(p => p === professorFilter);
+          });
+        }
+
+        const sortedEvents = sortEvents(filteredEvents);
+        setEvents(sortedEvents);
+        await fetchEventRatings(sortedEvents);
       } else {
         setEvents([]);
         const msg = result.message || (typeof result.error === 'string' ? result.error : 'Failed to fetch events');
@@ -152,11 +245,17 @@ const StaffEventsView = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, filter]);
+  }, [searchQuery, filter, professorFilter, sortBy, fetchEventRatings]);
 
   useEffect(() => {
     loadEvents();
-  }, [filter, loadEvents]);
+  }, [filter, professorFilter, sortBy, loadEvents]);
+
+  useEffect(() => {
+    if (filter !== 'workshop' && filter !== 'conference') {
+      setProfessorFilter('all');
+    }
+  }, [filter]);
 
   // Load user's registrations to check which events they're registered for
   useEffect(() => {
@@ -191,6 +290,138 @@ const StaffEventsView = () => {
 
     loadUserRegistrations();
   }, [user]);
+
+  // Load user's favorite events (for Staff and TA users)
+  useEffect(() => {
+    const loadFavoriteEvents = async () => {
+      if (!user || (user.userType !== 'TA' && user.userType !== 'Staff')) return;
+      
+      try {
+        const result = await eventsApiService.getFavoriteEvents();
+        if (result.success && result.data.events) {
+          const favoriteIds = new Set();
+          result.data.events.forEach(event => {
+            if (event._id) {
+              favoriteIds.add(String(event._id));
+            } else if (event.id) {
+              favoriteIds.add(String(event.id));
+            }
+          });
+          setFavoriteEventIds(favoriteIds);
+        }
+      } catch (error) {
+        console.error('Error loading favorite events:', error);
+      }
+    };
+
+    loadFavoriteEvents();
+  }, [user]);
+
+  const handleToggleFavorite = async (eventId, e) => {
+    e.stopPropagation(); // Prevent card click
+    
+    if (!user || (user.userType !== 'TA' && user.userType !== 'Staff')) return;
+    
+    const isFavorite = favoriteEventIds.has(String(eventId));
+    
+    try {
+      if (isFavorite) {
+        const result = await eventsApiService.removeFromFavorites(eventId);
+        if (result.success) {
+          setFavoriteEventIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(String(eventId));
+            return newSet;
+          });
+        }
+      } else {
+        const result = await eventsApiService.addToFavorites(eventId);
+        if (result.success) {
+          setFavoriteEventIds(prev => new Set([...prev, String(eventId)]));
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
+  // Load notifications
+  const loadNotifications = useCallback(async () => {
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+      
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(notificationsResult.data.data.notifications || notificationsResult.data.data || []);
+      }
+      
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, []);
+
+  // Load notifications on mount and poll for updates
+  useEffect(() => {
+    loadNotifications();
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
+
+  // Mark notification as read
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev => prev.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Mark all as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  // Format notification date
+  const formatNotificationDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   const handleSearch = () => {
     loadEvents();
@@ -279,76 +510,169 @@ const StaffEventsView = () => {
     return type ? type.toUpperCase() : 'EVENT';
   };
 
-  const getEventStatus = (event) => {
-    const now = new Date();
-    const startDate = new Date(event.startDate);
-    const endDate = new Date(event.endDate);
-    
-    if (event.capacity && event.registeredCount >= event.capacity) {
-      return { label: 'Full', color: 'red' };
+  const loadRatingsAndComments = async (eventId) => {
+    if (!eventId) {
+      setRatingsLoadError('Event ID is required');
+      return;
     }
-    if (now >= startDate && now <= endDate) {
-      return { label: 'Active', color: 'green' };
-    }
-    if (now < startDate) {
-      return { label: 'Upcoming', color: 'blue' };
-    }
-    return { label: 'Past', color: 'gray' };
-  };
-
-  const formatTableDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  const toggleRowExpansion = (eventId) => {
-    setExpandedRows(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(eventId)) {
-        newSet.delete(eventId);
+    setLoadingRatingsComments(true);
+    setRatingsLoadError('');
+    try {
+      const result = await eventsApiService.getRatingsAndComments(String(eventId));
+      if (result.success) {
+        setRatingsAndComments(result.data);
       } else {
-        newSet.add(eventId);
+        setRatingsLoadError(result.message || result.error?.message || 'Failed to load ratings and comments');
       }
-      return newSet;
-    });
+    } catch (err) {
+      console.error('Error loading ratings and comments:', err);
+      setRatingsLoadError(err.response?.data?.message || err.message || 'Error loading ratings and comments');
+    } finally {
+      setLoadingRatingsComments(false);
+    }
   };
 
-  // Filter events based on type
-  const filteredEvents = events.filter(event => {
-    const title = (event.title || '').trim();
-    if (!title) return false;
-    if (!event.startDate) return false;
-    
-    const startDate = new Date(event.startDate);
-    if (isNaN(startDate.getTime())) return false;
-    
-    // Filter out past events - only filter if the event has completely ended
-    const now = new Date();
-    if (event.endDate) {
-      const eventEndDate = new Date(event.endDate);
-      // Only filter out if endDate is valid and has passed
-      if (!isNaN(eventEndDate.getTime()) && eventEndDate < now) {
-        return false;
+  const hasEventPassed = (eventDate, eventEndDate) => {
+    try {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+
+      let checkDate = null;
+      if (eventEndDate) {
+        const parsedEnd = new Date(eventEndDate);
+        if (!isNaN(parsedEnd.getTime())) {
+          parsedEnd.setHours(0, 0, 0, 0);
+          checkDate = parsedEnd;
+        }
       }
-    } else {
-      // If no endDate, use startDate (for backward compatibility)
-      // But be lenient - only filter if startDate is clearly in the past (more than 1 day ago)
-      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      if (startDate < oneDayAgo) {
-        return false;
+
+      if (!checkDate && eventDate) {
+        const parsedStart = new Date(eventDate);
+        if (!isNaN(parsedStart.getTime())) {
+          parsedStart.setHours(0, 0, 0, 0);
+          checkDate = parsedStart;
+        }
       }
+
+      if (!checkDate) return false;
+      return checkDate <= now;
+    } catch (error) {
+      console.error('Error checking if event has passed:', error);
+      return false;
     }
-    
-    const typeMatch = filter === 'all' || (event.type && event.type === filter);
-    return typeMatch;
-  });
+  };
+
+  const didStaffAttend = (eventId) => {
+    if (!eventId) return false;
+    return registeredEventIds.has(String(eventId));
+  };
+
+  const resetFeedbackState = () => {
+    setRating(0);
+    setHoveredRating(0);
+    setCommentText('');
+    setModalError('');
+  };
+
+  const handleSubmitRating = async (eventId) => {
+    if (!eventId) {
+      setModalError('Event not available');
+      return;
+    }
+    if (!rating || rating === 0) {
+      setModalError('Please select a rating');
+      return;
+    }
+
+    try {
+      const result = await eventsApiService.submitRating(String(eventId), rating);
+      if (result.success) {
+        setRating(0);
+        setHoveredRating(0);
+        setModalError('');
+        await loadRatingsAndComments(eventId);
+        try {
+          const ratingResult = await eventsApiService.getRatingsAndComments(String(eventId));
+          if (ratingResult.success && ratingResult.data?.ratings) {
+            setEventRatings(prev => ({
+              ...prev,
+              [eventId]: {
+                average: ratingResult.data.ratings.average || 0,
+                count: ratingResult.data.ratings.count || 0
+              }
+            }));
+          }
+        } catch (err) {
+          console.error('Error refreshing event rating stats:', err);
+        }
+      } else {
+        setModalError(result.message || result.error?.message || 'Failed to submit rating');
+      }
+    } catch (err) {
+      console.error('Error submitting rating:', err);
+      setModalError(err.response?.data?.message || err.message || 'Error submitting rating');
+    }
+  };
+
+  const handleSubmitComment = async (eventId) => {
+    if (!eventId) {
+      setModalError('Event not available');
+      return;
+    }
+    if (!commentText.trim()) {
+      setModalError('Please enter a comment');
+      return;
+    }
+    if (commentText.trim().length > 1000) {
+      setModalError('Comment cannot exceed 1000 characters');
+      return;
+    }
+
+    try {
+      const result = await eventsApiService.submitComment(String(eventId), commentText.trim());
+      if (result.success) {
+        setCommentText('');
+        setModalError('');
+        await loadRatingsAndComments(eventId);
+      } else {
+        setModalError(result.message || result.error?.message || 'Failed to submit comment');
+      }
+    } catch (err) {
+      console.error('Error submitting comment:', err);
+      setModalError(err.response?.data?.message || err.message || 'Error submitting comment');
+    }
+  };
+
+  const handleViewRatingsComments = async (eventData) => {
+    if (!eventData?.id) {
+      setRatingsLoadError('Event data not available');
+      return;
+    }
+    resetFeedbackState();
+    setRatingsLoadError('');
+    setSelectedEventForView({
+      eventId: String(eventData.id),
+      eventTitle: eventData.title,
+      eventDate: eventData.startDate,
+      eventEndDate: eventData.endDate,
+      eventLocation: eventData.location
+    });
+    setRatingsAndComments(null);
+    setModalError('');
+    setShowRatingsCommentsModal(true);
+    await loadRatingsAndComments(eventData.id);
+  };
+
 
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
     : user?.name || (user?.userType === 'TA' ? 'TA' : 'Staff');
   
-  const userRole = user?.userType === 'TA' ? 'TA' : 'Staff';
+  const userRole = user?.userType === 'TA' ? 'Teaching Assistant' : 'Staff';
+  const canSubmitFeedback = selectedEventForView
+    ? hasEventPassed(selectedEventForView.eventDate, selectedEventForView.eventEndDate) &&
+      didStaffAttend(selectedEventForView.eventId)
+    : false;
 
   return (
     <div style={{
@@ -382,6 +706,249 @@ const StaffEventsView = () => {
           </Link>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          {/* Notifications Bell */}
+          <div style={{ position: 'relative' }} data-notifications-dropdown>
+            <button
+              onClick={() => {
+                setShowNotificationsDropdown(!showNotificationsDropdown);
+                setShowLogoutDropdown(false);
+                if (!showNotificationsDropdown) {
+                  loadNotifications();
+                }
+              }}
+              style={{
+                position: 'relative',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span className="material-symbols-outlined" style={{
+                fontSize: '1.5rem',
+                color: '#1D3557'
+              }}>
+                notifications
+              </span>
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '0.25rem',
+                  right: '0.25rem',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  borderRadius: '50%',
+                  width: '1.125rem',
+                  height: '1.125rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.625rem',
+                  fontWeight: '700',
+                  border: '2px solid #FFFFFF'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {showNotificationsDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 1001,
+                width: '360px',
+                maxHeight: '500px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  padding: '1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    margin: 0
+                  }}>
+                    Notifications
+                  </h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllAsRead}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#1e40af',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        padding: '0.25rem 0.5rem'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.textDecoration = 'underline';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.textDecoration = 'none';
+                      }}
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                <div style={{
+                  overflowY: 'auto',
+                  maxHeight: '400px'
+                }}>
+                  {loadingNotifications ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      Loading...
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification._id}
+                        onClick={() => {
+                          if (!notification.isRead) {
+                            handleMarkAsRead(notification._id);
+                          }
+                          if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                            navigate(`/staff/events`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            (notification.type === 'event_reminder' || 
+                             notification.type === 'workshop_reminder' || 
+                             notification.type === 'trip_reminder' ||
+                             notification.type === 'gym_session_reminder') && 
+                            (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                          ) {
+                            navigate(`/staff/my-registrations`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            notification.type === 'new_loyalty_partner' || 
+                            notification.type === 'loyalty_partner_added' ||
+                            (notification.type === 'system' && notification.metadata?.vendorId)
+                          ) {
+                            navigate('/staff/loyalty-vendors');
+                            setShowNotificationsDropdown(false);
+                          }
+                        }}
+                        style={{
+                          padding: '1rem',
+                          borderBottom: '1px solid #f3f4f6',
+                          cursor: 'pointer',
+                          backgroundColor: notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fef2f2'
+                              : '#eff6ff',
+                          borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
+                            ? '3px solid #ef4444'
+                            : 'none',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#f9fafb' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fee2e2'
+                              : '#dbeafe';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fef2f2'
+                              : '#eff6ff';
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{
+                              fontSize: '0.875rem',
+                              fontWeight: notification.isRead ? '400' : '600',
+                              color: '#1D3557',
+                              margin: 0,
+                              marginBottom: '0.25rem'
+                            }}>
+                              {notification.title || notification.message}
+                            </p>
+                            {notification.message && notification.message !== notification.title && (
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                margin: 0
+                              }}>
+                                {notification.message}
+                              </p>
+                            )}
+                            <p style={{
+                              fontSize: '0.625rem',
+                              color: '#9ca3af',
+                              margin: '0.5rem 0 0 0'
+                            }}>
+                              {formatNotificationDate(notification.createdAt)}
+                            </p>
+                          </div>
+                          {!notification.isRead && (
+                            <div style={{
+                              width: '0.5rem',
+                              height: '0.5rem',
+                              borderRadius: '50%',
+                              backgroundColor: '#1e40af',
+                              flexShrink: 0,
+                              marginTop: '0.25rem'
+                            }} />
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div style={{ textAlign: 'right' }}>
             <p style={{
               fontSize: '0.875rem',
@@ -396,13 +963,18 @@ const StaffEventsView = () => {
               color: '#6b7280',
               margin: 0
             }}>
-              {userRole}
+              {user?.userType === 'TA' ? 'TA' : 'Staff'}
             </p>
           </div>
+
+          {/* Profile Icon */}
           <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            onClick={() => {
+              setShowLogoutDropdown(!showLogoutDropdown);
+              setShowNotificationsDropdown(false);
+            }}
           >
             {user?.profilePicturePath ? (
               <img
@@ -427,7 +999,7 @@ const StaffEventsView = () => {
                 color: '#FFFFFF',
                 fontWeight: '600'
               }}>
-                {(user?.firstName?.[0] || user?.name?.[0] || 'S').toUpperCase()}
+                {(user?.firstName?.[0] || user?.name?.[0] || (user?.userType === 'TA' ? 'T' : 'S')).toUpperCase()}
               </div>
             )}
             {showLogoutDropdown && (
@@ -443,6 +1015,37 @@ const StaffEventsView = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
+                {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
+                  <Link
+                    to="/wallet"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#1D3557',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                    }}
+                    onClick={() => setShowLogoutDropdown(false)}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      account_balance_wallet
+                    </span>
+                    My Wallet
+                  </Link>
+                )}
                 <button
                   onClick={handleLogout}
                   style={{
@@ -526,6 +1129,19 @@ const StaffEventsView = () => {
             My Events
           </Link>
           <Link
+            to="/staff/favorites"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Favorites
+          </Link>
+          <Link
             to="/gym-schedule"
             style={{
               textDecoration: 'none',
@@ -548,7 +1164,6 @@ const StaffEventsView = () => {
         flexDirection: 'column',
         overflow: 'hidden'
       }}>
-
         {/* Content */}
         <div style={{
           flex: 1,
@@ -595,41 +1210,40 @@ const StaffEventsView = () => {
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'flex-start',
-              padding: '2rem 2.5rem',
+              padding: '2rem',
               color: '#FFFFFF'
             }}>
-              <h3 style={{
-                color: '#FFFFFF',
-                fontSize: '1.75rem',
+              <h1 style={{
+                fontSize: '2rem',
                 fontWeight: '700',
                 margin: 0,
-                marginBottom: '0.5rem'
+                marginBottom: '0.5rem',
+                textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
               }}>
                 Discover Events
-              </h3>
+              </h1>
               <p style={{
-                color: 'rgba(255, 255, 255, 0.9)',
-                fontSize: '0.875rem',
+                fontSize: '1rem',
                 fontWeight: '400',
-                margin: 0
+                margin: 0,
+                opacity: 0.9,
+                textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
               }}>
-                Browse and register for upcoming events.
+                Browse and register for upcoming events
               </p>
             </div>
           </div>
-
           {/* Search and Filters */}
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '0.75rem',
-            padding: '1rem 1.5rem',
-            marginBottom: '1.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
           }}>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'nowrap', justifyContent: 'space-between' }}>
-              {/* Search Input and Button - Left Side */}
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: '1 1 auto', minWidth: 0 }}>
-                <div style={{ position: 'relative', flex: '1 1 auto', minWidth: '200px', maxWidth: '520px' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: '0 1 auto' }}>
+                <div style={{ position: 'relative', width: '520px' }}>
                   <span className="material-symbols-outlined" style={{
                     position: 'absolute',
                     left: '0.75rem',
@@ -699,38 +1313,315 @@ const StaffEventsView = () => {
                   Search
                 </button>
               </div>
-              
-              {/* Filter Buttons - Right Side */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }}>
-                {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
-                <button
-                  onClick={handleSearch}
-                  style={{
-                    padding: '0.875rem 1.75rem',
-                    borderRadius: '0.5rem',
-                    backgroundColor: '#1e40af',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    flexShrink: 0
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#1e3a8a';
-                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#1e40af';
-                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                  }}
-                >
-                  Search
-                </button>
-                ))}
+
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
+                <div style={{ position: 'relative' }} data-filter-dropdown>
+                  <button
+                    onClick={() => {
+                      setShowFilterDropdown(!showFilterDropdown);
+                      setShowSortDropdown(false);
+                      setShowProfessorDropdown(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.875rem 1.25rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#1e40af',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#1e3a8a';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#1e40af';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      filter_list
+                    </span>
+                    Filter
+                  </button>
+                  {showFilterDropdown && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: '0.5rem',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '0.5rem',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      border: '1px solid #e5e7eb',
+                      zIndex: 1000,
+                      minWidth: '180px',
+                      overflow: 'hidden'
+                    }}>
+                      {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            setFilter(type);
+                            setShowFilterDropdown(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            textAlign: 'left',
+                            backgroundColor: filter === type ? '#eff6ff' : 'transparent',
+                            color: filter === type ? '#1e40af' : '#374151',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: filter === type ? '600' : '500',
+                            textTransform: 'capitalize',
+                            transition: 'all 0.2s',
+                            borderBottom: '1px solid #f3f4f6'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (filter !== type) {
+                              e.target.style.backgroundColor = '#f9fafb';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (filter !== type) {
+                              e.target.style.backgroundColor = 'transparent';
+                            }
+                          }}
+                        >
+                          {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ position: 'relative' }} data-sort-dropdown>
+                  <button
+                    onClick={() => {
+                      setShowSortDropdown(!showSortDropdown);
+                      setShowFilterDropdown(false);
+                      setShowProfessorDropdown(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.875rem 1.25rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#1e40af',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#1e3a8a';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#1e40af';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      sort
+                    </span>
+                    Sort
+                  </button>
+                  {showSortDropdown && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '0.5rem',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '0.5rem',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      border: '1px solid #e5e7eb',
+                      zIndex: 1000,
+                      minWidth: '200px',
+                      overflow: 'hidden'
+                    }}>
+                      {[
+                        { value: 'date-asc', label: 'Date (Earliest First)' },
+                        { value: 'date-desc', label: 'Date (Latest First)' },
+                        { value: 'title-asc', label: 'Title (A-Z)' },
+                        { value: 'title-desc', label: 'Title (Z-A)' }
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => {
+                            setSortBy(option.value);
+                            setShowSortDropdown(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            textAlign: 'left',
+                            backgroundColor: sortBy === option.value ? '#eff6ff' : 'transparent',
+                            color: sortBy === option.value ? '#1e40af' : '#374151',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: sortBy === option.value ? '600' : '500',
+                            transition: 'all 0.2s',
+                            borderBottom: '1px solid #f3f4f6'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (sortBy !== option.value) {
+                              e.target.style.backgroundColor = '#f9fafb';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (sortBy !== option.value) {
+                              e.target.style.backgroundColor = 'transparent';
+                            }
+                          }}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {(filter === 'workshop' || filter === 'conference') && (
+                  <div style={{ position: 'relative' }} data-professor-dropdown>
+                    <button
+                      onClick={() => {
+                        setShowProfessorDropdown(!showProfessorDropdown);
+                        setShowFilterDropdown(false);
+                        setShowSortDropdown(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.875rem 1.25rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: '#1e40af',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        transition: 'all 0.2s',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#1e3a8a';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = '#1e40af';
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                        person
+                      </span>
+                      Professor
+                    </button>
+                    {showProfessorDropdown && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: '0.5rem',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '0.5rem',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        border: '1px solid #e5e7eb',
+                        zIndex: 1000,
+                        minWidth: '200px',
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                        overflow: 'hidden'
+                      }}>
+                        <button
+                          onClick={() => {
+                            setProfessorFilter('all');
+                            setShowProfessorDropdown(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            textAlign: 'left',
+                            backgroundColor: professorFilter === 'all' ? '#eff6ff' : 'transparent',
+                            color: professorFilter === 'all' ? '#1e40af' : '#374151',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: professorFilter === 'all' ? '600' : '500',
+                            transition: 'all 0.2s',
+                            borderBottom: '1px solid #f3f4f6'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (professorFilter !== 'all') {
+                              e.target.style.backgroundColor = '#f9fafb';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (professorFilter !== 'all') {
+                              e.target.style.backgroundColor = 'transparent';
+                            }
+                          }}
+                        >
+                          All Professors
+                        </button>
+                        {availableProfessors.map((professor) => (
+                          <button
+                            key={professor}
+                            onClick={() => {
+                              setProfessorFilter(professor);
+                              setShowProfessorDropdown(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 1rem',
+                              textAlign: 'left',
+                              backgroundColor: professorFilter === professor ? '#eff6ff' : 'transparent',
+                              color: professorFilter === professor ? '#1e40af' : '#374151',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: professorFilter === professor ? '600' : '500',
+                              transition: 'all 0.2s',
+                              borderBottom: '1px solid #f3f4f6'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (professorFilter !== professor) {
+                                e.target.style.backgroundColor = '#f9fafb';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (professorFilter !== professor) {
+                                e.target.style.backgroundColor = 'transparent';
+                              }
+                            }}
+                          >
+                            {professor}
+                          </button>
+                        ))}
+                        {availableProfessors.length === 0 && (
+                          <div style={{
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.8125rem',
+                            color: '#6b7280'
+                          }}>
+                            No professors found
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -766,7 +1657,7 @@ const StaffEventsView = () => {
               }} className="spinner"></div>
               <p style={{ margin: 0, color: '#6b7280' }}>Loading events...</p>
             </div>
-          ) : filteredEvents.length === 0 ? (
+          ) : events.length === 0 ? (
             <div style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '0.75rem',
@@ -834,9 +1725,10 @@ const StaffEventsView = () => {
                 fontSize: '0.875rem',
                 fontWeight: '500'
               }}>
-                Found {filteredEvents.length} upcoming event{filteredEvents.length !== 1 ? 's' : ''}
+                Found {events.length} upcoming event{events.length !== 1 ? 's' : ''}
                 {searchQuery && ` matching "${searchQuery}"`}
                 {filter !== 'all' && ` in ${filter} category`}
+                {(filter === 'workshop' || filter === 'conference') && professorFilter !== 'all' && ` with ${professorFilter}`}
               </div>
               
               <div style={{
@@ -844,10 +1736,8 @@ const StaffEventsView = () => {
                 gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
                 gap: '1.5rem'
               }}>
-                {filteredEvents.map(event => {
-                  const statusInfo = getEventStatus(event);
+                {events.map(event => {
                   const isRegistered = registeredEventIds.has(String(event.id));
-                  
                   return (
                     <div
                       key={event.id}
@@ -895,6 +1785,7 @@ const StaffEventsView = () => {
                               objectPosition: 'center'
                             }}
                             onError={(e) => {
+                              // Fallback if image doesn't exist
                               e.target.style.display = 'none';
                               e.target.parentElement.style.backgroundColor = getEventTypeColor(event.type);
                               e.target.parentElement.style.display = 'flex';
@@ -911,6 +1802,48 @@ const StaffEventsView = () => {
                               }
                             }}
                           />
+                          {/* Heart Icon for Staff and TA users */}
+                          {(user?.userType === 'TA' || user?.userType === 'Staff') && (
+                            <button
+                              onClick={(e) => handleToggleFavorite(event.id, e)}
+                              style={{
+                                position: 'absolute',
+                                top: '0.75rem',
+                                right: '0.75rem',
+                                background: 'rgba(255, 255, 255, 0.9)',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '2.5rem',
+                                height: '2.5rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                                transition: 'all 0.2s',
+                                zIndex: 10
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.background = '#ffffff';
+                                e.target.style.transform = 'scale(1.1)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.background = 'rgba(255, 255, 255, 0.9)';
+                                e.target.style.transform = 'scale(1)';
+                              }}
+                            >
+                              <span 
+                                className="material-symbols-outlined" 
+                                style={{ 
+                                  fontSize: '1.5rem',
+                                  color: favoriteEventIds.has(String(event.id)) ? '#ef4444' : '#6b7280',
+                                  transition: 'color 0.2s'
+                                }}
+                              >
+                                {favoriteEventIds.has(String(event.id)) ? 'favorite' : 'favorite_border'}
+                              </span>
+                            </button>
+                          )}
                         </div>
                       )}
                       
@@ -928,27 +1861,31 @@ const StaffEventsView = () => {
                           }}>
                             {event.type}
                           </div>
-                        )}
-                      </div>
+                          {getDaysUntilEvent(event.startDate) && (
+                            <div style={{
+                              fontSize: '0.75rem',
+                              color: '#1e40af',
+                              fontWeight: '600',
+                              backgroundColor: '#eff6ff',
+                              padding: '0.25rem 0.625rem',
+                              borderRadius: '0.375rem'
+                            }}>
+                              {getDaysUntilEvent(event.startDate)}
+                            </div>
+                          )}
+                        </div>
                       
-                      <h3 style={{
-                        color: '#1D3557',
-                        fontSize: '1.125rem',
-                        fontWeight: '600',
-                        marginBottom: '0.75rem',
-                        marginTop: 0,
-                        lineHeight: '1.4'
-                      }}>
-                        {event.title}
-                      </h3>
+                        <h3 style={{
+                          color: '#1D3557',
+                          fontSize: '1.125rem',
+                          fontWeight: '600',
+                          marginBottom: '0.75rem',
+                          marginTop: 0,
+                          lineHeight: '1.4'
+                        }}>
+                          {event.title}
+                        </h3>
                       
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.5rem',
-                        marginBottom: '0.75rem',
-                        flex: 1
-                      }}>
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -960,29 +1897,11 @@ const StaffEventsView = () => {
                             fontSize: '1.125rem',
                             color: '#9ca3af'
                           }}>
-                            calendar_today
+                            location_on
                           </span>
-                          <span>{formatDate(event.startDate)}</span>
+                          <span>{event.location}</span>
                         </div>
-                        
-                        <h3 style={{
-                          color: '#1D3557',
-                          fontSize: '1.125rem',
-                          fontWeight: '600',
-                          marginBottom: '0.75rem',
-                          marginTop: 0,
-                          lineHeight: '1.4'
-                        }}>
-                          {event.title}
-                        </h3>
-                        
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.5rem',
-                          marginBottom: '0.75rem',
-                          flex: 1
-                        }}>
+                        {event.price && (
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -994,10 +1913,12 @@ const StaffEventsView = () => {
                               fontSize: '1.125rem',
                               color: '#9ca3af'
                             }}>
-                              calendar_today
+                              attach_money
                             </span>
-                            {formatTableDate(event.startDate)}
+                            <span>{formatDate(event.startDate)}</span>
                           </div>
+                        )}
+                        {event.capacity && (
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1009,11 +1930,12 @@ const StaffEventsView = () => {
                               fontSize: '1.125rem',
                               color: '#9ca3af'
                             }}>
-                              location_on
+                              people
                             </span>
-                            {event.location}
+                            <span>{event.location}</span>
                           </div>
-                          {event.capacity && (
+                        )}
+                        {(event.type === 'bazaar' || event.type === 'booth') && event.vendors && (
                             <div style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -1021,54 +1943,7 @@ const StaffEventsView = () => {
                               fontSize: '0.8125rem',
                               color: '#6b7280'
                             }}>
-                              storefront
-                            </span>
-                            <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {event.description && (
-                        <p style={{
-                          color: '#6b7280',
-                          fontSize: '0.8125rem',
-                          marginBottom: '0.75rem',
-                          marginTop: 0,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          lineHeight: '1.5'
-                        }}>
-                          {event.description}
-                        </p>
-                      )}
-
-                      {(event.type === 'workshop' || event.type === 'trip') && (
-                        isRegistered ? (
-                          <button
-                            disabled
-                            style={{
-                              width: '100%',
-                              padding: '0.75rem 1rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: '#10b981',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              cursor: 'not-allowed',
-                              fontSize: '0.875rem',
-                              fontWeight: '600',
-                              marginTop: 'auto',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.625rem',
-                              fontSize: '0.8125rem',
-                              color: '#6b7280'
-                            }}>
-                              <span className="material-symbols-outlined" style={{
-                                fontSize: '1.125rem',
-                                color: '#9ca3af'
-                              }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
                                 storefront
                               </span>
                               <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
@@ -1096,11 +1971,81 @@ const StaffEventsView = () => {
                               </span>
                             </div>
                           )}
-                        </div>
-                        
-                        {(event.type === 'workshop' || event.type === 'trip') && (
-                          <div style={{ marginTop: 'auto', paddingTop: '0.75rem' }}>
-                            {isRegistered ? (
+
+                        {event.description && (
+                          <p style={{
+                            color: '#6b7280',
+                            fontSize: '0.8125rem',
+                            marginBottom: '0.75rem',
+                            marginTop: 0,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            lineHeight: '1.5'
+                          }}>
+                            {event.description}
+                          </p>
+                        )}
+
+                        <div style={{
+                          marginTop: 'auto',
+                          paddingTop: '0.75rem',
+                          borderTop: '1px solid #e5e7eb',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.75rem'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '0.5rem'
+                          }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewRatingsComments(event);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.375rem',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '0.25rem',
+                                borderRadius: '0.375rem',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f3f4f6';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }}
+                              title="View ratings and comments"
+                            >
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1rem',
+                                color: '#fbbf24'
+                              }}>
+                                star
+                              </span>
+                              <span style={{
+                                fontSize: '0.8125rem',
+                                fontWeight: '600',
+                                color: '#374151'
+                              }}>
+                                {eventRatings[event.id]?.average > 0
+                                  ? eventRatings[event.id].average.toFixed(1)
+                                  : '—'}
+                              </span>
+                            </button>
+                          </div>
+
+                          {(event.type === 'workshop' || event.type === 'trip') && (
+                            isRegistered ? (
                               <button
                                 disabled
                                 onClick={(e) => e.stopPropagation()}
@@ -1151,9 +2096,9 @@ const StaffEventsView = () => {
                                 <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>how_to_reg</span>
                                 Register
                               </button>
-                            )}
-                          </div>
-                        )}
+                            )
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -1165,7 +2110,7 @@ const StaffEventsView = () => {
         </div>
       </main>
 
-      {/* Event Modal - Same as StudentEventsView */}
+      {/* Event Modal */}
       {selectedEvent && (
         <div
           onClick={() => setSelectedEvent(null)}
@@ -1189,113 +2134,55 @@ const StaffEventsView = () => {
               maxWidth: '600px',
               width: '100%',
               maxHeight: '90vh',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden'
+              overflowY: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
             }}
           >
-            {/* Event Image at Top with Close Button Overlay */}
-            <div style={{ position: 'relative' }}>
-              {getEventTypeImage(selectedEvent.type) && (
-                <div style={{
-                  width: '100%',
-                  height: '200px',
-                  overflow: 'hidden',
-                  position: 'relative',
-                  backgroundColor: '#f3f4f6',
-                  flexShrink: 0
-                }}>
-                  <img
-                    src={getEventTypeImage(selectedEvent.type)}
-                    alt={selectedEvent.type ? selectedEvent.type.charAt(0).toUpperCase() + selectedEvent.type.slice(1) : 'Event'}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      objectPosition: 'center'
-                    }}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.parentElement.style.backgroundColor = getEventTypeColor(selectedEvent.type);
-                      e.target.parentElement.style.display = 'flex';
-                      e.target.parentElement.style.alignItems = 'center';
-                      e.target.parentElement.style.justifyContent = 'center';
-                      if (!e.target.parentElement.querySelector('.fallback-text')) {
-                        const fallback = document.createElement('div');
-                        fallback.className = 'fallback-text';
-                        fallback.textContent = getEventTypeFallbackText(selectedEvent.type);
-                        fallback.style.color = '#FFFFFF';
-                        fallback.style.fontSize = '1.5rem';
-                        fallback.style.fontWeight = '700';
-                        e.target.parentElement.appendChild(fallback);
-                      }
-                    }}
-                  />
-                </div>
-              )}
-              
-              {/* Close Button - Upper Right Corner */}
-              <button
-                onClick={() => setSelectedEvent(null)}
-                style={{
-                  position: 'absolute',
-                  top: '0.75rem',
-                  right: '0.75rem',
-                  background: 'rgba(255, 255, 255, 0.9)',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: '#6b7280',
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: '0.375rem',
-                  transition: 'all 0.2s',
-                  lineHeight: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '2rem',
-                  height: '2rem',
-                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-                  zIndex: 10
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#ffffff';
-                  e.target.style.color = '#1D3557';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                  e.target.style.color = '#6b7280';
-                }}
-              >
-                ×
-              </button>
-            </div>
-            
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '1rem 1.5rem',
+              padding: '1.5rem',
               borderBottom: '1px solid #e5e7eb'
             }}>
               <h2 style={{
                 color: '#1D3557',
                 fontSize: '1.5rem',
                 fontWeight: '700',
-                margin: 0,
-                paddingRight: '1rem'
+                margin: 0
               }}>
                 {selectedEvent.title}
               </h2>
+              <button
+                onClick={() => setSelectedEvent(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.25rem',
+                  transition: 'background-color 0.2s',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2rem',
+                  height: '2rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                ×
+              </button>
             </div>
             
-            <div style={{ 
-              padding: '1rem 1.5rem 1.5rem 1.5rem',
-              overflowY: 'auto',
-              flex: 1,
-              minHeight: 0
-            }}>
+            <div style={{ padding: '1.5rem' }}>
               <div style={{
                 padding: '0.375rem 0.875rem',
                 borderRadius: '0.5rem',
@@ -1330,6 +2217,214 @@ const StaffEventsView = () => {
                   }}>
                     calendar_today
                   </span>
+                  {canSubmitFeedback && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{
+                        marginBottom: '2rem',
+                        padding: '1.5rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        position: 'relative',
+                        zIndex: 10
+                      }}
+                    >
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '1rem',
+                        marginTop: 0
+                      }}>
+                        Share Your Feedback
+                      </h3>
+
+                      {modalError && (
+                        <div style={{
+                          padding: '0.75rem',
+                          marginBottom: '1rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: '#fee2e2',
+                          color: '#991b1b',
+                          fontSize: '0.875rem'
+                        }}>
+                          {modalError}
+                        </div>
+                      )}
+
+                      <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Your Rating
+                        </label>
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem'
+                        }}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRating(star);
+                              }}
+                              onMouseEnter={(e) => {
+                                e.stopPropagation();
+                                setHoveredRating(star);
+                              }}
+                              onMouseLeave={(e) => {
+                                e.stopPropagation();
+                                setHoveredRating(0);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontSize: '2rem',
+                                color: (hoveredRating >= star || rating >= star) ? '#fbbf24' : '#d1d5db',
+                                transition: 'all 0.2s',
+                                lineHeight: 1
+                              }}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                        {rating > 0 && (
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await handleSubmitRating(selectedEventForView.eventId);
+                            }}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: '#1e40af',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.stopPropagation();
+                              e.target.style.backgroundColor = '#1e3a8a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.stopPropagation();
+                              e.target.style.backgroundColor = '#1e40af';
+                            }}
+                          >
+                            Submit Rating
+                          </button>
+                        )}
+                      </div>
+
+                      <div>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Your Comment
+                        </label>
+                        <textarea
+                          value={commentText}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setCommentText(e.target.value);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onFocus={(e) => {
+                            e.stopPropagation();
+                            e.target.style.borderColor = '#1e40af';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.stopPropagation();
+                            e.target.style.borderColor = '#e5e7eb';
+                            e.target.style.boxShadow = 'none';
+                          }}
+                          placeholder="Share your thoughts about this event..."
+                          maxLength={1000}
+                          style={{
+                            width: '100%',
+                            minHeight: '100px',
+                            padding: '0.875rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            fontSize: '0.875rem',
+                            fontFamily: 'inherit',
+                            resize: 'vertical',
+                            marginBottom: '0.5rem',
+                            outline: 'none',
+                            transition: 'all 0.2s'
+                          }}
+                        />
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '0.75rem'
+                        }}>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280'
+                          }}>
+                            {commentText.length}/1000 characters
+                          </div>
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await handleSubmitComment(selectedEventForView.eventId);
+                            }}
+                            disabled={!commentText.trim()}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.stopPropagation();
+                              if (commentText.trim()) {
+                                e.target.style.backgroundColor = '#1e3a8a';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.stopPropagation();
+                              if (commentText.trim()) {
+                                e.target.style.backgroundColor = '#1e40af';
+                              }
+                            }}
+                          >
+                            Submit Comment
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Start Date</div>
                     <div style={{ color: '#374151', fontWeight: '500' }}>{formatDate(selectedEvent.startDate)}</div>
@@ -1436,29 +2531,6 @@ const StaffEventsView = () => {
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Vendors</div>
                       <div style={{ color: '#374151', fontWeight: '500' }}>{(selectedEvent.vendors && selectedEvent.vendors.length) || 0} vendor{((selectedEvent.vendors && selectedEvent.vendors.length) || 0) !== 1 ? 's' : ''} participating</div>
-                    </div>
-                  </div>
-                )}
-                {(selectedEvent.type === 'workshop' || selectedEvent.type === 'conference') && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                  }}>
-                    <span className="material-symbols-outlined" style={{
-                      fontSize: '1.25rem',
-                      color: '#9ca3af'
-                    }}>
-                      school
-                    </span>
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Professor</div>
-                      <div style={{ color: '#374151', fontWeight: '500' }}>
-                        {selectedEvent.professors 
-                          ? (Array.isArray(selectedEvent.professors) ? selectedEvent.professors.join(', ') : selectedEvent.professors)
-                          : (selectedEvent.creatorName || 'Professor')
-                        }
-                      </div>
                     </div>
                   </div>
                 )}
@@ -1682,6 +2754,332 @@ const StaffEventsView = () => {
           workshop={selectedWorkshop}
           onSubmitted={handleCloseWorkshopEditModal}
         />
+      )}
+
+      {/* Ratings & Comments Modal */}
+      {showRatingsCommentsModal && selectedEventForView && (
+        <div
+          onClick={() => {
+            setShowRatingsCommentsModal(false);
+            setSelectedEventForView(null);
+            setRatingsAndComments(null);
+            resetFeedbackState();
+            setRatingsLoadError('');
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1001,
+            padding: '1rem',
+            backdropFilter: 'blur(4px)'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '700px',
+              width: '100%',
+              maxHeight: '90vh',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              position: 'relative',
+              zIndex: 1002
+            }}
+          >
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h2 style={{
+                  color: '#1D3557',
+                  fontSize: '1.5rem',
+                  fontWeight: '700',
+                  margin: 0
+                }}>
+                  Ratings & Comments
+                </h2>
+                {selectedEventForView.eventTitle && (
+                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+                    {selectedEventForView.eventTitle}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setShowRatingsCommentsModal(false);
+                  setSelectedEventForView(null);
+                  setRatingsAndComments(null);
+                    resetFeedbackState();
+                    setRatingsLoadError('');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
+                  lineHeight: 1
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                padding: '1.5rem',
+                overflowY: 'auto',
+                flex: 1,
+                position: 'relative',
+                zIndex: 10
+              }}
+            >
+              {ratingsLoadError && (
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#fee2e2',
+                  color: '#991b1b',
+                  fontSize: '0.875rem'
+                }}>
+                  {ratingsLoadError}
+                </div>
+              )}
+
+              {loadingRatingsComments ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: '#6b7280'
+                }}>
+                  Loading...
+                </div>
+              ) : ratingsAndComments ? (
+                <>
+                  {ratingsAndComments.ratings && (
+                    <div style={{
+                      marginBottom: '2rem',
+                      padding: '1.5rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '0.5rem'
+                    }}>
+                      <h3 style={{
+                        color: '#1D3557',
+                        fontSize: '1.125rem',
+                        fontWeight: '600',
+                        marginBottom: '1rem',
+                        marginTop: 0
+                      }}>
+                        Ratings
+                      </h3>
+                      {ratingsAndComments.ratings.count > 0 ? (
+                        <>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            marginBottom: '1rem'
+                          }}>
+                            <div style={{
+                              fontSize: '2.5rem',
+                              fontWeight: '700',
+                              color: '#1D3557'
+                            }}>
+                              {ratingsAndComments.ratings.average.toFixed(1)}
+                            </div>
+                            <div>
+                              <div style={{
+                                display: 'flex',
+                                gap: '0.25rem',
+                                marginBottom: '0.25rem'
+                              }}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <span
+                                    key={star}
+                                    style={{
+                                      fontSize: '1.25rem',
+                                      color: star <= Math.round(ratingsAndComments.ratings.average) ? '#fbbf24' : '#d1d5db'
+                                    }}
+                                  >
+                                    ★
+                                  </span>
+                                ))}
+                              </div>
+                              <div style={{
+                                fontSize: '0.875rem',
+                                color: '#6b7280'
+                              }}>
+                                Based on {ratingsAndComments.ratings.count} rating{ratingsAndComments.ratings.count !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                          </div>
+                          {ratingsAndComments.ratings.distribution && (
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem'
+                            }}>
+                              {[5, 4, 3, 2, 1].map((star) => (
+                                <div key={star} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem'
+                                }}>
+                                  <span style={{ fontSize: '0.875rem', color: '#6b7280', minWidth: '60px' }}>
+                                    {star} star{star !== 1 ? 's' : ''}
+                                  </span>
+                                  <div style={{
+                                    flex: 1,
+                                    height: '8px',
+                                    backgroundColor: '#e5e7eb',
+                                    borderRadius: '0.25rem',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <div style={{
+                                      width: `${ratingsAndComments.ratings.count > 0 ? (ratingsAndComments.ratings.distribution[star] || 0) / ratingsAndComments.ratings.count * 100 : 0}%`,
+                                      height: '100%',
+                                      backgroundColor: '#fbbf24',
+                                      transition: 'width 0.3s'
+                                    }} />
+                                  </div>
+                                  <span style={{ fontSize: '0.875rem', color: '#6b7280', minWidth: '40px' }}>
+                                    {ratingsAndComments.ratings.distribution[star] || 0}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p style={{
+                          color: '#6b7280',
+                          fontSize: '0.875rem',
+                          margin: 0
+                        }}>
+                          No ratings yet
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 style={{
+                      color: '#1D3557',
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      marginBottom: '1rem',
+                      marginTop: 0
+                    }}>
+                      Comments ({ratingsAndComments.comments?.length || 0})
+                    </h3>
+                    {ratingsAndComments.comments && ratingsAndComments.comments.length > 0 ? (
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem'
+                      }}>
+                        {ratingsAndComments.comments.map((comment) => (
+                          <div
+                            key={comment._id}
+                            style={{
+                              padding: '1rem',
+                              backgroundColor: '#f9fafb',
+                              borderRadius: '0.5rem',
+                              border: '1px solid #e5e7eb'
+                            }}
+                          >
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              marginBottom: '0.5rem'
+                            }}>
+                              <div>
+                                <div style={{
+                                  fontWeight: '600',
+                                  color: '#1D3557',
+                                  fontSize: '0.875rem'
+                                }}>
+                                  {comment.user?.firstName} {comment.user?.lastName}
+                                </div>
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: '#6b7280'
+                                }}>
+                                  {comment.user?.userType || 'User'}
+                                </div>
+                              </div>
+                              <div style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280'
+                              }}>
+                                {formatDate(comment.createdAt)}
+                              </div>
+                            </div>
+                            <p style={{
+                              color: '#374151',
+                              fontSize: '0.875rem',
+                              lineHeight: '1.6',
+                              margin: 0
+                            }}>
+                              {comment.text}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        margin: 0,
+                        padding: '1rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '0.5rem'
+                      }}>
+                        No comments yet
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: '#6b7280'
+                }}>
+                  No data available
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

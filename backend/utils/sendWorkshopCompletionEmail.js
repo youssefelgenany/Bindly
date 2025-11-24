@@ -1,4 +1,7 @@
 const nodemailer = require('nodemailer');
+const fs = require('fs');
+const path = require('path');
+const { generateCertificate } = require('./generateCertificate');
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -10,7 +13,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-async function sendWorkshopCompletionEmail(email, name, workshopTitle, endDate, location) {
+async function sendWorkshopCompletionEmail(email, name, workshopTitle, endDate, location, userType = 'Student') {
   const formattedDate = new Date(endDate).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -82,6 +85,7 @@ async function sendWorkshopCompletionEmail(email, name, workshopTitle, endDate, 
   console.log('   SMTP User:', process.env.SMTP_USER);
   console.log('   To:', email);
   console.log('   Subject: Congratulations on Completing -', workshopTitle);
+  console.log('   User Type:', userType);
 
   try {
     // Verify transporter connection first
@@ -92,13 +96,74 @@ async function sendWorkshopCompletionEmail(email, name, workshopTitle, endDate, 
       from: process.env.SMTP_FROM || `Bindly <${process.env.SMTP_USER}>`,
       to: email,
       subject: `🎉 Congratulations on Completing - ${workshopTitle}`,
-      html: html
+      html: html,
+      attachments: []
     };
+
+    // Generate and attach certificate for TAs, Staff, Students, and Professors
+    const eligibleForCertificate = ['TA', 'Staff', 'Student', 'Professor'].includes(userType);
+    if (eligibleForCertificate) {
+      try {
+        console.log(`📜 Generating certificate for ${userType}:`, name);
+        
+        // Create certificates directory if it doesn't exist
+        const certsDir = path.join(__dirname, '../certificates');
+        if (!fs.existsSync(certsDir)) {
+          fs.mkdirSync(certsDir, { recursive: true });
+        }
+
+        // Generate unique filename
+        const sanitizedName = name.replace(/[^a-zA-Z0-9]/g, '_');
+        const sanitizedWorkshop = workshopTitle.replace(/[^a-zA-Z0-9]/g, '_');
+        const timestamp = Date.now();
+        const certFileName = `certificate_${sanitizedName}_${sanitizedWorkshop}_${timestamp}.pdf`;
+        const certPath = path.join(certsDir, certFileName);
+
+        // Generate certificate
+        await generateCertificate(name, workshopTitle, new Date(endDate), certPath);
+
+        // Attach certificate to email
+        mailOptions.attachments.push({
+          filename: `Certificate_${workshopTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+          path: certPath
+        });
+
+        console.log('✅ Certificate generated and attached');
+
+        // Update email HTML to mention certificate
+        const updatedHtml = html.replace(
+          '<p>Congratulations! You have successfully completed the workshop. We hope you found it valuable and enriching.</p>',
+          `<p>Congratulations! You have successfully completed the workshop. We hope you found it valuable and enriching.</p>
+          <p style="background: #e3f2fd; padding: 15px; border-radius: 5px; border-left: 4px solid #2196F3; margin: 15px 0;">
+            <strong>📜 Certificate of Attendance</strong><br>
+            Your certificate of attendance has been attached to this email. Please find it in the attachments.
+          </p>`
+        );
+        mailOptions.html = updatedHtml;
+
+      } catch (certError) {
+        console.error('⚠️  Failed to generate certificate, sending email without it:', certError.message);
+        // Continue without certificate if generation fails
+      }
+    }
 
     const info = await transporter.sendMail(mailOptions);
     console.log('✅ Workshop completion email sent successfully!');
     console.log('   Message ID:', info.messageId);
     console.log('   To:', email);
+    
+    // Clean up certificate file after sending (optional - you might want to keep them)
+    if (mailOptions.attachments.length > 0 && mailOptions.attachments[0].path) {
+      const certPath = mailOptions.attachments[0].path;
+      // Delete after a delay to ensure email is sent
+      setTimeout(() => {
+        if (fs.existsSync(certPath)) {
+          fs.unlinkSync(certPath);
+          console.log('🗑️  Certificate file cleaned up:', certPath);
+        }
+      }, 5000);
+    }
+    
     return { sent: true, messageId: info.messageId };
   } catch (error) {
     console.error('❌ Failed to send workshop completion email:');

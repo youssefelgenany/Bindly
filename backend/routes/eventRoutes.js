@@ -21,12 +21,20 @@ const {
   cancelRegistration,
   getWalletTransactions,
   getEventRatingsAndComments,
+  submitRating,
+  submitComment,
+  deleteComment,
   cleanupInvalidEvents,
-  getSalesReport
+  getSalesReport,
+  archiveEvent,
+  unarchiveEvent,
+  getArchivedEvents,
+  exportRegistrations
 } = require("../controllers/eventController");
 const { verifyPayment } = require("../controllers/paymentVerificationController");
 const { sendWorkshopCompletionEmails } = require("../controllers/workshopCompletionController");
 const { getWorkshopParticipants } = require("../controllers/workshopController");
+const stripeSuccessController = require("../controllers/stripeSuccessController");
 
 const { protect, permit } = require("../middleware/authMiddleware");
 
@@ -85,15 +93,58 @@ router.get(
   getFavoriteEvents
 );
 
+// 📦 Get archived events (Events Office only) - MUST be before /:id routes
+router.get(
+  "/archived",
+  protect,
+  permit("event_office", "Event Office", "Events Office", "admin"),
+  getArchivedEvents
+);
+
+// ✅ Stripe payment success callback (public - no auth required, Stripe redirects don't include tokens)
+// MUST be before /:id routes to avoid route matching conflicts
+router.get("/payment-success", stripeSuccessController);
+
 // 👥 Get registrations for a specific event (for event creators)
 router.get("/:id/registrations", protect, getEventRegistrations);
+
+// 📊 Export registrations to Excel (Events Office only, except conferences) - MUST be before /:id
+router.get(
+  "/:id/export-registrations",
+  protect,
+  permit("event_office", "Event Office", "Events Office", "admin"),
+  exportRegistrations
+);
 
 // 📊 Get ratings and comments for an event (all authenticated users can view)
 router.get("/:id/ratings", protect, getEventRatingsAndComments);
 router.get("/:id/comments", protect, getEventRatingsAndComments);
 router.get("/:id/feedback", protect, getEventRatingsAndComments);
 
-// 🔍 Get a specific event by its ID
+// ⭐ Submit a rating for an event (Student, Staff, TA, Professor)
+router.post(
+  "/:id/ratings",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  submitRating
+);
+
+// 💬 Submit a comment on an event (Student, Staff, TA, Professor)
+router.post(
+  "/:id/comments",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  submitComment
+);
+
+// 🗑️ Delete a comment (owner or admin) - permissions checked in controller
+router.delete(
+  "/:id/comments/:commentId",
+  protect,
+  deleteComment
+);
+
+// 🔍 Get a specific event by its ID (must be last)
 router.get("/:id", protect, getEventById);
 
 // ✏️ Update event details (Event Office, Admin, or Professor)
@@ -128,12 +179,6 @@ router.post(
   payForEvent
 );
 
-// ✅ Confirm Stripe payment success (callback after redirect - public route)
-router.get(
-  "/payment-success",
-  require("../controllers/stripeSuccessController")
-);
-
 // 🔍 Manual payment verification endpoint (for testing/debugging)
 router.get(
   "/verify-payment",
@@ -145,6 +190,14 @@ router.get(
 // 🚫 Cancel event registration and get refund
 router.post(
   "/:id/cancel",
+  protect,
+  permit("Student", "Staff", "TA", "Professor"),
+  cancelRegistration
+);
+
+// 🚫 Cancel event registration (DELETE method for consistency with frontend)
+router.delete(
+  "/:id/register",
   protect,
   permit("Student", "Staff", "TA", "Professor"),
   cancelRegistration
@@ -188,6 +241,22 @@ router.delete(
   protect,
   permit("Student", "Staff", "TA", "Professor"),
   removeFromFavorites
+);
+
+// 📦 Archive an event (Events Office only)
+router.post(
+  "/:id/archive",
+  protect,
+  permit("event_office", "Event Office", "Events Office", "admin"),
+  archiveEvent
+);
+
+// 📦 Unarchive an event (Events Office only)
+router.post(
+  "/:id/unarchive",
+  protect,
+  permit("event_office", "Event Office", "Events Office", "admin"),
+  unarchiveEvent
 );
 
 module.exports = router;

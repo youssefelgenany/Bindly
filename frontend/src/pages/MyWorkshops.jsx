@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import professorApiService from '../api/professorApi';
+import { notificationApiService } from '../api/notificationApi';
 
 const MyWorkshops = () => {
   const { user, logout } = useAuth();
@@ -36,6 +37,16 @@ const MyWorkshops = () => {
   });
   const [creating, setCreating] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [selectedWorkshopForParticipants, setSelectedWorkshopForParticipants] = useState(null);
+  const [participants, setParticipants] = useState([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
+  const [workshopStatus, setWorkshopStatus] = useState(null);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -54,10 +65,90 @@ const MyWorkshops = () => {
       if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
+      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLogoutDropdown]);
+  }, [showLogoutDropdown, showNotificationsDropdown]);
+
+  // Load notifications
+  const loadNotifications = useCallback(async () => {
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+      
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(notificationsResult.data.data.notifications || notificationsResult.data.data || []);
+      }
+      
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, []);
+
+  // Load notifications on mount and poll for updates
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
+
+  // Mark notification as read
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev => prev.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Mark all as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  // Format notification date
+  const formatNotificationDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   const handleLogout = () => {
     logout();
@@ -71,11 +162,43 @@ const MyWorkshops = () => {
     setError('');
 
     try {
-      const result = await professorApiService.getMyWorkshops();
-      if (result.success) {
-        setWorkshops(Array.isArray(result.data) ? result.data : []);
+      // Load both workshops and status in parallel
+      const [workshopsResult, statusResult] = await Promise.all([
+        professorApiService.getMyWorkshops(),
+        professorApiService.getMyWorkshopsStatus()
+      ]);
+
+      if (workshopsResult.success) {
+        let workshopsData = Array.isArray(workshopsResult.data) ? workshopsResult.data : [];
+        
+        // Merge status data if available
+        if (statusResult.success && statusResult.data && statusResult.data.workshops) {
+          setWorkshopStatus(statusResult.data);
+          const statusMap = new Map();
+          statusResult.data.workshops.forEach(status => {
+            statusMap.set(status.id, status);
+          });
+          
+          workshopsData = workshopsData.map(workshop => {
+            const status = statusMap.get(workshop._id || workshop.id);
+            if (status) {
+              return {
+                ...workshop,
+                editRequests: status.editRequests,
+                rejectionReason: status.rejectionReason,
+                hasEditRequests: status.hasEditRequests,
+                hasRejectionReason: status.hasRejectionReason,
+                submittedAt: status.submittedAt,
+                lastUpdated: status.lastUpdated
+              };
+            }
+            return workshop;
+          });
+        }
+        
+        setWorkshops(workshopsData);
       } else {
-        setError(result.message || 'Failed to load workshops');
+        setError(workshopsResult.message || 'Failed to load workshops');
         setWorkshops([]);
       }
     } catch (err) {
@@ -84,6 +207,7 @@ const MyWorkshops = () => {
       setWorkshops([]);
     } finally {
       setLoading(false);
+      setLoadingStatus(false);
     }
   }, [user]);
 
@@ -92,6 +216,7 @@ const MyWorkshops = () => {
       loadWorkshops();
     }
   }, [user, loadWorkshops]);
+
 
   useEffect(() => {
     if (location.pathname === '/professor/my-workshops' && user) {
@@ -325,7 +450,8 @@ const MyWorkshops = () => {
         setShowEditModal(false);
         setSelectedWorkshop(null);
         setError('');
-        await loadWorkshops(); // Reload workshops
+        // Reload workshops and status to reflect cleared edit requests
+        await loadWorkshops();
       } else {
         setError(result.message || result.error?.message || 'Failed to update workshop');
       }
@@ -505,6 +631,43 @@ const MyWorkshops = () => {
     return colorMap[type?.toLowerCase()] || '#6b7280';
   };
 
+  const handleViewParticipants = async (workshop) => {
+    setSelectedWorkshopForParticipants(workshop);
+    setShowParticipantsModal(true);
+    setLoadingParticipants(true);
+    setParticipants([]);
+
+    try {
+      console.log('📋 Loading participants for workshop:', workshop._id, workshop.title);
+      const result = await professorApiService.getEventRegistrations(workshop._id);
+      console.log('📋 Participants API response:', result);
+      
+      if (result.success && result.data && result.data.registrations) {
+        console.log('✅ Found participants:', result.data.registrations.length);
+        setParticipants(result.data.registrations);
+      } else if (result.success && Array.isArray(result.data)) {
+        // Handle case where registrations are returned directly as array
+        console.log('✅ Found participants (array format):', result.data.length);
+        setParticipants(result.data);
+      } else {
+        console.log('⚠️ No participants found or unexpected response format');
+        setParticipants([]);
+      }
+    } catch (err) {
+      console.error('❌ Error loading participants:', err);
+      console.error('❌ Error details:', err.response?.data || err.message);
+      setParticipants([]);
+    } finally {
+      setLoadingParticipants(false);
+    }
+  };
+
+  const getRemainingSpots = (workshop) => {
+    const capacity = workshop.capacity || 0;
+    const registered = workshop.registeredCount || 0;
+    return Math.max(0, capacity - registered);
+  };
+
   return (
     <div style={{
       display: 'flex',
@@ -537,6 +700,250 @@ const MyWorkshops = () => {
           </Link>
           </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          {/* Notifications Bell */}
+          <div style={{ position: 'relative' }} data-notifications-dropdown>
+            <button
+              onClick={() => {
+                setShowNotificationsDropdown(!showNotificationsDropdown);
+                setShowLogoutDropdown(false);
+                if (!showNotificationsDropdown) {
+                  loadNotifications();
+                }
+              }}
+              style={{
+                position: 'relative',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span className="material-symbols-outlined" style={{
+                fontSize: '1.5rem',
+                color: '#1D3557'
+              }}>
+                notifications
+              </span>
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '0.25rem',
+                  right: '0.25rem',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  borderRadius: '50%',
+                  width: '1.125rem',
+                  height: '1.125rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.625rem',
+                  fontWeight: '700',
+                  border: '2px solid #FFFFFF'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {showNotificationsDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 1001,
+                width: '360px',
+                maxHeight: '500px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  padding: '1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    margin: 0
+                  }}>
+                    Notifications
+                  </h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllAsRead}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#1e40af',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        padding: '0.25rem 0.5rem'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.textDecoration = 'underline';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.textDecoration = 'none';
+                      }}
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                <div style={{
+                  overflowY: 'auto',
+                  maxHeight: '400px'
+                }}>
+                  {loadingNotifications ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      Loading...
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification._id}
+                        onClick={() => {
+                          if (!notification.isRead) {
+                            handleMarkAsRead(notification._id);
+                          }
+                          if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                            navigate(`/professor/all-events`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            (notification.type === 'event_reminder' || 
+                             notification.type === 'workshop_reminder' || 
+                             notification.type === 'trip_reminder' ||
+                             notification.type === 'gym_session_reminder') && 
+                            (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                          ) {
+                            // Navigate to My Events for reminders
+                            navigate(`/professor/events`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            notification.type === 'new_loyalty_partner' || 
+                            notification.type === 'loyalty_partner_added' ||
+                            (notification.type === 'system' && notification.metadata?.vendorId)
+                          ) {
+                            // Navigate to Loyalty Partners page
+                            navigate(`/professor/loyalty-vendors`);
+                            setShowNotificationsDropdown(false);
+                          }
+                        }}
+                        style={{
+                          padding: '1rem',
+                          borderBottom: '1px solid #f3f4f6',
+                          cursor: 'pointer',
+                          backgroundColor: notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fef2f2'
+                              : '#eff6ff',
+                          borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
+                            ? '3px solid #ef4444'
+                            : 'none',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#f9fafb' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fee2e2'
+                              : '#dbeafe';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fef2f2'
+                              : '#eff6ff';
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{
+                              fontSize: '0.875rem',
+                              fontWeight: notification.isRead ? '400' : '600',
+                              color: '#1D3557',
+                              margin: 0,
+                              marginBottom: '0.25rem'
+                            }}>
+                              {notification.title || notification.message}
+                            </p>
+                            {notification.message && notification.message !== notification.title && (
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                margin: 0
+                              }}>
+                                {notification.message}
+                              </p>
+                            )}
+                            <p style={{
+                              fontSize: '0.625rem',
+                              color: '#9ca3af',
+                              margin: '0.5rem 0 0 0'
+                            }}>
+                              {formatNotificationDate(notification.createdAt)}
+                            </p>
+                          </div>
+                          {!notification.isRead && (
+                            <div style={{
+                              width: '0.5rem',
+                              height: '0.5rem',
+                              borderRadius: '50%',
+                              backgroundColor: '#1e40af',
+                              flexShrink: 0,
+                              marginTop: '0.25rem'
+                            }} />
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
@@ -694,6 +1101,19 @@ const MyWorkshops = () => {
             My Workshops
           </Link>
           <Link
+            to="/professor/favorites"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/favorites') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/favorites') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Favorites
+          </Link>
+          <Link
             to="/gym-schedule"
             style={{
               textDecoration: 'none',
@@ -714,16 +1134,27 @@ const MyWorkshops = () => {
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        backgroundColor: '#f6f7f8'
       }}>
-
-        {/* Content - Split Screen Layout */}
+        {/* Content Wrapper with Margins */}
         <div style={{
           flex: 1,
-          display: 'flex',
-          overflow: 'hidden',
+          padding: '2rem 0',
+          overflowY: 'auto',
           backgroundColor: '#f6f7f8'
         }}>
+          <div style={{
+            marginLeft: '4rem',
+            marginRight: '4rem'
+          }}>
+            {/* Content - Split Screen Layout */}
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              overflow: 'hidden',
+              backgroundColor: '#f6f7f8'
+            }}>
           {/* Left Side - Workshops List */}
           <div style={{
             flex: showCreateForm ? 1 : 1,
@@ -788,13 +1219,82 @@ const MyWorkshops = () => {
             </div>
           </div>
 
-          {/* Create Workshop Button - Below Banner, Right Aligned */}
-          {!showCreateForm && (
-            <div style={{ 
-              marginBottom: '1.5rem',
-              display: 'flex',
-              justifyContent: 'flex-end'
+          {/* Summary Section */}
+          {!showCreateForm && workshopStatus && workshopStatus.summary && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: '1rem',
+              marginBottom: '1.5rem'
             }}>
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Pending</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#f59e0b' }}>
+                  {workshopStatus.summary.pending || 0}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Approved</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#059669' }}>
+                  {workshopStatus.summary.approved || 0}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Needs Edits</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#d97706' }}>
+                  {workshopStatus.summary.needsEdits || 0}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Rejected</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#dc2626' }}>
+                  {workshopStatus.summary.rejected || 0}
+                </div>
+              </div>
+              {workshopStatus.summary.withEditRequests > 0 && (
+                <div style={{
+                  backgroundColor: '#FEF3C7',
+                  padding: '1rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #FCD34D',
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                }}>
+                  <div style={{ fontSize: '0.75rem', color: '#92400e', marginBottom: '0.25rem' }}>With Edit Requests</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#92400e' }}>
+                    {workshopStatus.summary.withEditRequests || 0}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Create Workshop Button - Below Banner */}
+          {!showCreateForm && (
+            <div style={{ marginBottom: '1.5rem' }}>
               <button
                 onClick={() => setShowCreateForm(true)}
                 style={{
@@ -1067,10 +1567,90 @@ const MyWorkshops = () => {
                             }}>
                               people
                             </span>
-                            <span>Capacity: {workshop.capacity}</span>
+                            <span>
+                              {workshop.registeredCount || 0} / {workshop.capacity} registered
+                              {getRemainingSpots(workshop) > 0 && (
+                                <span style={{ color: '#059669', fontWeight: '600', marginLeft: '0.5rem' }}>
+                                  ({getRemainingSpots(workshop)} spots remaining)
+                                </span>
+                              )}
+                            </span>
                           </div>
                         )}
                       </div>
+
+                      {/* Edit Requests and Rejection Reasons */}
+                      {(workshop.hasEditRequests || workshop.hasRejectionReason) && (
+                        <div style={{
+                          marginBottom: '0.75rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.5rem'
+                        }}>
+                          {workshop.hasEditRequests && workshop.editRequests && (
+                            <div style={{
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: '#FEF3C7',
+                              border: '1px solid #FCD34D'
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                marginBottom: '0.5rem',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                color: '#92400e'
+                              }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                  edit_note
+                                </span>
+                                Edit Requests
+                              </div>
+                              <div style={{
+                                fontSize: '0.8125rem',
+                                color: '#78350f',
+                                lineHeight: '1.5',
+                                whiteSpace: 'pre-wrap'
+                              }}>
+                                {workshop.editRequests}
+                              </div>
+                            </div>
+                          )}
+                          {workshop.hasRejectionReason && workshop.rejectionReason && (
+                            <div style={{
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: '#FEE2E2',
+                              border: '1px solid #FCA5A5'
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                marginBottom: '0.5rem',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                color: '#991b1b'
+                              }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                  cancel
+                                </span>
+                                Rejection Reason
+                              </div>
+                              <div style={{
+                                fontSize: '0.8125rem',
+                                color: '#7f1d1d',
+                                lineHeight: '1.5',
+                                whiteSpace: 'pre-wrap'
+                              }}>
+                                {workshop.rejectionReason}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       
                       <div style={{
                         display: 'flex',
@@ -1079,6 +1659,39 @@ const MyWorkshops = () => {
                         paddingTop: '0.75rem',
                         borderTop: '1px solid #e5e7eb'
                           }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewParticipants(workshop);
+                              }}
+                              style={{
+                            flex: 1,
+                                padding: '0.5rem',
+                                borderRadius: '0.375rem',
+                            backgroundColor: '#059669',
+                            color: '#FFFFFF',
+                            border: 'none',
+                                cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            gap: '0.25rem',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#047857';
+                              }}
+                              onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = '#059669';
+                              }}
+                            >
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                groups
+                              </span>
+                          Participants
+                            </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1703,6 +2316,8 @@ const MyWorkshops = () => {
               </form>
             </div>
           )}
+            </div>
+          </div>
         </div>
       </main>
 
@@ -2307,6 +2922,245 @@ const MyWorkshops = () => {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Participants Modal */}
+      {showParticipantsModal && selectedWorkshopForParticipants && (
+        <div
+          onClick={() => setShowParticipantsModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem',
+            backdropFilter: 'blur(4px)'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              maxWidth: '700px',
+              width: '100%',
+              maxHeight: '90vh',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <div>
+                <h2 style={{
+                  color: '#1D3557',
+                  fontSize: '1.5rem',
+                  fontWeight: '700',
+                  margin: 0,
+                  marginBottom: '0.25rem'
+                }}>
+                  Workshop Participants
+                </h2>
+                <p style={{
+                  color: '#6b7280',
+                  fontSize: '0.875rem',
+                  margin: 0
+                }}>
+                  {selectedWorkshopForParticipants.workshopName || selectedWorkshopForParticipants.title}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowParticipantsModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  transition: 'all 0.2s',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2rem',
+                  height: '2rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#1D3557';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Participants Info */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              backgroundColor: '#f9fafb'
+            }}>
+              <div style={{
+                display: 'flex',
+                gap: '2rem',
+                alignItems: 'center',
+                flexWrap: 'wrap'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Total Capacity</div>
+                  <div style={{ color: '#374151', fontWeight: '600', fontSize: '1rem' }}>
+                    {selectedWorkshopForParticipants.capacity || 0}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Registered</div>
+                  <div style={{ color: '#374151', fontWeight: '600', fontSize: '1rem' }}>
+                    {selectedWorkshopForParticipants.registeredCount || 0}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Remaining Spots</div>
+                  <div style={{ 
+                    color: getRemainingSpots(selectedWorkshopForParticipants) > 0 ? '#059669' : '#dc2626', 
+                    fontWeight: '600', 
+                    fontSize: '1rem' 
+                  }}>
+                    {getRemainingSpots(selectedWorkshopForParticipants)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Participants List */}
+            <div style={{
+              padding: '1.5rem',
+              overflowY: 'auto',
+              flex: 1,
+              minHeight: 0
+            }}>
+              {loadingParticipants ? (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: '3rem',
+                  color: '#6b7280'
+                }}>
+                  <div style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    border: '3px solid #e5e7eb',
+                    borderTop: '3px solid #1e40af',
+                    borderRadius: '50%',
+                    display: 'inline-block',
+                    marginBottom: '1rem'
+                  }} className="spinner"></div>
+                  <span>Loading participants...</span>
+                </div>
+              ) : participants.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '3rem',
+                  color: '#6b7280'
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '3rem', opacity: 0.5, marginBottom: '1rem', display: 'block' }}>
+                    person_off
+                  </span>
+                  <p style={{ fontSize: '1rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+                    No participants yet
+                  </p>
+                  <p style={{ fontSize: '0.875rem', margin: 0 }}>
+                    No one has registered for this workshop yet.
+                  </p>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem'
+                }}>
+                  {participants.map((participant, index) => (
+                    <div
+                      key={participant.id || index}
+                      style={{
+                        padding: '1rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{
+                          fontWeight: '600',
+                          color: '#1D3557',
+                          fontSize: '0.875rem',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {participant.name || 'Unknown'}
+                        </div>
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280',
+                          marginBottom: '0.125rem'
+                        }}>
+                          {participant.email}
+                        </div>
+                        {participant.studentId && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280'
+                          }}>
+                            {participant.userType === 'TA' ? 'TA ID' : 'Student ID'}: {participant.studentId}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{
+                        padding: '0.375rem 0.75rem',
+                        borderRadius: '0.375rem',
+                        backgroundColor: participant.status === 'approved' || participant.status === 'registered' 
+                          ? '#d1fae5' 
+                          : participant.status === 'pending'
+                          ? '#fef3c7'
+                          : '#fee2e2',
+                        color: participant.status === 'approved' || participant.status === 'registered'
+                          ? '#065f46'
+                          : participant.status === 'pending'
+                          ? '#92400e'
+                          : '#991b1b',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        textTransform: 'capitalize'
+                      }}>
+                        {participant.status || 'pending'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -100,6 +100,8 @@ const AdminUsers = () => {
           return userType === 'Event Office' || userType === 'event office' || 
                  userType === 'Event_Office' || userType === 'event_office' ||
                  userTypeLower === 'event office';
+        } else if (roleFilter === 'Vendor') {
+          return userType === 'Vendor' || userType === 'vendor' || userTypeLower === 'vendor';
         } else {
           return userType === roleFilter;
         }
@@ -299,10 +301,14 @@ const AdminUsers = () => {
     setToggleMsgById(prev => ({ ...prev, [userId]: '' }));
     
     try {
-      const result = await adminApiService.updateUserStatus(userId, newStatus);
+      // Use dedicated block/unblock endpoints instead of updateUserStatus
+      const result = newStatus 
+        ? await adminApiService.unblockUser(userId)
+        : await adminApiService.blockUser(userId);
+      
       if (result.success) {
         setActiveStatusById(prev => ({ ...prev, [userId]: newStatus }));
-        setToggleMsgById(prev => ({ ...prev, [userId]: 'Status updated.' }));
+        setToggleMsgById(prev => ({ ...prev, [userId]: result.message || 'Status updated.' }));
         // Update the user in the local state
         setUsers(prev => prev.map(u => 
           u._id === userId ? { ...u, status: newStatus ? 'active' : 'blocked' } : u
@@ -319,6 +325,65 @@ const AdminUsers = () => {
 
   const handleDeleteClick = (userId) => {
     setDeleteConfirm({ show: true, userId });
+  };
+
+  const handleViewDocument = async (vendorId, documentType) => {
+    try {
+      const token = localStorage.getItem('token');
+      const url = `http://localhost:5000/api/vendor/${vendorId}/documents/${documentType}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+      } else {
+        alert('Failed to load document');
+      }
+    } catch (error) {
+      console.error('Error viewing document:', error);
+      alert('Failed to view document');
+    }
+  };
+
+  const handleDownloadDocument = async (vendorId, documentType) => {
+    try {
+      const token = localStorage.getItem('token');
+      const url = `http://localhost:5000/api/vendor/${vendorId}/documents/${documentType}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        
+        const vendor = users.find(v => (v._id || v.id) === vendorId);
+        const companyName = vendor?.companyName || 'vendor';
+        const safeName = companyName.replace(/[^a-z0-9]/gi, '_');
+        link.download = `${safeName}_${documentType}.${documentType === 'logo' ? 'png' : 'pdf'}`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      } else {
+        alert('Failed to download document');
+      }
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      alert('Failed to download document');
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -611,6 +676,45 @@ const AdminUsers = () => {
                   margin: 0
                 }}>
                   Users
+                </p>
+              </Link>
+
+              <Link
+                to="/admin/loyalty-program-vendors"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isActiveRoute('/admin/loyalty-program-vendors') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActiveRoute('/admin/loyalty-program-vendors')) {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActiveRoute('/admin/loyalty-program-vendors')) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
+                  color: isActiveRoute('/admin/loyalty-program-vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  fontSize: '1.25rem' 
+                }}>
+                  local_offer
+                </span>
+                <p style={{
+                  color: isActiveRoute('/admin/loyalty-program-vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/admin/loyalty-program-vendors') ? '700' : '500',
+                  lineHeight: 'normal',
+                  margin: 0
+                }}>
+                  Loyalty Partners
                 </p>
               </Link>
 
@@ -1008,7 +1112,7 @@ const AdminUsers = () => {
                   
                   {/* Filter Buttons */}
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', flexShrink: 0 }}>
-                    {['all', 'Admin', 'Event Office', 'TA', 'Staff', 'Professor', 'Student'].map((role) => (
+                    {['all', 'Admin', 'Event Office', 'TA', 'Staff', 'Professor', 'Student', 'Vendor'].map((role) => (
                       <button
                         key={role}
                         onClick={() => setRoleFilter(role)}
@@ -1157,7 +1261,9 @@ const AdminUsers = () => {
                                 fontWeight: '500',
                                 color: '#111827'
                               }}>
-                                {`${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name || 'Unknown User'}
+                                {u.userType === 'Vendor' 
+                                  ? (u.companyName || 'Unknown Vendor')
+                                  : (`${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name || 'Unknown User')}
                               </td>
                               <td style={{
                                 padding: '1rem 1.5rem',
@@ -1200,13 +1306,18 @@ const AdminUsers = () => {
                                       value={pendingRoles[userId] ?? ''}
                                       onChange={(e) => handleRoleChange(userId, e.target.value)}
                                       style={{
-                                        padding: '0.5rem 0.75rem',
+                                        padding: '0.5rem 2.5rem 0.5rem 0.75rem',
                                         border: '1px solid #e5e7eb',
                                         borderRadius: '0.5rem',
                                         fontSize: '0.875rem',
                                         outline: 'none',
                                         backgroundColor: '#FFFFFF',
-                                        cursor: 'pointer'
+                                        cursor: 'pointer',
+                                        appearance: 'none',
+                                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                                        backgroundRepeat: 'no-repeat',
+                                        backgroundPosition: 'right 0.75rem center',
+                                        backgroundSize: '12px'
                                       }}
                                     >
                                       <option value="" disabled>Select role</option>
@@ -1467,7 +1578,9 @@ const AdminUsers = () => {
                                 fontWeight: '500',
                                 color: '#111827'
                               }}>
-                                {`${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name || 'Unknown User'}
+                                {u.userType === 'Vendor' 
+                                  ? (u.companyName || 'Unknown Vendor')
+                                  : (`${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name || 'Unknown User')}
                               </td>
                               <td style={{
                                 padding: '1rem 1.5rem',
@@ -1544,22 +1657,54 @@ const AdminUsers = () => {
                                         </button>
                                       );
                                     } else {
+                                      const isBlocked = !activeStatusById[userId];
                                       return (
                                         <button
                                           onClick={() => handleToggleActive(userId)}
                                           disabled={!!togglingIds[userId]}
                                           style={{
                                             padding: '0.5rem 1rem',
-                                            backgroundColor: activeStatusById[userId] ? '#dc2626' : '#059669',
+                                            backgroundColor: isBlocked ? '#059669' : '#dc2626',
                                             color: '#FFFFFF',
                                             border: 'none',
                                             borderRadius: '0.5rem',
                                             fontSize: '0.875rem',
                                             fontWeight: '500',
-                                            cursor: togglingIds[userId] ? 'not-allowed' : 'pointer'
+                                            cursor: togglingIds[userId] ? 'not-allowed' : 'pointer',
+                                            transition: 'background-color 0.2s, transform 0.1s',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            opacity: togglingIds[userId] ? 0.7 : 1
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            if (!togglingIds[userId]) {
+                                              e.target.style.backgroundColor = isBlocked ? '#047857' : '#b91c1c';
+                                              e.target.style.transform = 'translateY(-1px)';
+                                            }
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            if (!togglingIds[userId]) {
+                                              e.target.style.backgroundColor = isBlocked ? '#059669' : '#dc2626';
+                                              e.target.style.transform = 'translateY(0)';
+                                            }
                                           }}
                                         >
-                                          {togglingIds[userId] ? 'Updating...' : (activeStatusById[userId] ? 'Block' : 'Activate')}
+                                          {togglingIds[userId] ? (
+                                            <>
+                                              <span className="material-symbols-outlined" style={{ fontSize: '1rem', animation: 'spin 1s linear infinite' }}>
+                                                hourglass_empty
+                                              </span>
+                                              Updating...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                                {isBlocked ? 'lock_open' : 'block'}
+                                              </span>
+                                              {isBlocked ? 'Unblock' : 'Block'}
+                                            </>
+                                          )}
                                         </button>
                                       );
                                     }
@@ -1638,7 +1783,177 @@ const AdminUsers = () => {
                                           {isVerified ? 'Verified' : 'Not Verified'}
                                         </p>
                                       </div>
+                                      {u.userType === 'Vendor' && u.companyName && (
+                                        <div>
+                                          <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                            Company Name
+                                          </h4>
+                                          <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                            {u.companyName}
+                                          </p>
+                                        </div>
+                                      )}
                                     </div>
+                                    {u.userType === 'Vendor' && (
+                                      <div style={{
+                                        marginTop: '1rem',
+                                        padding: '1rem',
+                                        backgroundColor: '#FFFFFF',
+                                        borderRadius: '0.5rem',
+                                        border: '1px solid #e5e7eb'
+                                      }}>
+                                        <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>
+                                          Documents
+                                        </h4>
+                                        <div style={{
+                                          display: 'flex',
+                                          gap: '1rem',
+                                          flexWrap: 'wrap'
+                                        }}>
+                                          {(u.vendorLogoPath || u.hasLogo) && (
+                                            <div style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '0.5rem',
+                                              padding: '0.75rem',
+                                              backgroundColor: '#f9fafb',
+                                              borderRadius: '0.5rem',
+                                              border: '1px solid #e5e7eb'
+                                            }}>
+                                              <span className="material-symbols-outlined" style={{ 
+                                                fontSize: '1.25rem',
+                                                color: '#3b82f6'
+                                              }}>
+                                                image
+                                              </span>
+                                              <span style={{
+                                                fontSize: '0.875rem',
+                                                color: '#111827',
+                                                fontWeight: '500'
+                                              }}>
+                                                Logo
+                                              </span>
+                                              <button
+                                                onClick={() => handleViewDocument(userId, 'logo')}
+                                                style={{
+                                                  padding: '0.375rem 0.75rem',
+                                                  borderRadius: '0.375rem',
+                                                  border: '1px solid #3b82f6',
+                                                  backgroundColor: 'transparent',
+                                                  color: '#3b82f6',
+                                                  fontSize: '0.75rem',
+                                                  fontWeight: '500',
+                                                  cursor: 'pointer',
+                                                  marginLeft: '0.5rem'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.target.style.backgroundColor = '#eff6ff';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.target.style.backgroundColor = 'transparent';
+                                                }}
+                                              >
+                                                View
+                                              </button>
+                                              <button
+                                                onClick={() => handleDownloadDocument(userId, 'logo')}
+                                                style={{
+                                                  padding: '0.375rem 0.75rem',
+                                                  borderRadius: '0.375rem',
+                                                  border: 'none',
+                                                  backgroundColor: '#3b82f6',
+                                                  color: '#FFFFFF',
+                                                  fontSize: '0.75rem',
+                                                  fontWeight: '500',
+                                                  cursor: 'pointer'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.target.style.backgroundColor = '#2563eb';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.target.style.backgroundColor = '#3b82f6';
+                                                }}
+                                              >
+                                                Download
+                                              </button>
+                                            </div>
+                                          )}
+                                          {(u.vendorTaxCardPath || u.hasTaxCard) && (
+                                            <div style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '0.5rem',
+                                              padding: '0.75rem',
+                                              backgroundColor: '#f9fafb',
+                                              borderRadius: '0.5rem',
+                                              border: '1px solid #e5e7eb'
+                                            }}>
+                                              <span className="material-symbols-outlined" style={{ 
+                                                fontSize: '1.25rem',
+                                                color: '#10b981'
+                                              }}>
+                                                description
+                                              </span>
+                                              <span style={{
+                                                fontSize: '0.875rem',
+                                                color: '#111827',
+                                                fontWeight: '500'
+                                              }}>
+                                                Tax Card
+                                              </span>
+                                              <button
+                                                onClick={() => handleViewDocument(userId, 'tax-card')}
+                                                style={{
+                                                  padding: '0.375rem 0.75rem',
+                                                  borderRadius: '0.375rem',
+                                                  border: '1px solid #10b981',
+                                                  backgroundColor: 'transparent',
+                                                  color: '#10b981',
+                                                  fontSize: '0.75rem',
+                                                  fontWeight: '500',
+                                                  cursor: 'pointer',
+                                                  marginLeft: '0.5rem'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.target.style.backgroundColor = '#ecfdf5';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.target.style.backgroundColor = 'transparent';
+                                                }}
+                                              >
+                                                View
+                                              </button>
+                                              <button
+                                                onClick={() => handleDownloadDocument(userId, 'tax-card')}
+                                                style={{
+                                                  padding: '0.375rem 0.75rem',
+                                                  borderRadius: '0.375rem',
+                                                  border: 'none',
+                                                  backgroundColor: '#10b981',
+                                                  color: '#FFFFFF',
+                                                  fontSize: '0.75rem',
+                                                  fontWeight: '500',
+                                                  cursor: 'pointer'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.target.style.backgroundColor = '#059669';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.target.style.backgroundColor = '#10b981';
+                                                }}
+                                              >
+                                                Download
+                                              </button>
+                                            </div>
+                                          )}
+                                          {!(u.vendorLogoPath || u.hasLogo) && !(u.vendorTaxCardPath || u.hasTaxCard) && (
+                                            <p style={{ fontSize: '0.875rem', color: '#9ca3af', margin: 0 }}>
+                                              No documents uploaded
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
                                     {toggleMsgById[userId] && (
                                       <div style={{
                                         padding: '0.75rem 1rem',
@@ -1943,14 +2258,19 @@ const AdminUsers = () => {
                     onChange={handleFormChange}
                     style={{
                       width: '100%',
-                      padding: '0.75rem 1rem',
+                      padding: '0.75rem 2.5rem 0.75rem 1rem',
                       border: `1px solid ${formErrors.role ? '#ef4444' : '#e5e7eb'}`,
                       borderRadius: '0.5rem',
                       fontSize: '0.875rem',
                       outline: 'none',
                       backgroundColor: '#FFFFFF',
                       cursor: 'pointer',
-                      transition: 'border-color 0.2s'
+                      transition: 'border-color 0.2s',
+                      appearance: 'none',
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 0.75rem center',
+                      backgroundSize: '12px'
                     }}
                     onFocus={(e) => {
                       e.target.style.borderColor = '#1D3557';

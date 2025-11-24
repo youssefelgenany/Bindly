@@ -45,8 +45,15 @@ module.exports.getAllVendors = async (req, res) => {
 
 module.exports.getLoyaltyProgramVendors = async (req, res) => {
   try {
-    const vendors = (sampleVendors || []).map((vendor) => ({
-      id: vendor.id || vendor.vendorName,
+    const VendorLoyaltyProgram = require('../models/vendorLoyaltyProgramModel');
+    
+    // Get all active loyalty program vendors from database
+    const vendors = await VendorLoyaltyProgram.find({ isActive: true })
+      .sort({ vendorName: 1 })
+      .lean();
+
+    const formattedVendors = vendors.map((vendor) => ({
+      id: vendor._id.toString(),
       vendorName: vendor.vendorName,
       category: vendor.category || null,
       description: vendor.description || null,
@@ -57,19 +64,22 @@ module.exports.getLoyaltyProgramVendors = async (req, res) => {
       validFrom: vendor.validFrom || null,
       validUntil: vendor.validUntil || null,
       logoUrl: vendor.logoUrl || null,
+      isActive: vendor.isActive,
+      createdAt: vendor.createdAt,
       updatedAt: vendor.updatedAt || null
     }));
 
     return res.status(200).json({
       success: true,
-      count: vendors.length,
-      vendors
+      count: formattedVendors.length,
+      vendors: formattedVendors
     });
   } catch (error) {
     console.error('Server error in getLoyaltyProgramVendors:', error);
     return res.status(500).json({
       success: false,
-      message: 'Unable to fetch loyalty program vendors'
+      message: 'Unable to fetch loyalty program vendors',
+      error: error.message
     });
   }
 };
@@ -341,6 +351,20 @@ module.exports.applyToEvent = async (req, res) => {
     const request = new VendorRequest(requestData);
     await request.save();
     console.log('🔍 Saved VendorRequest with ID:', request._id);
+    
+    // Notify Events Office users about the new vendor request
+    try {
+      const notificationService = require('../services/notificationService');
+      const vendor = await User.findById(req.user._id);
+      const event = await Event.findById(eventId);
+      if (vendor && event) {
+        await notificationService.notifyVendorRequest(request, vendor, event);
+      }
+    } catch (notifError) {
+      console.error('Error creating vendor request notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+    
     res.status(201).json({ message: 'Application submitted' });
   } catch (error) {
     console.error('Server error in applyToEvent:', error);
