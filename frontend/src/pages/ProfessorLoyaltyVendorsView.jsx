@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { vendorApi } from '../api/vendorApi';
 import { notificationApiService } from '../api/notificationApi';
 
-const StudentLoyaltyVendorsView = () => {
+const ProfessorLoyaltyVendorsView = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -31,7 +31,7 @@ const StudentLoyaltyVendorsView = () => {
 
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
-    : user?.name || 'Student';
+    : user?.name || 'Professor';
 
   const handleLogout = (e) => {
     if (e) {
@@ -297,18 +297,20 @@ const StudentLoyaltyVendorsView = () => {
                 top: '100%',
                 right: 0,
                 marginTop: '0.5rem',
-                width: '22rem',
                 backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
                 borderRadius: '0.5rem',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                border: '1px solid #e5e7eb',
-                zIndex: 1000,
-                maxHeight: '32rem',
-                overflowY: 'auto'
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 1001,
+                width: '360px',
+                maxHeight: '500px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
               }}>
                 <div style={{
                   padding: '1rem',
-                  borderBottom: '1px solid #e5e7eb',
+                  borderBottom: '1px solid #e2e8f0',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
@@ -327,42 +329,55 @@ const StudentLoyaltyVendorsView = () => {
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#2563eb',
-                        fontSize: '0.75rem',
+                        color: '#1e40af',
                         cursor: 'pointer',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '0.25rem'
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        padding: '0.25rem 0.5rem'
                       }}
                       onMouseEnter={(e) => {
-                        e.target.style.backgroundColor = '#eff6ff';
+                        e.target.style.textDecoration = 'underline';
                       }}
                       onMouseLeave={(e) => {
-                        e.target.style.backgroundColor = 'transparent';
+                        e.target.style.textDecoration = 'none';
                       }}
                     >
                       Mark all as read
                     </button>
                   )}
                 </div>
-                {loadingNotifications ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
-                    Loading...
-                  </div>
-                ) : notifications.length === 0 ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
-                    No notifications
-                  </div>
-                ) : (
-                  <div>
-                    {notifications.map((notification) => (
+                <div style={{
+                  overflowY: 'auto',
+                  maxHeight: '400px'
+                }}>
+                  {loadingNotifications ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      Loading...
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
                       <div
                         key={notification._id}
-                        onClick={async () => {
+                        onClick={() => {
                           if (!notification.isRead) {
-                            await handleMarkAsRead(notification._id);
+                            handleMarkAsRead(notification._id);
                           }
                           if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
-                            navigate(`/student/events`);
+                            navigate(`/professor/all-events`);
                             setShowNotificationsDropdown(false);
                           } else if (
                             (notification.type === 'event_reminder' || 
@@ -371,7 +386,7 @@ const StudentLoyaltyVendorsView = () => {
                              notification.type === 'gym_session_reminder') && 
                             (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
                           ) {
-                            navigate(`/student/my-registrations`);
+                            navigate(`/professor/events`);
                             setShowNotificationsDropdown(false);
                           } else if (
                             notification.type === 'new_loyalty_partner' || 
@@ -456,30 +471,33 @@ const StudentLoyaltyVendorsView = () => {
                           )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>
-
-          {/* Student Name */}
-          <span style={{
-            color: '#1D3557',
-            fontSize: '0.875rem',
-            fontWeight: '500'
-          }}>
-            {displayName}
-          </span>
-
-          {/* Profile Icon */}
-          <div
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#1D3557',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              Professor
+            </p>
+          </div>
+          <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => {
-              setShowLogoutDropdown(!showLogoutDropdown);
-              setShowNotificationsDropdown(false);
-            }}
+            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
           >
             {user?.profilePicturePath ? (
               <img
@@ -489,8 +507,7 @@ const StudentLoyaltyVendorsView = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: '50%',
-                  objectFit: 'cover',
-                  border: '2px solid #e5e7eb'
+                  objectFit: 'cover'
                 }}
               />
             ) : (
@@ -503,10 +520,9 @@ const StudentLoyaltyVendorsView = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#FFFFFF',
-                fontSize: '1rem',
                 fontWeight: '600'
               }}>
-                {displayName.charAt(0).toUpperCase()}
+                {(user?.firstName?.[0] || user?.name?.[0] || 'P').toUpperCase()}
               </div>
             )}
             {showLogoutDropdown && (
@@ -516,58 +532,26 @@ const StudentLoyaltyVendorsView = () => {
                 right: 0,
                 marginTop: '0.5rem',
                 backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
                 borderRadius: '0.5rem',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                border: '1px solid #e5e7eb',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                 zIndex: 1000,
-                minWidth: '10rem',
-                overflow: 'hidden'
+                minWidth: '150px'
               }}>
-                <Link
-                  to="/wallet"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    background: 'none',
-                    border: 'none',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    color: '#1D3557',
-                    fontSize: '0.875rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    transition: 'background-color 0.2s',
-                    textDecoration: 'none'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
-                  onClick={() => setShowLogoutDropdown(false)}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                    account_balance_wallet
-                  </span>
-                  My Wallet
-                </Link>
                 <button
                   onClick={handleLogout}
                   style={{
                     width: '100%',
                     padding: '0.75rem 1rem',
-                    background: 'none',
-                    border: 'none',
                     textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
                     cursor: 'pointer',
-                    color: '#1D3557',
                     fontSize: '0.875rem',
+                    color: '#1D3557',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.5rem',
-                    transition: 'background-color 0.2s'
+                    gap: '0.5rem'
                   }}
                   onMouseEnter={(e) => {
                     e.target.style.backgroundColor = '#f3f4f6';
@@ -610,56 +594,56 @@ const StudentLoyaltyVendorsView = () => {
             Dashboard
           </Link>
           <Link
-            to="/student/events"
+            to="/professor/all-events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/student/events') ? '600' : '500',
+              fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             Discover Events
           </Link>
           <Link
-            to="/student/my-registrations"
+            to="/professor/events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
+              fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             My Events
           </Link>
           <Link
-            to="/student/favorites"
+            to="/professor/my-workshops"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/student/favorites') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/student/favorites') ? '600' : '500',
+              fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
-            My Favorites
+            My Workshops
           </Link>
           <Link
-            to="/student/courts"
+            to="/professor/gym-schedule"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
+              fontWeight: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
-            Campus Courts
+            View Gym Sessions
           </Link>
         </div>
       </nav>
@@ -667,326 +651,334 @@ const StudentLoyaltyVendorsView = () => {
       {/* Main Content */}
       <main style={{
         flex: 1,
-        padding: '2rem 4rem',
-        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
         backgroundColor: '#f6f7f8'
       }}>
         {/* Content Wrapper with Margins */}
         <div style={{
-          marginLeft: '0',
-          marginRight: '0'
+          flex: 1,
+          padding: '2rem 0',
+          overflowY: 'auto',
+          backgroundColor: '#f6f7f8'
         }}>
-          {/* Loyalty Program Banner with Background Image */}
           <div style={{
-            position: 'relative',
-            height: '140px',
-            borderRadius: '0.75rem',
-            overflow: 'hidden',
-            marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+            marginLeft: '4rem',
+            marginRight: '4rem'
           }}>
-            {/* Background Image */}
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage: 'url(/assets/images/LoyaltyProgram.png)',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              backgroundSize: 'cover',
-              filter: 'blur(2px)'
-            }}></div>
-            {/* Blue Overlay */}
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundColor: 'rgba(29, 53, 87, 0.75)'
-            }}></div>
-            {/* Content */}
+            {/* Loyalty Program Banner with Background Image */}
             <div style={{
               position: 'relative',
-              zIndex: 10,
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'flex-start',
-              padding: '2rem 2.5rem',
-              color: '#FFFFFF'
+              height: '140px',
+              borderRadius: '0.75rem',
+              overflow: 'hidden',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
             }}>
-              <h3 style={{
-                color: '#FFFFFF',
-                fontSize: '1.75rem',
-                fontWeight: '700',
-                margin: 0,
-                marginBottom: '0.5rem'
+              {/* Background Image */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: 'url(/assets/images/LoyaltyProgram.png)',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: 'cover',
+                filter: 'blur(2px)'
+              }}></div>
+              {/* Blue Overlay */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundColor: 'rgba(29, 53, 87, 0.75)'
+              }}></div>
+              {/* Content */}
+              <div style={{
+                position: 'relative',
+                zIndex: 10,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+                padding: '2rem 2.5rem',
+                color: '#FFFFFF'
               }}>
-                GUC Loyalty Program Partners
-              </h3>
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.9)',
-                fontSize: '0.875rem',
-                fontWeight: '400',
-                margin: 0
-              }}>
-                View all partner vendors offering exclusive discounts and promotions
-              </p>
+                <h3 style={{
+                  color: '#FFFFFF',
+                  fontSize: '1.75rem',
+                  fontWeight: '700',
+                  margin: 0,
+                  marginBottom: '0.5rem'
+                }}>
+                  GUC Loyalty Program Partners
+                </h3>
+                <p style={{
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: '0.875rem',
+                  fontWeight: '400',
+                  margin: 0
+                }}>
+                  View all partner vendors offering exclusive discounts and promotions
+                </p>
+              </div>
             </div>
-          </div>
 
-          {/* Content */}
-          <div style={{
-            padding: '0 0 2rem 0'
-          }}>
-            {/* Search Bar */}
+            {/* Content */}
             <div style={{
-              marginBottom: '2rem',
-              display: 'flex',
-              gap: '1rem',
-              alignItems: 'center'
+              padding: '0 0 2rem 0'
             }}>
-          <div style={{
-            flex: 1,
-            maxWidth: '520px',
-            position: 'relative'
-          }}>
-            <span className="material-symbols-outlined" style={{
-              position: 'absolute',
-              left: '1rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#9ca3af',
-              fontSize: '1.25rem',
-              pointerEvents: 'none'
-            }}>
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Search vendors, categories, or promo codes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem 0.75rem 3rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                fontSize: '0.875rem',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#2563eb';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-              }}
-            />
-            </div>
-          </div>
-
-                {/* Loading State */}
-            {loading && (
+              {/* Search Bar */}
               <div style={{
-                textAlign: 'center',
-                padding: '3rem',
-                color: '#6b7280'
+                marginBottom: '2rem',
+                display: 'flex',
+                gap: '1rem',
+                alignItems: 'center'
               }}>
-                Loading vendors...
-              </div>
-            )}
-
-            {/* Error State */}
-            {error && !loading && (
-              <div style={{
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: '0.5rem',
-                padding: '1rem',
-                color: '#991b1b',
-                marginBottom: '2rem'
-              }}>
-                {error}
-              </div>
-            )}
-
-            {/* Vendors Grid */}
-        {!loading && !error && (
-          <>
-            {vendors.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '3rem',
-                color: '#6b7280'
-              }}>
-                {searchQuery ? 'No vendors found matching your search.' : 'No vendors available at the moment.'}
-              </div>
-            ) : (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                gap: '1.5rem'
-              }}>
-                {vendors.map((vendor) => (
-                  <div
-                    key={vendor.id}
-                    onClick={() => handleViewVendor(vendor)}
+                <div style={{
+                  flex: 1,
+                  maxWidth: '520px',
+                  position: 'relative'
+                }}>
+                  <span className="material-symbols-outlined" style={{
+                    position: 'absolute',
+                    left: '1rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#9ca3af',
+                    fontSize: '1.25rem',
+                    pointerEvents: 'none'
+                  }}>
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search vendors, categories, or promo codes..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     style={{
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '0.75rem',
-                      padding: '1.5rem',
-                      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      border: '1px solid #e5e7eb'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    {/* Vendor Logo/Icon */}
-                    {vendor.logoUrl ? (
-                      <img
-                        src={vendor.logoUrl}
-                        alt={vendor.vendorName}
-                        style={{
-                          width: '4rem',
-                          height: '4rem',
-                          borderRadius: '0.5rem',
-                          objectFit: 'cover',
-                          marginBottom: '1rem'
-                        }}
-                      />
-                    ) : (
-                      <div style={{
-                        width: '4rem',
-                        height: '4rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: '#1D3557',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#FFFFFF',
-                        fontSize: '1.5rem',
-                        fontWeight: '700',
-                        marginBottom: '1rem'
-                      }}>
-                        {vendor.vendorName.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-
-                    {/* Vendor Name */}
-                    <h3 style={{
-                      color: '#1D3557',
-                      fontSize: '1.125rem',
-                      fontWeight: '600',
-                      margin: 0,
-                      marginBottom: '0.5rem'
-                    }}>
-                      {vendor.vendorName}
-                    </h3>
-
-                    {/* Category */}
-                    {vendor.category && (
-                      <p style={{
-                        color: '#6b7280',
-                        fontSize: '0.75rem',
-                        margin: 0,
-                        marginBottom: '0.75rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}>
-                        {vendor.category}
-                      </p>
-                    )}
-
-                    {/* Discount Badge */}
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      backgroundColor: '#dbeafe',
-                      color: '#1e40af',
-                      padding: '0.5rem 1rem',
+                      width: '100%',
+                      padding: '0.75rem 1rem 0.75rem 3rem',
+                      border: '1px solid #d1d5db',
                       borderRadius: '0.5rem',
                       fontSize: '0.875rem',
-                      fontWeight: '600',
-                      marginBottom: '0.75rem'
-                    }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-                        local_offer
-                      </span>
-                      {formatDiscount(vendor.discountRate, vendor.discountType)} OFF
-                    </div>
-
-                    {/* Promo Code */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      marginBottom: '0.75rem'
-                    }}>
-                      <span style={{
-                        color: '#6b7280',
-                        fontSize: '0.75rem',
-                        fontWeight: '500'
-                      }}>
-                        Promo Code:
-                      </span>
-                      <span style={{
-                        color: '#1D3557',
-                        fontSize: '0.875rem',
-                        fontWeight: '700',
-                        fontFamily: 'monospace',
-                        backgroundColor: '#f3f4f6',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '0.25rem'
-                      }}>
-                        {vendor.promoCode}
-                      </span>
-                    </div>
-
-                    {/* Description Preview */}
-                    {vendor.description && (
-                      <p style={{
-                        color: '#6b7280',
-                        fontSize: '0.875rem',
-                        margin: 0,
-                        marginBottom: '0.75rem',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden'
-                      }}>
-                        {vendor.description}
-                      </p>
-                    )}
-
-                    {/* View Details Link */}
-                    <div style={{
-                      color: '#2563eb',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      marginTop: '0.5rem'
-                    }}>
-                      View Details
-                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-                        arrow_forward
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                      outline: 'none',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#2563eb';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#d1d5db';
+                    }}
+                  />
+                </div>
               </div>
-            )}
-          </>
-        )}
+
+              {/* Loading State */}
+              {loading && (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '3rem',
+                  color: '#6b7280'
+                }}>
+                  Loading vendors...
+                </div>
+              )}
+
+              {/* Error State */}
+              {error && !loading && (
+                <div style={{
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '0.5rem',
+                  padding: '1rem',
+                  color: '#991b1b',
+                  marginBottom: '2rem'
+                }}>
+                  {error}
+                </div>
+              )}
+
+              {/* Vendors Grid */}
+              {!loading && !error && (
+                <>
+                  {vendors.length === 0 ? (
+                    <div style={{
+                      textAlign: 'center',
+                      padding: '3rem',
+                      color: '#6b7280'
+                    }}>
+                      {searchQuery ? 'No vendors found matching your search.' : 'No vendors available at the moment.'}
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                      gap: '1.5rem'
+                    }}>
+                      {vendors.map((vendor) => (
+                        <div
+                          key={vendor.id}
+                          onClick={() => handleViewVendor(vendor)}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: '0.75rem',
+                            padding: '1.5rem',
+                            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            border: '1px solid #e5e7eb'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}
+                        >
+                          {/* Vendor Logo/Icon */}
+                          {vendor.logoUrl ? (
+                            <img
+                              src={vendor.logoUrl}
+                              alt={vendor.vendorName}
+                              style={{
+                                width: '4rem',
+                                height: '4rem',
+                                borderRadius: '0.5rem',
+                                objectFit: 'cover',
+                                marginBottom: '1rem'
+                              }}
+                            />
+                          ) : (
+                            <div style={{
+                              width: '4rem',
+                              height: '4rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: '#1D3557',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#FFFFFF',
+                              fontSize: '1.5rem',
+                              fontWeight: '700',
+                              marginBottom: '1rem'
+                            }}>
+                              {vendor.vendorName.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+
+                          {/* Vendor Name */}
+                          <h3 style={{
+                            color: '#1D3557',
+                            fontSize: '1.125rem',
+                            fontWeight: '600',
+                            margin: 0,
+                            marginBottom: '0.5rem'
+                          }}>
+                            {vendor.vendorName}
+                          </h3>
+
+                          {/* Category */}
+                          {vendor.category && (
+                            <p style={{
+                              color: '#6b7280',
+                              fontSize: '0.75rem',
+                              margin: 0,
+                              marginBottom: '0.75rem',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em'
+                            }}>
+                              {vendor.category}
+                            </p>
+                          )}
+
+                          {/* Discount Badge */}
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            backgroundColor: '#dbeafe',
+                            color: '#1e40af',
+                            padding: '0.5rem 1rem',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            marginBottom: '0.75rem'
+                          }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                              local_offer
+                            </span>
+                            {formatDiscount(vendor.discountRate, vendor.discountType)} OFF
+                          </div>
+
+                          {/* Promo Code */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            marginBottom: '0.75rem'
+                          }}>
+                            <span style={{
+                              color: '#6b7280',
+                              fontSize: '0.75rem',
+                              fontWeight: '500'
+                            }}>
+                              Promo Code:
+                            </span>
+                            <span style={{
+                              color: '#1D3557',
+                              fontSize: '0.875rem',
+                              fontWeight: '700',
+                              fontFamily: 'monospace',
+                              backgroundColor: '#f3f4f6',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '0.25rem'
+                            }}>
+                              {vendor.promoCode}
+                            </span>
+                          </div>
+
+                          {/* Description Preview */}
+                          {vendor.description && (
+                            <p style={{
+                              color: '#6b7280',
+                              fontSize: '0.875rem',
+                              margin: 0,
+                              marginBottom: '0.75rem',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden'
+                            }}>
+                              {vendor.description}
+                            </p>
+                          )}
+
+                          {/* View Details Link */}
+                          <div style={{
+                            color: '#2563eb',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            marginTop: '0.5rem'
+                          }}>
+                            View Details
+                            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                              arrow_forward
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1280,5 +1272,5 @@ const StudentLoyaltyVendorsView = () => {
   );
 };
 
-export default StudentLoyaltyVendorsView;
+export default ProfessorLoyaltyVendorsView;
 

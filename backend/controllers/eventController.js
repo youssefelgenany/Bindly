@@ -2249,35 +2249,45 @@ exports.cancelRegistration = async (req, res) => {
                          (eventPrice > 0); // Always refund if event has a price (fallback safety)
     
     if (shouldRefund && eventPrice > 0) {
-      const paymentMethod = payment ? payment.paymentMethod : 'wallet'; // Default to wallet if no payment record
+      console.log('💰 Processing refund - Amount:', eventPrice);
       
-      console.log('💰 Processing refund - Method:', paymentMethod, 'Amount:', eventPrice);
-      
-      if (paymentMethod === 'wallet' && eventPrice > 0) {
-        // Refund to wallet
-        const user = await User.findById(userId);
-        if (user) {
-          const oldBalance = user.walletBalance || 0;
-          user.walletBalance = oldBalance + eventPrice;
-          if (!user.walletTransactions) {
-            user.walletTransactions = [];
-          }
-          user.walletTransactions.push({
-            amount: eventPrice,
-            type: 'refund',
-            description: `Refund for cancelled registration: ${event.title}`,
-            balanceAfter: user.walletBalance,
-            reference: eventId.toString(),
-            createdAt: new Date()
-          });
-          await user.save();
-          console.log(`✅ Refund of ${eventPrice} EGP added to wallet. Old balance: ${oldBalance}, New balance: ${user.walletBalance}`);
-
-          // Refund email removed per user request
-        } else {
-          console.error('❌ User not found for refund:', userId);
+      // ALWAYS refund to wallet FIRST (for consistency with TA behavior - wallet is always updated)
+      const user = await User.findById(userId);
+      if (user) {
+        // Calculate current balance from transactions if walletBalance is null/undefined
+        let currentBalance = user.walletBalance;
+        if (currentBalance === null || currentBalance === undefined) {
+          currentBalance = (user.walletTransactions || []).reduce((sum, tx) => {
+            return sum + (parseFloat(tx.amount) || 0);
+          }, 0);
+          user.walletBalance = currentBalance;
         }
-      } else if (payment && payment.paymentMethod === 'card' && eventPrice > 0) {
+        // Ensure balance is a number
+        currentBalance = typeof currentBalance === 'number' ? currentBalance : parseFloat(currentBalance) || 0;
+        
+        const oldBalance = currentBalance;
+        const newBalance = currentBalance + eventPrice;
+        user.walletBalance = newBalance;
+        
+        if (!user.walletTransactions) {
+          user.walletTransactions = [];
+        }
+        user.walletTransactions.push({
+          amount: eventPrice,
+          type: 'refund',
+          description: `Refund for cancelled registration: ${event.title}`,
+          balanceAfter: newBalance,
+          reference: eventId.toString(),
+          createdAt: new Date()
+        });
+        await user.save();
+        console.log(`✅ Refund of ${eventPrice} EGP added to wallet. Old balance: ${oldBalance}, New balance: ${newBalance}`);
+      } else {
+        console.error('❌ User not found for refund:', userId);
+      }
+      
+      // Also process Stripe refund for card payments (but wallet is already updated above)
+      if (payment && payment.paymentMethod === 'card' && eventPrice > 0) {
         // Process Stripe refund for card payments
         console.log(`💳 Processing Stripe refund for payment: ${payment._id}, amount: ${eventPrice}`);
         
@@ -2321,49 +2331,11 @@ exports.cancelRegistration = async (req, res) => {
 
             console.log(`✅ Payment ${payment._id} marked as refunded`);
           } else {
-            console.error('❌ Payment intent ID not found. Cannot process Stripe refund.');
-            // Fallback: refund to wallet if we can't process Stripe refund
-            const user = await User.findById(userId);
-            if (user) {
-              const oldBalance = user.walletBalance || 0;
-              user.walletBalance = oldBalance + eventPrice;
-              if (!user.walletTransactions) {
-                user.walletTransactions = [];
-              }
-              user.walletTransactions.push({
-                amount: eventPrice,
-                type: 'refund',
-                description: `Refund for cancelled registration (Stripe refund failed, refunded to wallet): ${event.title}`,
-                balanceAfter: user.walletBalance,
-                reference: eventId.toString(),
-                createdAt: new Date()
-              });
-              await user.save();
-              console.log(`✅ Fallback: Refund of ${eventPrice} EGP added to wallet. Old balance: ${oldBalance}, New balance: ${user.walletBalance}`);
-            }
+            console.error('❌ Payment intent ID not found. Wallet refund already processed above.');
           }
         } catch (stripeError) {
           console.error('❌ Error processing Stripe refund:', stripeError);
-          
-          // Fallback: refund to wallet if Stripe refund fails
-          const user = await User.findById(userId);
-          if (user) {
-            const oldBalance = user.walletBalance || 0;
-            user.walletBalance = oldBalance + eventPrice;
-            if (!user.walletTransactions) {
-              user.walletTransactions = [];
-            }
-            user.walletTransactions.push({
-              amount: eventPrice,
-              type: 'refund',
-              description: `Refund for cancelled registration (Stripe refund failed, refunded to wallet): ${event.title}`,
-              balanceAfter: user.walletBalance,
-              reference: eventId.toString(),
-              createdAt: new Date()
-            });
-            await user.save();
-            console.log(`✅ Fallback: Refund of ${eventPrice} EGP added to wallet due to Stripe error. Old balance: ${oldBalance}, New balance: ${user.walletBalance}`);
-          }
+          console.log('✅ Wallet refund already processed above.');
         }
       }
     }
@@ -2442,15 +2414,34 @@ exports.getWalletTransactions = async (req, res) => {
       return dateB - dateA;
     });
 
+    // Calculate balance from transactions if walletBalance is null/undefined
+    // This ensures balance is always accurate even if walletBalance field wasn't initialized
+    let calculatedBalance = user.walletBalance;
+    if (calculatedBalance === null || calculatedBalance === undefined) {
+      // Calculate from transactions (amounts are signed: negative for payments, positive for refunds/topups)
+      calculatedBalance = transactions.reduce((sum, tx) => {
+        return sum + (parseFloat(tx.amount) || 0);
+      }, 0);
+      
+      // Update user's walletBalance if it was null/undefined
+      if (user.walletBalance === null || user.walletBalance === undefined) {
+        user.walletBalance = calculatedBalance;
+        await user.save();
+      }
+    }
+    
+    // Ensure balance is a number
+    calculatedBalance = typeof calculatedBalance === 'number' ? calculatedBalance : parseFloat(calculatedBalance) || 0;
+
     return res.status(200).json({
       success: true,
-      walletBalance: user.walletBalance || 0,
+      walletBalance: calculatedBalance,
       transactions: transactions.map(tx => ({
         id: tx._id,
         amount: tx.amount,
         type: tx.type,
         description: tx.description,
-        balanceAfter: tx.balanceAfter,
+        balanceAfter: tx.balanceAfter !== null && tx.balanceAfter !== undefined ? tx.balanceAfter : calculatedBalance,
         reference: tx.reference,
         createdAt: tx.createdAt
       })),

@@ -32,8 +32,10 @@ import VendorAccepted from './pages/VendorAccepted';
 import VendorRequests from './pages/VendorRequests';
 import StudentEventsView from './pages/StudentEventsView';
 import StudentMyRegistrations from './pages/StudentMyRegistrations';
+import StudentFavorites from './pages/StudentFavorites';
 import StudentCourtsView from './pages/StudentCourtsView';
 import StudentLoyaltyVendorsView from './pages/StudentLoyaltyVendorsView';
+import ProfessorLoyaltyVendorsView from './pages/ProfessorLoyaltyVendorsView';
 import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
 import StaffFavorites from './pages/StaffFavorites';
@@ -447,6 +449,16 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/student/favorites"
+              element={
+                <ProtectedRoute>
+                  <StudentOnly>
+                    <StudentFavorites />
+                  </StudentOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/student/courts"
               element={
                 <ProtectedRoute>
@@ -605,6 +617,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <GymSchedule />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/professor/loyalty-vendors"
+              element={
+                <ProtectedRoute>
+                  <ProfessorLoyaltyVendorsView />
                 </ProtectedRoute>
               }
             />

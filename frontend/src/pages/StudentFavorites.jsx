@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { eventsApiService } from '../api/eventsApi';
 
-const StaffFavorites = () => {
+const StudentFavorites = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -152,9 +152,7 @@ const StaffFavorites = () => {
 
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
-    : user?.name || (user?.userType === 'TA' ? 'TA' : 'Staff');
-
-  const userRole = user?.userType === 'TA' ? 'TA' : 'Staff';
+    : user?.name || 'Student';
 
   return (
     <div style={{
@@ -202,7 +200,7 @@ const StaffFavorites = () => {
               color: '#6b7280',
               margin: 0
             }}>
-              {userRole}
+              Student
             </p>
           </div>
           <div 
@@ -250,37 +248,35 @@ const StaffFavorites = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
-                {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
-                  <Link
-                    to="/wallet"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      textAlign: 'left',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      color: '#1D3557',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      textDecoration: 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#f3f4f6';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'transparent';
-                    }}
-                    onClick={() => setShowLogoutDropdown(false)}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                      account_balance_wallet
-                    </span>
-                    My Wallet
-                  </Link>
-                )}
+                <Link
+                  to="/wallet"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => setShowLogoutDropdown(false)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    account_balance_wallet
+                  </span>
+                  My Wallet
+                </Link>
                 <button
                   onClick={handleLogout}
                   style={{
@@ -337,43 +333,56 @@ const StaffFavorites = () => {
             Dashboard
           </Link>
           <Link
-            to="/staff/events"
+            to="/student/events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
+              fontWeight: isActiveRoute('/student/events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             Discover Events
           </Link>
           <Link
-            to="/staff/my-registrations"
+            to="/student/my-registrations"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
+              fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             My Events
           </Link>
           <Link
-            to="/staff/favorites"
+            to="/student/favorites"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/student/favorites') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
+              fontWeight: isActiveRoute('/student/favorites') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+              borderBottom: isActiveRoute('/student/favorites') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
             My Favorites
+          </Link>
+          <Link
+            to="/student/courts"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            Campus Courts
           </Link>
           <Link
             to="/gym-schedule"
@@ -523,31 +532,73 @@ const StaffFavorites = () => {
                 }}>
                   Start exploring events and add them to your favorites!
                 </p>
-                <Link
-                  to="/staff/events"
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    borderRadius: '0.5rem',
-                    backgroundColor: '#1e40af',
-                    color: '#FFFFFF',
-                    textDecoration: 'none',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    display: 'inline-block',
-                    transition: 'all 0.2s',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#1e3a8a';
-                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#1e40af';
-                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                  }}
-                >
-                  Discover Events
-                </Link>
+                <div style={{
+                  display: 'flex',
+                  gap: '1rem',
+                  justifyContent: 'center',
+                  flexWrap: 'wrap'
+                }}>
+                  <Link
+                    to="/student/events"
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#1e40af',
+                      color: '#FFFFFF',
+                      textDecoration: 'none',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#1e3a8a';
+                      e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#1e40af';
+                      e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      explore
+                    </span>
+                    Discover Events
+                  </Link>
+                  <Link
+                    to="/student/courts"
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#1D3557',
+                      color: '#FFFFFF',
+                      textDecoration: 'none',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#152a47';
+                      e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#1D3557';
+                      e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      sports_tennis
+                    </span>
+                    Campus Courts
+                  </Link>
+                </div>
               </div>
             ) : (
               <>
@@ -748,5 +799,5 @@ const StaffFavorites = () => {
   );
 };
 
-export default StaffFavorites;
+export default StudentFavorites;
 

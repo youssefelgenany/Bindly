@@ -230,8 +230,10 @@ const Signup = () => {
       
       if (result.success) {
         setMessage('Account created successfully! Redirecting...');
+        // Store email for verification page
+        localStorage.setItem('pendingVerificationEmail', formData.email);
         setTimeout(() => {
-          navigate('/verify-email');
+          navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`);
         }, 800);
       } else {
         setMessage(result.message);

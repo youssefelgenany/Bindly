@@ -43,6 +43,7 @@ const StudentEventsView = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [favoriteEventIds, setFavoriteEventIds] = useState(new Set());
 
 
   const isActiveRoute = (path) => {
@@ -285,6 +286,60 @@ const StudentEventsView = () => {
 
     loadUserRegistrations();
   }, [user]);
+
+  // Load user's favorite events (for Student users)
+  useEffect(() => {
+    const loadFavoriteEvents = async () => {
+      if (!user || user.userType !== 'Student') return;
+      
+      try {
+        const result = await eventsApiService.getFavoriteEvents();
+        if (result.success && result.data.events) {
+          const favoriteIds = new Set();
+          result.data.events.forEach(event => {
+            if (event._id) {
+              favoriteIds.add(String(event._id));
+            } else if (event.id) {
+              favoriteIds.add(String(event.id));
+            }
+          });
+          setFavoriteEventIds(favoriteIds);
+        }
+      } catch (error) {
+        console.error('Error loading favorite events:', error);
+      }
+    };
+
+    loadFavoriteEvents();
+  }, [user]);
+
+  const handleToggleFavorite = async (eventId, e) => {
+    e.stopPropagation(); // Prevent card click
+    
+    if (!user || user.userType !== 'Student') return;
+    
+    const isFavorite = favoriteEventIds.has(String(eventId));
+    
+    try {
+      if (isFavorite) {
+        const result = await eventsApiService.removeFromFavorites(eventId);
+        if (result.success) {
+          setFavoriteEventIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(String(eventId));
+            return newSet;
+          });
+        }
+      } else {
+        const result = await eventsApiService.addToFavorites(eventId);
+        if (result.success) {
+          setFavoriteEventIds(prev => new Set([...prev, String(eventId)]));
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
 
   // Load notifications
   const loadNotifications = useCallback(async () => {
@@ -984,6 +1039,35 @@ const StudentEventsView = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
+                <Link
+                  to="/wallet"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => setShowLogoutDropdown(false)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    account_balance_wallet
+                  </span>
+                  My Wallet
+                </Link>
                 <button
                   onClick={handleLogout}
                   style={{
@@ -1065,6 +1149,19 @@ const StudentEventsView = () => {
             }}
           >
                   My Events
+              </Link>
+              <Link
+                to="/student/favorites"
+                style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/student/favorites') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/student/favorites') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/student/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+                  My Favorites
               </Link>
               <Link
                 to="/student/courts"
@@ -1734,6 +1831,48 @@ const StudentEventsView = () => {
                               }
                             }}
                           />
+                          {/* Heart Icon for Student users */}
+                          {user?.userType === 'Student' && (
+                            <button
+                              onClick={(e) => handleToggleFavorite(event.id, e)}
+                              style={{
+                                position: 'absolute',
+                                top: '0.75rem',
+                                right: '0.75rem',
+                                background: 'rgba(255, 255, 255, 0.9)',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '2.5rem',
+                                height: '2.5rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                                transition: 'all 0.2s',
+                                zIndex: 10
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.background = '#ffffff';
+                                e.target.style.transform = 'scale(1.1)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.background = 'rgba(255, 255, 255, 0.9)';
+                                e.target.style.transform = 'scale(1)';
+                              }}
+                            >
+                              <span 
+                                className="material-symbols-outlined" 
+                                style={{ 
+                                  fontSize: '1.5rem',
+                                  color: favoriteEventIds.has(String(event.id)) ? '#ef4444' : '#6b7280',
+                                  transition: 'color 0.2s'
+                                }}
+                              >
+                                {favoriteEventIds.has(String(event.id)) ? 'favorite' : 'favorite_border'}
+                              </span>
+                            </button>
+                          )}
                         </div>
                       )}
                       

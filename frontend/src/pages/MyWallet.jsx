@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { eventsApiService } from '../api/eventsApi';
 
 const MyWallet = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [walletBalance, setWalletBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
@@ -16,7 +16,12 @@ const MyWallet = () => {
     
     // Listen for wallet refresh events (e.g., after cancellation)
     const handleWalletRefresh = () => {
+      console.log('💰 Wallet refresh event received');
       loadWalletData();
+      // Also refresh user object to get latest wallet balance
+      if (refreshUser) {
+        refreshUser();
+      }
     };
     window.addEventListener('walletRefresh', handleWalletRefresh);
     
@@ -31,7 +36,7 @@ const MyWallet = () => {
       document.removeEventListener('click', handleClickOutside);
       window.removeEventListener('walletRefresh', handleWalletRefresh);
     };
-  }, []);
+  }, []); // Remove user dependency to prevent unnecessary re-renders
 
   const loadWalletData = async () => {
     try {
@@ -46,13 +51,63 @@ const MyWallet = () => {
       
       if (response.ok) {
         const data = await response.json();
-        setWalletBalance(data.walletBalance || 0);
+        console.log('💰 Wallet API Response:', data);
+        
+        // Prioritize walletBalance from API response (this is the source of truth)
+        let balance = data.walletBalance;
+        
+        // If balance is null/undefined, try to get from latest transaction's balanceAfter
+        if (balance === null || balance === undefined) {
+          const transactions = data.transactions || [];
+          if (transactions.length > 0) {
+            const latestTx = transactions[0];
+            if (latestTx.balanceAfter !== null && latestTx.balanceAfter !== undefined) {
+              balance = latestTx.balanceAfter;
+              console.log('💰 Using balanceAfter from latest transaction:', balance);
+            } else {
+              // Calculate from transactions (amounts are signed: negative for payments, positive for refunds/topups)
+              balance = transactions.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0);
+              console.log('💰 Calculated balance from transactions:', balance);
+            }
+          } else {
+            balance = 0;
+            console.log('💰 No transactions found, balance set to 0');
+          }
+        }
+        
+        // Ensure balance is a number
+        balance = typeof balance === 'number' ? balance : parseFloat(balance) || 0;
+        console.log('💰 Final wallet balance:', balance);
+        console.log('💰 Transactions count:', (data.transactions || []).length);
+        
+        // Set state - this is the source of truth
+        setWalletBalance(balance);
         setTransactions(data.transactions || []);
+        
+        // Update user object in context with latest balance
+        if (updateUser) {
+          updateUser({ walletBalance: balance });
+        }
+        
+        // Also refresh user object from backend to ensure sync
+        if (refreshUser) {
+          try {
+            await refreshUser();
+          } catch (err) {
+            console.error('Error refreshing user:', err);
+          }
+        }
       } else {
-        console.error('Failed to load wallet data');
+        // Fallback to user object if endpoint fails
+        const fallbackBalance = user?.walletBalance || 0;
+        setWalletBalance(fallbackBalance);
+        console.error('Failed to load wallet data, using cached balance:', fallbackBalance);
       }
     } catch (err) {
       console.error('Error loading wallet data:', err);
+      // Fallback to user object on error
+      const fallbackBalance = user?.walletBalance || 0;
+      setWalletBalance(fallbackBalance);
     } finally {
       setLoading(false);
     }
@@ -91,9 +146,9 @@ const MyWallet = () => {
   const getTransactionIcon = (type) => {
     switch (type) {
       case 'refund':
-        return 'arrow_back';
+        return 'arrow_forward'; // Money coming IN (right arrow)
       case 'payment':
-        return 'arrow_forward';
+        return 'arrow_back'; // Money going OUT (left arrow)
       case 'topup':
         return 'add';
       default:
@@ -195,7 +250,7 @@ const MyWallet = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
-                {user?.userType === 'TA' && (
+                {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
                   <Link
                     to="/wallet"
                     style={{

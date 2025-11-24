@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { gymApiService } from '../api/gymApi';
 import { gymSessionApi } from '../api/gymSessionApi';
+import { notificationApiService } from '../api/notificationApi';
 import GymSessionForm from '../components/GymSessionForm';
+import GymSessionRegistrationForm from '../components/GymSessionRegistrationForm';
 
 const TYPES = ['yoga', 'pilates', 'aerobics', 'zumba', 'cross circuit', 'kick-boxing', 'strength', 'cardio', 'other'];
 
@@ -13,6 +15,10 @@ const GymSchedule = () => {
   const navigate = useNavigate();
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
   
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
@@ -61,12 +67,19 @@ const GymSchedule = () => {
   const [typeFilter, setTypeFilter] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
   const [updating, setUpdating] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancellingSession, setCancellingSession] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+
+  // User type checks
+  const isEventsOffice = !user?.userType || (user.userType !== 'TA' && user.userType !== 'Staff' && user.userType !== 'Professor' && user.userType !== 'Student');
+  const isProfessor = user?.userType === 'Professor';
+  const showHorizontalMenu = user?.userType === 'Student' || user?.userType === 'Staff' || user?.userType === 'TA';
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -91,10 +104,93 @@ const GymSchedule = () => {
       if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
+      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLogoutDropdown]);
+  }, [showLogoutDropdown, showNotificationsDropdown]);
+
+  // Load notifications (for professors)
+  const loadNotifications = useCallback(async () => {
+    if (user?.userType !== 'Professor') return;
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+      
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(notificationsResult.data.data.notifications || notificationsResult.data.data || []);
+      }
+      
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, [user]);
+
+  // Load notifications on mount and poll for updates (for professors)
+  useEffect(() => {
+    if (user?.userType === 'Professor') {
+      loadNotifications();
+      const interval = setInterval(() => {
+        loadNotifications();
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [loadNotifications, user]);
+
+  // Mark notification as read
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev => prev.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Mark all as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  // Format notification date
+  const formatNotificationDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   const load = async () => {
     setLoading(true);
@@ -183,8 +279,6 @@ const GymSchedule = () => {
     setMonth(n.getMonth());
   };
 
-  // Check if user is Events Office
-  const isEventsOffice = user?.userType === 'Event Office' || user?.userType === 'Events Office' || user?.userType === 'event_office' || user?.role === 'event_office' || user?.role === 'Event Office';
 
   // Handle gym session creation
   const handleGymSessionCreate = async (formData) => {
@@ -296,7 +390,7 @@ const GymSchedule = () => {
       display: 'flex',
       height: '100vh',
       fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
+      backgroundColor: '#f6f7f8'
     }}>
       {/* Left Sidebar */}
       <aside style={{
@@ -721,6 +815,251 @@ const GymSchedule = () => {
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+            {/* Notifications Bell - Only for Professors */}
+            {isProfessor && (
+              <div style={{ position: 'relative' }} data-notifications-dropdown>
+                <button
+                  onClick={() => {
+                    setShowNotificationsDropdown(!showNotificationsDropdown);
+                    setShowLogoutDropdown(false);
+                    if (!showNotificationsDropdown) {
+                      loadNotifications();
+                    }
+                  }}
+                  style={{
+                    position: 'relative',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.5rem',
+                    color: '#1D3557'
+                  }}>
+                    notifications
+                  </span>
+                  {unreadCount > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '0.25rem',
+                      right: '0.25rem',
+                      backgroundColor: '#ef4444',
+                      color: '#FFFFFF',
+                      borderRadius: '50%',
+                      width: '1.125rem',
+                      height: '1.125rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.625rem',
+                      fontWeight: '700',
+                      border: '2px solid #FFFFFF'
+                    }}>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {showNotificationsDropdown && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '0.5rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                    zIndex: 1001,
+                    width: '360px',
+                    maxHeight: '500px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      padding: '1rem',
+                      borderBottom: '1px solid #e2e8f0',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <h3 style={{
+                        fontSize: '1rem',
+                        fontWeight: '600',
+                        color: '#1D3557',
+                        margin: 0
+                      }}>
+                        Notifications
+                      </h3>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllAsRead}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#1e40af',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            padding: '0.25rem 0.5rem'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.textDecoration = 'underline';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.textDecoration = 'none';
+                          }}
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+                    <div style={{
+                      overflowY: 'auto',
+                      maxHeight: '400px'
+                    }}>
+                      {loadingNotifications ? (
+                        <div style={{
+                          padding: '2rem',
+                          textAlign: 'center',
+                          color: '#6b7280',
+                          fontSize: '0.875rem'
+                        }}>
+                          Loading...
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div style={{
+                          padding: '2rem',
+                          textAlign: 'center',
+                          color: '#6b7280',
+                          fontSize: '0.875rem'
+                        }}>
+                          No notifications
+                        </div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <div
+                            key={notification._id}
+                            onClick={() => {
+                              if (!notification.isRead) {
+                                handleMarkAsRead(notification._id);
+                              }
+                              if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                            navigate(`/professor/all-events`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            (notification.type === 'event_reminder' || 
+                             notification.type === 'workshop_reminder' || 
+                             notification.type === 'trip_reminder' ||
+                             notification.type === 'gym_session_reminder') && 
+                            (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                          ) {
+                            navigate(`/professor/events`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            notification.type === 'new_loyalty_partner' || 
+                            notification.type === 'loyalty_partner_added' ||
+                            (notification.type === 'system' && notification.metadata?.vendorId)
+                          ) {
+                            // Navigate to Loyalty Partners page
+                            navigate(`/professor/loyalty-vendors`);
+                            setShowNotificationsDropdown(false);
+                          }
+                        }}
+                            style={{
+                              padding: '1rem',
+                              borderBottom: '1px solid #f3f4f6',
+                              cursor: 'pointer',
+                              backgroundColor: notification.isRead 
+                                ? '#FFFFFF' 
+                                : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                  ? '#fef2f2'
+                                  : '#eff6ff',
+                              borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
+                                ? '3px solid #ef4444'
+                                : 'none',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = notification.isRead 
+                                ? '#f9fafb' 
+                                : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                  ? '#fee2e2'
+                                  : '#dbeafe';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = notification.isRead 
+                                ? '#FFFFFF' 
+                                : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                  ? '#fef2f2'
+                                  : '#eff6ff';
+                            }}
+                          >
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              gap: '0.5rem'
+                            }}>
+                              <div style={{ flex: 1 }}>
+                                <p style={{
+                                  fontSize: '0.875rem',
+                                  fontWeight: notification.isRead ? '400' : '600',
+                                  color: '#1D3557',
+                                  margin: 0,
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  {notification.title || notification.message}
+                                </p>
+                                {notification.message && notification.message !== notification.title && (
+                                  <p style={{
+                                    fontSize: '0.75rem',
+                                    color: '#6b7280',
+                                    margin: 0
+                                  }}>
+                                    {notification.message}
+                                  </p>
+                                )}
+                                <p style={{
+                                  fontSize: '0.625rem',
+                                  color: '#9ca3af',
+                                  margin: '0.5rem 0 0 0'
+                                }}>
+                                  {formatNotificationDate(notification.createdAt)}
+                                </p>
+                              </div>
+                              {!notification.isRead && (
+                                <div style={{
+                                  width: '0.5rem',
+                                  height: '0.5rem',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#1e40af',
+                                  flexShrink: 0,
+                                  marginTop: '0.25rem'
+                                }} />
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
@@ -783,6 +1122,37 @@ const GymSchedule = () => {
                   zIndex: 1000,
                   minWidth: '150px'
                 }}>
+                  {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
+                    <Link
+                      to="/wallet"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        textAlign: 'left',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#1D3557',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        textDecoration: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#f3f4f6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'transparent';
+                      }}
+                      onClick={() => setShowLogoutDropdown(false)}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                        account_balance_wallet
+                      </span>
+                      My Wallet
+                    </Link>
+                  )}
                   <button
                     onClick={handleLogout}
                     style={{
@@ -816,6 +1186,85 @@ const GymSchedule = () => {
           </div>
         </header>
 
+      {/* Horizontal Menu Bar - For Professors */}
+      {isProfessor && (
+        <nav style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '1rem 2rem',
+          backgroundColor: '#FFFFFF',
+          borderBottom: '1px solid #e2e8f0'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <Link
+              to="/dashboard"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              Dashboard
+            </Link>
+            <Link
+              to="/professor/all-events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              Discover Events
+            </Link>
+            <Link
+              to="/professor/events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              My Events
+            </Link>
+            <Link
+              to="/professor/my-workshops"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              My Workshops
+            </Link>
+            <Link
+              to="/professor/gym-schedule"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
+              }}
+            >
+              View Gym Sessions
+            </Link>
+          </div>
+        </nav>
+      )}
+
       {/* Main Content */}
       <main style={{
         marginLeft: sidebarOpen ? '16rem' : '0',
@@ -826,8 +1275,8 @@ const GymSchedule = () => {
         overflow: 'hidden',
         transition: 'margin-left 0.3s ease'
       }}>
-        {/* Horizontal Menu Bar - Only show for Students */}
-        {user?.userType === 'Student' && (
+        {/* Horizontal Menu Bar - Show for Students, Staff, and TA */}
+        {showHorizontalMenu && (
           <nav style={{
             display: 'flex',
             alignItems: 'center',
@@ -849,47 +1298,106 @@ const GymSchedule = () => {
             >
               Dashboard
             </Link>
+            {(user?.userType === 'TA' || user?.userType === 'Staff') ? (
+              <>
+                <Link
+                  to="/staff/events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  Discover Events
+                </Link>
+                <Link
+                  to="/staff/my-registrations"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Events
+                </Link>
+                <Link
+                  to="/staff/favorites"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Favorites
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/student/events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  Discover Events
+                </Link>
+                <Link
+                  to="/student/my-registrations"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Events
+                </Link>
+                <Link
+                  to="/student/favorites"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/student/favorites') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/favorites') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/student/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  My Favorites
+                </Link>
+                <Link
+                  to="/student/courts"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
+                  }}
+                >
+                  Campus Courts
+                </Link>
+              </>
+            )}
             <Link
-              to="/student/events"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/student/events') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Discover Events
-            </Link>
-            <Link
-              to="/student/my-registrations"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              My Events
-            </Link>
-            <Link
-              to="/student/courts"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Campus Courts
-            </Link>
-            <Link
-              to="/gym"
+              to="/gym-schedule"
               style={{
                 textDecoration: 'none',
                 color: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
@@ -899,7 +1407,7 @@ const GymSchedule = () => {
                 borderBottom: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
               }}
             >
-              Gym Sessions
+              View Gym Sessions
             </Link>
           </div>
         </nav>
@@ -909,9 +1417,9 @@ const GymSchedule = () => {
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '1rem',
-          paddingLeft: '6rem',
-          paddingRight: '6rem',
+          padding: isProfessor ? '2rem 0' : '1rem',
+          paddingLeft: isProfessor ? '4rem' : '6rem',
+          paddingRight: isProfessor ? '4rem' : '6rem',
           backgroundColor: '#f6f7f8'
         }}>
           {/* Page Title Banner */}
@@ -1312,8 +1820,15 @@ const GymSchedule = () => {
                               const sessionType = s.type || 'other';
                               const sessionColor = getSessionTypeColor(sessionType);
 
+                              // Check if user can register (not Events Office)
+                              const canRegister = user?.userType && ['Student', 'Staff', 'TA', 'Professor'].includes(user.userType);
+                              // Check if session is active and not in the past
+                              const sessionDate = new Date(s.date);
+                              const [hh = '0', mm = '0'] = String(s.time || '00:00').split(':');
+                              const sessionDateTime = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate(), parseInt(hh, 10) || 0, parseInt(mm, 10) || 0);
+                              const isFuture = sessionDateTime > new Date();
+                              const isActive = s.status === 'active';
                               const isCancelled = s.status === 'cancelled';
-                              
                               return (
                                 <div
                                   key={s._id || s.id || sessionIdx}
@@ -1323,25 +1838,34 @@ const GymSchedule = () => {
                                     borderRadius: '0.25rem',
                                     padding: '0.25rem 0.375rem',
                                     fontSize: '0.625rem',
-                                    cursor: isEventsOffice ? 'default' : 'pointer',
+                                    cursor: (canRegister && isActive && isFuture && !isCancelled && !isEventsOffice) ? 'pointer' : 'default',
                                     transition: 'opacity 0.2s, transform 0.2s',
                                     boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                                     position: 'relative',
                                     opacity: isCancelled ? 0.6 : 1
                                   }}
+                                  onClick={() => {
+                                    if (canRegister && isActive && isFuture) {
+                                      setSelectedSession(s);
+                                      setIsRegistrationModalOpen(true);
+                                    }
+                                  }}
                                   onMouseEnter={(e) => {
-                                    if (!isEventsOffice) {
+                                    if (canRegister && isActive && isFuture && !isCancelled && !isEventsOffice) {
                                       e.target.style.opacity = '0.9';
                                       e.target.style.transform = 'scale(1.02)';
                                     }
                                   }}
                                   onMouseLeave={(e) => {
-                                    if (!isEventsOffice) {
-                                      e.target.style.opacity = isCancelled ? 0.6 : '1';
+                                    if (canRegister && isActive && isFuture && !isCancelled && !isEventsOffice) {
+                                      e.target.style.opacity = '1';
+                                      e.target.style.transform = 'scale(1)';
+                                    } else if (!isEventsOffice && isCancelled) {
+                                      e.target.style.opacity = '0.6';
                                       e.target.style.transform = 'scale(1)';
                                     }
                                   }}
-                                  title={`${typeLabel} at ${timeStr}${isCancelled ? ' (Cancelled)' : ''}`}
+                                  title={canRegister && isActive && isFuture && !isCancelled ? `Click to register for ${typeLabel} at ${timeStr}` : `${typeLabel} at ${timeStr}${isCancelled ? ' (Cancelled)' : ''}`}
                                 >
                                   <div style={{
                                     fontWeight: '600',
@@ -1435,6 +1959,22 @@ const GymSchedule = () => {
           )}
         </div>
       </main>
+
+      {/* Registration Modal */}
+      {isRegistrationModalOpen && selectedSession && (
+        <GymSessionRegistrationForm
+          gymSession={selectedSession}
+          onClose={() => {
+            setIsRegistrationModalOpen(false);
+            setSelectedSession(null);
+          }}
+          onSuccess={(result) => {
+            console.log('Registration successful:', result);
+            // Reload sessions to update the display
+            load();
+          }}
+        />
+      )}
 
       {/* Create Gym Session Modal */}
       {isCreateModalOpen && isEventsOffice && (
