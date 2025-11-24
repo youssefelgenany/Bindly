@@ -642,7 +642,13 @@ const approveWorkshop = async (req, res) => {
     
     // Send notifications to all eligible users about the newly approved event
     const { notifyNewEventCreated } = require("../services/notificationService");
-    await notifyNewEventCreated(event);
+    console.log(`📢 Workshop ${event._id} is approved, triggering notifications...`);
+    try {
+      await notifyNewEventCreated(event);
+      console.log(`✅ Notifications triggered successfully for workshop ${event._id}`);
+    } catch (notifError) {
+      console.error(`❌ Error triggering notifications for workshop ${event._id}:`, notifError);
+    }
     
     // Create notification for the professor
     try {
