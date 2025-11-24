@@ -146,46 +146,7 @@ const StudentEventsView = () => {
             }
           }
           
-          // STRICT FILTER: Filter out past events - exclude any event that has ended
-          const now = new Date();
-          const nowTime = now.getTime();
-          
-          // If event has endDate, check if it's in the past (using full datetime comparison)
-          if (ev.endDate) {
-            const endDate = new Date(ev.endDate);
-            if (!isNaN(endDate.getTime())) {
-              const endTime = endDate.getTime();
-              // If endDate is before or equal to now, exclude it (event has ended)
-              if (endTime <= nowTime) {
-                console.log('🚫 Frontend: FILTERING OUT PAST EVENT:', ev.title, 'endDate:', ev.endDate, 'endTime:', endTime, 'nowTime:', nowTime, 'diff:', (nowTime - endTime) / (1000 * 60 * 60 * 24), 'days ago');
-                return false;
-              }
-            } else {
-              // Invalid endDate, exclude to be safe
-              console.log('🚫 Frontend: Invalid endDate for event:', ev.title);
-              return false;
-            }
-          } else if (ev.startDate) {
-            // If no endDate, use startDate - if startDate is in the past, exclude it
-            const startDate = new Date(ev.startDate);
-            if (!isNaN(startDate.getTime())) {
-              const startTime = startDate.getTime();
-              // If startDate is before or equal to now, exclude it (event has started/ended)
-              if (startTime <= nowTime) {
-                console.log('🚫 Frontend: FILTERING OUT PAST EVENT (no endDate):', ev.title, 'startDate:', ev.startDate, 'startTime:', startTime, 'nowTime:', nowTime, 'diff:', (nowTime - startTime) / (1000 * 60 * 60 * 24), 'days ago');
-                return false;
-              }
-            } else {
-              // Invalid startDate, exclude to be safe
-              console.log('🚫 Frontend: Invalid startDate for event:', ev.title);
-              return false;
-            }
-          } else {
-            // If event has no dates at all, exclude it to be safe
-            console.log('🚫 Frontend: FILTERING OUT event with no dates:', ev.title);
-            return false;
-          }
-          
+          // Show all events including past events - no date filtering
           return true;
         });
         

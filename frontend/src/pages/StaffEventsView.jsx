@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { eventsApiService } from '../api/eventsApi';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
+import { notificationApiService } from '../api/notificationApi';
 import StudentRegistrationForm from '../components/StudentRegistrationForm';
 import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
 
@@ -21,19 +22,19 @@ const StaffEventsView = () => {
   const [showWorkshopEditModal, setShowWorkshopEditModal] = useState(false);
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
   const [registeredEventIds, setRegisteredEventIds] = useState(new Set());
-  const [expandedRows, setExpandedRows] = useState(new Set());
-  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   const [favoriteEventIds, setFavoriteEventIds] = useState(new Set());
+  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
-    // Exact match
     if (currentPath === path) return true;
-    // For dashboard, check if it's exactly /dashboard (not /dashboard/something)
     if (path === '/dashboard') {
       return currentPath === '/dashboard';
     }
-    // For other routes, check if current path starts with the route path
     return currentPath.startsWith(path);
   };
 
@@ -51,26 +52,25 @@ const StaffEventsView = () => {
       if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
+      if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLogoutDropdown]);
+  }, [showLogoutDropdown, showNotificationsDropdown]);
 
   const loadEvents = useCallback(async () => {
     try {
       setError('');
       setLoading(true);
-      const typeParam = filter && filter !== 'all' && filter.trim() !== '' ? filter.trim().toLowerCase() : undefined;
-      console.log('🔍 Frontend - Filter state:', filter, '-> Sending type param:', typeParam);
-      
       const result = await eventsApiService.getStudentEvents({
         q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
-        type: typeParam
+        type: filter !== 'all' ? filter : undefined
       });
       
       if (result.success) {
-        const eventsList = Array.isArray(result.data) ? result.data : (result.data.events || []);
-        const mapped = eventsList.map(ev => ({
+        const mapped = (result.data || []).map(ev => ({
           id: ev._id || ev.id,
           title: ev.title,
           type: ev.type,
@@ -104,30 +104,7 @@ const StaffEventsView = () => {
             return false;
           }
           
-          // Apply type filter if not 'all' - strict matching
-          if (filter && filter !== 'all' && filter.trim() !== '') {
-            const filterType = filter.trim().toLowerCase();
-            const eventType = (type || '').toString().trim().toLowerCase();
-            if (eventType !== filterType) {
-              return false;
-            }
-          }
-          
-          // Filter out past events - use endDate to allow events that haven't ended yet
-          const now = new Date();
-          if (ev.endDate) {
-            const endDate = new Date(ev.endDate);
-            if (!isNaN(endDate.getTime()) && endDate < now) {
-              return false;
-            }
-          } else if (ev.startDate) {
-            // If no endDate, use startDate (for backward compatibility)
-            const startDate = new Date(ev.startDate);
-            if (!isNaN(startDate.getTime()) && startDate < now) {
-              return false;
-            }
-          }
-          
+          // Show all events including past events - no date filtering
           return true;
         });
         
@@ -142,6 +119,7 @@ const StaffEventsView = () => {
             endDate: e.endDate
           }))
         });
+        
         setEvents(mapped);
       } else {
         setEvents([]);
@@ -167,12 +145,9 @@ const StaffEventsView = () => {
       try {
         const result = await studentRegistrationApi.getMyRegistrations(user.email);
         if (result.success && result.data.registrations) {
-          // Extract event IDs from PAID registrations only
+          // Extract event IDs from registrations
           const registeredIds = new Set();
           result.data.registrations.forEach(reg => {
-            // Only include paid registrations
-            if (reg.paid !== true) return;
-            
             // Check for eventId in the formatted response
             if (reg.eventId) {
               registeredIds.add(String(reg.eventId));
@@ -250,6 +225,84 @@ const StaffEventsView = () => {
     }
   };
 
+  // Load notifications
+  const loadNotifications = useCallback(async () => {
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+      
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(notificationsResult.data.data.notifications || notificationsResult.data.data || []);
+      }
+      
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, []);
+
+  // Load notifications on mount and poll for updates
+  useEffect(() => {
+    loadNotifications();
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
+
+  // Mark notification as read
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev => prev.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Mark all as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  // Format notification date
+  const formatNotificationDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   const handleSearch = () => {
     loadEvents();
   };
@@ -261,38 +314,12 @@ const StaffEventsView = () => {
 
   const handleRegistrationSuccess = (registrationData) => {
     setShowRegistrationForm(false);
-    // Only add to registered set if payment was completed (paid: true)
-    // For free events, registrationData will have paid: true
-    // For paid events, this will only be called after successful payment
-    if (registrationEvent?.id && registrationData?.paid !== false) {
+    // Add the event ID to registered set
+    if (registrationEvent?.id) {
       setRegisteredEventIds(prev => new Set([...prev, String(registrationEvent.id)]));
     }
     setRegistrationEvent(null);
     loadEvents();
-    // Reload registrations to update the registered events list
-    const loadUserRegistrations = async () => {
-      if (!user?.email) return;
-      try {
-        const result = await studentRegistrationApi.getMyRegistrations(user.email);
-        if (result.success && result.data.registrations) {
-          const registeredIds = new Set();
-          result.data.registrations.forEach(reg => {
-            if (reg.paid !== true) return;
-            if (reg.eventId) {
-              registeredIds.add(String(reg.eventId));
-            } else if (reg.event && typeof reg.event === 'object' && reg.event._id) {
-              registeredIds.add(String(reg.event._id));
-            } else if (reg.event && typeof reg.event === 'string') {
-              registeredIds.add(reg.event);
-            }
-          });
-          setRegisteredEventIds(registeredIds);
-        }
-      } catch (error) {
-        console.error('Error reloading user registrations:', error);
-      }
-    };
-    loadUserRegistrations();
   };
 
   const handleCloseRegistrationForm = () => {
@@ -363,76 +390,12 @@ const StaffEventsView = () => {
     return type ? type.toUpperCase() : 'EVENT';
   };
 
-  const getEventStatus = (event) => {
-    const now = new Date();
-    const startDate = new Date(event.startDate);
-    const endDate = new Date(event.endDate);
-    
-    if (event.capacity && event.registeredCount >= event.capacity) {
-      return { label: 'Full', color: 'red' };
-    }
-    if (now >= startDate && now <= endDate) {
-      return { label: 'Active', color: 'green' };
-    }
-    if (now < startDate) {
-      return { label: 'Upcoming', color: 'blue' };
-    }
-    return { label: 'Past', color: 'gray' };
-  };
-
-  const formatTableDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  const toggleRowExpansion = (eventId) => {
-    setExpandedRows(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(eventId)) {
-        newSet.delete(eventId);
-      } else {
-        newSet.add(eventId);
-      }
-      return newSet;
-    });
-  };
-
-  // Filter events based on type
-  const filteredEvents = events.filter(event => {
-    const title = (event.title || '').trim();
-    if (!title) return false;
-    if (!event.startDate) return false;
-    
-    const startDate = new Date(event.startDate);
-    if (isNaN(startDate.getTime())) return false;
-    
-    // Filter out past events - only filter if the event has completely ended
-    const now = new Date();
-    if (event.endDate) {
-      const eventEndDate = new Date(event.endDate);
-      // Only filter out if endDate is valid and has passed
-      if (!isNaN(eventEndDate.getTime()) && eventEndDate < now) {
-        return false;
-      }
-    } else {
-      // If no endDate, use startDate (for backward compatibility)
-      // But be lenient - only filter if startDate is clearly in the past (more than 1 day ago)
-      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      if (startDate < oneDayAgo) {
-        return false;
-      }
-    }
-    
-    const typeMatch = filter === 'all' || (event.type && event.type === filter);
-    return typeMatch;
-  });
 
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
     : user?.name || (user?.userType === 'TA' ? 'TA' : 'Staff');
   
-  const userRole = user?.userType === 'TA' ? 'TA' : 'Staff';
+  const userRole = user?.userType === 'TA' ? 'Teaching Assistant' : 'Staff';
 
   return (
     <div style={{
@@ -466,6 +429,242 @@ const StaffEventsView = () => {
           </Link>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+          {/* Notifications Bell */}
+          <div style={{ position: 'relative' }} data-notifications-dropdown>
+            <button
+              onClick={() => {
+                setShowNotificationsDropdown(!showNotificationsDropdown);
+                setShowLogoutDropdown(false);
+                if (!showNotificationsDropdown) {
+                  loadNotifications();
+                }
+              }}
+              style={{
+                position: 'relative',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span className="material-symbols-outlined" style={{
+                fontSize: '1.5rem',
+                color: '#1D3557'
+              }}>
+                notifications
+              </span>
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '0.25rem',
+                  right: '0.25rem',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  borderRadius: '50%',
+                  width: '1.125rem',
+                  height: '1.125rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.625rem',
+                  fontWeight: '700',
+                  border: '2px solid #FFFFFF'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {showNotificationsDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 1001,
+                width: '360px',
+                maxHeight: '500px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  padding: '1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1D3557',
+                    margin: 0
+                  }}>
+                    Notifications
+                  </h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllAsRead}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#1e40af',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        padding: '0.25rem 0.5rem'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.textDecoration = 'underline';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.textDecoration = 'none';
+                      }}
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                <div style={{
+                  overflowY: 'auto',
+                  maxHeight: '400px'
+                }}>
+                  {loadingNotifications ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      Loading...
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification._id}
+                        onClick={() => {
+                          if (!notification.isRead) {
+                            handleMarkAsRead(notification._id);
+                          }
+                          if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                            navigate(`/staff/events`);
+                            setShowNotificationsDropdown(false);
+                          } else if (
+                            (notification.type === 'event_reminder' || 
+                             notification.type === 'workshop_reminder' || 
+                             notification.type === 'trip_reminder' ||
+                             notification.type === 'gym_session_reminder') && 
+                            (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                          ) {
+                            navigate(`/staff/my-registrations`);
+                            setShowNotificationsDropdown(false);
+                          }
+                        }}
+                        style={{
+                          padding: '1rem',
+                          borderBottom: '1px solid #f3f4f6',
+                          cursor: 'pointer',
+                          backgroundColor: notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fef2f2'
+                              : '#eff6ff',
+                          borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
+                            ? '3px solid #ef4444'
+                            : 'none',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#f9fafb' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fee2e2'
+                              : '#dbeafe';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = notification.isRead 
+                            ? '#FFFFFF' 
+                            : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                              ? '#fef2f2'
+                              : '#eff6ff';
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{
+                              fontSize: '0.875rem',
+                              fontWeight: notification.isRead ? '400' : '600',
+                              color: '#1D3557',
+                              margin: 0,
+                              marginBottom: '0.25rem'
+                            }}>
+                              {notification.title || notification.message}
+                            </p>
+                            {notification.message && notification.message !== notification.title && (
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                margin: 0
+                              }}>
+                                {notification.message}
+                              </p>
+                            )}
+                            <p style={{
+                              fontSize: '0.625rem',
+                              color: '#9ca3af',
+                              margin: '0.5rem 0 0 0'
+                            }}>
+                              {formatNotificationDate(notification.createdAt)}
+                            </p>
+                          </div>
+                          {!notification.isRead && (
+                            <div style={{
+                              width: '0.5rem',
+                              height: '0.5rem',
+                              borderRadius: '50%',
+                              backgroundColor: '#1e40af',
+                              flexShrink: 0,
+                              marginTop: '0.25rem'
+                            }} />
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div style={{ textAlign: 'right' }}>
             <p style={{
               fontSize: '0.875rem',
@@ -480,13 +679,18 @@ const StaffEventsView = () => {
               color: '#6b7280',
               margin: 0
             }}>
-              {userRole}
+              {user?.userType === 'TA' ? 'TA' : 'Staff'}
             </p>
           </div>
+
+          {/* Profile Icon */}
           <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            onClick={() => {
+              setShowLogoutDropdown(!showLogoutDropdown);
+              setShowNotificationsDropdown(false);
+            }}
           >
             {user?.profilePicturePath ? (
               <img
@@ -511,7 +715,7 @@ const StaffEventsView = () => {
                 color: '#FFFFFF',
                 fontWeight: '600'
               }}>
-                {(user?.firstName?.[0] || user?.name?.[0] || 'S').toUpperCase()}
+                {(user?.firstName?.[0] || user?.name?.[0] || (user?.userType === 'TA' ? 'T' : 'S')).toUpperCase()}
               </div>
             )}
             {showLogoutDropdown && (
@@ -641,19 +845,6 @@ const StaffEventsView = () => {
             My Events
           </Link>
           <Link
-            to="/staff/favorites"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Favorites
-          </Link>
-          <Link
             to="/gym-schedule"
             style={{
               textDecoration: 'none',
@@ -664,7 +855,7 @@ const StaffEventsView = () => {
               borderBottom: isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
-            View Gym Sessions
+            Gym Sessions
           </Link>
         </div>
       </nav>
@@ -676,7 +867,6 @@ const StaffEventsView = () => {
         flexDirection: 'column',
         overflow: 'hidden'
       }}>
-
         {/* Content */}
         <div style={{
           flex: 1,
@@ -723,156 +913,169 @@ const StaffEventsView = () => {
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'flex-start',
-              padding: '2rem 2.5rem',
+              padding: '2rem',
               color: '#FFFFFF'
             }}>
-              <h3 style={{
-                color: '#FFFFFF',
-                fontSize: '1.75rem',
+              <h1 style={{
+                fontSize: '2rem',
                 fontWeight: '700',
                 margin: 0,
-                marginBottom: '0.5rem'
+                marginBottom: '0.5rem',
+                textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
               }}>
                 Discover Events
-              </h3>
+              </h1>
               <p style={{
-                color: 'rgba(255, 255, 255, 0.9)',
-                fontSize: '0.875rem',
+                fontSize: '1rem',
                 fontWeight: '400',
-                margin: 0
+                margin: 0,
+                opacity: 0.9,
+                textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
               }}>
-                Browse and register for upcoming events.
+                Browse and register for upcoming events
               </p>
             </div>
           </div>
-
           {/* Search and Filters */}
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '0.75rem',
-            padding: '1rem 1.5rem',
-            marginBottom: '1.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
           }}>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'nowrap', justifyContent: 'space-between' }}>
-              {/* Search Input and Button - Left Side */}
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: '1 1 auto', minWidth: 0 }}>
-                <div style={{ position: 'relative', flex: '1 1 auto', minWidth: '200px', maxWidth: '520px' }}>
-                  <span className="material-symbols-outlined" style={{
-                    position: 'absolute',
-                    left: '0.75rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#9ca3af',
-                    fontSize: '1.25rem',
-                    pointerEvents: 'none',
-                    zIndex: 1
-                  }}>
-                    search
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Search by event name, professor name, location, or description..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem 0.875rem 0.875rem 2.75rem',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #e5e7eb',
-                      backgroundColor: '#ffffff',
-                      fontSize: '0.875rem',
-                      outline: 'none',
-                      transition: 'all 0.2s',
-                      boxSizing: 'border-box'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = '#1e40af';
-                      e.target.style.backgroundColor = '#ffffff';
-                      e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = '#e5e7eb';
-                      e.target.style.backgroundColor = '#ffffff';
-                      e.target.style.boxShadow = 'none';
-                    }}
-                  />
-                </div>
-                <button
-                  onClick={handleSearch}
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', alignItems: 'center' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <span className="material-symbols-outlined" style={{
+                  position: 'absolute',
+                  left: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#9ca3af',
+                  fontSize: '1.25rem',
+                  pointerEvents: 'none'
+                }}>
+                  search
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search by event name, professor name, location, or description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   style={{
-                    padding: '0.875rem 1.75rem',
+                    width: '100%',
+                    padding: '0.875rem 0.875rem 0.875rem 2.75rem',
                     borderRadius: '0.5rem',
-                    backgroundColor: '#1e40af',
-                    color: '#FFFFFF',
-                    border: 'none',
+                    border: '1px solid #e5e7eb',
+                    backgroundColor: '#f9fafb',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1e40af';
+                    e.target.style.backgroundColor = '#ffffff';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.backgroundColor = '#f9fafb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+              <button
+                onClick={handleSearch}
+                style={{
+                  padding: '0.875rem 1.75rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#1e40af',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#1e3a8a';
+                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#1e40af';
+                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                }}
+              >
+                Search
+              </button>
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    loadEvents();
+                  }}
+                  style={{
+                    padding: '0.875rem 1rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#f3f4f6',
+                    color: '#6b7280',
+                    border: '1px solid #e5e7eb',
                     cursor: 'pointer',
                     fontSize: '0.875rem',
-                    fontWeight: '600',
+                    fontWeight: '500',
                     transition: 'all 0.2s',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    flexShrink: 0
+                    whiteSpace: 'nowrap'
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#1e3a8a';
-                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                    e.target.style.backgroundColor = '#e5e7eb';
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#1e40af';
-                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                    e.target.style.backgroundColor = '#f3f4f6';
                   }}
                 >
-                  Search
+                  Clear
                 </button>
-              </div>
-              
-              {/* Filter Buttons - Right Side */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }}>
-                {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => {
-                      setFilter(type);
-                      loadEvents();
-                    }}
-                    style={{
-                      padding: '0.875rem 1.75rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: filter === type ? '#1e40af' : '#f3f4f6',
-                      color: filter === type ? '#FFFFFF' : '#374151',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      transition: 'all 0.2s',
-                      whiteSpace: 'nowrap',
-                      boxShadow: filter === type ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
-                      flexShrink: 0
-                    }}
-                    onMouseEnter={(e) => {
-                      if (filter !== type) {
-                        e.target.style.backgroundColor = '#e5e7eb';
-                      } else {
-                        e.target.style.backgroundColor = '#1e3a8a';
-                        e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (filter !== type) {
-                        e.target.style.backgroundColor = '#f3f4f6';
-                        e.target.style.boxShadow = 'none';
-                      } else {
-                        e.target.style.backgroundColor = '#1e40af';
-                        e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                      }
-                    }}
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </button>
-                ))}
-              </div>
+              )}
+            </div>
+            
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setFilter(type)}
+                  style={{
+                    padding: '0.625rem 1.25rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: filter === type ? '#1e40af' : '#f9fafb',
+                    color: filter === type ? '#FFFFFF' : '#6b7280',
+                    border: filter === type ? 'none' : '1px solid #e5e7eb',
+                    cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: filter === type ? '600' : '500',
+                    textTransform: 'capitalize',
+                    transition: 'all 0.2s',
+                    boxShadow: filter === type ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (filter !== type) {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                      e.target.style.borderColor = '#d1d5db';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (filter !== type) {
+                      e.target.style.backgroundColor = '#f9fafb';
+                      e.target.style.borderColor = '#e5e7eb';
+                    }
+                  }}
+                >
+                  {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -907,7 +1110,7 @@ const StaffEventsView = () => {
               }} className="spinner"></div>
               <p style={{ margin: 0, color: '#6b7280' }}>Loading events...</p>
             </div>
-          ) : filteredEvents.length === 0 ? (
+          ) : events.length === 0 ? (
             <div style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '0.75rem',
@@ -975,7 +1178,7 @@ const StaffEventsView = () => {
                 fontSize: '0.875rem',
                 fontWeight: '500'
               }}>
-                Found {filteredEvents.length} upcoming event{filteredEvents.length !== 1 ? 's' : ''}
+                Found {events.length} upcoming event{events.length !== 1 ? 's' : ''}
                 {searchQuery && ` matching "${searchQuery}"`}
                 {filter !== 'all' && ` in ${filter} category`}
               </div>
@@ -985,10 +1188,8 @@ const StaffEventsView = () => {
                 gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
                 gap: '1.5rem'
               }}>
-                {filteredEvents.map(event => {
-                  const statusInfo = getEventStatus(event);
+                {events.map(event => {
                   const isRegistered = registeredEventIds.has(String(event.id));
-                  
                   return (
                     <div
                       key={event.id}
@@ -996,14 +1197,13 @@ const StaffEventsView = () => {
                       style={{
                         backgroundColor: '#FFFFFF',
                         borderRadius: '0.75rem',
-                        padding: 0,
+                        padding: '1.5rem',
                         boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         border: '1px solid #e5e7eb',
                         display: 'flex',
-                        flexDirection: 'column',
-                        overflow: 'hidden'
+                        flexDirection: 'column'
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.transform = 'translateY(-4px)';
@@ -1024,7 +1224,9 @@ const StaffEventsView = () => {
                           overflow: 'hidden',
                           position: 'relative',
                           backgroundColor: '#f3f4f6',
-                          flexShrink: 0
+                          flexShrink: 0,
+                          marginBottom: '1rem',
+                          borderRadius: '0.5rem'
                         }}>
                           <img
                             src={getEventTypeImage(event.type)}
@@ -1036,6 +1238,7 @@ const StaffEventsView = () => {
                               objectPosition: 'center'
                             }}
                             onError={(e) => {
+                              // Fallback if image doesn't exist
                               e.target.style.display = 'none';
                               e.target.parentElement.style.backgroundColor = getEventTypeColor(event.type);
                               e.target.parentElement.style.display = 'flex';
@@ -1097,7 +1300,7 @@ const StaffEventsView = () => {
                         </div>
                       )}
                       
-                      <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ padding: '0 0.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
                           <div style={{
                             padding: '0.375rem 0.875rem',
@@ -1111,6 +1314,18 @@ const StaffEventsView = () => {
                           }}>
                             {event.type}
                           </div>
+                          {getDaysUntilEvent(event.startDate) && (
+                            <div style={{
+                              fontSize: '0.75rem',
+                              color: '#1e40af',
+                              fontWeight: '600',
+                              backgroundColor: '#eff6ff',
+                              padding: '0.25rem 0.625rem',
+                              borderRadius: '0.375rem'
+                            }}>
+                              {getDaysUntilEvent(event.startDate)}
+                            </div>
+                          )}
                         </div>
                       
                         <h3 style={{
@@ -1126,11 +1341,20 @@ const StaffEventsView = () => {
                       
                         <div style={{
                           display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.5rem',
-                          marginBottom: '0.75rem',
-                          flex: 1
+                          alignItems: 'center',
+                          gap: '0.625rem',
+                          fontSize: '0.8125rem',
+                          color: '#6b7280'
                         }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.125rem',
+                            color: '#9ca3af'
+                          }}>
+                            location_on
+                          </span>
+                          <span>{event.location}</span>
+                        </div>
+                        {event.price && (
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1142,10 +1366,12 @@ const StaffEventsView = () => {
                               fontSize: '1.125rem',
                               color: '#9ca3af'
                             }}>
-                              calendar_today
+                              attach_money
                             </span>
-                            <span>{formatTableDate(event.startDate)}</span>
+                            <span>{formatDate(event.startDate)}</span>
                           </div>
+                        )}
+                        {event.capacity && (
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1157,11 +1383,12 @@ const StaffEventsView = () => {
                               fontSize: '1.125rem',
                               color: '#9ca3af'
                             }}>
-                              location_on
+                              people
                             </span>
                             <span>{event.location}</span>
                           </div>
-                          {(event.type === 'bazaar' || event.type === 'booth') && event.vendors && (
+                        )}
+                        {(event.type === 'bazaar' || event.type === 'booth') && event.vendors && (
                             <div style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -1197,7 +1424,6 @@ const StaffEventsView = () => {
                               </span>
                             </div>
                           )}
-                        </div>
 
                         {event.description && (
                           <p style={{
@@ -1282,7 +1508,7 @@ const StaffEventsView = () => {
         </div>
       </main>
 
-      {/* Event Modal - Same as StudentEventsView */}
+      {/* Event Modal */}
       {selectedEvent && (
         <div
           onClick={() => setSelectedEvent(null)}
@@ -1306,113 +1532,55 @@ const StaffEventsView = () => {
               maxWidth: '600px',
               width: '100%',
               maxHeight: '90vh',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden'
+              overflowY: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
             }}
           >
-            {/* Event Image at Top with Close Button Overlay */}
-            <div style={{ position: 'relative' }}>
-              {getEventTypeImage(selectedEvent.type) && (
-                <div style={{
-                  width: '100%',
-                  height: '200px',
-                  overflow: 'hidden',
-                  position: 'relative',
-                  backgroundColor: '#f3f4f6',
-                  flexShrink: 0
-                }}>
-                  <img
-                    src={getEventTypeImage(selectedEvent.type)}
-                    alt={selectedEvent.type ? selectedEvent.type.charAt(0).toUpperCase() + selectedEvent.type.slice(1) : 'Event'}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      objectPosition: 'center'
-                    }}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.parentElement.style.backgroundColor = getEventTypeColor(selectedEvent.type);
-                      e.target.parentElement.style.display = 'flex';
-                      e.target.parentElement.style.alignItems = 'center';
-                      e.target.parentElement.style.justifyContent = 'center';
-                      if (!e.target.parentElement.querySelector('.fallback-text')) {
-                        const fallback = document.createElement('div');
-                        fallback.className = 'fallback-text';
-                        fallback.textContent = getEventTypeFallbackText(selectedEvent.type);
-                        fallback.style.color = '#FFFFFF';
-                        fallback.style.fontSize = '1.5rem';
-                        fallback.style.fontWeight = '700';
-                        e.target.parentElement.appendChild(fallback);
-                      }
-                    }}
-                  />
-                </div>
-              )}
-              
-              {/* Close Button - Upper Right Corner */}
-              <button
-                onClick={() => setSelectedEvent(null)}
-                style={{
-                  position: 'absolute',
-                  top: '0.75rem',
-                  right: '0.75rem',
-                  background: 'rgba(255, 255, 255, 0.9)',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: '#6b7280',
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: '0.375rem',
-                  transition: 'all 0.2s',
-                  lineHeight: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '2rem',
-                  height: '2rem',
-                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-                  zIndex: 10
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#ffffff';
-                  e.target.style.color = '#1D3557';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                  e.target.style.color = '#6b7280';
-                }}
-              >
-                ×
-              </button>
-            </div>
-            
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '1rem 1.5rem',
+              padding: '1.5rem',
               borderBottom: '1px solid #e5e7eb'
             }}>
               <h2 style={{
                 color: '#1D3557',
                 fontSize: '1.5rem',
                 fontWeight: '700',
-                margin: 0,
-                paddingRight: '1rem'
+                margin: 0
               }}>
                 {selectedEvent.title}
               </h2>
+              <button
+                onClick={() => setSelectedEvent(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.25rem',
+                  transition: 'background-color 0.2s',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2rem',
+                  height: '2rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                ×
+              </button>
             </div>
             
-            <div style={{ 
-              padding: '1rem 1.5rem 1.5rem 1.5rem',
-              overflowY: 'auto',
-              flex: 1,
-              minHeight: 0
-            }}>
+            <div style={{ padding: '1.5rem' }}>
               <div style={{
                 padding: '0.375rem 0.875rem',
                 borderRadius: '0.5rem',
@@ -1553,29 +1721,6 @@ const StaffEventsView = () => {
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Vendors</div>
                       <div style={{ color: '#374151', fontWeight: '500' }}>{(selectedEvent.vendors && selectedEvent.vendors.length) || 0} vendor{((selectedEvent.vendors && selectedEvent.vendors.length) || 0) !== 1 ? 's' : ''} participating</div>
-                    </div>
-                  </div>
-                )}
-                {(selectedEvent.type === 'workshop' || selectedEvent.type === 'conference') && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                  }}>
-                    <span className="material-symbols-outlined" style={{
-                      fontSize: '1.25rem',
-                      color: '#9ca3af'
-                    }}>
-                      school
-                    </span>
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Professor</div>
-                      <div style={{ color: '#374151', fontWeight: '500' }}>
-                        {selectedEvent.professors 
-                          ? (Array.isArray(selectedEvent.professors) ? selectedEvent.professors.join(', ') : selectedEvent.professors)
-                          : (selectedEvent.creatorName || 'Professor')
-                        }
-                      </div>
                     </div>
                   </div>
                 )}
