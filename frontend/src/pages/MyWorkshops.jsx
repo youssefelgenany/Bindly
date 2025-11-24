@@ -1101,6 +1101,19 @@ const MyWorkshops = () => {
             My Workshops
           </Link>
           <Link
+            to="/professor/favorites"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/favorites') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/favorites') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Favorites
+          </Link>
+          <Link
             to="/gym-schedule"
             style={{
               textDecoration: 'none',

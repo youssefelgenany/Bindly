@@ -1,9 +1,24 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
 import { eventsApiService } from '../api/eventsApi';
 import { notificationApiService } from '../api/notificationApi';
 import { useAuth } from '../contexts/AuthContext';
+
+const getDisplayStatus = (status) => {
+  const normalized = status?.toLowerCase();
+  if (normalized === 'approved' || normalized === 'registered') return 'REGISTERED';
+  if (normalized === 'pending') return 'PENDING';
+  if (normalized === 'rejected') return 'REJECTED';
+  return status ? status.toUpperCase() : 'STATUS';
+};
+
+const canStudentCancel = (registration) => {
+  if (!registration) return false;
+  if (!registration.paid) return false;
+  if (!registration.eventDate) return false;
+  return new Date(registration.eventDate) > new Date();
+};
 
 const StudentMyRegistrations = () => {
   const { user, logout, refreshUser } = useAuth();
@@ -15,15 +30,14 @@ const StudentMyRegistrations = () => {
   const [error, setError] = useState('');
   const [selectedRegistration, setSelectedRegistration] = useState(null);
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
-  const [showRatingModal, setShowRatingModal] = useState(false);
-  const [showCommentModal, setShowCommentModal] = useState(false);
   const [showRatingsCommentsModal, setShowRatingsCommentsModal] = useState(false);
-  const [selectedEventForRating, setSelectedEventForRating] = useState(null);
-  const [selectedEventForComment, setSelectedEventForComment] = useState(null);
   const [selectedEventForView, setSelectedEventForView] = useState(null); // { eventId, eventDate, eventEndDate, eventTitle }
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [commentText, setCommentText] = useState('');
+  const [modalError, setModalError] = useState('');
+  const [modalSuccess, setModalSuccess] = useState('');
+  const [modalFocus, setModalFocus] = useState(null);
   const [ratingsAndComments, setRatingsAndComments] = useState(null);
   const [loadingRatingsComments, setLoadingRatingsComments] = useState(false);
   const [eventRatings, setEventRatings] = useState({}); // { eventId: { average: number, count: number } }
@@ -36,6 +50,17 @@ const StudentMyRegistrations = () => {
   const [cancelRegistrationData, setCancelRegistrationData] = useState(null);
   const [showCancelSuccess, setShowCancelSuccess] = useState(false);
   const [cancelSuccessData, setCancelSuccessData] = useState(null);
+  const ratingSectionRef = useRef(null);
+  const commentSectionRef = useRef(null);
+
+  const resetModalState = () => {
+    setRating(0);
+    setHoveredRating(0);
+    setCommentText('');
+    setModalError('');
+    setModalSuccess('');
+    setModalFocus(null);
+  };
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -67,6 +92,15 @@ const StudentMyRegistrations = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLogoutDropdown, showNotificationsDropdown]);
+
+  useEffect(() => {
+    if (!showRatingsCommentsModal || !modalFocus) return;
+    const target = modalFocus === 'comment' ? commentSectionRef.current : ratingSectionRef.current;
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    setModalFocus(null);
+  }, [showRatingsCommentsModal, modalFocus]);
 
   // Load notifications
   const loadNotifications = useCallback(async () => {
@@ -283,136 +317,192 @@ const StudentMyRegistrations = () => {
     }
   };
 
-  // Handle rating submission
-  const handleSubmitRating = async () => {
-    if (!selectedEventForRating || rating === 0) {
-      setError('Please select a rating');
-      return;
-    }
+  // Some legacy "Past Event" entries do not have reliable dates.
+  const isMarkedAsPastEvent = (source) => {
+    if (!source) return false;
+    const typeString = typeof source === 'string'
+      ? source
+      : source.eventType || source.eventCategory || source.type || source.eventTypeLabel || '';
+    if (!typeString) return false;
+    const normalized = typeString.toString().trim().toLowerCase();
+    const pastLabels = ['past event', 'past events', 'past'];
+    return pastLabels.includes(normalized);
+  };
 
+  const refreshEventRatingStats = async (eventId) => {
     try {
-      const result = await eventsApiService.submitRating(selectedEventForRating.eventId, rating);
-      if (result.success) {
-        setShowRatingModal(false);
-        setRating(0);
-        setHoveredRating(0);
-        // Update rating in state
-        const updatedRatings = { ...eventRatings };
-        const ratingResult = await eventsApiService.getRatingsAndComments(selectedEventForRating.eventId);
-        if (ratingResult.success && ratingResult.data?.ratings) {
-          updatedRatings[selectedEventForRating.eventId] = {
+      const ratingResult = await eventsApiService.getRatingsAndComments(eventId);
+      if (ratingResult.success && ratingResult.data?.ratings) {
+        setEventRatings(prev => ({
+          ...prev,
+          [eventId]: {
             average: ratingResult.data.ratings.average || 0,
             count: ratingResult.data.ratings.count || 0
-          };
-          setEventRatings(updatedRatings);
-        }
-        setSelectedEventForRating(null);
-        setError('');
-      } else {
-        setError(result.message || 'Failed to submit rating');
+          }
+        }));
       }
     } catch (err) {
-      console.error('Error submitting rating:', err);
-      setError(err.message || 'Error submitting rating');
+      console.error('Error refreshing rating stats:', err);
     }
   };
 
-  // Handle comment submission
-  const handleSubmitComment = async () => {
-    if (!selectedEventForComment || !commentText.trim()) {
-      setError('Please enter a comment');
+  const handleSubmitRating = async () => {
+    if (!selectedEventForView?.eventId) {
+      setModalError('No event selected.');
       return;
     }
-
-    if (commentText.trim().length > 1000) {
-      setError('Comment cannot exceed 1000 characters');
+    if (!rating || rating < 1 || rating > 5) {
+      setModalError('Please select a rating between 1 and 5.');
       return;
     }
-
+    setModalError('');
     try {
-      const result = await eventsApiService.submitComment(selectedEventForComment.eventId, commentText.trim());
+      const eventId = String(selectedEventForView.eventId);
+      const result = await eventsApiService.submitRating(eventId, rating);
       if (result.success) {
-        setShowCommentModal(false);
-        setCommentText('');
-        setSelectedEventForComment(null);
-        setError('');
+        setRating(0);
+        setHoveredRating(0);
+        setModalSuccess('Rating submitted successfully.');
+        await loadRatingsAndComments(eventId);
+        await refreshEventRatingStats(eventId);
       } else {
-        setError(result.message || 'Failed to submit comment');
+        setModalSuccess('');
+        setModalError(result.message || result.error?.message || 'Failed to submit rating.');
+      }
+    } catch (err) {
+      console.error('Error submitting rating:', err);
+      setModalSuccess('');
+      setModalError(err.response?.data?.message || err.message || 'Error submitting rating.');
+    }
+  };
+
+  const handleSubmitComment = async () => {
+    if (!selectedEventForView?.eventId) {
+      setModalError('No event selected.');
+      return;
+    }
+    if (!commentText.trim()) {
+      setModalError('Please enter a comment.');
+      return;
+    }
+    if (commentText.trim().length > 1000) {
+      setModalError('Comment cannot exceed 1000 characters.');
+      return;
+    }
+    setModalError('');
+    try {
+      const eventId = String(selectedEventForView.eventId);
+      const result = await eventsApiService.submitComment(eventId, commentText.trim());
+      if (result.success) {
+        setCommentText('');
+        setModalSuccess('Comment submitted successfully.');
+        await loadRatingsAndComments(eventId);
+      } else {
+        setModalSuccess('');
+        setModalError(result.message || result.error?.message || 'Failed to submit comment.');
       }
     } catch (err) {
       console.error('Error submitting comment:', err);
-      setError(err.message || 'Error submitting comment');
+      setModalSuccess('');
+      setModalError(err.response?.data?.message || err.message || 'Error submitting comment.');
     }
   };
 
   // Load ratings and comments for viewing
   const loadRatingsAndComments = async (eventId) => {
     if (!eventId) {
-      setError('Event ID is required');
+      setModalError('Event ID is required');
       return;
     }
     setLoadingRatingsComments(true);
-    setError(''); // Clear previous errors
+    setModalError('');
     try {
       const eventIdStr = String(eventId);
       const result = await eventsApiService.getRatingsAndComments(eventIdStr);
       if (result.success) {
         setRatingsAndComments(result.data);
       } else {
-        setError(result.message || result.error?.message || 'Failed to load ratings and comments');
+        setModalError(result.message || result.error?.message || 'Failed to load ratings and comments');
       }
     } catch (err) {
       console.error('Error loading ratings and comments:', err);
-      setError(err.response?.data?.message || err.message || 'Error loading ratings and comments');
+      setModalError(err.response?.data?.message || err.message || 'Error loading ratings and comments');
     } finally {
       setLoadingRatingsComments(false);
     }
   };
 
   // Handle view ratings and comments
-  const handleViewRatingsComments = async (eventId) => {
-    // Find the registration to get event dates
-    const registration = registrations.find(r => r.eventId === eventId || r.eventId?.toString() === eventId?.toString());
-    console.log('📋 Registration found:', registration);
-    
-    // Also try to fetch event details to get accurate dates
+  const handleViewRatingsComments = async (registrationOrEventId, options = {}) => {
+    let eventId = null;
+    let registration = null;
+
+    if (registrationOrEventId && typeof registrationOrEventId === 'object') {
+      registration = registrationOrEventId;
+      eventId = registration.eventId || registration.event?._id || registration.event?._id?.toString();
+    } else {
+      eventId = registrationOrEventId;
+      registration = registrations.find((r) => {
+        const regId = r.eventId || r.event?._id || r.event?._id?.toString();
+        return String(regId) === String(eventId);
+      });
+    }
+
+    if (!eventId) {
+      setModalError('Event ID not found.');
+      return;
+    }
+
     let eventDetails = null;
     try {
       const eventResult = await eventsApiService.getAllEventsAuthenticated({});
       if (eventResult.success && Array.isArray(eventResult.data)) {
-        eventDetails = eventResult.data.find(e => (e._id || e.id) === eventId || String(e._id || e.id) === String(eventId));
-        console.log('📅 Event details from API:', eventDetails);
+        eventDetails = eventResult.data.find(
+          (e) => String(e._id || e.id) === String(eventId)
+        );
       }
     } catch (err) {
       console.error('Error fetching event details:', err);
     }
-    
-    // Try all possible date field names - prioritize event details, then registration
+
     const eventData = {
-      eventId: eventId,
-      eventDate: eventDetails?.startDate || eventDetails?.eventDate || registration?.eventDate || registration?.startDate,
-      eventEndDate: eventDetails?.endDate || eventDetails?.eventEndDate || registration?.eventEndDate || registration?.endDate,
+      eventId: String(eventId),
+      eventDate:
+        eventDetails?.startDate ||
+        eventDetails?.eventDate ||
+        registration?.eventDate ||
+        registration?.startDate,
+      eventEndDate:
+        eventDetails?.endDate ||
+        eventDetails?.eventEndDate ||
+        registration?.eventEndDate ||
+        registration?.endDate,
       eventTitle: registration?.eventTitle || registration?.title || eventDetails?.title,
-      // Also store the full registration for debugging
-      registration: registration,
-      eventDetails: eventDetails
+      eventType: eventDetails?.type || eventDetails?.eventType || registration?.eventType || registration?.event?.type,
+      registration,
+      eventDetails,
     };
-    console.log('📅 Event data for modal:', eventData);
-    const isPast = hasEventPassed(eventData.eventDate, eventData.eventEndDate);
-    console.log('🔍 Date check result:', {
-      eventDate: eventData.eventDate,
-      eventEndDate: eventData.eventEndDate,
-      isPast,
-      now: new Date(),
-      checkDate: eventData.eventEndDate ? new Date(eventData.eventEndDate) : (eventData.eventDate ? new Date(eventData.eventDate) : null)
-    });
+
     setSelectedEventForView(eventData);
-    // Reset rating and comment state when opening modal
-    setRating(0);
-    setHoveredRating(0);
-    setCommentText('');
+    resetModalState();
+    if (options.focus) {
+      setModalFocus(options.focus);
+    }
     setShowRatingsCommentsModal(true);
     await loadRatingsAndComments(eventId);
+  };
+
+  const isRegistrationPast = (registration) => {
+    if (!registration) return false;
+    const eventDate = registration.eventDate || registration.startDate || registration.event?.startDate || registration.event?.eventDate;
+    const eventEndDate = registration.eventEndDate || registration.endDate || registration.event?.endDate || registration.event?.eventEndDate;
+    if (eventDate && getDaysUntilEvent(eventDate) === 'Past') {
+      return true;
+    }
+    return (
+      hasEventPassed(eventDate, eventEndDate) ||
+      isMarkedAsPastEvent(registration?.eventType || registration?.eventCategory || registration?.event?.type)
+    );
   };
 
   const getStatusColor = (status) => {
@@ -1223,19 +1313,45 @@ const StudentMyRegistrations = () => {
                         }}>
                           {registration.eventType}
                         </div>
-                        <div style={{
-                          padding: '0.375rem 0.875rem',
-                          borderRadius: '0.5rem',
-                          backgroundColor: getStatusColor(registration.status),
-                          color: '#FFFFFF',
-                          fontSize: '0.6875rem',
-                          fontWeight: '700',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
-                          {registration.status}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!canStudentCancel(registration)) {
+                              setSelectedRegistration(registration);
+                              return;
+                            }
+                            setCancelRegistrationData({
+                              eventId: registration.eventId,
+                              eventTitle: registration.eventTitle,
+                              paid: registration.paid
+                            });
+                            setShowCancelModal(true);
+                          }}
+                          style={{
+                            padding: '0.375rem 0.875rem',
+                            borderRadius: '0.5rem',
+                            border: 'none',
+                            backgroundColor: getStatusColor(registration.status),
+                            color: '#FFFFFF',
+                            fontSize: '0.6875rem',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            cursor: canStudentCancel(registration) ? 'pointer' : 'default',
+                            boxShadow: canStudentCancel(registration) ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                          }}
+                          title={canStudentCancel(registration) ? 'Tap to cancel & refund to wallet' : ''}
+                        >
+                          {getDisplayStatus(registration.status)}
+                        </button>
                       </div>
+                      {canStudentCancel(registration) && (
+                        <div style={{ marginTop: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#dc2626', fontWeight: '600' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>info</span>
+                          Tap “Registered” to cancel & refund
+                        </div>
+                      )}
 
                       <h3 style={{
                         color: '#1D3557',
@@ -1360,10 +1476,10 @@ const StudentMyRegistrations = () => {
                       }}>
                         {/* Average Rating Display - Bottom Left (Clickable to view ratings/comments for ALL events) */}
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewRatingsComments(registration.eventId);
-                          }}
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             handleViewRatingsComments(registration);
+                           }}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1401,13 +1517,7 @@ const StudentMyRegistrations = () => {
                         </button>
 
                         {/* Rating and Comment Icons - Only for Past Events */}
-                        {(() => {
-                          // Try multiple possible date property names
-                          const eventDate = registration.eventDate || registration.startDate || registration.event?.startDate || registration.event?.eventDate;
-                          const eventEndDate = registration.eventEndDate || registration.endDate || registration.event?.endDate || registration.event?.eventEndDate;
-                          const isPast = hasEventPassed(eventDate, eventEndDate);
-                          return isPast;
-                        })() && (
+                         {isRegistrationPast(registration) && (
                           <div style={{
                             display: 'flex',
                             gap: '0.5rem',
@@ -1416,13 +1526,7 @@ const StudentMyRegistrations = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                e.preventDefault();
-                                console.log('Rating button clicked for:', registration.eventTitle);
-                                setSelectedEventForRating({
-                                  eventId: registration.eventId,
-                                  eventTitle: registration.eventTitle
-                                });
-                                setShowRatingModal(true);
+                                 handleViewRatingsComments(registration, { focus: 'rating' });
                               }}
                               style={{
                                 padding: '0.5rem',
@@ -1457,13 +1561,7 @@ const StudentMyRegistrations = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                e.preventDefault();
-                                console.log('Comment button clicked for:', registration.eventTitle);
-                                setSelectedEventForComment({
-                                  eventId: registration.eventId,
-                                  eventTitle: registration.eventTitle
-                                });
-                                setShowCommentModal(true);
+                                 handleViewRatingsComments(registration, { focus: 'comment' });
                               }}
                               style={{
                                 padding: '0.5rem',
@@ -1935,279 +2033,6 @@ const StudentMyRegistrations = () => {
         </div>
       )}
 
-      {/* Rating Modal */}
-      {showRatingModal && selectedEventForRating && (
-        <div
-          onClick={() => {
-            setShowRatingModal(false);
-            setRating(0);
-            setSelectedEventForRating(null);
-          }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1001,
-            padding: '1rem',
-            backdropFilter: 'blur(4px)'
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '0.75rem',
-              maxWidth: '500px',
-              width: '100%',
-              padding: '2rem',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-            }}
-          >
-            <h2 style={{
-              color: '#1D3557',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              marginBottom: '1rem',
-              marginTop: 0
-            }}>
-              Rate Event: {selectedEventForRating.eventTitle}
-            </h2>
-            
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              marginBottom: '1.5rem',
-              padding: '1rem 0'
-            }}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setRating(star)}
-                  onMouseEnter={() => setHoveredRating(star)}
-                  onMouseLeave={() => setHoveredRating(0)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: 0,
-                    fontSize: '2.5rem',
-                    color: (hoveredRating >= star || rating >= star) ? '#fbbf24' : '#d1d5db',
-                    transition: 'all 0.2s',
-                    lineHeight: 1
-                  }}
-                >
-                  ★
-                </button>
-              ))}
-            </div>
-
-            <div style={{
-              display: 'flex',
-              gap: '0.75rem',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={() => {
-                  setShowRatingModal(false);
-                  setRating(0);
-                  setSelectedEventForRating(null);
-                }}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#f3f4f6',
-                  color: '#6b7280',
-                  border: '1px solid #e5e7eb',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#e5e7eb';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitRating}
-                disabled={rating === 0}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: rating === 0 ? '#d1d5db' : '#1e40af',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  cursor: rating === 0 ? 'not-allowed' : 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  if (rating !== 0) {
-                    e.target.style.backgroundColor = '#1e3a8a';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (rating !== 0) {
-                    e.target.style.backgroundColor = '#1e40af';
-                  }
-                }}
-              >
-                Submit Rating
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Comment Modal */}
-      {showCommentModal && selectedEventForComment && (
-        <div
-          onClick={() => {
-            setShowCommentModal(false);
-            setCommentText('');
-            setSelectedEventForComment(null);
-          }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1001,
-            padding: '1rem',
-            backdropFilter: 'blur(4px)'
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '0.75rem',
-              maxWidth: '500px',
-              width: '100%',
-              padding: '2rem',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-            }}
-          >
-            <h2 style={{
-              color: '#1D3557',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              marginBottom: '1rem',
-              marginTop: 0
-            }}>
-              Comment on: {selectedEventForComment.eventTitle}
-            </h2>
-            
-            <textarea
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Share your thoughts about this event..."
-              maxLength={1000}
-              style={{
-                width: '100%',
-                minHeight: '150px',
-                padding: '0.875rem',
-                borderRadius: '0.5rem',
-                border: '1px solid #e5e7eb',
-                fontSize: '0.875rem',
-                fontFamily: 'inherit',
-                resize: 'vertical',
-                marginBottom: '0.5rem',
-                outline: 'none',
-                transition: 'all 0.2s'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#1e40af';
-                e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#e5e7eb';
-                e.target.style.boxShadow = 'none';
-              }}
-            />
-            <div style={{
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              textAlign: 'right',
-              marginBottom: '1.5rem'
-            }}>
-              {commentText.length}/1000 characters
-            </div>
-
-            <div style={{
-              display: 'flex',
-              gap: '0.75rem',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={() => {
-                  setShowCommentModal(false);
-                  setCommentText('');
-                  setSelectedEventForComment(null);
-                }}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#f3f4f6',
-                  color: '#6b7280',
-                  border: '1px solid #e5e7eb',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#e5e7eb';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitComment}
-                disabled={!commentText.trim()}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  if (commentText.trim()) {
-                    e.target.style.backgroundColor = '#1e3a8a';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (commentText.trim()) {
-                    e.target.style.backgroundColor = '#1e40af';
-                  }
-                }}
-              >
-                Submit Comment
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Cancel Registration Modal */}
       {showCancelModal && cancelRegistrationData && (
         <div
@@ -2440,6 +2265,7 @@ const StudentMyRegistrations = () => {
             setShowRatingsCommentsModal(false);
             setSelectedEventForView(null);
             setRatingsAndComments(null);
+            resetModalState();
           }}
           style={{
             position: 'fixed',
@@ -2485,12 +2311,13 @@ const StudentMyRegistrations = () => {
               }}>
                 Ratings & Comments
               </h2>
-              <button
-                onClick={() => {
-                  setShowRatingsCommentsModal(false);
-                  setSelectedEventForView(null);
-                  setRatingsAndComments(null);
-                }}
+                <button
+                 onClick={() => {
+                   setShowRatingsCommentsModal(false);
+                   setSelectedEventForView(null);
+                   setRatingsAndComments(null);
+                   resetModalState();
+                 }}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -2658,6 +2485,7 @@ const StudentMyRegistrations = () => {
                     
                     // Check if event is past
                     const isPast = hasEventPassed(finalEventDate, finalEventEndDate);
+                    const isPastType = isMarkedAsPastEvent(selectedEventForView?.eventType || selectedEventForView?.registration);
                     
                     // Debug logging
                     console.log('🔍 Forms visibility check:', {
@@ -2674,14 +2502,15 @@ const StudentMyRegistrations = () => {
                     });
                     
                     // If we can't determine dates, don't show forms (be safe)
-                    if (!finalEventDate && !finalEventEndDate) {
+                    if (!finalEventDate && !finalEventEndDate && !isPastType) {
                       console.warn('⚠️ No dates found, hiding forms');
                       return false;
                     }
                     
-                    return isPast;
+                    return isPast || isPastType;
                   })() && (
                     <div 
+                      ref={ratingSectionRef}
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                       style={{
@@ -2704,7 +2533,7 @@ const StudentMyRegistrations = () => {
                         Rate & Comment
                       </h3>
                       
-                      {error && (
+                      {modalError && (
                         <div style={{
                           padding: '0.75rem',
                           marginBottom: '1rem',
@@ -2713,7 +2542,20 @@ const StudentMyRegistrations = () => {
                           color: '#991b1b',
                           fontSize: '0.875rem'
                         }}>
-                          {error}
+                          {modalError}
+                        </div>
+                      )}
+                      
+                      {modalSuccess && (
+                        <div style={{
+                          padding: '0.75rem',
+                          marginBottom: '1rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: '#ecfdf5',
+                          color: '#047857',
+                          fontSize: '0.875rem'
+                        }}>
+                          {modalSuccess}
                         </div>
                       )}
                       
@@ -2841,7 +2683,7 @@ const StudentMyRegistrations = () => {
                       </div>
 
                       {/* Comment Section */}
-                      <div>
+                      <div ref={commentSectionRef}>
                         <label style={{
                           display: 'block',
                           fontSize: '0.875rem',

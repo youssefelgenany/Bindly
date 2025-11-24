@@ -15,6 +15,7 @@ import EventsOfficeDashboard from './pages/EventsOfficeDashboard';
 import PendingVerification from './pages/PendingVerification';
 import ProfessorMyRegistrations from './pages/ProfessorMyRegistrations';
 import ProfessorEventsView from './pages/ProfessorEventsView';
+import ProfessorFavorites from './pages/ProfessorFavorites';
 import CreateWorkshop from './pages/CreateWorkshop';
 import MyWorkshops from './pages/MyWorkshops';
 import GymSchedule from './pages/GymSchedule';
@@ -39,6 +40,11 @@ import ProfessorLoyaltyVendorsView from './pages/ProfessorLoyaltyVendorsView';
 import StaffEventsView from './pages/StaffEventsView';
 import StaffMyRegistrations from './pages/StaffMyRegistrations';
 import StaffFavorites from './pages/StaffFavorites';
+import StaffLoyaltyVendorsView from './pages/StaffLoyaltyVendorsView';
+import TAEventsView from './pages/TAEventsView';
+import TAMyRegistrations from './pages/TAMyRegistrations';
+import TAFavorites from './pages/TAFavorites';
+import TALoyaltyVendorsView from './pages/TALoyaltyVendorsView';
 import EventPayment from './pages/EventPayment';
 import PaymentSuccess from './pages/PaymentSuccess';
 import MyWallet from './pages/MyWallet';
@@ -518,6 +524,56 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/staff/loyalty-vendors"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <StaffLoyaltyVendorsView />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ta/events"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <TAEventsView />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ta/my-registrations"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <TAMyRegistrations />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ta/favorites"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <TAFavorites />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ta/loyalty-vendors"
+              element={
+                <ProtectedRoute>
+                  <StaffAndTAOnly>
+                    <TALoyaltyVendorsView />
+                  </StaffAndTAOnly>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/events/:id/payment"
               element={
                 <ProtectedRoute>
@@ -610,6 +666,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <MyWorkshops />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/professor/favorites"
+              element={
+                <ProtectedRoute>
+                  <ProfessorFavorites />
                 </ProtectedRoute>
               }
             />

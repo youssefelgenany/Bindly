@@ -2,91 +2,8 @@ const { body, validationResult } = require('express-validator');
 const User = require('../models/userModel');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
-const fs = require('fs');
-const path = require('path');
 const Admin = require('../models/AdminModel');
-
-
-
-// ==================== EMAIL TRANSPORT ====================
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT || 587),
-  secure: Boolean(process.env.SMTP_SECURE === 'true'),
-  auth: process.env.SMTP_USER && process.env.SMTP_PASS ? {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  } : undefined
-});
-
-async function sendVerificationEmail(toEmail, token) {
-  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  const apiBase = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
-  const verifyUrl = `${apiBase}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #d32f2f; margin: 0;">Bindly</h1>
-        <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
-      </div>
-      
-      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-        <h2 style="color: #333; margin-top: 0;">Welcome to Bindly!</h2>
-        <p>Please verify your email to activate your account:</p>
-      </div>
-      
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${verifyUrl}" style="background: #d32f2f; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
-          Verify My Email
-        </a>
-      </div>
-      
-      <div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
-        <p style="margin: 0; color: #856404;">
-          <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
-          <a href="${verifyUrl}" style="color: #d32f2f; word-break: break-all;">${verifyUrl}</a>
-        </p>
-      </div>
-      
-      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
-        <p>After verification, you'll be able to access all features of the Bindly platform.</p>
-        <p>This verification link will expire in 24 hours.</p>
-        <p style="margin-top: 20px;">
-          Best regards,<br>
-          <strong>The Bindly Team</strong>
-        </p>
-      </div>
-    </div>
-  `;
-
-  console.log('[Bindly] Verification link for', toEmail, '=>', verifyUrl);
-
-  if (!process.env.SMTP_HOST || !process.env.SMTP_PORT) {
-    console.warn('[Bindly] SMTP not configured; email not sent.');
-    return { sent: false, verifyUrl };
-  }
-
-  try {
-    const mailOptions = {
-      from: process.env.SMTP_FROM || `Bindly <${process.env.SMTP_USER}>`,
-      to: toEmail,
-      subject: 'Verify your Bindly account',
-      html
-    };
-    if (process.env.DEBUG_EMAIL_BCC_SELF === 'true' && process.env.SMTP_USER) {
-      mailOptions.bcc = process.env.SMTP_USER;
-    }
-    const info = await transporter.sendMail(mailOptions);
-    if (info && info.messageId) {
-      console.log('[Bindly] Verification email messageId:', info.messageId);
-    }
-    return { sent: true, verifyUrl };
-  } catch (e) {
-    console.error('[Bindly] Error sending verification email:', e.message);
-    return { sent: false, verifyUrl };
-  }
-}
+const { sendVerificationEmail } = require('../utils/mailer');
 
 // ==================== VALIDATION ====================
 const signupValidation = [
@@ -173,9 +90,16 @@ const signup = async (req, res) => {
       email,
       password,
       userType,
-      isVerified: false, // All users need admin verification by default
-      status: 'blocked' // All users start as blocked until verified
+      // Students can access immediately; everyone else waits for admin verification
+      isVerified: userType === 'Student',
+      status: userType === 'Student' ? 'active' : 'blocked'
     };
+
+    // Students still get a verification token so we can email them a confirmation link
+    if (userType === 'Student') {
+      userData.verificationToken = crypto.randomBytes(32).toString('hex');
+      userData.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    }
 
     // Add first and last name only for non-vendors
     // Add firstName and lastName for non-vendor users
@@ -267,6 +191,17 @@ const signup = async (req, res) => {
       token: isReady ? token : null,
       requiresVerification: !isReady
     };
+
+    // Fire off the verification email for students so they still confirm their inbox
+    if (newUser.userType === 'Student') {
+      const studentName = `${newUser.firstName} ${newUser.lastName || ''}`.trim() || newUser.email;
+      const emailResult = await sendVerificationEmail(newUser.email, newUser.verificationToken, studentName);
+      responseBody.verificationEmailSent = emailResult.sent;
+      responseBody.verificationLink = emailResult.verificationUrl || emailResult.verifyUrl || null;
+      if (!emailResult.sent) {
+        console.warn('Student verification email failed to send:', newUser.email);
+      }
+    }
 
     res.status(201).json(responseBody);
 
