@@ -287,10 +287,10 @@ const TAEventsView = () => {
     loadUserRegistrations();
   }, [user]);
 
-  // Load user's favorite events (for Student users)
+  // Load user's favorite events (for TA users)
   useEffect(() => {
     const loadFavoriteEvents = async () => {
-      if (!user || user.userType !== 'Student') return;
+      if (!user || user.userType !== 'TA') return;
       
       try {
         const result = await eventsApiService.getFavoriteEvents();
@@ -316,7 +316,7 @@ const TAEventsView = () => {
   const handleToggleFavorite = async (eventId, e) => {
     e.stopPropagation(); // Prevent card click
     
-    if (!user || user.userType !== 'Student') return;
+    if (!user || user.userType !== 'TA') return;
     
     const isFavorite = favoriteEventIds.has(String(eventId));
     
@@ -350,8 +350,16 @@ const TAEventsView = () => {
         notificationApiService.getUnreadCount()
       ]);
       
-      if (notificationsResult.success && notificationsResult.data?.data) {
-        setNotifications(notificationsResult.data.data.notifications || notificationsResult.data.data || []);
+      if (notificationsResult.success) {
+        // Handle different response structures
+        const responseData = notificationsResult.data?.data || notificationsResult.data;
+        if (responseData) {
+          // Check if it's an array directly or has a notifications property
+          const notifications = Array.isArray(responseData) 
+            ? responseData 
+            : (responseData.notifications || []);
+          setNotifications(notifications);
+        }
       }
       
       if (countResult.success) {
@@ -987,11 +995,11 @@ const TAEventsView = () => {
               color: '#6b7280',
               margin: 0
             }}>
-              Student
+              TA
             </p>
           </div>
 
-          {/* Student Profile Icon */}
+          {/* TA Profile Icon */}
           <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
@@ -1831,8 +1839,8 @@ const TAEventsView = () => {
                               }
                             }}
                           />
-                          {/* Heart Icon for Student users */}
-                          {user?.userType === 'Student' && (
+                          {/* Heart Icon for TA users */}
+                          {user?.userType === 'TA' && (
                             <button
                               onClick={(e) => handleToggleFavorite(event.id, e)}
                               style={{

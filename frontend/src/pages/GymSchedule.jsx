@@ -401,6 +401,7 @@ const GymSchedule = () => {
       backgroundColor: '#f6f7f8'
     }}>
       {/* Left Sidebar */}
+      {user?.userType !== 'TA' && (
       <aside style={{
         width: sidebarOpen ? '16rem' : '0',
         flexShrink: 0,
@@ -777,12 +778,13 @@ const GymSchedule = () => {
           </button>
         </div>
       </aside>
+      )}
 
       {/* Header */}
       <header style={{
         position: 'fixed',
         top: 0,
-        left: sidebarOpen ? '16rem' : '0',
+        left: user?.userType === 'TA' ? '0' : (sidebarOpen ? '16rem' : '0'),
         right: 0,
         display: 'flex',
         alignItems: 'center',
@@ -794,6 +796,7 @@ const GymSchedule = () => {
         transition: 'left 0.3s ease'
       }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+            {user?.userType !== 'TA' && (
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               style={{
@@ -812,6 +815,7 @@ const GymSchedule = () => {
                 menu
               </span>
             </button>
+            )}
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
@@ -1275,7 +1279,7 @@ const GymSchedule = () => {
 
       {/* Main Content */}
       <main style={{
-        marginLeft: sidebarOpen ? '16rem' : '0',
+        marginLeft: user?.userType === 'TA' ? '0' : (sidebarOpen ? '16rem' : '0'),
         marginTop: '73px',
         flex: 1,
         display: 'flex',

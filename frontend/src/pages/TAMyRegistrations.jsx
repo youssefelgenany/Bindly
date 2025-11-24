@@ -96,8 +96,16 @@ const TAMyRegistrations = () => {
         notificationApiService.getUnreadCount()
       ]);
       
-      if (notificationsResult.success && notificationsResult.data?.data) {
-        setNotifications(notificationsResult.data.data.notifications || notificationsResult.data.data || []);
+      if (notificationsResult.success) {
+        // Handle different response structures
+        const responseData = notificationsResult.data?.data || notificationsResult.data;
+        if (responseData) {
+          // Check if it's an array directly or has a notifications property
+          const notifications = Array.isArray(responseData) 
+            ? responseData 
+            : (responseData.notifications || []);
+          setNotifications(notifications);
+        }
       }
       
       if (countResult.success) {
@@ -514,7 +522,7 @@ const TAMyRegistrations = () => {
 
   const displayName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
-    : user?.name || 'Student';
+    : user?.name || 'TA';
 
   if (loading) {
     return (
@@ -849,7 +857,7 @@ const TAMyRegistrations = () => {
               color: '#6b7280',
               margin: 0
             }}>
-              Student
+              TA
             </p>
           </div>
 
