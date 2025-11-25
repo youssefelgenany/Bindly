@@ -12,6 +12,7 @@ const VendorAcceptedEvents = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'upcoming', 'past'
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -94,22 +95,6 @@ const VendorAcceptedEvents = () => {
     setExpandedRows(newExpanded);
   };
 
-  const formatTableDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
     const date = new Date(dateString);
@@ -129,6 +114,7 @@ const VendorAcceptedEvents = () => {
     const diffTime = eventDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
+    if (Number.isNaN(diffDays)) return null;
     if (diffDays < 0) return null;
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Tomorrow';
@@ -147,7 +133,7 @@ const VendorAcceptedEvents = () => {
       standaloneBooth: '#3F51B5',
       other: '#757575'
     };
-    return colors[type] || colors.other;
+    return colors[type?.toLowerCase()] || colors.other;
   };
 
   const getEventTypeImage = (type) => {
@@ -160,21 +146,32 @@ const VendorAcceptedEvents = () => {
       platformBooth: '/assets/images/booth-background.jpg',
       standaloneBooth: '/assets/images/booth-background.jpg'
     };
-    return imageMap[type] || null;
+    return imageMap[type?.toLowerCase()] || null;
   };
 
   const getEventTypeFallbackText = (type) => {
-    return type ? type.toUpperCase() : 'EVENT';
+    const texts = {
+      bazaar: 'BAZAAR',
+      trip: 'TRIP',
+      workshop: 'WORKSHOP',
+      conference: 'CONFERENCE',
+      booth: 'BOOTH',
+      other: 'EVENT'
+    };
+    return texts[type?.toLowerCase()] || texts.other;
   };
 
   const getEventTypeLabel = (type) => {
     const typeMap = {
-      'bazaar': 'Bazaar',
-      'booth': 'Booth',
-      'platformBooth': 'Platform Booth',
-      'standaloneBooth': 'Standalone Booth'
+      bazaar: 'Bazaar',
+      trip: 'Trip',
+      workshop: 'Workshop',
+      conference: 'Conference',
+      booth: 'Booth',
+      platformBooth: 'Platform Booth',
+      standaloneBooth: 'Standalone Booth'
     };
-    return typeMap[type] || type || 'Event';
+    return typeMap[type?.toLowerCase()] || (type || 'Event');
   };
 
   const displayName = user?.companyName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Vendor';
@@ -378,6 +375,7 @@ const VendorAcceptedEvents = () => {
         overflow: 'hidden'
       }}>
 
+        {/* Content */}
         <div style={{
           flex: 1,
           padding: '2rem 0',
@@ -389,7 +387,7 @@ const VendorAcceptedEvents = () => {
             marginLeft: '4rem',
             marginRight: '4rem'
           }}>
-          {/* Page Title Banner */}
+          {/* Page Title Box */}
           <div style={{
             position: 'relative',
             height: '140px',
@@ -527,7 +525,6 @@ const VendorAcceptedEvents = () => {
                   const eventType = event.type || event.eventType || 'bazaar';
                   const eventName = event.name || event.title || event.eventName || 'Untitled Event';
                   const startDate = event.startDate || event.date;
-                  const isUpcoming = new Date(startDate || 0) >= new Date();
 
                   return (
                     <div
