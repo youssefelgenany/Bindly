@@ -2576,76 +2576,6 @@ const StudentMyRegistrations = () => {
                             </button>
                           ))}
                         </div>
-                        {rating > 0 && (
-                          <button
-                            type="button"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              if (rating > 0 && selectedEventForView?.eventId) {
-                                try {
-                                  const eventId = String(selectedEventForView.eventId);
-                                  console.log('🚀 Submitting rating:', { eventId, rating, selectedEventForView });
-                                  setError(''); // Clear previous errors
-                                  const result = await eventsApiService.submitRating(eventId, rating);
-                                  console.log('📊 Rating submission result:', result);
-                                  if (result.success) {
-                                    setRating(0);
-                                    setHoveredRating(0);
-                                    setError('');
-                                    // Reload ratings and comments
-                                    await loadRatingsAndComments(eventId);
-                                    // Update event ratings
-                                    const ratingResult = await eventsApiService.getRatingsAndComments(eventId);
-                                    if (ratingResult.success && ratingResult.data?.ratings) {
-                                      setEventRatings(prev => ({
-                                        ...prev,
-                                        [eventId]: {
-                                          average: ratingResult.data.ratings.average || 0,
-                                          count: ratingResult.data.ratings.count || 0
-                                        }
-                                      }));
-                                    }
-                                  } else {
-                                    const errorMsg = result.message || result.error?.message || result.error?.msg || 'Failed to submit rating';
-                                    console.error('❌ Rating submission failed:', errorMsg, result);
-                                    setError(errorMsg);
-                                  }
-                                } catch (err) {
-                                  console.error('❌ Error submitting rating:', err);
-                                  const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting rating';
-                                  setError(errorMsg);
-                                }
-                              } else {
-                                console.warn('⚠️ Cannot submit rating:', { rating, eventId: selectedEventForView?.eventId });
-                                setError('Please select a rating and ensure event is selected');
-                              }
-                            }}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: '#1e40af',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                              fontWeight: '600',
-                              transition: 'all 0.2s',
-                              zIndex: 10,
-                              position: 'relative'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.stopPropagation();
-                              e.target.style.backgroundColor = '#1e3a8a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.stopPropagation();
-                              e.target.style.backgroundColor = '#1e40af';
-                            }}
-                          >
-                            Submit Rating
-                          </button>
-                        )}
                       </div>
 
                       {/* Comment Section */}
@@ -2714,41 +2644,114 @@ const StudentMyRegistrations = () => {
                             onClick={async (e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              if (commentText.trim() && selectedEventForView?.eventId) {
-                                try {
-                                  const eventId = String(selectedEventForView.eventId);
-                                  console.log('🚀 Submitting comment:', { eventId, commentLength: commentText.trim().length, selectedEventForView });
-                                  setError(''); // Clear previous errors
-                                  const result = await eventsApiService.submitComment(eventId, commentText.trim());
-                                  console.log('📊 Comment submission result:', result);
-                                  if (result.success) {
-                                    setCommentText('');
-                                    setError('');
-                                    // Reload ratings and comments
-                                    await loadRatingsAndComments(eventId);
-                                  } else {
-                                    const errorMsg = result.message || result.error?.message || result.error?.msg || 'Failed to submit comment';
-                                    console.error('❌ Comment submission failed:', errorMsg, result);
-                                    setError(errorMsg);
+                              
+                              if (!selectedEventForView?.eventId) {
+                                setModalError('No event selected.');
+                                return;
+                              }
+                              
+                              const hasRating = rating > 0 && rating <= 5;
+                              const hasComment = commentText.trim().length > 0;
+                              
+                              if (!hasRating && !hasComment) {
+                                setModalError('Please provide a rating, comment, or both.');
+                                return;
+                              }
+                              
+                              setModalError('');
+                              setModalSuccess('');
+                              
+                              const eventId = String(selectedEventForView.eventId);
+                              let ratingSuccess = true;
+                              let commentSuccess = true;
+                              let errorMessages = [];
+                              
+                              try {
+                                // Submit rating if provided
+                                if (hasRating) {
+                                  try {
+                                    console.log('🚀 Submitting rating:', { eventId, rating, selectedEventForView });
+                                    const ratingResult = await eventsApiService.submitRating(eventId, rating);
+                                    console.log('📊 Rating submission result:', ratingResult);
+                                    if (ratingResult.success) {
+                                      setRating(0);
+                                      setHoveredRating(0);
+                                    } else {
+                                      ratingSuccess = false;
+                                      const errorMsg = ratingResult.message || ratingResult.error?.message || ratingResult.error?.msg || 'Failed to submit rating';
+                                      errorMessages.push(errorMsg);
+                                    }
+                                  } catch (err) {
+                                    ratingSuccess = false;
+                                    console.error('❌ Error submitting rating:', err);
+                                    const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting rating';
+                                    errorMessages.push(errorMsg);
                                   }
-                                } catch (err) {
-                                  console.error('❌ Error submitting comment:', err);
-                                  const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting comment';
-                                  setError(errorMsg);
                                 }
-                              } else {
-                                console.warn('⚠️ Cannot submit comment:', { hasText: !!commentText.trim(), eventId: selectedEventForView?.eventId });
-                                setError('Please enter a comment and ensure event is selected');
+                                
+                                // Submit comment if provided
+                                if (hasComment) {
+                                  try {
+                                    console.log('🚀 Submitting comment:', { eventId, commentLength: commentText.trim().length, selectedEventForView });
+                                    const commentResult = await eventsApiService.submitComment(eventId, commentText.trim());
+                                    console.log('📊 Comment submission result:', commentResult);
+                                    if (commentResult.success) {
+                                      setCommentText('');
+                                    } else {
+                                      commentSuccess = false;
+                                      const errorMsg = commentResult.message || commentResult.error?.message || commentResult.error?.msg || 'Failed to submit comment';
+                                      errorMessages.push(errorMsg);
+                                    }
+                                  } catch (err) {
+                                    commentSuccess = false;
+                                    console.error('❌ Error submitting comment:', err);
+                                    const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting comment';
+                                    errorMessages.push(errorMsg);
+                                  }
+                                }
+                                
+                                // Show success or error messages
+                                if (ratingSuccess && commentSuccess) {
+                                  const successMessages = [];
+                                  if (hasRating) successMessages.push('Rating');
+                                  if (hasComment) successMessages.push('Comment');
+                                  setModalSuccess(`${successMessages.join(' and ')} submitted successfully.`);
+                                  setModalError('');
+                                } else {
+                                  setModalError(errorMessages.join(' '));
+                                  setModalSuccess('');
+                                }
+                                
+                                // Reload ratings and comments regardless of success/failure
+                                await loadRatingsAndComments(eventId);
+                                
+                                // Update event ratings if rating was submitted
+                                if (hasRating && ratingSuccess) {
+                                  const ratingResult = await eventsApiService.getRatingsAndComments(eventId);
+                                  if (ratingResult.success && ratingResult.data?.ratings) {
+                                    setEventRatings(prev => ({
+                                      ...prev,
+                                      [eventId]: {
+                                        average: ratingResult.data.ratings.average || 0,
+                                        count: ratingResult.data.ratings.count || 0
+                                      }
+                                    }));
+                                  }
+                                }
+                              } catch (err) {
+                                console.error('❌ Error in submit process:', err);
+                                setModalError(err.response?.data?.message || err.message || 'Error submitting feedback');
+                                setModalSuccess('');
                               }
                             }}
-                            disabled={!commentText.trim()}
+                            disabled={!(rating > 0 || commentText.trim())}
                             style={{
                               padding: '0.5rem 1rem',
                               borderRadius: '0.5rem',
-                              backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
+                              backgroundColor: !(rating > 0 || commentText.trim()) ? '#d1d5db' : '#1e40af',
                               color: '#FFFFFF',
                               border: 'none',
-                              cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
+                              cursor: !(rating > 0 || commentText.trim()) ? 'not-allowed' : 'pointer',
                               fontSize: '0.875rem',
                               fontWeight: '600',
                               transition: 'all 0.2s',
@@ -2757,18 +2760,18 @@ const StudentMyRegistrations = () => {
                             }}
                             onMouseEnter={(e) => {
                               e.stopPropagation();
-                              if (commentText.trim()) {
+                              if (rating > 0 || commentText.trim()) {
                                 e.target.style.backgroundColor = '#1e3a8a';
                               }
                             }}
                             onMouseLeave={(e) => {
                               e.stopPropagation();
-                              if (commentText.trim()) {
+                              if (rating > 0 || commentText.trim()) {
                                 e.target.style.backgroundColor = '#1e40af';
                               }
                             }}
                           >
-                            Submit Comment
+                            Submit
                           </button>
                         </div>
                       </div>
