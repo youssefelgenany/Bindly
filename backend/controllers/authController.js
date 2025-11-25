@@ -90,9 +90,11 @@ const signup = async (req, res) => {
       email,
       password,
       userType,
-      // Students can access immediately; everyone else waits for admin verification
-      isVerified: userType === 'Student',
-      status: userType === 'Student' ? 'active' : 'blocked'
+      // Do not auto-verify users on signup. Users must click the verification
+      // link sent to their email to be marked verified. This ensures login
+      // fails for unverified accounts until email confirmation.
+      isVerified: false,
+      status: 'blocked'
     };
 
     // Students still get a verification token so we can email them a confirmation link
@@ -347,9 +349,15 @@ async function verifyEmail(req, res) {
   try {
     const { token } = req.query;
     if (!token) return res.status(400).send('Invalid verification link');
+    console.log('🔍 verifyEmail called with token:', token);
 
     const user = await User.findOne({ verificationToken: token, verificationExpiresAt: { $gt: new Date() } });
-    if (!user) return res.status(400).send('Verification link is invalid or expired');
+    if (!user) {
+      console.warn('⚠️ verifyEmail: No user found matching token (invalid/expired)');
+      return res.status(400).send('Verification link is invalid or expired');
+    }
+
+    console.log(`🔐 verifyEmail: Found user ${user.email} (isVerified=${user.isVerified}) - verifying now`);
 
     user.isVerified = true;
     user.verificationToken = null;
@@ -364,7 +372,65 @@ async function verifyEmail(req, res) {
 
     await user.save();
 
-    const loginUrl = (process.env.FRONTEND_URL || 'http://localhost:3000') + '/login';
+    // Determine the frontend login URL to redirect to.
+    // Priority:
+    // 1. process.env.FRONTEND_URL if provided
+    // 2. Origin or Referer header from the incoming request (preserves port)
+    // 3. Probe localhost:3001 then 3000 and use the first reachable
+    // 4. Fallback to http://localhost:3000
+    const determineFrontendOrigin = async () => {
+      if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL.replace(/\/+$/, '');
+
+      const referer = req.get('Referer') || req.get('Origin');
+      if (referer) {
+        try {
+          const urlObj = new URL(referer);
+          return urlObj.origin;
+        } catch (e) {
+          // ignore and continue to probe
+        }
+      }
+
+      // Probe common local dev ports so the redirect works whether frontend runs on 3001 or 3000
+      const net = require('net');
+      const probePort = (host, port, timeout = 200) => {
+        return new Promise((resolve) => {
+          const socket = new net.Socket();
+          let done = false;
+          socket.setTimeout(timeout);
+          socket.on('connect', () => { done = true; socket.destroy(); resolve(true); });
+          socket.on('timeout', () => { if (!done) { done = true; socket.destroy(); resolve(false); } });
+          socket.on('error', () => { if (!done) { done = true; socket.destroy(); resolve(false); } });
+          socket.connect(port, host);
+        });
+      };
+
+      const portsToTry = [3001, 3000];
+      for (const p of portsToTry) {
+        try {
+          // probe localhost and 127.0.0.1
+          const okLocal = await probePort('127.0.0.1', p);
+          if (okLocal) return `http://localhost:${p}`;
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      return 'http://localhost:3000';
+    };
+
+    const frontendOrigin = await determineFrontendOrigin();
+    const loginUrl = frontendOrigin + '/login';
+    console.log('✅ verifyEmail: User verified, redirect target:', loginUrl);
+
+    // If the client requested no redirect (e.g., frontend calling via XHR),
+    // return JSON indicating success and include the login URL. Otherwise,
+    // perform the existing redirect so email clicks still work.
+    const redirectParam = String(req.query.redirect || 'true').toLowerCase();
+    if (redirectParam === 'false' || redirectParam === '0') {
+      return res.json({ success: true, message: 'User verified', loginUrl });
+    }
+
     return res.redirect(loginUrl);
   } catch (e) {
     console.error('verifyEmail error:', e);

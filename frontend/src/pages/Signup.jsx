@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -23,6 +23,22 @@ const Signup = () => {
 
   const { signup } = useAuth();
   const navigate = useNavigate();
+  const topRef = useRef(null);
+  const messageRef = useRef(null);
+
+  // Scroll the message element into view whenever `message` changes.
+  // Scrolling the message itself avoids clipping when the message uses
+  // negative margins or sits near container edges.
+  useEffect(() => {
+    const el = messageRef.current || topRef.current;
+    if (message && el) {
+      try {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch (e) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  }, [message]);
 
   // Password strength calculation
   const calculatePasswordStrength = (password) => {
@@ -296,6 +312,8 @@ const Signup = () => {
             justifyContent: 'center',
             gap: '2rem'
           }}>
+            {/* Anchor for scrolling to show errors/messages */}
+            <div ref={topRef} />
             {/* Logo and Title */}
             <div style={{
               display: 'flex',
