@@ -55,7 +55,15 @@ export const vendorApi = {
         }
     },
 
-    applyToEvent: async ({ eventType, eventId, attendees, boothSize, durationWeeks, boothLocation, message }) => {
+    applyToEvent: async (payload) => {
+        // If payload is FormData (file included), send multipart request
+        if (payload instanceof FormData) {
+            // Let axios set the correct Content-Type with boundary for FormData
+            const res = await api.post('/apply', payload);
+            return res.data;
+        }
+
+        const { eventType, eventId, attendees, boothSize, durationWeeks, boothLocation, message } = payload;
         const res = await api.post('/apply', {
             eventType,
             eventId,
@@ -97,6 +105,25 @@ export const vendorApi = {
             console.error('Error fetching loyalty program vendors:', error);
             throw error;
         }
+    }
+,
+    // Apply to loyalty program (vendor)
+    applyToLoyaltyProgram: async (payload) => {
+        // payload is JSON body with discountRate, discountType, promoCode, termsAndConditions, validFrom, validUntil, description, category
+        const res = await api.post('/loyalty-program/apply', payload);
+        return res.data;
+    },
+
+    // Get my loyalty application
+    getMyLoyaltyApplication: async () => {
+        const res = await api.get('/loyalty-program/my-application');
+        return res.data;
+    }
+    ,
+    // Cancel my loyalty application
+    cancelMyLoyaltyApplication: async () => {
+        const res = await api.delete('/loyalty-program/my-application');
+        return res.data;
     }
 };
 

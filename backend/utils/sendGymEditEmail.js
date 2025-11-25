@@ -10,7 +10,18 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-async function sendGymEditEmail(email, name, sessionType, oldDate, oldTime, newDate, newTime, oldLocation, newLocation) {
+async function sendGymEditEmail(
+  email,
+  name,
+  sessionType,
+  oldDate,
+  oldTime,
+  newDate,
+  newTime,
+  oldLocation,
+  newLocation,
+  additionalChanges = []
+) {
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
     const date = new Date(dateString);
@@ -34,14 +45,45 @@ async function sendGymEditEmail(email, name, sessionType, oldDate, oldTime, newD
   };
 
   const changes = [];
-  if (oldDate && newDate && oldDate.toString() !== newDate.toString()) {
-    changes.push(`Date: ${formatDate(oldDate)} → ${formatDate(newDate)}`);
+
+  const pushChange = (label, before, after) => {
+    const formattedBefore = before === undefined || before === null || before === ''
+      ? 'Not specified'
+      : before;
+    const formattedAfter = after === undefined || after === null || after === ''
+      ? 'Not specified'
+      : after;
+
+    if (formattedBefore === formattedAfter) {
+      return;
+    }
+
+    changes.push({
+      label: label || 'Change',
+      before: formattedBefore,
+      after: formattedAfter
+    });
+  };
+
+  if (oldDate && newDate && new Date(oldDate).getTime() !== new Date(newDate).getTime()) {
+    pushChange('Date', formatDate(oldDate), formatDate(newDate));
   }
   if (oldTime && newTime && oldTime !== newTime) {
-    changes.push(`Time: ${formatTime(oldTime)} → ${formatTime(newTime)}`);
+    pushChange('Time', formatTime(oldTime), formatTime(newTime));
   }
   if (oldLocation && newLocation && oldLocation !== newLocation) {
-    changes.push(`Location: ${oldLocation} → ${newLocation}`);
+    pushChange('Location', oldLocation, newLocation);
+  }
+
+  if (Array.isArray(additionalChanges) && additionalChanges.length > 0) {
+    additionalChanges.forEach(change => {
+      if (!change) return;
+      pushChange(
+        change.label,
+        change.before,
+        change.after
+      );
+    });
   }
 
   if (changes.length === 0) {
@@ -69,18 +111,22 @@ async function sendGymEditEmail(email, name, sessionType, oldDate, oldTime, newD
         </tr>
         ${changes.map(change => `
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Change</td>
-          <td style="padding: 12px; border: 1px solid #e9ecef; color: #d32f2f;">${change}</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">${change.label || 'Change'}</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; color: #d32f2f;">${change.before} → ${change.after}</td>
         </tr>
         `).join('')}
+        ${newDate ? `
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">New Date</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Updated Date</td>
           <td style="padding: 12px; border: 1px solid #e9ecef;">${formatDate(newDate)}</td>
         </tr>
+        ` : ''}
+        ${newTime ? `
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">New Time</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Updated Time</td>
           <td style="padding: 12px; border: 1px solid #e9ecef;">${formatTime(newTime)}</td>
         </tr>
+        ` : ''}
         ${newLocation ? `
         <tr>
           <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Location</td>
@@ -112,7 +158,7 @@ async function sendGymEditEmail(email, name, sessionType, oldDate, oldTime, newD
     console.log('   To:', email);
     console.log('   Name:', name);
     console.log('   Session:', sessionType);
-    console.log('   Changes:', changes.join(', '));
+    console.log('   Changes:', changes.map(change => `${change.label}: ${change.before} → ${change.after}`).join('; '));
     console.log('   ⚠️  To enable email sending, configure SMTP_HOST, SMTP_USER, and SMTP_PASS in .env');
     return { sent: false, reason: 'SMTP not configured' };
   }

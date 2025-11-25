@@ -575,7 +575,7 @@ const ProfessorDashboard = () => {
             </header>
 
             {/* Horizontal Menu Bar */}
-            <nav style={{
+    <nav style={{
                 display: 'flex',
                 alignItems: 'center',
                 padding: '1rem 2rem',
@@ -623,19 +623,32 @@ const ProfessorDashboard = () => {
                     >
                         My Events
                     </Link>
-                    <Link
-                        to="/professor/my-workshops"
-                        style={{
-                            textDecoration: 'none',
-                            color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
-                            fontSize: '0.875rem',
-                            fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
-                            paddingBottom: '0.5rem',
-                            borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
-                        }}
-                    >
-                        My Workshops
-                    </Link>
+        <Link
+          to="/professor/my-workshops"
+          style={{
+            textDecoration: 'none',
+            color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
+            fontSize: '0.875rem',
+            fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+            paddingBottom: '0.5rem',
+            borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
+          }}
+        >
+          My Workshops
+        </Link>
+        <Link
+          to="/professor/favorites"
+          style={{
+            textDecoration: 'none',
+            color: isActiveRoute('/professor/favorites') ? '#2563eb' : '#6b7280',
+            fontSize: '0.875rem',
+            fontWeight: isActiveRoute('/professor/favorites') ? '600' : '500',
+            paddingBottom: '0.5rem',
+            borderBottom: isActiveRoute('/professor/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+          }}
+        >
+          My Favorites
+        </Link>
                     <Link
                         to="/gym-schedule"
                         style={{
@@ -984,6 +997,39 @@ const ProfessorDashboard = () => {
                                                     local_offer
                                                 </span>
                                                 View Loyalty Partners
+                                            </button>
+                                            <button
+                                                onClick={() => navigate('/professor/favorites')}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.75rem',
+                                                    padding: '0.75rem 1.5rem',
+                                                    backgroundColor: '#f97316',
+                                                    color: '#FFFFFF',
+                                                    border: 'none',
+                                                    borderRadius: '0.5rem',
+                                                    fontSize: '0.875rem',
+                                                    fontWeight: '500',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s',
+                                                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.target.style.backgroundColor = '#ea580c';
+                                                    e.target.style.transform = 'translateY(-1px)';
+                                                    e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.target.style.backgroundColor = '#f97316';
+                                                    e.target.style.transform = 'translateY(0)';
+                                                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                                                }}
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                                    favorite
+                                                </span>
+                                                My Favorites
                                             </button>
                                         </div>
                                     </div>

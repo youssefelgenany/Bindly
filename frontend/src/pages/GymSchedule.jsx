@@ -86,8 +86,9 @@ const GymSchedule = () => {
   // User type checks
   const isEventsOffice = !user?.userType || (user.userType !== 'TA' && user.userType !== 'Staff' && user.userType !== 'Professor' && user.userType !== 'Student');
   const isProfessor = user?.userType === 'Professor';
-  const canSeeNotifications = user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA';
   const showHorizontalMenu = user?.userType === 'Student' || user?.userType === 'Staff' || user?.userType === 'TA';
+  const canSeeNotifications = user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA';
+  const useFixedHeader = true;
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -401,7 +402,6 @@ const GymSchedule = () => {
       backgroundColor: '#f6f7f8'
     }}>
       {/* Left Sidebar */}
-      {user?.userType !== 'TA' && (
       <aside style={{
         width: sidebarOpen ? '16rem' : '0',
         flexShrink: 0,
@@ -778,13 +778,13 @@ const GymSchedule = () => {
           </button>
         </div>
       </aside>
-      )}
 
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <header style={{
         position: 'fixed',
         top: 0,
-        left: user?.userType === 'TA' ? '0' : (sidebarOpen ? '16rem' : '0'),
+        left: sidebarOpen ? '16rem' : '0',
         right: 0,
         display: 'flex',
         alignItems: 'center',
@@ -792,11 +792,10 @@ const GymSchedule = () => {
         borderBottom: '1px solid #e2e8f0',
         padding: '1rem 2.5rem',
         backgroundColor: '#FFFFFF',
-        zIndex: 100,
-        transition: 'left 0.3s ease'
+        zIndex: useFixedHeader ? 100 : 'auto',
+        transition: useFixedHeader ? 'left 0.3s ease' : 'none'
       }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
-            {user?.userType !== 'TA' && (
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               style={{
@@ -815,7 +814,6 @@ const GymSchedule = () => {
                 menu
               </span>
             </button>
-            )}
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
@@ -1198,88 +1196,9 @@ const GymSchedule = () => {
           </div>
         </header>
 
-      {/* Horizontal Menu Bar - For Professors */}
-      {isProfessor && (
-        <nav style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '1rem 2rem',
-          backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid #e2e8f0'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-            <Link
-              to="/dashboard"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Dashboard
-            </Link>
-            <Link
-              to="/professor/all-events"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Discover Events
-            </Link>
-            <Link
-              to="/professor/events"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              My Events
-            </Link>
-            <Link
-              to="/professor/my-workshops"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              My Workshops
-            </Link>
-            <Link
-              to="/professor/gym-schedule"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              View Gym Sessions
-            </Link>
-          </div>
-        </nav>
-      )}
-
       {/* Main Content */}
       <main style={{
-        marginLeft: user?.userType === 'TA' ? '0' : (sidebarOpen ? '16rem' : '0'),
+        marginLeft: sidebarOpen ? '16rem' : '0',
         marginTop: '73px',
         flex: 1,
         display: 'flex',
@@ -2493,6 +2412,8 @@ const GymSchedule = () => {
           </div>
         </div>
       )}
+
+      </div>
 
       <style>{`
         @keyframes spin {

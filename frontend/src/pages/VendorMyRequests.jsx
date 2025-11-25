@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { vendorApi } from '../api/vendorApi';
+import axios from 'axios';
 
 const VendorMyRequests = () => {
   const { user, logout } = useAuth();
@@ -84,6 +85,31 @@ const VendorMyRequests = () => {
   useEffect(() => {
     loadMyRequests();
   }, []);
+
+  const handleCancel = async (requestId) => {
+    if (!requestId) return;
+    const ok = window.confirm('Are you sure you want to cancel this request? This cannot be undone.');
+    if (!ok) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.delete(`http://localhost:5000/api/vendor-requests/${requestId}/cancel`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      if (res.status === 200) {
+        // remove from UI
+        setRequests(prev => prev.filter(r => String(r._id || r.id) !== String(requestId)));
+        alert('Request cancelled successfully.');
+      } else {
+        alert(res.data?.message || 'Failed to cancel request');
+      }
+    } catch (err) {
+      console.error('Error cancelling request', err);
+      const msg = err.response?.data?.message || err.message || 'Error cancelling request';
+      alert(msg);
+    }
+  };
 
   const toggleRowExpansion = (requestId) => {
     const newExpanded = new Set(expandedRows);
@@ -735,7 +761,9 @@ const VendorMyRequests = () => {
                           }}>
                             {getEventTypeLabel(eventType)}
                           </div>
-                          {getStatusBadge(request.status)}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+                            {getStatusBadge(request.status)}
+                          </div>
                         </div>
                         
                         <h3 style={{
@@ -823,6 +851,27 @@ const VendorMyRequests = () => {
                           }}>
                             {request.description}
                           </p>
+                        )}
+                      </div>
+                      {/* Footer with Cancel button aligned bottom-right */}
+                      <div style={{ padding: '0.75rem 1rem 1rem', display: 'flex', justifyContent: 'flex-end', marginTop: 'auto' }}>
+                        {request.status === 'pending' && (request.paymentStatus !== 'paid' && !request.paidAt) && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCancel(requestId); }}
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              minWidth: 160,
+                              borderRadius: '0.375rem',
+                              backgroundColor: '#ef4444',
+                              color: '#fff',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '0.9rem',
+                              fontWeight: 700
+                            }}
+                          >
+                            Cancel Request
+                          </button>
                         )}
                       </div>
                     </div>

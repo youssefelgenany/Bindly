@@ -11,7 +11,6 @@ const VendorDashboard = () => {
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   const [showPlatformBoothsModal, setShowPlatformBoothsModal] = useState(false);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
-  const [applications, setApplications] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -49,19 +48,6 @@ const VendorDashboard = () => {
         pendingApplications: pending.length,
         acceptedApplications: accepted.length
       });
-
-      // Combine and sort by date (most recent first)
-      const allApplications = [
-        ...pending.map(app => ({ ...app, status: 'pending' })),
-        ...rejected.map(app => ({ ...app, status: 'rejected' })),
-        ...accepted.map(app => ({ ...app, status: 'approved' }))
-      ].sort((a, b) => {
-        const dateA = new Date(a.createdAt || a.dateApplied || 0);
-        const dateB = new Date(b.createdAt || b.dateApplied || 0);
-        return dateB - dateA;
-      }).slice(0, 5); // Show first 5
-
-      setApplications(allApplications);
 
       // Generate notifications from applications
       const notifs = [];
@@ -132,44 +118,6 @@ const VendorDashboard = () => {
     } catch {
       return dateString;
     }
-  };
-
-  const formatTimeAgo = (date) => {
-    if (!date) return 'N/A';
-    try {
-      const now = new Date();
-      const past = new Date(date);
-      const diffInHours = Math.floor((now - past) / (1000 * 60 * 60));
-      
-      if (diffInHours < 1) return 'Just now';
-      if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
-      const diffInDays = Math.floor(diffInHours / 24);
-      if (diffInDays === 1) return '1 day ago';
-      return `${diffInDays} days ago`;
-    } catch {
-      return formatDate(date);
-    }
-  };
-
-  const getStatusBadge = (status) => {
-    const statusMap = {
-      approved: { bg: '#d1fae5', text: '#065f46', label: 'Approved' },
-      pending: { bg: '#fef3c7', text: '#92400e', label: 'Pending' },
-      rejected: { bg: '#fee2e2', text: '#991b1b', label: 'Rejected' }
-    };
-    const config = statusMap[status] || statusMap.pending;
-    return (
-      <span style={{
-        padding: '0.25rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '500',
-        backgroundColor: config.bg,
-        color: config.text
-      }}>
-        {config.label}
-      </span>
-    );
   };
 
   const getEventIcon = (type) => {
@@ -440,6 +388,19 @@ const VendorDashboard = () => {
             }}
           >
             My Applications
+          </Link>
+          <Link
+            to="/vendor/loyalty-program"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/loyalty-program') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/loyalty-program') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/loyalty-program') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            GUC Loyalty Program
           </Link>
         </div>
       </nav>

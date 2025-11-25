@@ -153,7 +153,65 @@ exports.getGymSessionById = async (req, res) => {
 exports.updateGymSession = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const updates = { ...req.body };
+
+    // Normalize and validate incoming values early
+    if (typeof updates.status === 'string') {
+      updates.status = updates.status.toLowerCase();
+    }
+
+    if (updates.date) {
+      const parsedDate = new Date(updates.date);
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid date provided for gym session update'
+        });
+      }
+      updates.date = parsedDate;
+    }
+
+    if (updates.time && typeof updates.time === 'string') {
+      updates.time = updates.time.trim();
+    }
+
+    if (updates.duration !== undefined) {
+      const parsedDuration = Number(updates.duration);
+      if (Number.isNaN(parsedDuration) || parsedDuration <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Duration must be greater than 0'
+        });
+      }
+      updates.duration = parsedDuration;
+    }
+
+    if (updates.maxParticipants !== undefined) {
+      const parsedCapacity = Number(updates.maxParticipants);
+      if (Number.isNaN(parsedCapacity)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Max participants must be a valid number'
+        });
+      }
+      updates.maxParticipants = parsedCapacity;
+    }
+
+    if (updates.type && typeof updates.type === 'string') {
+      updates.type = updates.type.trim().toLowerCase();
+    }
+
+    if (updates.instructor && typeof updates.instructor === 'string') {
+      updates.instructor = updates.instructor.trim();
+    }
+
+    if (updates.location && typeof updates.location === 'string') {
+      updates.location = updates.location.trim();
+    }
+
+    if (updates.description && typeof updates.description === 'string') {
+      updates.description = updates.description.trim();
+    }
 
     const gymSession = await GymSession.findById(id);
     if (!gymSession) {
@@ -235,14 +293,149 @@ exports.updateGymSession = async (req, res) => {
     const isBeingCancelled = updates.status === 'cancelled' && wasActive;
 
     // Check if session details are being edited (date, time, or location changed)
-    const isBeingEdited = (updates.date && updates.date.toString() !== gymSession.date.toString()) ||
-                          (updates.time && updates.time !== gymSession.time) ||
-                          (updates.location && updates.location !== gymSession.location);
-
     // Store old values for email notification
     const oldDate = gymSession.date;
     const oldTime = gymSession.time;
     const oldLocation = gymSession.location;
+
+    const additionalChanges = [];
+    let editChangesDetected = false;
+
+    const formatValue = (value, fallback = 'Not specified') => {
+      if (value === undefined || value === null || value === '') {
+        return fallback;
+      }
+      if (value instanceof Date) {
+        return value.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      }
+      return String(value);
+    };
+
+    const formatMinutes = (value) => (value || value === 0
+      ? `${value} minute${value === 1 ? '' : 's'}`
+      : 'Not specified');
+
+    const formatParticipants = (value) => (value || value === 0
+      ? `${value} participant${value === 1 ? '' : 's'}`
+      : 'Not specified');
+
+    const formatSessionType = (value) => value
+      ? `${value.charAt(0).toUpperCase()}${value.slice(1)}`
+      : 'Gym Session';
+
+    const trackChange = (field, label, formatter = formatValue, structural = false) => {
+      if (!(field in updates)) return;
+
+      let oldValue = gymSession[field];
+      let newValue = updates[field];
+
+      // Normalize dates - handle both Date objects and date strings
+      if (field === 'date') {
+        // Convert oldValue to Date if it's not already
+        if (oldValue && !(oldValue instanceof Date)) {
+          oldValue = new Date(oldValue);
+        }
+        // Convert newValue to Date if it's not already
+        if (newValue && !(newValue instanceof Date)) {
+          newValue = new Date(newValue);
+        }
+        // Compare dates by date only (ignore time)
+        if (oldValue instanceof Date && newValue instanceof Date) {
+          const oldDateOnly = new Date(oldValue.getFullYear(), oldValue.getMonth(), oldValue.getDate());
+          const newDateOnly = new Date(newValue.getFullYear(), newValue.getMonth(), newValue.getDate());
+          if (oldDateOnly.getTime() === newDateOnly.getTime()) {
+            return; // Dates are equal, no change
+          }
+          // Dates are different, continue to mark as changed
+          editChangesDetected = true;
+          if (!structural) {
+            additionalChanges.push({
+              label,
+              before: formatter(gymSession[field]),
+              after: formatter(updates[field])
+            });
+          }
+          return;
+        }
+      }
+
+      // For non-date fields, normalize types
+      if (oldValue instanceof Date) {
+        oldValue = new Date(oldValue);
+      }
+      if (newValue instanceof Date) {
+        newValue = new Date(newValue);
+      }
+
+      if (typeof oldValue === 'string') {
+        oldValue = oldValue.trim();
+      }
+      if (typeof newValue === 'string') {
+        newValue = newValue.trim();
+      }
+
+      if (field === 'type') {
+        oldValue = (oldValue || '').toLowerCase();
+        newValue = (newValue || '').toLowerCase();
+      }
+
+      // Compare values
+      const valuesEqual = (() => {
+        if (oldValue === undefined && newValue === undefined) return true;
+        if (oldValue === null && newValue === null) return true;
+        if (oldValue instanceof Date && newValue instanceof Date) {
+          return oldValue.getTime() === newValue.getTime();
+        }
+        // For strings, compare after normalization
+        if (typeof oldValue === 'string' && typeof newValue === 'string') {
+          return oldValue === newValue;
+        }
+        // For numbers, compare numerically
+        if (typeof oldValue === 'number' && typeof newValue === 'number') {
+          return oldValue === newValue;
+        }
+        // Fallback: strict equality
+        return oldValue === newValue;
+      })();
+
+      if (valuesEqual) return;
+
+      editChangesDetected = true;
+
+      if (!structural) {
+        additionalChanges.push({
+          label,
+          before: formatter(gymSession[field]),
+          after: formatter(updates[field])
+        });
+      }
+    };
+
+    trackChange('date', 'Date', formatValue, true);
+    trackChange('time', 'Time', formatValue, true);
+    trackChange('location', 'Location', formatValue, true);
+    trackChange('duration', 'Duration', formatMinutes);
+    trackChange('maxParticipants', 'Capacity', formatParticipants);
+    trackChange('instructor', 'Instructor');
+    trackChange('description', 'Description', (val) => {
+      if (val === undefined || val === null || val === '') return 'Not specified';
+      return val;
+    });
+    trackChange('type', 'Session Type', formatSessionType);
+
+    const isBeingEdited = editChangesDetected;
+
+    console.log(`🔍 Edit detection summary:`);
+    console.log(`   - editChangesDetected: ${editChangesDetected}`);
+    console.log(`   - isBeingEdited: ${isBeingEdited}`);
+    console.log(`   - isBeingCancelled: ${isBeingCancelled}`);
+    console.log(`   - wasActive: ${wasActive}`);
+    console.log(`   - Updates received: ${Object.keys(updates).join(', ')}`);
+    console.log(`   - Additional changes count: ${additionalChanges.length}`);
 
     // Use findByIdAndUpdate to avoid full validation issues
     const updatedGymSession = await GymSession.findByIdAndUpdate(
@@ -253,6 +446,7 @@ exports.updateGymSession = async (req, res) => {
 
     // If session was edited (not cancelled), notify all registered users
     if (isBeingEdited && !isBeingCancelled && wasActive) {
+      console.log(`✅ Conditions met for sending edit emails`);
       try {
         const registrations = await GymRegistration.find({
           gymSession: id,
@@ -277,7 +471,8 @@ exports.updateGymSession = async (req, res) => {
                 updatedGymSession.date,
                 updatedGymSession.time,
                 oldLocation,
-                updatedGymSession.location
+                updatedGymSession.location,
+                additionalChanges
               );
 
               if (emailResult.sent) {
@@ -299,6 +494,11 @@ exports.updateGymSession = async (req, res) => {
         console.error('❌ Error sending edit notification emails:', error);
         // Don't fail the update if email sending fails
       }
+    } else {
+      console.log(`⚠️  Edit emails NOT sent. Reasons:`);
+      if (!isBeingEdited) console.log(`   - No changes detected (editChangesDetected: ${editChangesDetected})`);
+      if (isBeingCancelled) console.log(`   - Session is being cancelled (cancellation emails will be sent instead)`);
+      if (!wasActive) console.log(`   - Session was not active (status: ${gymSession.status})`);
     }
 
     // If session was cancelled, notify all registered users
@@ -342,6 +542,11 @@ exports.updateGymSession = async (req, res) => {
         }
 
         console.log('✅ Finished sending cancellation emails');
+
+        await GymRegistration.updateMany(
+          { gymSession: id, status: { $ne: 'cancelled' } },
+          { $set: { status: 'cancelled' } }
+        );
       } catch (error) {
         console.error('❌ Error sending cancellation emails:', error);
         // Don't fail the update if email sending fails
@@ -427,6 +632,11 @@ exports.deleteGymSession = async (req, res) => {
           }
 
           console.log('✅ Finished sending cancellation emails');
+
+          await GymRegistration.updateMany(
+            { gymSession: id, status: { $ne: 'cancelled' } },
+            { $set: { status: 'cancelled' } }
+          );
         }
       } catch (error) {
         console.error('❌ Error sending cancellation emails:', error);
@@ -546,6 +756,11 @@ exports.bulkUpdateGymSessions = async (req, res) => {
                 }
               }
             }
+
+            await GymRegistration.updateMany(
+              { gymSession: session._id, status: { $ne: 'cancelled' } },
+              { $set: { status: 'cancelled' } }
+            );
           } catch (error) {
             console.error('❌ Error sending cancellation emails for session:', session._id, error);
           }

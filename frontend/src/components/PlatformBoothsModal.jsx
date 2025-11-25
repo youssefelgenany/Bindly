@@ -6,7 +6,8 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
     attendees: [{ name: '', email: '' }],
     duration: '',
     boothLocation: '',
-    boothSize: ''
+    boothSize: '',
+    attendeeFiles: [null]
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -22,14 +23,15 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
 
   const addAttendee = () => {
     if (formData.attendees.length < 5) {
-      setFormData({ ...formData, attendees: [...formData.attendees, { name: '', email: '' }] });
+      setFormData({ ...formData, attendees: [...formData.attendees, { name: '', email: '' }], attendeeFiles: [...(formData.attendeeFiles || []), null] });
     }
   };
 
   const removeAttendee = (idx) => {
     if (formData.attendees.length > 1) {
       const next = formData.attendees.filter((_, i) => i !== idx);
-      setFormData({ ...formData, attendees: next });
+      const nextFiles = (formData.attendeeFiles || []).filter((_, i) => i !== idx);
+      setFormData({ ...formData, attendees: next, attendeeFiles: nextFiles.length ? nextFiles : [null] });
     }
   };
 
@@ -89,6 +91,13 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleFileChange = (e, idx) => {
+    const file = e.target.files && e.target.files[0];
+    const nextFiles = [...(formData.attendeeFiles || [])];
+    nextFiles[idx] = file || null;
+    setFormData(prev => ({ ...prev, attendeeFiles: nextFiles }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage({ type: '', text: '' });
@@ -142,14 +151,47 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
       console.log('🔍 Submitting platform booth application:', submissionData);
 
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/vendor-requests', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(submissionData)
-      });
+
+      // If attendee files are present, ensure one per attendee and send as multipart/form-data
+      const files = formData.attendeeFiles || [];
+      const missingFileIndex = validAttendees.findIndex((_, i) => !files[i]);
+      let response;
+
+      if (missingFileIndex !== -1) {
+        setMessage({ type: 'error', text: `Please upload an ID for attendee #${missingFileIndex + 1}.` });
+        setLoading(false);
+        return;
+      }
+
+      if (files.some(f => f)) {
+        const fd = new FormData();
+        fd.append('eventType', 'platformBooth');
+        fd.append('attendees', JSON.stringify(validAttendees));
+        if (submissionData.boothSize) fd.append('boothSize', submissionData.boothSize);
+        if (submissionData.durationWeeks) fd.append('durationWeeks', submissionData.durationWeeks);
+        if (submissionData.boothLocation) fd.append('boothLocation', submissionData.boothLocation);
+        // append files in order
+        files.slice(0, validAttendees.length).forEach((file) => {
+          if (file) fd.append('individualIds', file);
+        });
+
+        response = await fetch('http://localhost:5000/api/vendor-requests', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: fd
+        });
+      } else {
+        response = await fetch('http://localhost:5000/api/vendor-requests', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(submissionData)
+        });
+      }
 
       const data = await response.json();
       console.log('🔍 Platform booth submission response:', { status: response.status, data });
@@ -165,7 +207,8 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
           attendees: [{ name: '', email: '' }],
           duration: '',
           boothLocation: '',
-          boothSize: ''
+          boothSize: '',
+          attendeeFiles: [null]
         });
 
         // Call onSuccess callback if provided
@@ -230,7 +273,8 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
       attendees: [{ name: '', email: '' }],
       duration: '',
       boothLocation: '',
-      boothSize: ''
+      boothSize: '',
+      attendeeFiles: [null]
     });
     setErrors({});
     setMessage({ type: '', text: '' });
@@ -354,13 +398,13 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
                 color: '#111827',
                 marginBottom: '1rem'
               }}>
-                Names and Emails of Attendees (Maximum 5) <span style={{ color: '#ef4444' }}>*</span>
+                Names, Emails and IDs of Attendees (Maximum 5) <span style={{ color: '#ef4444' }}>*</span>
               </h4>
               
               {formData.attendees.map((attendee, idx) => (
                 <div key={idx} style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 1fr auto',
+                  gridTemplateColumns: '1fr 1fr 1fr auto',
                   gap: '0.75rem',
                   marginBottom: '0.75rem',
                   alignItems: 'end'
@@ -418,6 +462,31 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
                       }}
                       required
                     />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => handleFileChange(e, idx)}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          backgroundColor: '#f3f4f6'
+                        }}
+                        required
+                        aria-label={`Attendee ${idx + 1} ID file`}
+                      />
+                      <span style={{ color: '#6b7280', fontSize: '0.8125rem' }}>(select ID file)</span>
+                    </div>
+                    {formData.attendeeFiles && formData.attendeeFiles[idx] && (
+                      <div style={{ marginTop: '0.25rem', color: '#374151', fontSize: '0.75rem' }}>
+                        {formData.attendeeFiles[idx].name}
+                      </div>
+                    )}
                   </div>
                   {formData.attendees.length > 1 && (
                     <button

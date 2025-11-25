@@ -492,8 +492,50 @@ const PlatformBooths = () => {
           )}
         </div>
 
-        {/* Logout Button - Fixed at bottom */}
+        {/* Loyalty link + Logout Button - Fixed at bottom */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {/* GUC Loyalty Program link */}
+          {sidebarOpen && (
+            <Link
+              to="/vendor/loyalty-program"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.5rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: isActiveRoute('/vendor/loyalty-program') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                textDecoration: 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActiveRoute('/vendor/loyalty-program')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActiveRoute('/vendor/loyalty-program')) {
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ 
+                color: isActiveRoute('/vendor/loyalty-program') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                fontSize: '1.25rem' 
+              }}>
+                badge
+              </span>
+              <p style={{
+                color: isActiveRoute('/vendor/loyalty-program') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/vendor/loyalty-program') ? '700' : '500',
+                lineHeight: 'normal',
+                margin: 0
+              }}>
+                GUC Loyalty Program
+              </p>
+            </Link>
+          )}
+
           <button
             onClick={handleLogout}
             style={{

@@ -15,6 +15,7 @@ import EventsOfficeDashboard from './pages/EventsOfficeDashboard';
 import PendingVerification from './pages/PendingVerification';
 import ProfessorMyRegistrations from './pages/ProfessorMyRegistrations';
 import ProfessorEventsView from './pages/ProfessorEventsView';
+import ProfessorFavorites from './pages/ProfessorFavorites';
 import CreateWorkshop from './pages/CreateWorkshop';
 import MyWorkshops from './pages/MyWorkshops';
 import GymSchedule from './pages/GymSchedule';
@@ -57,6 +58,7 @@ import EventsOfficeLoyaltyProgramVendors from './pages/EventsOfficeLoyaltyProgra
 import VendorAcceptedEvents from './pages/VendorAcceptedEvents';
 import VendorMyRequests from './pages/VendorMyRequests';
 import PlatformBoothRequests from './pages/PlatformBoothRequests';
+import VendorLoyaltyProgram from './pages/VendorLoyaltyProgram';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -376,6 +378,14 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/vendor/loyalty-program"
+              element={
+                <ProtectedRoute>
+                  <VendorLoyaltyProgram />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/event-office/vendor-requests"
               element={
                 <ProtectedRoute>
@@ -656,6 +666,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <MyWorkshops />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/professor/favorites"
+              element={
+                <ProtectedRoute>
+                  <ProfessorFavorites />
                 </ProtectedRoute>
               }
             />

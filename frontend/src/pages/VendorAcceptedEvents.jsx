@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { vendorApi } from '../api/vendorApi';
+import axios from 'axios';
 
 const VendorAcceptedEvents = () => {
   const { user, logout } = useAuth();
@@ -13,6 +14,14 @@ const VendorAcceptedEvents = () => {
   const [error, setError] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'upcoming', 'past'
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [paymentData, setPaymentData] = useState({
+    cardNumber: '',
+    cvv: '',
+    expirationDate: ''
+  });
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -48,8 +57,9 @@ const VendorAcceptedEvents = () => {
     try {
       setLoading(true);
       setError('');
-      const data = await vendorApi.listMyAccepted();
-      const eventsList = Array.isArray(data?.events) ? data.events : [];
+      // Use requests endpoint so we receive requestId and payment fields
+      const data = await vendorApi.listMyRequests({ status: 'accepted' });
+      const eventsList = Array.isArray(data?.events) ? data.events : (Array.isArray(data) ? data : []);
       
       // Sort events: upcoming first (nearest first), then past events (most recent past first)
       const now = new Date();
@@ -84,6 +94,90 @@ const VendorAcceptedEvents = () => {
   useEffect(() => {
     loadAcceptedEvents();
   }, []);
+
+  const handleCancel = async (requestId) => {
+    if (!requestId) return;
+    const ok = window.confirm('Are you sure you want to cancel this participation request? This cannot be undone.');
+    if (!ok) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.delete(`http://localhost:5000/api/vendor-requests/${requestId}/cancel`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      if (res.status === 200) {
+        setEvents(prev => prev.filter(ev => String(ev.requestId || ev._id) !== String(requestId)));
+        alert('Participation request cancelled successfully.');
+      } else {
+        alert(res.data?.message || 'Failed to cancel request');
+      }
+    } catch (err) {
+      console.error('Error cancelling request:', err);
+      const msg = err.response?.data?.message || err.message || 'Error cancelling request';
+      alert(msg);
+    }
+  };
+
+  const handleOpenPaymentModal = (event) => {
+    setSelectedEvent(event);
+    setPaymentData({ cardNumber: '', cvv: '', expirationDate: '' });
+    setShowPaymentModal(true);
+  };
+
+  const handleClosePaymentModal = () => {
+    setShowPaymentModal(false);
+    setSelectedEvent(null);
+    setPaymentData({ cardNumber: '', cvv: '', expirationDate: '' });
+  };
+
+  const handlePaymentSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedEvent) return;
+
+    // Basic validation
+    if (!paymentData.cardNumber || !paymentData.cvv || !paymentData.expirationDate) {
+      alert('Please fill in all payment fields');
+      return;
+    }
+
+    try {
+      setPaymentLoading(true);
+      const token = localStorage.getItem('token');
+      
+      // Here you would typically send payment to your backend
+      // For now, we'll simulate a successful payment
+      const res = await axios.post(
+        `http://localhost:5000/api/vendor-requests/${selectedEvent.requestId}/payment`,
+        { ...paymentData, paymentMethod: 'card' },
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (res.status === 200) {
+        alert('Payment successful!');
+        // Update the event in the list to mark as paid
+        setEvents(prev => prev.map(ev => 
+          ev.requestId === selectedEvent.requestId 
+            ? { ...ev, paymentStatus: 'paid', paidAt: new Date().toISOString() }
+            : ev
+        ));
+        handleClosePaymentModal();
+      } else {
+        alert(res.data?.message || 'Payment failed');
+      }
+    } catch (err) {
+      console.error('Error processing payment:', err);
+      const msg = err.response?.data?.message || err.message || 'Error processing payment';
+      alert(msg);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
 
   const toggleRowExpansion = (eventId) => {
     const newExpanded = new Set(expandedRows);
@@ -631,8 +725,9 @@ const VendorAcceptedEvents = () => {
                               backgroundColor: '#d1fae5',
                               color: '#065f46'
                             }}>
-                              Accepted
+                              {(event.paymentStatus === 'paid' || event.paidAt) ? 'Paid' : 'Accepted'}
                             </span>
+                            {/* (Cancel button moved to card footer) */}
                           </div>
                         </div>
                         
@@ -740,6 +835,70 @@ const VendorAcceptedEvents = () => {
                           </p>
                         )}
                       </div>
+                      {/* Footer with Payment and Cancel buttons aligned bottom-right */}
+                      <div style={{ padding: '0.75rem 1rem 1rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: 'auto' }}>
+                        {/* Payment Button - show "Paid" if already paid, otherwise "Payment" */}
+                        {event.paymentStatus === 'paid' || event.paidAt ? (
+                          <button
+                            disabled
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              minWidth: 140,
+                              borderRadius: '0.375rem',
+                              backgroundColor: '#10b981',
+                              color: '#fff',
+                              border: 'none',
+                              cursor: 'not-allowed',
+                              fontSize: '0.9rem',
+                              fontWeight: 600,
+                              opacity: 0.7
+                            }}
+                          >
+                            ✓ Paid
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleOpenPaymentModal(event); }}
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              minWidth: 140,
+                              borderRadius: '0.375rem',
+                              backgroundColor: '#1e40af',
+                              color: '#fff',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '0.9rem',
+                              fontWeight: 600
+                            }}
+                            onMouseEnter={(e) => e.target.style.backgroundColor = '#1e3a8a'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = '#1e40af'}
+                          >
+                            Payment
+                          </button>
+                        )}
+                        
+                        {/* Cancel Button - only show if not paid */}
+                        {event.requestId && (event.paymentStatus !== 'paid' && !event.paidAt) && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCancel(event.requestId); }}
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              minWidth: 160,
+                              borderRadius: '0.375rem',
+                              backgroundColor: '#ef4444',
+                              color: '#fff',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '0.9rem',
+                              fontWeight: 700
+                            }}
+                            onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
+                          >
+                            Cancel Request
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -749,6 +908,218 @@ const VendorAcceptedEvents = () => {
           </div>
         </div>
       </main>
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={handleClosePaymentModal}
+        >
+          <div
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '0.75rem',
+              padding: '2rem',
+              maxWidth: '500px',
+              width: '90%',
+              position: 'relative',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={handleClosePaymentModal}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'none',
+                border: 'none',
+                fontSize: '1.5rem',
+                cursor: 'pointer',
+                color: '#6b7280',
+                width: '2rem',
+                height: '2rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '0.375rem'
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            >
+              ✕
+            </button>
+
+            <h2 style={{
+              color: '#1D3557',
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              marginTop: 0,
+              marginBottom: '0.5rem'
+            }}>
+              Payment Details
+            </h2>
+            
+            {selectedEvent && (
+              <p style={{
+                color: '#6b7280',
+                fontSize: '0.875rem',
+                marginTop: 0,
+                marginBottom: '1.5rem'
+              }}>
+                Event: <strong>{selectedEvent.name}</strong>
+              </p>
+            )}
+
+            <form onSubmit={handlePaymentSubmit}>
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label
+                  htmlFor="cardNumber"
+                  style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#374151'
+                  }}
+                >
+                  Card Number
+                </label>
+                <input
+                  type="text"
+                  id="cardNumber"
+                  value={paymentData.cardNumber}
+                  onChange={(e) => setPaymentData({ ...paymentData, cardNumber: e.target.value })}
+                  placeholder="1234 5678 9012 3456"
+                  maxLength="19"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.625rem 0.875rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label
+                    htmlFor="expirationDate"
+                    style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151'
+                    }}
+                  >
+                    Expiration Date
+                  </label>
+                  <input
+                    type="text"
+                    id="expirationDate"
+                    value={paymentData.expirationDate}
+                    onChange={(e) => setPaymentData({ ...paymentData, expirationDate: e.target.value })}
+                    placeholder="MM/YY"
+                    maxLength="5"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.625rem 0.875rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                    onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                  />
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <label
+                    htmlFor="cvv"
+                    style={{
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151'
+                    }}
+                  >
+                    CVV
+                  </label>
+                  <input
+                    type="text"
+                    id="cvv"
+                    value={paymentData.cvv}
+                    onChange={(e) => setPaymentData({ ...paymentData, cvv: e.target.value })}
+                    placeholder="123"
+                    maxLength="4"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.625rem 0.875rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                    onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={paymentLoading}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  backgroundColor: paymentLoading ? '#9ca3af' : '#1e40af',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: paymentLoading ? 'not-allowed' : 'pointer',
+                  marginTop: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  if (!paymentLoading) e.target.style.backgroundColor = '#1e3a8a';
+                }}
+                onMouseLeave={(e) => {
+                  if (!paymentLoading) e.target.style.backgroundColor = '#1e40af';
+                }}
+              >
+                {paymentLoading ? 'Processing...' : 'Pay Now'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
