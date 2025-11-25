@@ -89,14 +89,63 @@ if (process.env.NODE_ENV !== 'production') {
 // Email verification link route
 app.get("/api/verify", verifyByToken);
 
-// Connect to MongoDB Atlas
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
+// Connect to MongoDB Atlas with improved connection options
+const connectDB = async () => {
+  try {
+    if (!process.env.MONGO_URI) {
+      console.error('❌ MONGO_URI is not defined in environment variables');
+      return;
+    }
+
+    const options = {
+      serverSelectionTimeoutMS: 10000, // 10 seconds timeout for server selection
+      socketTimeoutMS: 45000, // 45 seconds timeout for socket operations
+      connectTimeoutMS: 10000, // 10 seconds timeout for initial connection
+      maxPoolSize: 10, // Maintain up to 10 socket connections
+      minPoolSize: 2, // Maintain at least 2 socket connections
+      retryWrites: true,
+      retryReads: true,
+      // DNS resolution options
+      family: 4, // Use IPv4, skip IPv6
+    };
+
+    await mongoose.connect(process.env.MONGO_URI, options);
     console.log('✅ Connected to MongoDB Atlas');
+    
     const { initializeNotificationScheduler } = require('./services/notificationScheduler');
     initializeNotificationScheduler();
-  })
-  .catch(err => console.error('❌ MongoDB connection error:', err));
+  } catch (err) {
+    console.error('❌ MongoDB connection error:', err);
+    console.error('Error details:', {
+      message: err.message,
+      code: err.code,
+      name: err.name
+    });
+    
+    // Retry connection after 5 seconds
+    console.log('🔄 Retrying MongoDB connection in 5 seconds...');
+    setTimeout(() => {
+      connectDB();
+    }, 5000);
+  }
+};
+
+// Handle connection events
+mongoose.connection.on('error', (err) => {
+  console.error('❌ MongoDB connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('⚠️ MongoDB disconnected. Attempting to reconnect...');
+  connectDB();
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('✅ MongoDB reconnected');
+});
+
+// Initial connection
+connectDB();
 
 // Test route
 app.get('/', (req, res) => {
