@@ -87,6 +87,8 @@ const GymSchedule = () => {
   const isEventsOffice = !user?.userType || (user.userType !== 'TA' && user.userType !== 'Staff' && user.userType !== 'Professor' && user.userType !== 'Student');
   const isProfessor = user?.userType === 'Professor';
   const showHorizontalMenu = user?.userType === 'Student' || user?.userType === 'Staff' || user?.userType === 'TA';
+  const canSeeNotifications = user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA';
+  const useFixedHeader = true;
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -776,7 +778,6 @@ const GymSchedule = () => {
           </button>
         </div>
       </aside>
-      )}
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
@@ -1194,95 +1195,6 @@ const GymSchedule = () => {
             </div>
           </div>
         </header>
-
-      {/* Main Content */}
-      <main style={{
-        marginLeft: showSidebar ? (sidebarOpen ? '16rem' : '0') : '0',
-        marginTop: useFixedHeader ? '73px' : '0',
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        transition: showSidebar ? 'margin-left 0.3s ease' : 'none'
-      }}>
-        {/* Horizontal Menu Bar - Show for Students, Staff, and TA */}
-        {showHorizontalMenu && (
-          <nav style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '1rem 2rem',
-            backgroundColor: '#FFFFFF',
-            borderBottom: '1px solid #e2e8f0'
-          }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-            <Link
-              to="/dashboard"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Dashboard
-            </Link>
-            <Link
-              to="/professor/all-events"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Discover Events
-            </Link>
-            <Link
-              to="/professor/events"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              My Events
-            </Link>
-            <Link
-              to="/professor/my-workshops"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              My Workshops
-            </Link>
-            <Link
-              to="/professor/gym-schedule"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              View Gym Sessions
-            </Link>
-          </div>
-        </nav>
-      )}
 
       {/* Main Content */}
       <main style={{
@@ -1978,7 +1890,6 @@ const GymSchedule = () => {
           )}
         </div>
       </main>
-      </div>
 
       {/* Registration Modal */}
       {isRegistrationModalOpen && selectedSession && (
@@ -2501,6 +2412,8 @@ const GymSchedule = () => {
           </div>
         </div>
       )}
+
+      </div>
 
       <style>{`
         @keyframes spin {
