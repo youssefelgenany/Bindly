@@ -591,7 +591,7 @@ const StudentMyRegistrations = () => {
         padding: '1rem 2.5rem',
         backgroundColor: '#FFFFFF'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
@@ -605,7 +605,113 @@ const StudentMyRegistrations = () => {
             </h2>
           </Link>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+        
+        {/* Centered Navigation Menu */}
+        <nav style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+          gap: '1.25rem'
+        }}>
+          <Link
+            to="/dashboard"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              dashboard
+            </span>
+            Dashboard
+          </Link>
+          <Link
+            to="/student/events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/student/events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              explore
+            </span>
+            Discover Events
+          </Link>
+          <Link
+            to="/student/my-registrations"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              event
+            </span>
+            My Events
+          </Link>
+          <Link
+            to="/student/courts"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              sports_tennis
+            </span>
+            Campus Courts
+          </Link>
+          <Link
+            to="/gym"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/gym') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              fitness_center
+            </span>
+            Gym Sessions
+          </Link>
+        </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
           {/* Notifications Bell */}
           <div style={{ position: 'relative' }} data-notifications-dropdown>
             <button
@@ -849,6 +955,37 @@ const StudentMyRegistrations = () => {
               </div>
             )}
           </div>
+          
+          {/* Heart Icon - Favorites */}
+          <Link
+            to="/student/favorites"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              textDecoration: 'none',
+              color: 'inherit'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{
+              fontSize: '1.5rem',
+              color: '#1D3557'
+            }}>
+              favorite
+            </span>
+          </Link>
 
           <div style={{ textAlign: 'right' }}>
             <p style={{
@@ -977,97 +1114,6 @@ const StudentMyRegistrations = () => {
           </div>
         </div>
       </header>
-
-      {/* Horizontal Menu Bar */}
-      <nav style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '1rem 2rem',
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #e2e8f0'
-      }}>
-        {/* Navigation Links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <Link
-            to="/dashboard"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/student/events"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/student/events') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Discover Events
-          </Link>
-          <Link
-            to="/student/my-registrations"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Events
-          </Link>
-          <Link
-            to="/student/favorites"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/student/favorites') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/student/favorites') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/favorites') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Favorites
-          </Link>
-          <Link
-            to="/student/courts"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Campus Courts
-          </Link>
-          <Link
-            to="/gym"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/gym') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Gym Sessions
-          </Link>
-        </div>
-      </nav>
 
       {/* Main Content */}
       <main style={{
@@ -1515,86 +1561,6 @@ const StudentMyRegistrations = () => {
                               : '—'}
                           </span>
                         </button>
-
-                        {/* Rating and Comment Icons - Only for Past Events */}
-                         {isRegistrationPast(registration) && (
-                          <div style={{
-                            display: 'flex',
-                            gap: '0.5rem',
-                            marginLeft: 'auto'
-                          }}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                 handleViewRatingsComments(registration, { focus: 'rating' });
-                              }}
-                              style={{
-                                padding: '0.5rem',
-                                borderRadius: '0.5rem',
-                                backgroundColor: 'transparent',
-                                border: '1px solid #e5e7eb',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.2s',
-                                zIndex: 10,
-                                position: 'relative'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = '#f3f4f6';
-                                e.target.style.borderColor = '#d1d5db';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = 'transparent';
-                                e.target.style.borderColor = '#e5e7eb';
-                              }}
-                              title="Rate this event"
-                            >
-                              <span className="material-symbols-outlined" style={{
-                                fontSize: '1.25rem',
-                                color: '#1e40af'
-                              }}>
-                                star
-                              </span>
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                 handleViewRatingsComments(registration, { focus: 'comment' });
-                              }}
-                              style={{
-                                padding: '0.5rem',
-                                borderRadius: '0.5rem',
-                                backgroundColor: 'transparent',
-                                border: '1px solid #e5e7eb',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.2s',
-                                zIndex: 10,
-                                position: 'relative'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = '#f3f4f6';
-                                e.target.style.borderColor = '#d1d5db';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = 'transparent';
-                                e.target.style.borderColor = '#e5e7eb';
-                              }}
-                              title="Comment on this event"
-                            >
-                              <span className="material-symbols-outlined" style={{
-                                fontSize: '1.25rem',
-                                color: '#1e40af'
-                              }}>
-                                comment
-                              </span>
-                            </button>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -2610,76 +2576,6 @@ const StudentMyRegistrations = () => {
                             </button>
                           ))}
                         </div>
-                        {rating > 0 && (
-                          <button
-                            type="button"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              if (rating > 0 && selectedEventForView?.eventId) {
-                                try {
-                                  const eventId = String(selectedEventForView.eventId);
-                                  console.log('🚀 Submitting rating:', { eventId, rating, selectedEventForView });
-                                  setError(''); // Clear previous errors
-                                  const result = await eventsApiService.submitRating(eventId, rating);
-                                  console.log('📊 Rating submission result:', result);
-                                  if (result.success) {
-                                    setRating(0);
-                                    setHoveredRating(0);
-                                    setError('');
-                                    // Reload ratings and comments
-                                    await loadRatingsAndComments(eventId);
-                                    // Update event ratings
-                                    const ratingResult = await eventsApiService.getRatingsAndComments(eventId);
-                                    if (ratingResult.success && ratingResult.data?.ratings) {
-                                      setEventRatings(prev => ({
-                                        ...prev,
-                                        [eventId]: {
-                                          average: ratingResult.data.ratings.average || 0,
-                                          count: ratingResult.data.ratings.count || 0
-                                        }
-                                      }));
-                                    }
-                                  } else {
-                                    const errorMsg = result.message || result.error?.message || result.error?.msg || 'Failed to submit rating';
-                                    console.error('❌ Rating submission failed:', errorMsg, result);
-                                    setError(errorMsg);
-                                  }
-                                } catch (err) {
-                                  console.error('❌ Error submitting rating:', err);
-                                  const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting rating';
-                                  setError(errorMsg);
-                                }
-                              } else {
-                                console.warn('⚠️ Cannot submit rating:', { rating, eventId: selectedEventForView?.eventId });
-                                setError('Please select a rating and ensure event is selected');
-                              }
-                            }}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: '#1e40af',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                              fontWeight: '600',
-                              transition: 'all 0.2s',
-                              zIndex: 10,
-                              position: 'relative'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.stopPropagation();
-                              e.target.style.backgroundColor = '#1e3a8a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.stopPropagation();
-                              e.target.style.backgroundColor = '#1e40af';
-                            }}
-                          >
-                            Submit Rating
-                          </button>
-                        )}
                       </div>
 
                       {/* Comment Section */}
@@ -2748,41 +2644,114 @@ const StudentMyRegistrations = () => {
                             onClick={async (e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              if (commentText.trim() && selectedEventForView?.eventId) {
-                                try {
-                                  const eventId = String(selectedEventForView.eventId);
-                                  console.log('🚀 Submitting comment:', { eventId, commentLength: commentText.trim().length, selectedEventForView });
-                                  setError(''); // Clear previous errors
-                                  const result = await eventsApiService.submitComment(eventId, commentText.trim());
-                                  console.log('📊 Comment submission result:', result);
-                                  if (result.success) {
-                                    setCommentText('');
-                                    setError('');
-                                    // Reload ratings and comments
-                                    await loadRatingsAndComments(eventId);
-                                  } else {
-                                    const errorMsg = result.message || result.error?.message || result.error?.msg || 'Failed to submit comment';
-                                    console.error('❌ Comment submission failed:', errorMsg, result);
-                                    setError(errorMsg);
+                              
+                              if (!selectedEventForView?.eventId) {
+                                setModalError('No event selected.');
+                                return;
+                              }
+                              
+                              const hasRating = rating > 0 && rating <= 5;
+                              const hasComment = commentText.trim().length > 0;
+                              
+                              if (!hasRating && !hasComment) {
+                                setModalError('Please provide a rating, comment, or both.');
+                                return;
+                              }
+                              
+                              setModalError('');
+                              setModalSuccess('');
+                              
+                              const eventId = String(selectedEventForView.eventId);
+                              let ratingSuccess = true;
+                              let commentSuccess = true;
+                              let errorMessages = [];
+                              
+                              try {
+                                // Submit rating if provided
+                                if (hasRating) {
+                                  try {
+                                    console.log('🚀 Submitting rating:', { eventId, rating, selectedEventForView });
+                                    const ratingResult = await eventsApiService.submitRating(eventId, rating);
+                                    console.log('📊 Rating submission result:', ratingResult);
+                                    if (ratingResult.success) {
+                                      setRating(0);
+                                      setHoveredRating(0);
+                                    } else {
+                                      ratingSuccess = false;
+                                      const errorMsg = ratingResult.message || ratingResult.error?.message || ratingResult.error?.msg || 'Failed to submit rating';
+                                      errorMessages.push(errorMsg);
+                                    }
+                                  } catch (err) {
+                                    ratingSuccess = false;
+                                    console.error('❌ Error submitting rating:', err);
+                                    const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting rating';
+                                    errorMessages.push(errorMsg);
                                   }
-                                } catch (err) {
-                                  console.error('❌ Error submitting comment:', err);
-                                  const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting comment';
-                                  setError(errorMsg);
                                 }
-                              } else {
-                                console.warn('⚠️ Cannot submit comment:', { hasText: !!commentText.trim(), eventId: selectedEventForView?.eventId });
-                                setError('Please enter a comment and ensure event is selected');
+                                
+                                // Submit comment if provided
+                                if (hasComment) {
+                                  try {
+                                    console.log('🚀 Submitting comment:', { eventId, commentLength: commentText.trim().length, selectedEventForView });
+                                    const commentResult = await eventsApiService.submitComment(eventId, commentText.trim());
+                                    console.log('📊 Comment submission result:', commentResult);
+                                    if (commentResult.success) {
+                                      setCommentText('');
+                                    } else {
+                                      commentSuccess = false;
+                                      const errorMsg = commentResult.message || commentResult.error?.message || commentResult.error?.msg || 'Failed to submit comment';
+                                      errorMessages.push(errorMsg);
+                                    }
+                                  } catch (err) {
+                                    commentSuccess = false;
+                                    console.error('❌ Error submitting comment:', err);
+                                    const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting comment';
+                                    errorMessages.push(errorMsg);
+                                  }
+                                }
+                                
+                                // Show success or error messages
+                                if (ratingSuccess && commentSuccess) {
+                                  const successMessages = [];
+                                  if (hasRating) successMessages.push('Rating');
+                                  if (hasComment) successMessages.push('Comment');
+                                  setModalSuccess(`${successMessages.join(' and ')} submitted successfully.`);
+                                  setModalError('');
+                                } else {
+                                  setModalError(errorMessages.join(' '));
+                                  setModalSuccess('');
+                                }
+                                
+                                // Reload ratings and comments regardless of success/failure
+                                await loadRatingsAndComments(eventId);
+                                
+                                // Update event ratings if rating was submitted
+                                if (hasRating && ratingSuccess) {
+                                  const ratingResult = await eventsApiService.getRatingsAndComments(eventId);
+                                  if (ratingResult.success && ratingResult.data?.ratings) {
+                                    setEventRatings(prev => ({
+                                      ...prev,
+                                      [eventId]: {
+                                        average: ratingResult.data.ratings.average || 0,
+                                        count: ratingResult.data.ratings.count || 0
+                                      }
+                                    }));
+                                  }
+                                }
+                              } catch (err) {
+                                console.error('❌ Error in submit process:', err);
+                                setModalError(err.response?.data?.message || err.message || 'Error submitting feedback');
+                                setModalSuccess('');
                               }
                             }}
-                            disabled={!commentText.trim()}
+                            disabled={!(rating > 0 || commentText.trim())}
                             style={{
                               padding: '0.5rem 1rem',
                               borderRadius: '0.5rem',
-                              backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
+                              backgroundColor: !(rating > 0 || commentText.trim()) ? '#d1d5db' : '#1e40af',
                               color: '#FFFFFF',
                               border: 'none',
-                              cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
+                              cursor: !(rating > 0 || commentText.trim()) ? 'not-allowed' : 'pointer',
                               fontSize: '0.875rem',
                               fontWeight: '600',
                               transition: 'all 0.2s',
@@ -2791,18 +2760,18 @@ const StudentMyRegistrations = () => {
                             }}
                             onMouseEnter={(e) => {
                               e.stopPropagation();
-                              if (commentText.trim()) {
+                              if (rating > 0 || commentText.trim()) {
                                 e.target.style.backgroundColor = '#1e3a8a';
                               }
                             }}
                             onMouseLeave={(e) => {
                               e.stopPropagation();
-                              if (commentText.trim()) {
+                              if (rating > 0 || commentText.trim()) {
                                 e.target.style.backgroundColor = '#1e40af';
                               }
                             }}
                           >
-                            Submit Comment
+                            Submit
                           </button>
                         </div>
                       </div>
