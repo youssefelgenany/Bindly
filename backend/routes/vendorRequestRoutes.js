@@ -16,7 +16,9 @@ const {
   closeBoothPoll,
   getBoothPollResults,
   getVendorRequestPayment,
-  payVendorRequestFee
+  payVendorRequestFee,
+  handleStripePaymentSuccess,
+  uploadIndividualIds
 } = require('../controllers/vendorRequestController');
 const { protect, permit } = require('../middleware/authMiddleware');
 
@@ -39,6 +41,13 @@ router.get(
   permit('event_office', 'admin', 'Event Office', 'Events Office'),
   getPendingVendorRequestNotifications
 );
+
+// Stripe payment success callback (no auth required - called by Stripe redirect)
+// MUST be before /:id routes to prevent matching as :id parameter
+router.get('/payment-success', handleStripePaymentSuccess);
+
+// Route to upload individual IDs for an existing vendor request - Vendor
+router.put('/:requestId/upload-ids', protect, permit('vendor'), uploadIndividualIdsArray, uploadIndividualIds);
 
 // Route to get a single vendor request by ID - Events Office / Admin
 router.get(

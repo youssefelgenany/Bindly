@@ -47,6 +47,7 @@ import TAFavorites from './pages/TAFavorites';
 import TALoyaltyVendorsView from './pages/TALoyaltyVendorsView';
 import EventPayment from './pages/EventPayment';
 import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentCancel from './pages/PaymentCancel';
 import MyWallet from './pages/MyWallet';
 import CourtAvailability from './pages/CourtAvailability';
 import PlatformBoothReservation from './pages/PlatformBoothReservation';
@@ -133,9 +134,9 @@ const AdminOnly = ({ children }) => {
   }
 
   const isAdmin = user && (
-    user.role === 'admin' || 
+    user.role === 'admin' ||
     user.role === 'Admin' ||
-    user.userType === 'Admin' || 
+    user.userType === 'Admin' ||
     user.userType === 'admin'
   );
   return isAdmin ? children : <Navigate to="/dashboard" />;
@@ -210,11 +211,11 @@ const StudentOnly = ({ children }) => {
   }
 
   const isStudentOrEventOffice = user && (
-    user.userType === 'Student' || 
-    user.userType === 'Event Office' || 
-    user.userType === 'Events Office' || 
-    user.userType === 'event_office' || 
-    user.role === 'event_office' || 
+    user.userType === 'Student' ||
+    user.userType === 'Event Office' ||
+    user.userType === 'Events Office' ||
+    user.userType === 'event_office' ||
+    user.role === 'event_office' ||
     user.role === 'Event Office'
   );
   return isStudentOrEventOffice ? children : <Navigate to="/dashboard" />;
@@ -266,569 +267,577 @@ const AppContent = () => {
   return (
     <div className="App">
       <Routes>
-            <Route path="/" element={<Navigate to="/login" />} />
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/signup"
-              element={
-                <PublicRoute>
-                  <Signup />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/verify-email"
-              element={
-                <PublicRoute>
-                  <VerifyEmail />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/pending-verification"
-              element={<PendingVerification />}
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/event-office"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <EventsOfficeDashboard />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/vendor"
-              element={
-                <ProtectedRoute>
-                  <VendorDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/vendor/bazaars"
-              element={
-                <ProtectedRoute>
-                  <VendorBazaars />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/vendor/accepted"
-              element={
-                <ProtectedRoute>
-                  <VendorAccepted />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/vendor/requests"
-              element={
-                <ProtectedRoute>
-                  <VendorRequests />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/vendor/platform-booth"
-              element={
-                <ProtectedRoute>
-                  <PlatformBoothReservation />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/vendor/platform-booths"
-              element={
-                <ProtectedRoute>
-                  <Navigate to="/vendor" replace />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/vendor/accepted-events"
-              element={
-                <ProtectedRoute>
-                  <VendorAcceptedEvents />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/vendor/my-requests"
-              element={
-                <ProtectedRoute>
-                  <VendorMyRequests />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/vendor/loyalty-program"
-              element={
-                <ProtectedRoute>
-                  <VendorLoyaltyProgram />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/event-office/vendor-requests"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <VendorRequests />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/event-office/events"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <EventsOfficeEventsView />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/event-office/workshops"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <EventsOfficeWorkshops />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/event-office/vendors"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <EventsOfficeVendors />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/event-office/platform-booth-requests"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <PlatformBoothRequests />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/events"
-              element={
-                <ProtectedRoute>
-                  <EventsList />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/student/events"
-              element={
-                <ProtectedRoute>
-                  <StudentOnly>
-                    <StudentEventsView />
-                  </StudentOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/student/my-registrations"
-              element={
-                <ProtectedRoute>
-                  <StudentOnly>
-                    <StudentMyRegistrations />
-                  </StudentOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/student/favorites"
-              element={
-                <ProtectedRoute>
-                  <StudentOnly>
-                    <StudentFavorites />
-                  </StudentOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/student/courts"
-              element={
-                <ProtectedRoute>
-                  <StudentOnly>
-                    <StudentCourtsView />
-                  </StudentOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/student/loyalty-vendors"
-              element={
-                <ProtectedRoute>
-                  <StudentOnly>
-                    <StudentLoyaltyVendorsView />
-                  </StudentOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/events"
-              element={
-                <ProtectedRoute>
-                  <StaffAndTAOnly>
-                    <StaffEventsView />
-                  </StaffAndTAOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/my-registrations"
-              element={
-                <ProtectedRoute>
-                  <StaffAndTAOnly>
-                    <StaffMyRegistrations />
-                  </StaffAndTAOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/favorites"
-              element={
-                <ProtectedRoute>
-                  <StaffAndTAOnly>
-                    <StaffFavorites />
-                  </StaffAndTAOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/loyalty-vendors"
-              element={
-                <ProtectedRoute>
-                  <StaffAndTAOnly>
-                    <StaffLoyaltyVendorsView />
-                  </StaffAndTAOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/ta/events"
-              element={
-                <ProtectedRoute>
-                  <StaffAndTAOnly>
-                    <TAEventsView />
-                  </StaffAndTAOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/ta/my-registrations"
-              element={
-                <ProtectedRoute>
-                  <StaffAndTAOnly>
-                    <TAMyRegistrations />
-                  </StaffAndTAOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/ta/favorites"
-              element={
-                <ProtectedRoute>
-                  <StaffAndTAOnly>
-                    <TAFavorites />
-                  </StaffAndTAOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/ta/loyalty-vendors"
-              element={
-                <ProtectedRoute>
-                  <StaffAndTAOnly>
-                    <TALoyaltyVendorsView />
-                  </StaffAndTAOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/events/:id/payment"
-              element={
-                <ProtectedRoute>
-                  <EventPayment />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/payment-success"
-              element={
-                <ProtectedRoute>
-                  <PaymentSuccess />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/events/payment-success"
-              element={
-                <ProtectedRoute>
-                  <PaymentSuccess />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/wallet"
-              element={
-                <ProtectedRoute>
-                  <MyWallet />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/gym"
-              element={
-                <ProtectedRoute>
-                  <GymSchedule />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/gym-schedule"
-              element={
-                <ProtectedRoute>
-                  <GymSchedule />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/courts"
-              element={
-                <ProtectedRoute>
-                  <CourtAvailability />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/gym/manage"
-              element={
-                <ProtectedRoute>
-                  <GymManage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/professor/events"
-              element={
-                <ProtectedRoute>
-                  <ProfessorMyRegistrations />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/professor/all-events"
-              element={
-                <ProtectedRoute>
-                  <ProfessorEventsView />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/professor/create-workshop"
-              element={
-                <ProtectedRoute>
-                  <CreateWorkshop />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/professor/my-workshops"
-              element={
-                <ProtectedRoute>
-                  <MyWorkshops />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/professor/favorites"
-              element={
-                <ProtectedRoute>
-                  <ProfessorFavorites />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/professor/profile"
-              element={
-                <ProtectedRoute>
-                  <ProfessorProfile />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/professor/gym-schedule"
-              element={
-                <ProtectedRoute>
-                  <GymSchedule />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/professor/loyalty-vendors"
-              element={
-                <ProtectedRoute>
-                  <ProfessorLoyaltyVendorsView />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/users"
-              element={
-                <ProtectedRoute>
-                  <AdminOnly>
-                    <AdminUsers />
-                  </AdminOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/vendors"
-              element={
-                <ProtectedRoute>
-                  <AdminOnly>
-                    <AdminVendors />
-                  </AdminOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/events"
-              element={
-                <ProtectedRoute>
-                  <AdminOnly>
-                    <AdminEvents />
-                  </AdminOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/events-view"
-              element={
-                <ProtectedRoute>
-                  <AdminOnly>
-                    <AdminEventsView />
-                  </AdminOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/loyalty-program-vendors"
-              element={
-                <ProtectedRoute>
-                  <AdminOnly>
-                    <AdminLoyaltyProgramVendors />
-                  </AdminOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/event-office/loyalty-partners"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <EventsOfficeLoyaltyProgramVendors />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/platform-booth-requests"
-              element={
-                <ProtectedRoute>
-                  <AdminOnly>
-                    <AdminPlatformBoothRequests />
-                  </AdminOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/profile"
-              element={
-                <ProtectedRoute>
-                  <AdminOnly>
-                    <AdminProfile />
-                  </AdminOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/edit-conference/:id"
-              element={
-                <ProtectedRoute>
-                  <EditConfrences />
-                </ProtectedRoute>
-              } />
-            {/* ✅ ADD YOUR EVENT MANAGEMENT ROUTES HERE */}
-            <Route
-              path="/create-booth"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <CreateBooth />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/edit-bazaar/:id"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <EditBazaar />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/edit-trip/:id"
-              element={
-                <ProtectedRoute>
-                  <EventsOfficeOnly>
-                    <EditTrip />
-                  </EventsOfficeOnly>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/confrences"
-              element={
-                <ProtectedRoute>
-                  <Confrences />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </div>
+        <Route path="/" element={<Navigate to="/login" />} />
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <PublicRoute>
+              <Signup />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/verify-email"
+          element={
+            <PublicRoute>
+              <VerifyEmail />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/pending-verification"
+          element={<PendingVerification />}
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/event-office"
+          element={
+            <ProtectedRoute>
+              <EventsOfficeOnly>
+                <EventsOfficeDashboard />
+              </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vendor"
+          element={
+            <ProtectedRoute>
+              <VendorDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vendor/bazaars"
+          element={
+            <ProtectedRoute>
+              <VendorBazaars />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vendor/accepted"
+          element={
+            <ProtectedRoute>
+              <VendorAccepted />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vendor/requests"
+          element={
+            <ProtectedRoute>
+              <VendorRequests />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vendor/platform-booth"
+          element={
+            <ProtectedRoute>
+              <PlatformBoothReservation />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vendor/platform-booths"
+          element={
+            <ProtectedRoute>
+              <Navigate to="/vendor" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vendor/accepted-events"
+          element={
+            <ProtectedRoute>
+              <VendorAcceptedEvents />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vendor/my-requests"
+          element={
+            <ProtectedRoute>
+              <VendorMyRequests />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vendor/loyalty-program"
+          element={
+            <ProtectedRoute>
+              <VendorLoyaltyProgram />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/event-office/vendor-requests"
+          element={
+            <ProtectedRoute>
+              <EventsOfficeOnly>
+                <VendorRequests />
+              </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/event-office/events"
+          element={
+            <ProtectedRoute>
+              <EventsOfficeOnly>
+                <EventsOfficeEventsView />
+              </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/event-office/workshops"
+          element={
+            <ProtectedRoute>
+              <EventsOfficeOnly>
+                <EventsOfficeWorkshops />
+              </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/event-office/vendors"
+          element={
+            <ProtectedRoute>
+              <EventsOfficeOnly>
+                <EventsOfficeVendors />
+              </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/event-office/platform-booth-requests"
+          element={
+            <ProtectedRoute>
+              <EventsOfficeOnly>
+                <PlatformBoothRequests />
+              </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events"
+          element={
+            <ProtectedRoute>
+              <EventsList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/events"
+          element={
+            <ProtectedRoute>
+              <StudentOnly>
+                <StudentEventsView />
+              </StudentOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/my-registrations"
+          element={
+            <ProtectedRoute>
+              <StudentOnly>
+                <StudentMyRegistrations />
+              </StudentOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/favorites"
+          element={
+            <ProtectedRoute>
+              <StudentOnly>
+                <StudentFavorites />
+              </StudentOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/courts"
+          element={
+            <ProtectedRoute>
+              <StudentOnly>
+                <StudentCourtsView />
+              </StudentOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/loyalty-vendors"
+          element={
+            <ProtectedRoute>
+              <StudentOnly>
+                <StudentLoyaltyVendorsView />
+              </StudentOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/staff/events"
+          element={
+            <ProtectedRoute>
+              <StaffAndTAOnly>
+                <StaffEventsView />
+              </StaffAndTAOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/staff/my-registrations"
+          element={
+            <ProtectedRoute>
+              <StaffAndTAOnly>
+                <StaffMyRegistrations />
+              </StaffAndTAOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/staff/favorites"
+          element={
+            <ProtectedRoute>
+              <StaffAndTAOnly>
+                <StaffFavorites />
+              </StaffAndTAOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/staff/loyalty-vendors"
+          element={
+            <ProtectedRoute>
+              <StaffAndTAOnly>
+                <StaffLoyaltyVendorsView />
+              </StaffAndTAOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ta/events"
+          element={
+            <ProtectedRoute>
+              <StaffAndTAOnly>
+                <TAEventsView />
+              </StaffAndTAOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ta/my-registrations"
+          element={
+            <ProtectedRoute>
+              <StaffAndTAOnly>
+                <TAMyRegistrations />
+              </StaffAndTAOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ta/favorites"
+          element={
+            <ProtectedRoute>
+              <StaffAndTAOnly>
+                <TAFavorites />
+              </StaffAndTAOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ta/loyalty-vendors"
+          element={
+            <ProtectedRoute>
+              <StaffAndTAOnly>
+                <TALoyaltyVendorsView />
+              </StaffAndTAOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events/:id/payment"
+          element={
+            <ProtectedRoute>
+              <EventPayment />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payment-success"
+          element={
+            <ProtectedRoute>
+              <PaymentSuccess />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payment-cancel"
+          element={
+            <ProtectedRoute>
+              <PaymentCancel />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events/payment-success"
+          element={
+            <ProtectedRoute>
+              <PaymentSuccess />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/wallet"
+          element={
+            <ProtectedRoute>
+              <MyWallet />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/gym"
+          element={
+            <ProtectedRoute>
+              <GymSchedule />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/gym-schedule"
+          element={
+            <ProtectedRoute>
+              <GymSchedule />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/courts"
+          element={
+            <ProtectedRoute>
+              <CourtAvailability />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/gym/manage"
+          element={
+            <ProtectedRoute>
+              <GymManage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/professor/events"
+          element={
+            <ProtectedRoute>
+              <ProfessorMyRegistrations />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/professor/all-events"
+          element={
+            <ProtectedRoute>
+              <ProfessorEventsView />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/professor/create-workshop"
+          element={
+            <ProtectedRoute>
+              <CreateWorkshop />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/professor/my-workshops"
+          element={
+            <ProtectedRoute>
+              <MyWorkshops />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/professor/favorites"
+          element={
+            <ProtectedRoute>
+              <ProfessorFavorites />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/professor/profile"
+          element={
+            <ProtectedRoute>
+              <ProfessorProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/professor/gym-schedule"
+          element={
+            <ProtectedRoute>
+              <GymSchedule />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/professor/loyalty-vendors"
+          element={
+            <ProtectedRoute>
+              <ProfessorLoyaltyVendorsView />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute>
+              <AdminOnly>
+                <AdminUsers />
+              </AdminOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/vendors"
+          element={
+            <ProtectedRoute>
+              <AdminOnly>
+                <AdminVendors />
+              </AdminOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/events"
+          element={
+            <ProtectedRoute>
+              <AdminOnly>
+                <AdminEvents />
+              </AdminOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/events-view"
+          element={
+            <ProtectedRoute>
+              <AdminOnly>
+                <AdminEventsView />
+              </AdminOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/loyalty-program-vendors"
+          element={
+            <ProtectedRoute>
+              <AdminOnly>
+                <AdminLoyaltyProgramVendors />
+              </AdminOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/event-office/loyalty-partners"
+          element={
+            <ProtectedRoute>
+              <EventsOfficeOnly>
+                <EventsOfficeLoyaltyProgramVendors />
+              </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/platform-booth-requests"
+          element={
+            <ProtectedRoute>
+              <AdminOnly>
+                <AdminPlatformBoothRequests />
+              </AdminOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/profile"
+          element={
+            <ProtectedRoute>
+              <AdminOnly>
+                <AdminProfile />
+              </AdminOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/edit-conference/:id"
+          element={
+            <ProtectedRoute>
+              <EditConfrences />
+            </ProtectedRoute>
+          } />
+        {/* ✅ ADD YOUR EVENT MANAGEMENT ROUTES HERE */}
+        <Route
+          path="/create-booth"
+          element={
+            <ProtectedRoute>
+              <EventsOfficeOnly>
+                <CreateBooth />
+              </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/edit-bazaar/:id"
+          element={
+            <ProtectedRoute>
+              <EventsOfficeOnly>
+                <EditBazaar />
+              </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/edit-trip/:id"
+          element={
+            <ProtectedRoute>
+              <EventsOfficeOnly>
+                <EditTrip />
+              </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/confrences"
+          element={
+            <ProtectedRoute>
+              <Confrences />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </div>
   );
 };
 

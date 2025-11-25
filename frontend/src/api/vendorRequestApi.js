@@ -159,6 +159,72 @@ export const vendorRequestApi = {
         error: error
       };
     }
+  },
+
+  // Upload individual IDs for a vendor request
+  uploadIndividualIds: async (requestId, files) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return {
+          success: false,
+          message: 'No authentication token found. Please log in again.'
+        };
+      }
+
+      if (!files || files.length === 0) {
+        return {
+          success: false,
+          message: 'Please select at least one file to upload.'
+        };
+      }
+
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('individualIds', file);
+      });
+
+      const response = await fetch(`${API_BASE}/vendor-requests/${requestId}/upload-ids`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          return {
+            success: false,
+            message: 'Invalid/expired token. Please log in again.',
+            requiresLogin: true
+          };
+        }
+
+        return {
+          success: false,
+          message: data.message || data.error || 'Failed to upload individual IDs',
+          error: data
+        };
+      }
+
+      return {
+        success: true,
+        message: data.message || 'Individual IDs uploaded successfully',
+        vendorRequest: data.vendorRequest
+      };
+    } catch (error) {
+      console.error('Error uploading individual IDs:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to upload individual IDs',
+        error: error
+      };
+    }
   }
 };
 

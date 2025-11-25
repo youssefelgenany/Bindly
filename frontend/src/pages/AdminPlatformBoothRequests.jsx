@@ -29,7 +29,7 @@ const AdminPlatformBoothRequests = () => {
     try {
       setLoading(true);
       setError('');
-      
+
       const token = localStorage.getItem('token');
       const response = await axios.get('http://localhost:5000/api/vendor-requests', {
         headers: {
@@ -38,8 +38,8 @@ const AdminPlatformBoothRequests = () => {
         }
       });
 
-      const allRequests = Array.isArray(response.data) 
-        ? response.data 
+      const allRequests = Array.isArray(response.data)
+        ? response.data
         : (response.data?.requests || []);
 
       console.log('🔍 All vendor requests:', allRequests);
@@ -78,9 +78,9 @@ const AdminPlatformBoothRequests = () => {
   const handleStatusUpdate = async (requestId, newStatus) => {
     try {
       setProcessingIds(prev => ({ ...prev, [requestId]: true }));
-      
+
       const result = await vendorRequestApi.updateStatus(requestId, newStatus);
-      
+
       if (result.success) {
         // Reload requests
         await loadPlatformBoothRequests();
@@ -113,9 +113,9 @@ const AdminPlatformBoothRequests = () => {
     if (!dateString) return 'N/A';
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
@@ -229,9 +229,9 @@ const AdminPlatformBoothRequests = () => {
                 }
               }}
             >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
+              <span className="material-symbols-outlined" style={{
+                color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                fontSize: '1.25rem'
               }}>
                 dashboard
               </span>
@@ -268,9 +268,9 @@ const AdminPlatformBoothRequests = () => {
                 }
               }}
             >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/admin/events-view') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
+              <span className="material-symbols-outlined" style={{
+                color: isActiveRoute('/admin/events-view') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                fontSize: '1.25rem'
               }}>
                 explore
               </span>
@@ -307,9 +307,9 @@ const AdminPlatformBoothRequests = () => {
                 }
               }}
             >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/admin/users') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
+              <span className="material-symbols-outlined" style={{
+                color: isActiveRoute('/admin/users') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                fontSize: '1.25rem'
               }}>
                 people
               </span>
@@ -346,9 +346,9 @@ const AdminPlatformBoothRequests = () => {
                 }
               }}
             >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/admin/loyalty-program-vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
+              <span className="material-symbols-outlined" style={{
+                color: isActiveRoute('/admin/loyalty-program-vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                fontSize: '1.25rem'
               }}>
                 local_offer
               </span>
@@ -385,9 +385,9 @@ const AdminPlatformBoothRequests = () => {
                 }
               }}
             >
-              <span className="material-symbols-outlined" style={{ 
-                color: isActiveRoute('/admin/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
-                fontSize: '1.25rem' 
+              <span className="material-symbols-outlined" style={{
+                color: isActiveRoute('/admin/platform-booth-requests') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                fontSize: '1.25rem'
               }}>
                 location_on
               </span>
@@ -735,23 +735,23 @@ const AdminPlatformBoothRequests = () => {
                     const isProcessing = !!processingIds[requestId];
                     const vendor = request.vendor || {};
                     const vendorName = vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Unknown Vendor';
-                    
+
                     return (
                       <React.Fragment key={requestId}>
-                        <tr style={{ 
+                        <tr style={{
                           borderBottom: '1px solid #e2e8f0',
                           cursor: 'pointer',
                           backgroundColor: isExpanded ? '#f9fafb' : '#FFFFFF'
                         }}
-                        onClick={() => toggleRowExpansion(requestId)}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f9fafb';
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isExpanded) {
-                            e.currentTarget.style.backgroundColor = '#FFFFFF';
-                          }
-                        }}
+                          onClick={() => toggleRowExpansion(requestId)}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f9fafb';
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isExpanded) {
+                              e.currentTarget.style.backgroundColor = '#FFFFFF';
+                            }
+                          }}
                         >
                           <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem', color: '#111827', fontWeight: '500' }}>
                             {vendorName}
@@ -891,6 +891,41 @@ const AdminPlatformBoothRequests = () => {
                                         }}>
                                           <strong>{attendee.name}</strong> - {attendee.email}
                                         </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {request.individualIdsPaths && request.individualIdsPaths.length > 0 && (
+                                  <div>
+                                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0.75rem 0 0.5rem 0' }}>📄 Uploaded Individual IDs ({request.individualIdsPaths.length})</p>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                                      {request.individualIdsPaths.map((idPath, idx) => (
+                                        <a
+                                          key={idx}
+                                          href={`http://localhost:5000${idPath}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          style={{
+                                            padding: '0.5rem',
+                                            backgroundColor: '#eff6ff',
+                                            borderRadius: '0.25rem',
+                                            fontSize: '0.875rem',
+                                            color: '#1e40af',
+                                            textDecoration: 'none',
+                                            border: '1px solid #bfdbfe',
+                                            transition: 'all 0.2s'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#dbeafe';
+                                            e.currentTarget.style.borderColor = '#7dd3fc';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#eff6ff';
+                                            e.currentTarget.style.borderColor = '#bfdbfe';
+                                          }}
+                                        >
+                                          ⬇️ {idPath.split('/').pop()}
+                                        </a>
                                       ))}
                                     </div>
                                   </div>
