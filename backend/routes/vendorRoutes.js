@@ -17,6 +17,7 @@ const {
   listVendorDocuments
 } = require('../controllers/vendorDocumentController.js');
 const { protect, permit } = require('../middleware/authMiddleware.js');
+const { uploadIndividualIdsArray } = require('../middleware/uploadMiddleware');
 
 const router = express.Router();
 
@@ -89,7 +90,8 @@ router.get(
 );
 
 // Applying to an event requires authenticated Vendor
-router.post('/apply', protect, permit('Vendor'), applyToEvent); // Requires eventType (bazaar/booth) in body
+// Allow uploading attendee IDs (single file field named 'individualIds')
+router.post('/apply', protect, permit('Vendor'), uploadIndividualIdsArray, applyToEvent); // Requires eventType (bazaar/booth) in body
 
 // Participants list (protected)
 router.get('/participants', protect, getParticipants); // ?type=bazaar|booth&id=EVENT_ID

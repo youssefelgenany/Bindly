@@ -82,7 +82,16 @@ exports.createEvent = async (req, res) => {
 
     // Send notifications to all eligible users about the new event (only if approved)
     if (newEvent.status === 'approved') {
-      await notifyNewEventCreated(newEvent);
+      console.log(`📢 Event ${newEvent._id} is approved, triggering notifications...`);
+      try {
+        await notifyNewEventCreated(newEvent);
+        console.log(`✅ Notifications triggered successfully for event ${newEvent._id}`);
+      } catch (notifError) {
+        console.error(`❌ Error triggering notifications for event ${newEvent._id}:`, notifError);
+        // Don't fail the request if notification fails, but log it
+      }
+    } else {
+      console.log(`⚠️ Event ${newEvent._id} status is "${newEvent.status}", skipping notifications (will notify when approved)`);
     }
 
     // Notify events office if a workshop is submitted by a doctor (Professor)
@@ -121,6 +130,18 @@ exports.createConference = async (req, res) => {
     });
 
     await newConference.save();
+    
+    // Send notifications to all eligible users about the new conference
+    if (newConference.status === 'approved') {
+      console.log(`📢 Conference ${newConference._id} is approved, triggering notifications...`);
+      try {
+        await notifyNewEventCreated(newConference);
+        console.log(`✅ Notifications triggered successfully for conference ${newConference._id}`);
+      } catch (notifError) {
+        console.error(`❌ Error triggering notifications for conference ${newConference._id}:`, notifError);
+      }
+    }
+    
     return res.status(201).json({ msg: "Conference created", conference: newConference });
   } catch (err) {
     console.error("createConference error:", err);
@@ -1295,7 +1316,13 @@ exports.updateEvent = async (req, res) => {
 
     // Send notifications if event was just approved (changed from pending to approved)
     if (wasPending && isNowApproved) {
-      await notifyNewEventCreated(event);
+      console.log(`📢 Event ${event._id} was just approved, triggering notifications...`);
+      try {
+        await notifyNewEventCreated(event);
+        console.log(`✅ Notifications triggered successfully for event ${event._id}`);
+      } catch (notifError) {
+        console.error(`❌ Error triggering notifications for event ${event._id}:`, notifError);
+      }
     }
 
     console.log('✅ Event updated successfully');

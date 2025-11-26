@@ -192,7 +192,7 @@ const createVendorRequest = async (req, res) => {
     const {
       eventId,
       eventType,
-      attendees,
+      attendees: rawAttendees,
       boothSize,
       durationWeeks,
       boothLocation,
@@ -200,6 +200,16 @@ const createVendorRequest = async (req, res) => {
       startDate,
       message
     } = req.body;
+
+    // If attendees arrives as a JSON string (multipart/form-data), parse it
+    let attendees = rawAttendees;
+    if (typeof attendees === 'string') {
+      try {
+        attendees = JSON.parse(attendees);
+      } catch (e) {
+        attendees = [];
+      }
+    }
 
     console.log('🔍 createVendorRequest - Received data:', {
       eventId,
@@ -273,6 +283,30 @@ const createVendorRequest = async (req, res) => {
         name: attendee.name.trim(),
         email: attendee.email.trim()
       };
+    }
+
+    // If request contains uploaded files (multipart), ensure files correspond to attendees
+    if (req.files && Array.isArray(req.files)) {
+      // require one file per attendee
+      if (req.files.length !== attendees.length) {
+        return res.status(400).json({
+          message: 'Please upload one ID file per attendee',
+          error: 'Mismatched number of ID files and attendees'
+        });
+      }
+
+      // Validate file types
+      const validExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.jfif', '.jpe', '.jif', '.webp', '.gif', '.bmp'];
+      for (const f of req.files) {
+        const ext = require('path').extname(f.originalname).toLowerCase();
+        if (!validExtensions.includes(ext)) {
+          // delete uploaded files
+          for (const ff of req.files) {
+            try { await require('fs').promises.unlink(ff.path); } catch (e) { }
+          }
+          return res.status(400).json({ message: 'Invalid file type for attendee IDs' });
+        }
+      }
     }
 
     // Validate eventType enum
@@ -371,6 +405,11 @@ const createVendorRequest = async (req, res) => {
     }
 
     console.log('🔍 createVendorRequest - Final request data:', requestData);
+
+    // If files were uploaded (multipart), include their stored paths
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      requestData.individualIdsPaths = req.files.map(f => '/uploads/' + f.filename);
+    }
 
     // Create the vendor request
     const vendorRequest = new VendorRequest(requestData);
@@ -788,45 +827,48 @@ const uploadIndividualIds = async (req, res) => {
     }
 
     // Check if file was uploaded
-    if (!req.file) {
+    // Check files were uploaded
+    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide an individual IDs file (PDF or image)'
+        message: 'Please provide at least one individual IDs file (PDF or image)'
       });
     }
 
-    // Validate file type
-    const fileExt = path.extname(req.file.originalname).toLowerCase();
+    // Validate file types and collect file paths
     const validExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.jfif', '.jpe', '.jif', '.webp', '.gif', '.bmp'];
+    const uploadedPaths = [];
 
-    if (!validExtensions.includes(fileExt)) {
-      // Delete the uploaded file if invalid
-      try {
-        await fs.unlink(req.file.path);
-      } catch (error) {
-        console.log('Error deleting invalid file:', error.message);
+    for (const file of req.files) {
+      const fileExt = path.extname(file.originalname).toLowerCase();
+      if (!validExtensions.includes(fileExt)) {
+        // Delete all uploaded files from this request before returning error
+        for (const f of req.files) {
+          try { await fs.unlink(f.path); } catch (e) { /* ignore */ }
+        }
+        return res.status(400).json({
+          success: false,
+          message: `Invalid file type. Allowed types: ${validExtensions.join(', ')}`
+        });
       }
-
-      return res.status(400).json({
-        success: false,
-        message: `Invalid file type. Allowed types: ${validExtensions.join(', ')}`
-      });
+      uploadedPaths.push('/uploads/' + file.filename);
     }
 
-    // Delete old file if exists
-    if (vendorRequest.individualIdsPath) {
-      const oldFilePath = path.join(__dirname, '..', vendorRequest.individualIdsPath);
-      try {
-        await fs.unlink(oldFilePath);
-        console.log('Deleted old individual IDs file:', oldFilePath);
-      } catch (error) {
-        // File might not exist, continue
-        console.log('Note: Could not delete old file:', error.message);
+    // Delete old files if exist
+    if (vendorRequest.individualIdsPaths && Array.isArray(vendorRequest.individualIdsPaths)) {
+      for (const oldRel of vendorRequest.individualIdsPaths) {
+        const oldFilePath = path.join(__dirname, '..', oldRel);
+        try {
+          await fs.unlink(oldFilePath);
+          console.log('Deleted old individual IDs file:', oldFilePath);
+        } catch (error) {
+          console.log('Note: Could not delete old file:', error.message);
+        }
       }
     }
 
-    // Update vendor request with new file path
-    vendorRequest.individualIdsPath = '/uploads/' + req.file.filename;
+    // Update vendor request with new file paths
+    vendorRequest.individualIdsPaths = uploadedPaths;
     await vendorRequest.save();
 
     return res.status(200).json({
@@ -836,8 +878,8 @@ const uploadIndividualIds = async (req, res) => {
         id: vendorRequest._id,
         eventType: vendorRequest.eventType,
         eventName: vendorRequest.eventName,
-        hasIndividualIds: !!vendorRequest.individualIdsPath,
-        individualIdsPath: vendorRequest.individualIdsPath
+        hasIndividualIds: (vendorRequest.individualIdsPaths || []).length > 0,
+        individualIdsPaths: vendorRequest.individualIdsPaths
       }
     });
   } catch (error) {
@@ -1121,10 +1163,79 @@ const payVendorRequestFee = async (req, res) => {
       const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
 
       if (!stripe) {
-        return res.status(500).json({
-          success: false,
-          message: 'Card payments are not available. Stripe is not configured.'
-        });
+        // Stripe not configured - simulate a successful card payment for local/dev environments
+        try {
+          const cardNumberRaw = req.body.cardNumber || req.body.card_number || '';
+          const cardLast4 = (String(cardNumberRaw).replace(/\D/g, '') || '').slice(-4) || null;
+
+          // Create a successful payment record
+          const payment = new Payment({
+            user: vendorId,
+            vendorRequest: requestId,
+            amount: vendorRequest.participationFee,
+            paymentMethod: 'card',
+            status: 'success',
+            cardLast4: cardLast4
+          });
+          await payment.save();
+
+          // Update vendor request
+          vendorRequest.paymentStatus = 'paid';
+          vendorRequest.paidAt = new Date();
+          await vendorRequest.save();
+
+          // Send payment receipt email asynchronously
+          const vendorPersonalName = `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || vendor.companyName || 'Vendor';
+          const vendorCompanyName = vendor.companyName || 'Your Company';
+          let eventTitle = vendorRequest.eventName || 'Vendor Request';
+          if (vendorRequest.eventType) {
+            const eventTypeDisplay = {
+              'bazaar': 'Bazaar',
+              'booth': 'Booth',
+              'standaloneBooth': 'Standalone Booth',
+              'platformBooth': 'Platform Booth'
+            }[vendorRequest.eventType] || vendorRequest.eventType;
+
+            if (vendorRequest.eventName) {
+              eventTitle = `${eventTypeDisplay} - ${vendorRequest.eventName}`;
+            } else {
+              eventTitle = `${eventTypeDisplay} Participation`;
+            }
+          }
+
+          const receiptDetails = {
+            eventType: vendorRequest.eventType,
+            boothSize: vendorRequest.boothSize,
+            durationWeeks: vendorRequest.durationWeeks,
+            boothLocation: vendorRequest.boothLocation
+          };
+
+          sendReceiptEmail(
+            vendor.email,
+            vendorPersonalName,
+            eventTitle,
+            vendorRequest.participationFee,
+            'card',
+            vendorRequest.paidAt,
+            receiptDetails
+          ).catch(err => console.error('Error sending receipt email (simulated card):', err));
+
+          return res.status(200).json({
+            success: true,
+            message: 'Payment completed (simulated).',
+            payment: {
+              id: payment._id,
+              amount: payment.amount,
+              method: payment.paymentMethod,
+              status: payment.status,
+              paidAt: vendorRequest.paidAt,
+              cardLast4: cardLast4
+            }
+          });
+        } catch (err) {
+          console.error('Error simulating card payment:', err);
+          return res.status(500).json({ success: false, message: 'Error processing simulated card payment', error: err.message });
+        }
       }
 
       // Get vendor details
@@ -1150,6 +1261,7 @@ const payVendorRequestFee = async (req, res) => {
 
       // Create Stripe checkout session
       const clientUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+      const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [
@@ -1166,7 +1278,7 @@ const payVendorRequestFee = async (req, res) => {
           }
         ],
         mode: 'payment',
-        success_url: `${clientUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}&type=vendor-request&requestId=${requestId}`,
+        success_url: `${backendUrl}/api/vendor-requests/payment-success?session_id={CHECKOUT_SESSION_ID}&type=vendor-request&requestId=${requestId}`,
         cancel_url: `${clientUrl}/payment-cancel?type=vendor-request&requestId=${requestId}`,
         metadata: {
           paymentId: payment._id.toString(),
@@ -1538,6 +1650,155 @@ const getBoothPollResults = async (req, res) => {
   }
 };
 
+// @desc Handle Stripe payment success callback
+// @route GET /api/vendor-requests/payment-success
+// @access Public (called by Stripe redirect)
+const handleStripePaymentSuccess = async (req, res) => {
+  try {
+    const { session_id, type, requestId } = req.query;
+
+    console.log('🔔 Stripe payment success callback received');
+    console.log('   Session ID:', session_id);
+    console.log('   Type:', type);
+    console.log('   Request ID:', requestId);
+
+    if (!session_id) {
+      console.error('❌ Missing session_id in payment success callback');
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      return res.redirect(`${clientUrl}/payment-error?error=Missing session ID`);
+    }
+
+    // Retrieve the Stripe session (requires Stripe instance)
+    let stripe = null;
+    try {
+      if (process.env.STRIPE_SECRET_KEY) {
+        stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+      }
+    } catch (error) {
+      console.error('❌ Stripe not configured');
+    }
+
+    if (!stripe) {
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      return res.redirect(`${clientUrl}/payment-error?error=Stripe not configured`);
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+    console.log('📋 Stripe session retrieved. Payment status:', session.payment_status);
+
+    if (session.payment_status !== 'paid') {
+      console.warn('⚠️ Payment status is not paid:', session.payment_status);
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      return res.redirect(`${clientUrl}/payment-error?error=Payment not completed`);
+    }
+
+    // Find the payment record
+    const payment = await Payment.findOne({ stripeSessionId: session_id });
+    if (!payment) {
+      console.error('❌ Payment record not found for session:', session_id);
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      return res.redirect(`${clientUrl}/payment-error?error=Payment record not found`);
+    }
+
+    console.log('💳 Found payment record. Current status:', payment.status);
+
+    // If already processed, just redirect
+    if (payment.status === 'success') {
+      console.log('✅ Payment already processed');
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      return res.redirect(`${clientUrl}/payment-success?session_id=${session_id}`);
+    }
+
+    // Update payment status
+    console.log('🔄 Updating payment status to success...');
+    payment.status = 'success';
+    payment.stripePaymentIntentId = session.payment_intent;
+    await payment.save();
+    console.log('✅ Payment status updated');
+
+    // Update vendor request
+    if (payment.vendorRequest) {
+      console.log('🔍 Processing vendor request payment...');
+      const vendorRequest = await VendorRequest.findById(payment.vendorRequest);
+      if (vendorRequest) {
+        vendorRequest.paymentStatus = 'paid';
+        vendorRequest.paidAt = new Date();
+        await vendorRequest.save();
+        console.log('✅ Vendor request marked as paid');
+      }
+    }
+
+    // Fetch user for email
+    const user = await User.findById(payment.user);
+    if (user) {
+      console.log('📧 Sending receipt email...');
+      const vendorPersonalName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.companyName || user.email;
+      let eventTitle = 'Vendor Request';
+      let receiptDetails = {};
+
+      if (payment.vendorRequest) {
+        const vendorRequest = await VendorRequest.findById(payment.vendorRequest);
+        if (vendorRequest) {
+          // Build event title
+          if (vendorRequest.eventType) {
+            const eventTypeDisplay = {
+              'bazaar': 'Bazaar',
+              'booth': 'Booth',
+              'standaloneBooth': 'Standalone Booth',
+              'platformBooth': 'Platform Booth'
+            }[vendorRequest.eventType] || vendorRequest.eventType;
+
+            if (vendorRequest.eventName) {
+              eventTitle = `${eventTypeDisplay} - ${vendorRequest.eventName}`;
+            } else {
+              eventTitle = `${eventTypeDisplay} Participation`;
+            }
+          }
+
+          // Build receipt details
+          receiptDetails = {
+            eventType: vendorRequest.eventType,
+            boothSize: vendorRequest.boothSize,
+            durationWeeks: vendorRequest.durationWeeks,
+            boothLocation: vendorRequest.boothLocation
+          };
+        }
+      }
+
+      try {
+        const { sendReceiptEmail } = require('../utils/sendReceiptEmail');
+        const emailResult = await sendReceiptEmail(
+          user.email,
+          vendorPersonalName,
+          eventTitle,
+          payment.amount,
+          'card',
+          new Date(),
+          receiptDetails
+        );
+
+        if (emailResult.sent) {
+          console.log('✅ Receipt email sent successfully');
+        } else {
+          console.error('❌ Receipt email not sent:', emailResult.reason || emailResult.error);
+        }
+      } catch (emailError) {
+        console.error('❌ Error sending receipt email:', emailError.message);
+        // Don't fail the entire process if email fails
+      }
+    }
+
+    console.log('✅ Payment processing complete. Redirecting...');
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    res.redirect(`${clientUrl}/payment-success?session_id=${session_id}`);
+
+  } catch (error) {
+    console.error('❌ Error processing payment success:', error);
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    res.redirect(`${clientUrl}/payment-error?error=${encodeURIComponent(error.message)}`);
+  }
+};
+
 module.exports = {
   getPendingVendorRequestNotifications,
   getAllVendorRequests,
@@ -1556,4 +1817,5 @@ module.exports = {
   voteInBoothPoll,
   closeBoothPoll,
   getBoothPollResults,
+  handleStripePaymentSuccess,
 };

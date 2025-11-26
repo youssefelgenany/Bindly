@@ -11,7 +11,6 @@ const VendorDashboard = () => {
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   const [showPlatformBoothsModal, setShowPlatformBoothsModal] = useState(false);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
-  const [applications, setApplications] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -49,19 +48,6 @@ const VendorDashboard = () => {
         pendingApplications: pending.length,
         acceptedApplications: accepted.length
       });
-
-      // Combine and sort by date (most recent first)
-      const allApplications = [
-        ...pending.map(app => ({ ...app, status: 'pending' })),
-        ...rejected.map(app => ({ ...app, status: 'rejected' })),
-        ...accepted.map(app => ({ ...app, status: 'approved' }))
-      ].sort((a, b) => {
-        const dateA = new Date(a.createdAt || a.dateApplied || 0);
-        const dateB = new Date(b.createdAt || b.dateApplied || 0);
-        return dateB - dateA;
-      }).slice(0, 5); // Show first 5
-
-      setApplications(allApplications);
 
       // Generate notifications from applications
       const notifs = [];
@@ -134,44 +120,6 @@ const VendorDashboard = () => {
     }
   };
 
-  const formatTimeAgo = (date) => {
-    if (!date) return 'N/A';
-    try {
-      const now = new Date();
-      const past = new Date(date);
-      const diffInHours = Math.floor((now - past) / (1000 * 60 * 60));
-      
-      if (diffInHours < 1) return 'Just now';
-      if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
-      const diffInDays = Math.floor(diffInHours / 24);
-      if (diffInDays === 1) return '1 day ago';
-      return `${diffInDays} days ago`;
-    } catch {
-      return formatDate(date);
-    }
-  };
-
-  const getStatusBadge = (status) => {
-    const statusMap = {
-      approved: { bg: '#d1fae5', text: '#065f46', label: 'Approved' },
-      pending: { bg: '#fef3c7', text: '#92400e', label: 'Pending' },
-      rejected: { bg: '#fee2e2', text: '#991b1b', label: 'Rejected' }
-    };
-    const config = statusMap[status] || statusMap.pending;
-    return (
-      <span style={{
-        padding: '0.25rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '500',
-        backgroundColor: config.bg,
-        color: config.text
-      }}>
-        {config.label}
-      </span>
-    );
-  };
-
   const getEventIcon = (type) => {
     const icons = {
       'bazaar': 'storefront',
@@ -182,6 +130,64 @@ const VendorDashboard = () => {
       'gym': 'fitness_center'
     };
     return icons[type?.toLowerCase()] || 'event';
+  };
+
+  const getEventTypeColor = (type) => {
+    const colors = {
+      bazaar: '#F48FB1',
+      trip: '#2196F3',
+      workshop: '#607D8B',
+      conference: '#795548',
+      booth: '#3F51B5',
+      platformBooth: '#3F51B5',
+      standaloneBooth: '#3F51B5',
+      other: '#757575'
+    };
+    return colors[type?.toLowerCase()] || colors.other;
+  };
+
+  const getEventTypeImage = (type) => {
+    const imageMap = {
+      conference: '/assets/images/conference-background.jpg',
+      workshop: '/assets/images/workshop-background.jpg',
+      bazaar: '/assets/images/bazaar-background.jpg',
+      trip: '/assets/images/trip-background.png',
+      booth: '/assets/images/booth-background.jpg',
+      platformBooth: '/assets/images/booth-background.jpg',
+      standaloneBooth: '/assets/images/booth-background.jpg'
+    };
+    return imageMap[type?.toLowerCase()] || null;
+  };
+
+  const getEventTypeFallbackText = (type) => {
+    return type ? type.toUpperCase() : 'EVENT';
+  };
+
+  const getEventTypeLabel = (type) => {
+    const typeMap = {
+      bazaar: 'Bazaar',
+      trip: 'Trip',
+      workshop: 'Workshop',
+      conference: 'Conference',
+      booth: 'Booth',
+      platformBooth: 'Platform Booth',
+      standaloneBooth: 'Standalone Booth'
+    };
+    return typeMap[type?.toLowerCase()] || (type || 'Event');
+  };
+
+  const getDaysUntilEvent = (dateString) => {
+    if (!dateString) return null;
+    const eventDate = new Date(dateString);
+    const today = new Date();
+    const diffTime = eventDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (Number.isNaN(diffDays)) return null;
+    if (diffDays < 0) return null;
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    return `In ${diffDays} days`;
   };
 
   const isActiveRoute = (path) => {
@@ -382,6 +388,19 @@ const VendorDashboard = () => {
             }}
           >
             My Applications
+          </Link>
+          <Link
+            to="/vendor/loyalty-program"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/loyalty-program') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/loyalty-program') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/loyalty-program') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            GUC Loyalty Program
           </Link>
         </div>
       </nav>
@@ -629,39 +648,67 @@ const VendorDashboard = () => {
                       }}>
                         Upcoming Events
                       </h3>
-                      <button
-                        onClick={() => setShowPlatformBoothsModal(true)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          padding: '0.625rem 1rem',
-                          backgroundColor: '#1D3557',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.2s',
-                          height: 'fit-content'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.backgroundColor = '#152843';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.backgroundColor = '#1D3557';
-                        }}
-                      >
-                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                          add
-                        </span>
-                        New Booth
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        {upcomingEvents.length > 0 && (
+                          <Link
+                            to="/vendor/accepted-events"
+                            style={{
+                              padding: '0.5rem 1rem',
+                              borderRadius: '0.5rem',
+                              border: '1px solid #d1d5db',
+                              backgroundColor: '#FFFFFF',
+                              color: '#1D3557',
+                              fontSize: '0.8125rem',
+                              fontWeight: '500',
+                              textDecoration: 'none',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.backgroundColor = '#f9fafb';
+                              e.target.style.borderColor = '#94a3b8';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.backgroundColor = '#FFFFFF';
+                              e.target.style.borderColor = '#d1d5db';
+                            }}
+                          >
+                            View More
+                          </Link>
+                        )}
+                        <button
+                          onClick={() => setShowPlatformBoothsModal(true)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.625rem 1rem',
+                            backgroundColor: '#1D3557',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                            height: 'fit-content'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#152843';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = '#1D3557';
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                            add
+                          </span>
+                          New Booth
+                        </button>
+                      </div>
                     </div>
                     <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                       gap: '1rem'
                     }}>
                       {upcomingEvents.length === 0 ? (
@@ -670,7 +717,8 @@ const VendorDashboard = () => {
                           padding: '2rem',
                           borderRadius: '0.5rem',
                           boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                          textAlign: 'center'
+                          textAlign: 'center',
+                          gridColumn: '1 / -1'
                         }}>
                           <span className="material-symbols-outlined" style={{ fontSize: '3rem', color: '#9ca3af', display: 'block', marginBottom: '0.5rem' }}>
                             event_busy
@@ -693,67 +741,119 @@ const VendorDashboard = () => {
                           </Link>
                         </div>
                       ) : (
-                        upcomingEvents.map((event, index) => (
-                          <div
-                            key={event._id || index}
-                            style={{
-                              backgroundColor: '#FFFFFF',
-                              padding: '1.5rem',
-                              borderRadius: '0.5rem',
-                              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.75rem'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                              <span className="material-symbols-outlined" style={{ color: '#1D3557', fontSize: '1.5rem' }}>
-                                {getEventIcon(event.type)}
-                              </span>
-                              <div style={{ flex: 1 }}>
-                                <p style={{
-                                  fontSize: '0.875rem',
-                                  fontWeight: '600',
-                                  color: '#111827',
-                                  margin: '0 0 0.25rem 0'
-                                }}>
-                                  {event.name || event.title || 'Untitled Event'}
-                                </p>
-                                <p style={{
-                                  fontSize: '0.75rem',
-                                  color: '#6b7280',
-                                  margin: 0
-                                }}>
-                                  {formatDate(event.startDate || event.date)}
-                                </p>
-                              </div>
-                            </div>
-                            {event.location && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: '#6b7280' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-                                  location_on
-                                </span>
-                                <span>{event.location}</span>
-                              </div>
-                            )}
+                        upcomingEvents.map((event, index) => {
+                          const eventType = event.type || event.eventType || 'bazaar';
+                          const startDate = event.startDate || event.date;
+                          const eventName = event.name || event.title || 'Untitled Event';
+
+                          return (
                             <Link
-                              to="/vendor/accepted"
+                              key={event._id || index}
+                              to="/vendor/accepted-events"
                               style={{
-                                padding: '0.5rem 1rem',
-                                backgroundColor: '#1D3557',
-                                color: '#FFFFFF',
-                                borderRadius: '0.375rem',
+                                backgroundColor: '#FFFFFF',
+                                borderRadius: '0.75rem',
+                                padding: 0,
+                                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                                border: '1px solid #e5e7eb',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                overflow: 'hidden',
                                 textDecoration: 'none',
-                                fontSize: '0.875rem',
-                                fontWeight: '500',
-                                textAlign: 'center',
-                                display: 'block'
+                                color: 'inherit',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+                                e.currentTarget.style.borderColor = '#1e40af';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                                e.currentTarget.style.borderColor = '#e5e7eb';
                               }}
                             >
-                              View Details
+                              {getEventTypeImage(eventType) && (
+                                <div style={{
+                                  width: '100%',
+                                  height: '200px',
+                                  overflow: 'hidden',
+                                  position: 'relative',
+                                  backgroundColor: '#f3f4f6',
+                                  flexShrink: 0
+                                }}>
+                                  <img
+                                    src={getEventTypeImage(eventType)}
+                                    alt={getEventTypeLabel(eventType)}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover',
+                                      objectPosition: 'center'
+                                    }}
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                      e.target.parentElement.style.backgroundColor = getEventTypeColor(eventType);
+                                      e.target.parentElement.style.display = 'flex';
+                                      e.target.parentElement.style.alignItems = 'center';
+                                      e.target.parentElement.style.justifyContent = 'center';
+                                      if (!e.target.parentElement.querySelector('.fallback-text')) {
+                                        const fallback = document.createElement('div');
+                                        fallback.className = 'fallback-text';
+                                        fallback.textContent = getEventTypeFallbackText(eventType);
+                                        fallback.style.color = '#FFFFFF';
+                                        fallback.style.fontSize = '1rem';
+                                        fallback.style.fontWeight = '700';
+                                        e.target.parentElement.appendChild(fallback);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              )}
+
+                              <div style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', flex: 1, gap: '0.5rem' }}>
+                                <div style={{
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '0.375rem',
+                                  backgroundColor: getEventTypeColor(eventType),
+                                  color: '#FFFFFF',
+                                  fontSize: '0.625rem',
+                                  fontWeight: '700',
+                                  letterSpacing: '0.05em',
+                                  textTransform: 'uppercase',
+                                  alignSelf: 'flex-start'
+                                }}>
+                                  {getEventTypeLabel(eventType)}
+                                </div>
+
+                                <h4 style={{
+                                  color: '#1D3557',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  margin: 0,
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  lineHeight: '1.3'
+                                }}>
+                                  {eventName}
+                                </h4>
+
+                                {startDate && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.6875rem', color: '#6b7280' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                                      calendar_today
+                                    </span>
+                                    <span style={{ fontSize: '0.6875rem' }}>{formatDate(startDate)}</span>
+                                  </div>
+                                )}
+                              </div>
                             </Link>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>

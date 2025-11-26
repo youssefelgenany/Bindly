@@ -15,52 +15,56 @@ exports.createEventReminders = async () => {
     const oneHourBefore = new Date(now.getTime() + 50 * 60 * 1000);
     const oneHourAfter = new Date(now.getTime() + 70 * 60 * 1000);
     
-    // Events
-    const eventsIn1Day = await Event.find({
-      startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
-    });
+    // Run all database queries in parallel for better performance
+    const [
+      eventsIn1Day,
+      eventsIn1Hour,
+      workshopsIn1Day,
+      workshopsIn1Hour,
+      tripsIn1Day,
+      tripsIn1Hour,
+      gymSessionsIn1Day,
+      gymSessionsIn1Hour
+    ] = await Promise.all([
+      Event.find({
+        startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
+      }),
+      Event.find({
+        startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
+      }),
+      Event.find({
+        type: 'workshop',
+        startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
+      }),
+      Event.find({
+        type: 'workshop',
+        startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
+      }),
+      Trip.find({
+        startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
+      }),
+      Trip.find({
+        startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
+      }),
+      GymSession.find({
+        startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
+      }),
+      GymSession.find({
+        startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
+      })
+    ]);
     
-    const eventsIn1Hour = await Event.find({
-      startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
-    });
-    
-    // Workshops (now in Event model with type: 'workshop')
-    const workshopsIn1Day = await Event.find({
-      type: 'workshop',
-      startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
-    });
-    
-    const workshopsIn1Hour = await Event.find({
-      type: 'workshop',
-      startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
-    });
-    
-    // Trips
-    const tripsIn1Day = await Trip.find({
-      startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
-    });
-    
-    const tripsIn1Hour = await Trip.find({
-      startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
-    });
-    
-    // Gym Sessions
-    const gymSessionsIn1Day = await GymSession.find({
-      startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
-    });
-    
-    const gymSessionsIn1Hour = await GymSession.find({
-      startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
-    });
-    
-    await processEventReminders(eventsIn1Day, '1 day');
-    await processEventReminders(eventsIn1Hour, '1 hour');
-    await processWorkshopReminders(workshopsIn1Day, '1 day');
-    await processWorkshopReminders(workshopsIn1Hour, '1 hour');
-    await processTripReminders(tripsIn1Day, '1 day');
-    await processTripReminders(tripsIn1Hour, '1 hour');
-    await processGymSessionReminders(gymSessionsIn1Day, '1 day');
-    await processGymSessionReminders(gymSessionsIn1Hour, '1 hour');
+    // Process all reminders in parallel since they're independent
+    await Promise.all([
+      processEventReminders(eventsIn1Day, '1 day'),
+      processEventReminders(eventsIn1Hour, '1 hour'),
+      processWorkshopReminders(workshopsIn1Day, '1 day'),
+      processWorkshopReminders(workshopsIn1Hour, '1 hour'),
+      processTripReminders(tripsIn1Day, '1 day'),
+      processTripReminders(tripsIn1Hour, '1 hour'),
+      processGymSessionReminders(gymSessionsIn1Day, '1 day'),
+      processGymSessionReminders(gymSessionsIn1Hour, '1 hour')
+    ]);
     
   } catch (error) {
     console.error('Error in createEventReminders:', error);
@@ -267,42 +271,93 @@ exports.getUserNotifications = async (userId, options = {}) => {
 // Notify all eligible users when a new event is created
 exports.notifyNewEventCreated = async (event) => {
   try {
+    console.log(`📢 Creating notifications for new event: ${event.title} (ID: ${event._id})`);
+    
+    if (!event || !event._id) {
+      console.error('❌ Invalid event object provided to notifyNewEventCreated');
+      throw new Error('Invalid event object');
+    }
+    
     // Find all users (Students, Staff, TAs, Professors, Events Office)
     const allUsers = await User.find({
       userType: { $in: ['Student', 'Staff', 'TA', 'Professor', 'event_office'] }
     });
     
+    console.log(`👥 Found ${allUsers.length} users to notify`);
+    
+    // Count users by type for debugging
+    const userTypeCounts = {};
+    allUsers.forEach(user => {
+      userTypeCounts[user.userType] = (userTypeCounts[user.userType] || 0) + 1;
+    });
+    console.log(`📊 User type breakdown:`, userTypeCounts);
+    
+    // Specifically log TA users found
+    const taUsers = allUsers.filter(u => u.userType === 'TA');
+    console.log(`👨‍🏫 Found ${taUsers.length} TA users:`, taUsers.map(u => `${u.email} (${u.firstName} ${u.lastName})`));
+    
+    let notificationCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    
+    const creatorIdStr = event.createdBy ? event.createdBy.toString() : null;
     for (const user of allUsers) {
-      // Check if notification already exists for this user and event
-      const existingNotification = await Notification.findOne({
-        recipient: user._id,
-        type: 'event_announcement',
-        'metadata.eventId': event._id.toString()
-      });
-      
-      if (!existingNotification) {
-        await Notification.create({
+      try {
+        // Check if notification already exists for this user and event
+        const existingNotification = await Notification.findOne({
           recipient: user._id,
           type: 'event_announcement',
-          title: `New Event: ${event.title}`,
-          message: `A new event "${event.title}" has been added on ${new Date(event.startDate).toLocaleDateString()} at ${event.location}`,
-          relatedEvent: event._id,
-          priority: 'medium',
-          metadata: {
-            eventTitle: event.title,
-            eventDate: event.startDate,
-            eventType: event.type,
-            location: event.location,
-            description: event.description,
-            eventId: event._id.toString(),
-            createdBy: event.createdBy?.toString(),
-            createdAt: new Date()
-          }
+          'metadata.eventId': event._id.toString()
         });
+
+        // If the event is approved, the creator (professor) already receives a dedicated
+        // 'workshop_approved' notification via the approval flow. To avoid duplicate
+        // notifications for the creator, skip creating a generic event announcement
+        // when the recipient is the creator and the event is approved.
+        const isCreator = creatorIdStr && user._id.toString() === creatorIdStr;
+        if (event.status === 'approved' && isCreator) {
+          skippedCount++;
+          continue;
+        }
+
+        if (!existingNotification) {
+          // Generic announcement for other users (students, other professors, staff, etc.)
+          await Notification.create({
+            recipient: user._id,
+            type: 'event_announcement',
+            title: `New Event: ${event.title}`,
+            message: `A new event "${event.title}" has been added on ${new Date(event.startDate).toLocaleDateString()} at ${event.location}`,
+            relatedEvent: event._id,
+            priority: 'medium',
+            metadata: {
+              eventTitle: event.title,
+              eventDate: event.startDate,
+              eventType: event.type,
+              location: event.location,
+              description: event.description,
+              eventId: event._id.toString(),
+              createdBy: event.createdBy?.toString(),
+              createdAt: new Date()
+            }
+          });
+          notificationCount++;
+          // Log specifically for TA users
+          if (user.userType === 'TA') {
+            console.log(`✅ Created notification for TA user: ${user.email} (${user.firstName} ${user.lastName})`);
+          }
+        } else {
+          skippedCount++;
+        }
+      } catch (userError) {
+        errorCount++;
+        console.error(`❌ Error creating notification for user ${user.email} (${user.userType}):`, userError);
       }
     }
+    
+    console.log(`✅ Notification creation complete: ${notificationCount} created, ${skippedCount} skipped (duplicates), ${errorCount} errors`);
   } catch (error) {
-    console.error('Error notifying new event created:', error);
+    console.error('❌ Error notifying new event created:', error);
+    throw error; // Re-throw to ensure calling code knows about the error
   }
 };
 

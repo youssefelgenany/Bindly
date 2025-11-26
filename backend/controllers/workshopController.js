@@ -3,6 +3,63 @@ const mongoose = require('mongoose');
 const Notification = require('../models/notificationModel');
 const Event = require('../models/eventModel');
 
+// Dev helper: force-create a notification for a professor for testing
+const forceNotifyProfessorForWorkshop = async (req, res) => {
+  try {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ success: false, message: 'Not allowed in production' });
+    }
+
+    const workshopId = req.params.id;
+    const { action, reason } = req.body || {};
+
+    if (!['approve', 'reject', 'edits'].includes(action)) {
+      return res.status(400).json({ success: false, message: 'Invalid action. Use approve|reject|edits' });
+    }
+
+    const event = await Event.findOne({ _id: workshopId, type: 'workshop' });
+    if (!event) return res.status(404).json({ success: false, message: 'Workshop not found' });
+
+    const recipientId = mongoose.Types.ObjectId.isValid(event.createdBy)
+      ? new mongoose.Types.ObjectId(event.createdBy)
+      : event.createdBy;
+
+    let type, title, message, metadata = {};
+    if (action === 'approve') {
+      type = 'workshop_approved';
+      title = 'Workshop Approved';
+      message = `Your workshop "${event.title}" has been approved and is now available for student registration.`;
+    } else if (action === 'reject') {
+      type = 'workshop_rejected';
+      title = 'Workshop Rejected';
+      const reasonText = reason || 'No reason provided';
+      message = `Your workshop "${event.title}" has been rejected. Reason: ${reasonText}`;
+      metadata = { rejectionReason: reasonText };
+    } else if (action === 'edits') {
+      type = 'workshop_edits_requested';
+      title = 'Workshop Edits Requested';
+      const editRequestsText = reason || 'Please review and update your workshop submission.';
+      message = `Your workshop "${event.title}" requires edits. ${editRequestsText}`;
+      metadata = { editRequests: editRequestsText };
+    }
+
+    const notification = await Notification.create({
+      recipient: recipientId,
+      type,
+      title,
+      message,
+      relatedEvent: event._id,
+      priority: 'high',
+      metadata
+    });
+
+    return res.json({ success: true, notification });
+  } catch (e) {
+    console.error('❌ Error in forceNotifyProfessorForWorkshop:', e);
+    return res.status(500).json({ success: false, message: 'Server error', details: e.message });
+  }
+};
+
 // Events Office: list all workshops - NOW QUERIES EVENTS COLLECTION
 const getAllWorkshops = async (req, res) => {
   try {
@@ -642,7 +699,13 @@ const approveWorkshop = async (req, res) => {
     
     // Send notifications to all eligible users about the newly approved event
     const { notifyNewEventCreated } = require("../services/notificationService");
-    await notifyNewEventCreated(event);
+    console.log(`📢 Workshop ${event._id} is approved, triggering notifications...`);
+    try {
+      await notifyNewEventCreated(event);
+      console.log(`✅ Notifications triggered successfully for workshop ${event._id}`);
+    } catch (notifError) {
+      console.error(`❌ Error triggering notifications for workshop ${event._id}:`, notifError);
+    }
     
     // Create notification for the professor
     try {
@@ -1643,6 +1706,7 @@ module.exports = {
   approveWorkshop,
   rejectWorkshop,
   requestEdits,
+  forceNotifyProfessorForWorkshop,
   getWorkshopParticipants,
   getMyNotifications,
   markNotificationAsRead,

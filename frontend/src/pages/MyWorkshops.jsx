@@ -102,7 +102,22 @@ const MyWorkshops = () => {
     const interval = setInterval(() => {
       loadNotifications();
     }, 30000);
-    return () => clearInterval(interval);
+    // Listen for real-time notifications and update UI immediately
+    const onNewNotification = (e) => {
+      try {
+        const notif = e.detail;
+        if (!notif) return;
+        setNotifications(prev => [notif, ...(prev || [])]);
+        setUnreadCount(prev => (prev || 0) + 1);
+      } catch (err) {
+        console.error('Error handling new_notification event:', err);
+      }
+    };
+    window.addEventListener('new_notification', onNewNotification);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('new_notification', onNewNotification);
+    };
   }, [loadNotifications]);
 
   // Mark notification as read
@@ -1099,6 +1114,19 @@ const MyWorkshops = () => {
             }}
           >
             My Workshops
+          </Link>
+          <Link
+            to="/professor/favorites"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/favorites') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/favorites') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/favorites') ? '2px solid #2563eb' : '2px solid transparent'
+            }}
+          >
+            My Favorites
           </Link>
           <Link
             to="/gym-schedule"

@@ -62,5 +62,20 @@ const notificationSchema = new mongoose.Schema({
 // Index for efficient queries
 notificationSchema.index({ recipient: 1, isRead: 1, createdAt: -1 });
 
+// After saving a notification, attempt to emit it over Socket.IO to the recipient room
+notificationSchema.post('save', function(doc) {
+  try {
+    const socketService = require('../services/socket');
+    const io = socketService.getIO && socketService.getIO();
+    if (io && doc && doc.recipient) {
+      const room = doc.recipient.toString();
+      io.to(room).emit('new_notification', doc);
+    }
+  } catch (e) {
+    // Don't block on errors here
+    console.error('Error emitting notification over socket:', e.message);
+  }
+});
+
 module.exports = mongoose.model('Notification', notificationSchema);
 

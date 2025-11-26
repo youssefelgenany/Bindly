@@ -12,6 +12,44 @@ const VerifyEmail = () => {
   // Get email from URL params or localStorage
   useEffect(() => {
     const emailFromUrl = searchParams.get('email');
+    const tokenFromUrl = searchParams.get('token');
+
+    // If the verification token is present in the URL, call the backend
+    // verify endpoint in `redirect=false` mode (returns JSON) and then
+    // navigate client-side to the login page. This is more reliable than
+    // depending on the browser to follow a server redirect.
+    if (tokenFromUrl) {
+      const doVerify = async () => {
+        setLoading(true);
+        setMessage('Verifying your email...');
+        setMessageType('');
+        try {
+          const backendBase = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+          const verifyUrl = `${backendBase.replace(/\/+$/, '')}/api/auth/verify-email?token=${encodeURIComponent(tokenFromUrl)}&redirect=false`;
+          const res = await axios.get(verifyUrl, { timeout: 10000 });
+          if (res.data && res.data.success) {
+            setMessage('Email verified successfully! Redirecting to login...');
+            setMessageType('success');
+            // Small delay to let user read the message, then go to login
+            setTimeout(() => {
+              window.location.href = (process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000') + '/login';
+            }, 900);
+            return;
+          } else {
+            setMessage(res.data?.message || 'Verification failed.');
+            setMessageType('error');
+          }
+        } catch (err) {
+          const errMsg = err.response?.data || err.message || 'Verification request failed';
+          setMessage(typeof errMsg === 'string' ? errMsg : (errMsg.message || JSON.stringify(errMsg)));
+          setMessageType('error');
+        } finally {
+          setLoading(false);
+        }
+      };
+      doVerify();
+      return; // don't continue with the rest of the effect
+    }
     const emailFromStorage = localStorage.getItem('pendingVerificationEmail');
     
     if (emailFromUrl) {

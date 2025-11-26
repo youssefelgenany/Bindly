@@ -40,6 +40,7 @@ const ProfessorEventsView = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [favoriteEventIds, setFavoriteEventIds] = useState(new Set());
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -305,6 +306,60 @@ const ProfessorEventsView = () => {
       setProfessorFilter('all');
     }
   }, [filter]);
+
+  // Load user's favorite events (for Professor users)
+  useEffect(() => {
+    const loadFavoriteEvents = async () => {
+      if (!user || user.userType !== 'Professor') return;
+      
+      try {
+        const result = await eventsApiService.getFavoriteEvents();
+        if (result.success && result.data.events) {
+          const favoriteIds = new Set();
+          result.data.events.forEach(event => {
+            if (event._id) {
+              favoriteIds.add(String(event._id));
+            } else if (event.id) {
+              favoriteIds.add(String(event.id));
+            }
+          });
+          setFavoriteEventIds(favoriteIds);
+        }
+      } catch (error) {
+        console.error('Error loading favorite events:', error);
+      }
+    };
+
+    loadFavoriteEvents();
+  }, [user]);
+
+  const handleToggleFavorite = async (eventId, e) => {
+    e.stopPropagation(); // Prevent card click
+    
+    if (!user || user.userType !== 'Professor') return;
+    
+    const isFavorite = favoriteEventIds.has(String(eventId));
+    
+    try {
+      if (isFavorite) {
+        const result = await eventsApiService.removeFromFavorites(eventId);
+        if (result.success) {
+          setFavoriteEventIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(String(eventId));
+            return newSet;
+          });
+        }
+      } else {
+        const result = await eventsApiService.addToFavorites(eventId);
+        if (result.success) {
+          setFavoriteEventIds(prev => new Set([...prev, String(eventId)]));
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
 
   // Load ratings and comments for viewing (VIEW ONLY)
   const loadRatingsAndComments = async (eventId) => {
@@ -574,7 +629,7 @@ const ProfessorEventsView = () => {
         padding: '1rem 2.5rem',
         backgroundColor: '#FFFFFF'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
@@ -588,7 +643,125 @@ const ProfessorEventsView = () => {
             </h2>
           </Link>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+        
+        {/* Centered Navigation Menu */}
+        <nav style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+          gap: '1.25rem'
+        }}>
+          <Link
+            to="/dashboard"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              dashboard
+            </span>
+            Dashboard
+          </Link>
+          <Link
+            to="/professor/all-events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              explore
+            </span>
+            Discover Events
+          </Link>
+          <Link
+            to="/professor/events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              event
+            </span>
+            My Events
+          </Link>
+          <Link
+            to="/gym"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/gym') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              fitness_center
+            </span>
+            Gym Sessions
+          </Link>
+        </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          {/* Heart Icon - Favorites */}
+          <Link
+            to="/professor/favorites"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              textDecoration: 'none',
+              color: 'inherit'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{
+              fontSize: '1.5rem',
+              color: '#1D3557'
+            }}>
+              favorite
+            </span>
+          </Link>
+
           {/* Notifications Bell */}
           <div style={{ position: 'relative' }} data-notifications-dropdown>
             <button
@@ -894,6 +1067,37 @@ const ProfessorEventsView = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
+                {user?.userType === 'Professor' && (
+                  <Link
+                    to="/wallet"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#1D3557',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                    }}
+                    onClick={() => setShowLogoutDropdown(false)}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      account_balance_wallet
+                    </span>
+                    My Wallet
+                  </Link>
+                )}
                 <button
                   onClick={handleLogout}
                   style={{
@@ -926,84 +1130,6 @@ const ProfessorEventsView = () => {
           </div>
         </div>
       </header>
-
-      {/* Horizontal Menu Bar */}
-      <nav style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '1rem 2rem',
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #e2e8f0'
-      }}>
-        {/* Navigation Links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <Link
-            to="/dashboard"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/professor/all-events"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Discover Events
-          </Link>
-          <Link
-            to="/professor/events"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Events
-          </Link>
-          <Link
-            to="/professor/my-workshops"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Workshops
-          </Link>
-          <Link
-            to="/gym-schedule"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/gym-schedule') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            View Gym Sessions
-          </Link>
-        </div>
-      </nav>
 
       {/* Main Content */}
       <main style={{
@@ -1645,6 +1771,45 @@ const ProfessorEventsView = () => {
                               }
                             }}
                           />
+                          {/* Heart Icon for Professor users */}
+                          {user?.userType === 'Professor' && (
+                            <button
+                              onClick={(e) => handleToggleFavorite(event.id, e)}
+                              style={{
+                                position: 'absolute',
+                                top: '0.75rem',
+                                right: '0.75rem',
+                                background: 'rgba(255, 255, 255, 0.9)',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '2.5rem',
+                                height: '2.5rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                                zIndex: 10,
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 1)';
+                                e.currentTarget.style.transform = 'scale(1.1)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                                e.currentTarget.style.transform = 'scale(1)';
+                              }}
+                            >
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.5rem',
+                                color: favoriteEventIds.has(String(event.id)) ? '#ef4444' : '#6b7280',
+                                transition: 'color 0.2s'
+                              }}>
+                                {favoriteEventIds.has(String(event.id)) ? 'favorite' : 'favorite_border'}
+                              </span>
+                            </button>
+                          )}
                         </div>
                       )}
                       

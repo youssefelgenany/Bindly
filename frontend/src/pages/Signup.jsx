@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -23,6 +23,22 @@ const Signup = () => {
 
   const { signup } = useAuth();
   const navigate = useNavigate();
+  const topRef = useRef(null);
+  const messageRef = useRef(null);
+
+  // Scroll the message element into view whenever `message` changes.
+  // Scrolling the message itself avoids clipping when the message uses
+  // negative margins or sits near container edges.
+  useEffect(() => {
+    const el = messageRef.current || topRef.current;
+    if (message && el) {
+      try {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch (e) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  }, [message]);
 
   // Password strength calculation
   const calculatePasswordStrength = (password) => {
@@ -204,7 +220,7 @@ const Signup = () => {
     setMessage('');
 
     try {
-      const submitData = new FormData();
+  const submitData = new FormData();
       
       const actualUserType = formData.userType === 'Employee' ? formData.employeeType : formData.userType;
       
@@ -226,15 +242,24 @@ const Signup = () => {
         submitData.append('companyName', formData.companyName);
       }
 
+      // If vendor, include uploaded files (logo and tax card) when present
+      if (actualUserType === 'Vendor') {
+        if (formData.vendorLogo) {
+          submitData.append('vendorLogo', formData.vendorLogo);
+        }
+        if (formData.vendorTaxCard) {
+          submitData.append('vendorTaxCard', formData.vendorTaxCard);
+        }
+      }
+
       const result = await signup(submitData);
       
       if (result.success) {
         setMessage('Account created successfully! Redirecting...');
         // Store email for verification page
         localStorage.setItem('pendingVerificationEmail', formData.email);
-        setTimeout(() => {
-          navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`);
-        }, 800);
+        // Immediately redirect to verification page
+        navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`);
       } else {
         setMessage(result.message);
         console.error('Signup failed:', result.message);
@@ -287,6 +312,8 @@ const Signup = () => {
             justifyContent: 'center',
             gap: '2rem'
           }}>
+            {/* Anchor for scrolling to show errors/messages */}
+            <div ref={topRef} />
             {/* Logo and Title */}
             <div style={{
               display: 'flex',
@@ -633,6 +660,8 @@ const Signup = () => {
                     </label>
                   )}
 
+                  {/* vendor file inputs moved to bottom to match layout */}
+
                   {/* Email Input */}
                   <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                     <p style={{
@@ -957,6 +986,63 @@ const Signup = () => {
                     )}
                   </label>
                 </div>
+
+                {/* Vendor file uploads: logo and tax card (styled like other inputs, last entry) */}
+                {formData.userType === 'Vendor' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', marginBottom: '0.5rem' }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                      <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#1A202C', paddingBottom: '0.5rem' }}>Company Logo (PNG/JPEG/WebP)</p>
+                      <input
+                        type="file"
+                        name="vendorLogo"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        disabled={loading}
+                        style={{
+                          display: 'flex',
+                          width: '100%',
+                          borderRadius: '0.375rem',
+                          border: '1px solid #D1D5DB',
+                          backgroundColor: '#FFFFFF',
+                          padding: '0.75rem 1rem',
+                          fontSize: '1rem',
+                          color: '#1A202C'
+                        }}
+                      />
+                      {formData.vendorLogo && (
+                        <div style={{ fontSize: '0.875rem', color: '#374151', marginTop: '0.25rem' }}>
+                          Selected: {formData.vendorLogo.name}
+                        </div>
+                      )}
+                    </label>
+
+                    <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                      <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#1A202C', paddingBottom: '0.5rem' }}>Tax Card (PDF or Image)</p>
+                      <input
+                        type="file"
+                        name="vendorTaxCard"
+                        accept="image/*,application/pdf"
+                        onChange={handleFileChange}
+                        disabled={loading}
+                        style={{
+                          display: 'flex',
+                          width: '100%',
+                          borderRadius: '0.375rem',
+                          border: '1px solid #D1D5DB',
+                          backgroundColor: '#FFFFFF',
+                          padding: '0.75rem 1rem',
+                          fontSize: '1rem',
+                          color: '#1A202C'
+                        }}
+                      />
+                      {formData.vendorTaxCard && (
+                        <div style={{ fontSize: '0.875rem', color: '#374151', marginTop: '0.25rem' }}>
+                          Selected: {formData.vendorTaxCard.name}
+                        </div>
+                      )}
+                    </label>
+                  </div>
+                )}
 
                 {/* Sign Up Button */}
                 <button

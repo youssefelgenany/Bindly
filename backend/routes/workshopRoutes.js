@@ -17,6 +17,13 @@ const {
   markAllNotificationsAsRead
 } = require('../controllers/workshopController');
 
+// Dev-only: force notify professor for a workshop (approve/reject/edits)
+if (process.env.NODE_ENV !== 'production') {
+  const { forceNotifyProfessorForWorkshop } = require('../controllers/workshopController');
+  // No auth on this route by design — dev/testing only
+  router.post('/:id/force-notify', express.json(), forceNotifyProfessorForWorkshop);
+}
+
 
 // Professor view participants
 router.get('/:id/participants', protect, permit('Professor'), getWorkshopParticipants);

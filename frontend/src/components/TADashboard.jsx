@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
+import { notificationApiService } from '../api/notificationApi';
 
 const TADashboard = () => {
     const { user, logout } = useAuth();
@@ -16,6 +17,10 @@ const TADashboard = () => {
     const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+    const [notifications, setNotifications] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+    const [loadingNotifications, setLoadingNotifications] = useState(false);
 
     useEffect(() => {
         loadDashboardData();
@@ -26,12 +31,15 @@ const TADashboard = () => {
             if (showLogoutDropdown && event.target instanceof Element && !event.target.closest('[data-profile-dropdown]')) {
                 setShowLogoutDropdown(false);
             }
+            if (showNotificationsDropdown && event.target instanceof Element && !event.target.closest('[data-notifications-dropdown]')) {
+                setShowNotificationsDropdown(false);
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showLogoutDropdown]);
+    }, [showLogoutDropdown, showNotificationsDropdown]);
 
     const loadDashboardData = async () => {
         try {
@@ -185,6 +193,92 @@ const TADashboard = () => {
         return `${diffInDays} days ago`;
     };
 
+    // Load notifications
+    const loadNotifications = useCallback(async () => {
+        try {
+            setLoadingNotifications(true);
+            const [notificationsResult, countResult] = await Promise.all([
+                notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+                notificationApiService.getUnreadCount()
+            ]);
+            
+            if (notificationsResult.success) {
+                // Handle different response structures
+                const responseData = notificationsResult.data?.data || notificationsResult.data;
+                if (responseData) {
+                    // Check if it's an array directly or has a notifications property
+                    const notifications = Array.isArray(responseData) 
+                        ? responseData 
+                        : (responseData.notifications || []);
+                    setNotifications(notifications);
+                }
+            }
+            
+            if (countResult.success) {
+                setUnreadCount(countResult.unreadCount || 0);
+            }
+        } catch (error) {
+            console.error('Error loading notifications:', error);
+        } finally {
+            setLoadingNotifications(false);
+        }
+    }, []);
+
+    // Load notifications on mount and poll for updates
+    useEffect(() => {
+        loadNotifications();
+        const interval = setInterval(() => {
+            loadNotifications();
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [loadNotifications]);
+
+    // Mark notification as read
+    const handleMarkAsRead = async (notificationId) => {
+        try {
+            const result = await notificationApiService.markAsRead(notificationId);
+            if (result.success) {
+                setNotifications(prev => prev.map(n => 
+                    n._id === notificationId ? { ...n, isRead: true } : n
+                ));
+                setUnreadCount(prev => Math.max(0, prev - 1));
+            }
+        } catch (error) {
+            console.error('Error marking notification as read:', error);
+        }
+    };
+
+    // Mark all as read
+    const handleMarkAllAsRead = async () => {
+        try {
+            const result = await notificationApiService.markAllAsRead();
+            if (result.success) {
+                setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+                setUnreadCount(0);
+            }
+        } catch (error) {
+            console.error('Error marking all as read:', error);
+        }
+    };
+
+    // Format notification date
+    const formatNotificationDate = (dateString) => {
+        if (!dateString) return 'Just now';
+        const now = new Date();
+        const date = new Date(dateString);
+        const diffInMs = now - date;
+        const diffInMins = Math.floor(diffInMs / 60000);
+        const diffInHours = Math.floor(diffInMs / 3600000);
+        const diffInDays = Math.floor(diffInMs / 86400000);
+
+        if (diffInMins < 1) return 'Just now';
+        if (diffInMins < 60) return `${diffInMins}m ago`;
+        if (diffInHours < 24) return `${diffInHours}h ago`;
+        if (diffInDays === 1) return 'Yesterday';
+        if (diffInDays < 7) return `${diffInDays}d ago`;
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
     const handleLogout = (e) => {
         if (e) {
             e.preventDefault();
@@ -224,7 +318,7 @@ const TADashboard = () => {
                 padding: '1rem 2.5rem',
                 backgroundColor: '#FFFFFF'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
                     <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
                         <h2 style={{
                             color: '#1D3557',
@@ -238,7 +332,376 @@ const TADashboard = () => {
                         </h2>
                     </Link>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+                
+                {/* Centered Navigation Menu */}
+                <nav style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flex: 1,
+                    gap: '1.25rem'
+                }}>
+                    <Link
+                        to="/dashboard"
+                        style={{
+                            textDecoration: 'none',
+                            color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+                            fontSize: '0.875rem',
+                            fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                            paddingBottom: '0.5rem',
+                            borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                            dashboard
+                        </span>
+                        Dashboard
+                    </Link>
+                    <Link
+                        to="/ta/events"
+                        style={{
+                            textDecoration: 'none',
+                            color: isActiveRoute('/ta/events') ? '#2563eb' : '#6b7280',
+                            fontSize: '0.875rem',
+                            fontWeight: isActiveRoute('/ta/events') ? '600' : '500',
+                            paddingBottom: '0.5rem',
+                            borderBottom: isActiveRoute('/ta/events') ? '2px solid #2563eb' : '2px solid transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                            explore
+                        </span>
+                        Discover Events
+                    </Link>
+                    <Link
+                        to="/ta/my-registrations"
+                        style={{
+                            textDecoration: 'none',
+                            color: isActiveRoute('/ta/my-registrations') ? '#2563eb' : '#6b7280',
+                            fontSize: '0.875rem',
+                            fontWeight: isActiveRoute('/ta/my-registrations') ? '600' : '500',
+                            paddingBottom: '0.5rem',
+                            borderBottom: isActiveRoute('/ta/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                            event
+                        </span>
+                        My Events
+                    </Link>
+                    <Link
+                        to="/gym"
+                        style={{
+                            textDecoration: 'none',
+                            color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+                            fontSize: '0.875rem',
+                            fontWeight: isActiveRoute('/gym') ? '600' : '500',
+                            paddingBottom: '0.5rem',
+                            borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                            fitness_center
+                        </span>
+                        Gym Sessions
+                    </Link>
+                </nav>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+                    {/* Heart Icon - Favorites */}
+                    <Link
+                        to="/ta/favorites"
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '0.5rem',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s',
+                            textDecoration: 'none',
+                            color: 'inherit'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f3f4f6';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                    >
+                        <span className="material-symbols-outlined" style={{
+                            fontSize: '1.5rem',
+                            color: '#1D3557'
+                        }}>
+                            favorite
+                        </span>
+                    </Link>
+
+                    {/* Notifications Bell */}
+                    <div style={{ position: 'relative' }} data-notifications-dropdown>
+                        <button
+                            onClick={() => {
+                                setShowNotificationsDropdown(!showNotificationsDropdown);
+                                setShowLogoutDropdown(false);
+                                if (!showNotificationsDropdown) {
+                                    loadNotifications();
+                                }
+                            }}
+                            style={{
+                                position: 'relative',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '0.5rem',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = '#f3f4f6';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'transparent';
+                            }}
+                        >
+                            <span className="material-symbols-outlined" style={{
+                                fontSize: '1.5rem',
+                                color: '#1D3557'
+                            }}>
+                                notifications
+                            </span>
+                            {unreadCount > 0 && (
+                                <span style={{
+                                    position: 'absolute',
+                                    top: '0.25rem',
+                                    right: '0.25rem',
+                                    backgroundColor: '#ef4444',
+                                    color: '#FFFFFF',
+                                    borderRadius: '50%',
+                                    width: '1.125rem',
+                                    height: '1.125rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '0.625rem',
+                                    fontWeight: '700',
+                                    border: '2px solid #FFFFFF'
+                                }}>
+                                    {unreadCount > 9 ? '9+' : unreadCount}
+                                </span>
+                            )}
+                        </button>
+                        {showNotificationsDropdown && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: '0.5rem',
+                                backgroundColor: '#FFFFFF',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '0.5rem',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                zIndex: 1001,
+                                width: '360px',
+                                maxHeight: '500px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                overflow: 'hidden'
+                            }}>
+                                <div style={{
+                                    padding: '1rem',
+                                    borderBottom: '1px solid #e2e8f0',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}>
+                                    <h3 style={{
+                                        fontSize: '1rem',
+                                        fontWeight: '600',
+                                        color: '#1D3557',
+                                        margin: 0
+                                    }}>
+                                        Notifications
+                                    </h3>
+                                    {unreadCount > 0 && (
+                                        <button
+                                            onClick={handleMarkAllAsRead}
+                                            style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                color: '#1e40af',
+                                                cursor: 'pointer',
+                                                fontSize: '0.75rem',
+                                                fontWeight: '500',
+                                                padding: '0.25rem 0.5rem'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.target.style.textDecoration = 'underline';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.target.style.textDecoration = 'none';
+                                            }}
+                                        >
+                                            Mark all as read
+                                        </button>
+                                    )}
+                                </div>
+                                <div style={{
+                                    overflowY: 'auto',
+                                    maxHeight: '400px'
+                                }}>
+                                    {loadingNotifications ? (
+                                        <div style={{
+                                            padding: '2rem',
+                                            textAlign: 'center',
+                                            color: '#6b7280',
+                                            fontSize: '0.875rem'
+                                        }}>
+                                            Loading...
+                                        </div>
+                                    ) : notifications.length === 0 ? (
+                                        <div style={{
+                                            padding: '2rem',
+                                            textAlign: 'center',
+                                            color: '#6b7280',
+                                            fontSize: '0.875rem'
+                                        }}>
+                                            No notifications
+                                        </div>
+                                    ) : (
+                                        notifications.map((notification) => (
+                                            <div
+                                                key={notification._id}
+                                                onClick={() => {
+                                                    if (!notification.isRead) {
+                                                        handleMarkAsRead(notification._id);
+                                                    }
+                                                    if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                                                        navigate('/ta/events');
+                                                        setShowNotificationsDropdown(false);
+                                                    } else if (
+                                                        (notification.type === 'event_reminder' ||
+                                                         notification.type === 'workshop_reminder' ||
+                                                         notification.type === 'trip_reminder' ||
+                                                         notification.type === 'gym_session_reminder') &&
+                                                        (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
+                                                    ) {
+                                                        navigate('/ta/my-registrations');
+                                                        setShowNotificationsDropdown(false);
+                                                    } else if (
+                                                        notification.type === 'new_loyalty_partner' ||
+                                                        notification.type === 'loyalty_partner_added' ||
+                                                        (notification.type === 'system' && notification.metadata?.vendorId)
+                                                    ) {
+                                                        navigate('/ta/loyalty-vendors');
+                                                        setShowNotificationsDropdown(false);
+                                                    }
+                                                }}
+                                                style={{
+                                                    padding: '0.75rem 1rem',
+                                                    borderBottom: '1px solid #f1f5f9',
+                                                    backgroundColor: notification.isRead 
+                                                        ? '#FFFFFF' 
+                                                        : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                                            ? '#fff7ed'
+                                                            : '#f8fafc',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s',
+                                                    display: 'flex',
+                                                    gap: '0.75rem'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.backgroundColor = notification.isRead 
+                                                        ? '#f8fafc' 
+                                                        : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                                            ? '#ffedd5'
+                                                            : '#edf2ff';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.backgroundColor = notification.isRead 
+                                                        ? '#FFFFFF' 
+                                                        : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                                            ? '#fff7ed'
+                                                            : '#f8fafc';
+                                                }}
+                                            >
+                                                <div style={{
+                                                    width: '2.5rem',
+                                                    height: '2.5rem',
+                                                    borderRadius: '0.75rem',
+                                                    backgroundColor: notification.priority === 'high' ? '#fef3c7' : '#e0e7ff',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0
+                                                }}>
+                                                    <span className="material-symbols-outlined" style={{
+                                                        fontSize: '1.25rem',
+                                                        color: notification.priority === 'high' ? '#b45309' : '#4338ca'
+                                                    }}>
+                                                        {notification.type === 'event_announcement' || notification.type === 'new_event' ? 'campaign'
+                                                            : notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder' ? 'event'
+                                                            : 'notifications'}
+                                                    </span>
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{
+                                                        fontWeight: notification.isRead ? '400' : '600',
+                                                        color: '#1D3557',
+                                                        fontSize: '0.875rem',
+                                                        marginBottom: '0.25rem'
+                                                    }}>
+                                                        {notification.title || notification.message}
+                                                    </div>
+                                                    {notification.message && notification.message !== notification.title && (
+                                                        <div style={{
+                                                            fontSize: '0.8125rem',
+                                                            color: '#475569',
+                                                            marginBottom: '0.25rem'
+                                                        }}>
+                                                            {notification.message}
+                                                        </div>
+                                                    )}
+                                                    <div style={{
+                                                        fontSize: '0.75rem',
+                                                        color: '#9ca3af'
+                                                    }}>
+                                                        {formatNotificationDate(notification.createdAt)}
+                                                    </div>
+                                                </div>
+                                                {!notification.isRead && (
+                                                    <div style={{
+                                                        width: '0.5rem',
+                                                        height: '0.5rem',
+                                                        borderRadius: '50%',
+                                                        backgroundColor: '#1e40af',
+                                                        flexShrink: 0,
+                                                        marginTop: '0.25rem'
+                                                    }} />
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                     <div style={{ textAlign: 'right' }}>
                         <p style={{
                             fontSize: '0.875rem',
@@ -259,7 +722,10 @@ const TADashboard = () => {
                     <div 
                         data-profile-dropdown
                         style={{ position: 'relative', cursor: 'pointer' }}
-                        onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+                        onClick={() => {
+                            setShowLogoutDropdown(!showLogoutDropdown);
+                            setShowNotificationsDropdown(false);
+                        }}
                     >
                         {user?.profilePicturePath ? (
                             <img
@@ -362,83 +828,6 @@ const TADashboard = () => {
                     </div>
                 </div>
             </header>
-
-            {/* Horizontal Menu Bar */}
-            <nav style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '1rem 2rem',
-                backgroundColor: '#FFFFFF',
-                borderBottom: '1px solid #e2e8f0'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-                    <Link
-                        to="/dashboard"
-                        style={{
-                            textDecoration: 'none',
-                            color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
-                            fontSize: '0.875rem',
-                            fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
-                            paddingBottom: '0.5rem',
-                            borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
-                        }}
-                    >
-                        Dashboard
-                    </Link>
-                    <Link
-                        to="/staff/events"
-                        style={{
-                            textDecoration: 'none',
-                            color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
-                            fontSize: '0.875rem',
-                            fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
-                            paddingBottom: '0.5rem',
-                            borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
-                        }}
-                    >
-                        Discover Events
-                    </Link>
-                    <Link
-                        to="/staff/my-registrations"
-                        style={{
-                            textDecoration: 'none',
-                            color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
-                            fontSize: '0.875rem',
-                            fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
-                            paddingBottom: '0.5rem',
-                            borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
-                        }}
-                    >
-                        My Events
-                    </Link>
-                    <Link
-                        to="/staff/favorites"
-                        style={{
-                            textDecoration: 'none',
-                            color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
-                            fontSize: '0.875rem',
-                            fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
-                            paddingBottom: '0.5rem',
-                            borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
-                        }}
-                    >
-                        My Favorites
-                    </Link>
-                    <Link
-                        to="/gym-schedule"
-                        style={{
-                            textDecoration: 'none',
-                            color: isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
-                            fontSize: '0.875rem',
-                            fontWeight: isActiveRoute('/gym-schedule') ? '600' : '500',
-                            paddingBottom: '0.5rem',
-                            borderBottom: isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
-                        }}
-                    >
-                        View Gym Sessions
-                    </Link>
-                </div>
-            </nav>
 
             {/* Main Content */}
             <main style={{
@@ -674,6 +1063,91 @@ const TADashboard = () => {
                                         </div>
                                     </div>
                                 )}
+                            </div>
+
+                            {/* Quick Actions */}
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <h3 style={{
+                                    color: '#1D3557',
+                                    fontSize: '1.125rem',
+                                    fontWeight: '600',
+                                    marginBottom: '1rem',
+                                    marginTop: 0
+                                }}>
+                                    Quick Actions
+                                </h3>
+                                <div style={{
+                                    display: 'flex',
+                                    gap: '1rem',
+                                    flexWrap: 'wrap'
+                                }}>
+                                    <button
+                                        onClick={() => navigate('/ta/favorites')}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.75rem',
+                                            padding: '0.75rem 1.5rem',
+                                            backgroundColor: '#1D3557',
+                                            color: '#FFFFFF',
+                                            border: 'none',
+                                            borderRadius: '0.5rem',
+                                            fontSize: '0.875rem',
+                                            fontWeight: '500',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.target.style.backgroundColor = '#152a47';
+                                            e.target.style.transform = 'translateY(-1px)';
+                                            e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.target.style.backgroundColor = '#1D3557';
+                                            e.target.style.transform = 'translateY(0)';
+                                            e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                                        }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                            favorite
+                                        </span>
+                                        My Favorites
+                                    </button>
+                                    <button
+                                        onClick={() => navigate('/ta/loyalty-vendors')}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.75rem',
+                                            padding: '0.75rem 1.5rem',
+                                            backgroundColor: '#1D3557',
+                                            color: '#FFFFFF',
+                                            border: 'none',
+                                            borderRadius: '0.5rem',
+                                            fontSize: '0.875rem',
+                                            fontWeight: '500',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.target.style.backgroundColor = '#152a47';
+                                            e.target.style.transform = 'translateY(-1px)';
+                                            e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.target.style.backgroundColor = '#1D3557';
+                                            e.target.style.transform = 'translateY(0)';
+                                            e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                                        }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                            local_offer
+                                        </span>
+                                        View Loyalty Partners
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Recent Activity and Upcoming Deadlines */}

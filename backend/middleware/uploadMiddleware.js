@@ -96,10 +96,14 @@ const uploadProfilePicture = upload.single('profilePicture');
 // Individual IDs upload (single file - PDF or image)
 const uploadIndividualIds = upload.single('individualIds');
 
+// Individual IDs upload (multiple files - one per attendee)
+const uploadIndividualIdsArray = upload.array('individualIds', 10); // allow up to 10 just in case
+
 module.exports = {
   uploadVendorFiles,
   uploadProfilePicture,
-  uploadIndividualIds
+  uploadIndividualIds,
+  uploadIndividualIdsArray
 };
 
 

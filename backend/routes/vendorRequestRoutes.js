@@ -14,12 +14,17 @@ const {
   getBoothPolls,
   voteInBoothPoll,
   closeBoothPoll,
-  getBoothPollResults
+  getBoothPollResults,
+  getVendorRequestPayment,
+  payVendorRequestFee,
+  handleStripePaymentSuccess,
+  uploadIndividualIds
 } = require('../controllers/vendorRequestController');
 const { protect, permit } = require('../middleware/authMiddleware');
 
 // Route to create a new vendor request - Vendor
-router.post('/', protect, permit('vendor'), createVendorRequest);
+const { uploadIndividualIdsArray } = require('../middleware/uploadMiddleware');
+router.post('/', protect, permit('vendor'), uploadIndividualIdsArray, createVendorRequest);
 
 // Route to get all vendor requests - Events Office / Admin
 router.get(
@@ -36,6 +41,13 @@ router.get(
   permit('event_office', 'admin', 'Event Office', 'Events Office'),
   getPendingVendorRequestNotifications
 );
+
+// Stripe payment success callback (no auth required - called by Stripe redirect)
+// MUST be before /:id routes to prevent matching as :id parameter
+router.get('/payment-success', handleStripePaymentSuccess);
+
+// Route to upload individual IDs for an existing vendor request - Vendor
+router.put('/:requestId/upload-ids', protect, permit('vendor'), uploadIndividualIdsArray, uploadIndividualIds);
 
 // Route to get a single vendor request by ID - Events Office / Admin
 router.get(
@@ -75,6 +87,12 @@ router.patch('/polls/:pollId/close', protect, permit('event_office', 'admin'), c
 
 // Get booth poll results - Events Office / Admin
 router.get('/polls/:pollId/results', protect, permit('event_office', 'admin'), getBoothPollResults);
+
+// Payment endpoints for vendor requests - Vendor owners
+// Get payment details
+router.get('/:requestId/payment', protect, permit('vendor'), getVendorRequestPayment);
+// Submit payment (wallet or card)
+router.post('/:requestId/payment', protect, permit('vendor'), payVendorRequestFee);
 
 module.exports = router;
 

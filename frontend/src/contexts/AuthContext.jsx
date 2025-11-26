@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { io as ioClient } from 'socket.io-client';
 
 const AuthContext = createContext();
 
@@ -14,6 +15,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const socketRef = useRef(null);
 
   useEffect(() => {
     // Check if user is logged in on app start
@@ -26,7 +28,29 @@ export const AuthProvider = ({ children }) => {
       // For now, we'll just set the user from localStorage
       const userData = localStorage.getItem('user');
       if (userData) {
-        setUser(JSON.parse(userData));
+        const parsed = JSON.parse(userData);
+        setUser(parsed);
+        // Initialize socket connection for real-time notifications
+        try {
+          if (!socketRef.current) {
+            const socket = ioClient('http://localhost:5000', {
+              auth: { token },
+              transports: ['websocket']
+            });
+            socketRef.current = socket;
+            // Join user's room when connected
+            socket.on('connect', () => {
+              if (parsed && parsed._id) socket.emit('join', parsed._id);
+            });
+
+            // Dispatch DOM event for incoming notifications
+            socket.on('new_notification', (notif) => {
+              try { window.dispatchEvent(new CustomEvent('new_notification', { detail: notif })); } catch (e) {}
+            });
+          }
+        } catch (e) {
+          console.warn('Socket init failed:', e.message);
+        }
       }
     }
     setLoading(false);
@@ -132,6 +156,12 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('user');
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);
+    try {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    } catch (e) {}
   };
 
   const updateUser = (updatedUserData) => {

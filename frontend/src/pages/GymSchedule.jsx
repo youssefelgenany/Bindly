@@ -55,6 +55,13 @@ const GymSchedule = () => {
     return '/event-office';
   };
 
+  const getLoyaltyRoute = () => {
+    if (user?.userType === 'TA' || user?.userType === 'Staff') return '/staff/loyalty-vendors';
+    if (user?.userType === 'Professor') return '/professor/loyalty-vendors';
+    if (user?.userType === 'Student') return '/student/loyalty-vendors';
+    return '/event-office/loyalty-program-vendors';
+  };
+
   const getDashboardRoute = () => {
     return '/dashboard';
   };
@@ -80,6 +87,8 @@ const GymSchedule = () => {
   const isEventsOffice = !user?.userType || (user.userType !== 'TA' && user.userType !== 'Staff' && user.userType !== 'Professor' && user.userType !== 'Student');
   const isProfessor = user?.userType === 'Professor';
   const showHorizontalMenu = user?.userType === 'Student' || user?.userType === 'Staff' || user?.userType === 'TA';
+  const canSeeNotifications = user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA' || user?.userType === 'Student';
+  const useFixedHeader = true;
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -112,9 +121,9 @@ const GymSchedule = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLogoutDropdown, showNotificationsDropdown]);
 
-  // Load notifications (for professors)
+  // Load notifications (for staff and professors)
   const loadNotifications = useCallback(async () => {
-    if (user?.userType !== 'Professor') return;
+    if (!user?.userType || (user.userType !== 'Professor' && user.userType !== 'Staff' && user.userType !== 'TA')) return;
     try {
       setLoadingNotifications(true);
       const [notificationsResult, countResult] = await Promise.all([
@@ -136,9 +145,9 @@ const GymSchedule = () => {
     }
   }, [user]);
 
-  // Load notifications on mount and poll for updates (for professors)
+  // Load notifications on mount and poll for updates (for staff/professors)
   useEffect(() => {
-    if (user?.userType === 'Professor') {
+    if (user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA') {
       loadNotifications();
       const interval = setInterval(() => {
         loadNotifications();
@@ -770,11 +779,12 @@ const GymSchedule = () => {
         </div>
       </aside>
 
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <header style={{
         position: 'fixed',
         top: 0,
-        left: sidebarOpen ? '16rem' : '0',
+        left: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '0' : (sidebarOpen ? '16rem' : '0'),
         right: 0,
         display: 'flex',
         alignItems: 'center',
@@ -782,10 +792,11 @@ const GymSchedule = () => {
         borderBottom: '1px solid #e2e8f0',
         padding: '1rem 2.5rem',
         backgroundColor: '#FFFFFF',
-        zIndex: 100,
-        transition: 'left 0.3s ease'
+        zIndex: useFixedHeader ? 100 : 'auto',
+        transition: useFixedHeader ? 'left 0.3s ease' : 'none'
       }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+            {user?.userType !== 'Student' && user?.userType !== 'TA' && user?.userType !== 'Staff' && user?.userType !== 'Professor' && (
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               style={{
@@ -804,19 +815,260 @@ const GymSchedule = () => {
                 menu
               </span>
             </button>
+            )}
+            <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
-              margin: 0
+                margin: 0,
+                cursor: 'pointer'
             }}>
               Bindly
             </h2>
+            </Link>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
-            {/* Notifications Bell - Only for Professors */}
-            {isProfessor && (
+          
+          {/* Centered Navigation Menu - For Students, TA, Staff, and Professor */}
+          {(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') && (
+            <nav style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: 1,
+              gap: '1.25rem'
+            }}>
+              <Link
+                to="/dashboard"
+                style={{
+                  textDecoration: 'none',
+                  color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                  paddingBottom: '0.5rem',
+                  borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                  dashboard
+                </span>
+                Dashboard
+              </Link>
+              {user?.userType === 'Student' && (
+                <>
+                  <Link
+                    to="/student/events"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/student/events') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      explore
+                    </span>
+                    Discover Events
+                  </Link>
+                  <Link
+                    to="/student/my-registrations"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      event
+                    </span>
+                    My Events
+                  </Link>
+                  <Link
+                    to="/student/courts"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      sports_tennis
+                    </span>
+                    Campus Courts
+                  </Link>
+                </>
+              )}
+              {user?.userType === 'TA' && (
+                <>
+                  <Link
+                    to="/ta/events"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/ta/events') ? '#2563eb' : '#6b7280',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/ta/events') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/ta/events') ? '2px solid #2563eb' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      explore
+                    </span>
+                    Discover Events
+                  </Link>
+                  <Link
+                    to="/ta/my-registrations"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/ta/my-registrations') ? '#2563eb' : '#6b7280',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/ta/my-registrations') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/ta/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      event
+                    </span>
+                    My Events
+                  </Link>
+                </>
+              )}
+              {user?.userType === 'Staff' && (
+                <>
+                  <Link
+                    to="/staff/events"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      explore
+                    </span>
+                    Discover Events
+                  </Link>
+                  <Link
+                    to="/staff/my-registrations"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      event
+                    </span>
+                    My Events
+                  </Link>
+                </>
+              )}
+              {user?.userType === 'Professor' && (
+                <>
+                  <Link
+                    to="/professor/all-events"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      explore
+                    </span>
+                    Discover Events
+                  </Link>
+                  <Link
+                    to="/professor/events"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      event
+                    </span>
+                    My Events
+                  </Link>
+                </>
+              )}
+              <Link
+                to="/gym"
+                style={{
+                  textDecoration: 'none',
+                  color: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
+                  fontSize: '0.875rem',
+                  fontWeight: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '600' : '500',
+                  paddingBottom: '0.5rem',
+                  borderBottom: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                  fitness_center
+                </span>
+                Gym Sessions
+              </Link>
+            </nav>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+            {/* Notifications Bell */}
               <div style={{ position: 'relative' }} data-notifications-dropdown>
                 <button
                   onClick={() => {
@@ -958,7 +1210,7 @@ const GymSchedule = () => {
                                 handleMarkAsRead(notification._id);
                               }
                               if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
-                            navigate(`/professor/all-events`);
+                                navigate(getEventsRoute());
                             setShowNotificationsDropdown(false);
                           } else if (
                             (notification.type === 'event_reminder' || 
@@ -967,7 +1219,7 @@ const GymSchedule = () => {
                              notification.type === 'gym_session_reminder') && 
                             (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
                           ) {
-                            navigate(`/professor/events`);
+                                navigate(getMyEventsRoute());
                             setShowNotificationsDropdown(false);
                           } else if (
                             notification.type === 'new_loyalty_partner' || 
@@ -975,7 +1227,7 @@ const GymSchedule = () => {
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
                             // Navigate to Loyalty Partners page
-                            navigate(`/professor/loyalty-vendors`);
+                            navigate(getLoyaltyRoute());
                             setShowNotificationsDropdown(false);
                           }
                         }}
@@ -1059,7 +1311,45 @@ const GymSchedule = () => {
                   </div>
                 )}
               </div>
+            
+            {/* Heart Icon - Favorites (For Students, TA, Staff, and Professor) */}
+            {(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') && (
+              <Link
+                to={
+                  user?.userType === 'Student' ? '/student/favorites' :
+                  user?.userType === 'TA' ? '/ta/favorites' :
+                  user?.userType === 'Staff' ? '/staff/favorites' :
+                  '/professor/favorites'
+                }
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s',
+                  textDecoration: 'none',
+                  color: 'inherit'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{
+                  fontSize: '1.5rem',
+                  color: '#1D3557'
+                }}>
+                  favorite
+                </span>
+              </Link>
             )}
+            
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
@@ -1186,88 +1476,9 @@ const GymSchedule = () => {
           </div>
         </header>
 
-      {/* Horizontal Menu Bar - For Professors */}
-      {isProfessor && (
-        <nav style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '1rem 2rem',
-          backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid #e2e8f0'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-            <Link
-              to="/dashboard"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Dashboard
-            </Link>
-            <Link
-              to="/professor/all-events"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Discover Events
-            </Link>
-            <Link
-              to="/professor/events"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              My Events
-            </Link>
-            <Link
-              to="/professor/my-workshops"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              My Workshops
-            </Link>
-            <Link
-              to="/professor/gym-schedule"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              View Gym Sessions
-            </Link>
-          </div>
-        </nav>
-      )}
-
       {/* Main Content */}
       <main style={{
-        marginLeft: sidebarOpen ? '16rem' : '0',
+        marginLeft: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '0' : (sidebarOpen ? '16rem' : '0'),
         marginTop: '73px',
         flex: 1,
         display: 'flex',
@@ -1275,143 +1486,6 @@ const GymSchedule = () => {
         overflow: 'hidden',
         transition: 'margin-left 0.3s ease'
       }}>
-        {/* Horizontal Menu Bar - Show for Students, Staff, and TA */}
-        {showHorizontalMenu && (
-          <nav style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '1rem 2rem',
-            backgroundColor: '#FFFFFF',
-            borderBottom: '1px solid #e2e8f0'
-          }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-            <Link
-              to="/dashboard"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              Dashboard
-            </Link>
-            {(user?.userType === 'TA' || user?.userType === 'Staff') ? (
-              <>
-                <Link
-                  to="/staff/events"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  Discover Events
-                </Link>
-                <Link
-                  to="/staff/my-registrations"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  My Events
-                </Link>
-                <Link
-                  to="/staff/favorites"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  My Favorites
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link
-                  to="/student/events"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/student/events') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  Discover Events
-                </Link>
-                <Link
-                  to="/student/my-registrations"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  My Events
-                </Link>
-                <Link
-                  to="/student/favorites"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/student/favorites') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/student/favorites') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/student/favorites') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  My Favorites
-                </Link>
-                <Link
-                  to="/student/courts"
-                  style={{
-                    textDecoration: 'none',
-                    color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
-                    paddingBottom: '0.5rem',
-                    borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent'
-                  }}
-                >
-                  Campus Courts
-                </Link>
-              </>
-            )}
-            <Link
-              to="/gym-schedule"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
-              }}
-            >
-              View Gym Sessions
-            </Link>
-          </div>
-        </nav>
-        )}
 
         {/* Content Area */}
         <div style={{
@@ -2498,6 +2572,8 @@ const GymSchedule = () => {
           </div>
         </div>
       )}
+
+      </div>
 
       <style>{`
         @keyframes spin {
