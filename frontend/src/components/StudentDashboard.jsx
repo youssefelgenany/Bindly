@@ -1083,358 +1083,323 @@ const StudentDashboard = () => {
                             padding: '0 0 2rem 0'
                         }}>
 
-                        {/* Animated WIR/GUC Ad - Exact Match to Photo */}
+                        {/* Animated WIR/GUC Ad - Tripadvisor Style Layout */}
                         <div 
-                            onClick={() => navigate('/student/loyalty-vendors')}
                             style={{
                                 marginBottom: '1.5rem',
                                 position: 'relative',
+                                width: '100%',
                                 background: 'linear-gradient(to bottom, #fafafa, #f0f0f0)',
                                 borderRadius: '1.25rem',
-                                padding: '4rem 3rem',
-                                boxShadow: '0 8px 24px -8px rgba(0, 0, 0, 0.12)',
-                                cursor: 'pointer',
-                                overflow: 'hidden',
+                                padding: '2.5rem',
+                                boxShadow: '0 8px 24px -8px rgba(0, 0, 0, 0.15)',
                                 animation: 'fadeInUp 0.8s ease-out',
-                                transition: 'all 0.3s ease',
+                                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                                 animationDelay: '0.2s',
                                 animationFillMode: 'both',
-                                minHeight: '400px'
+                                overflow: 'hidden'
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-3px)';
-                                e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(0, 0, 0, 0.18)';
+                                e.currentTarget.style.transform = 'translateY(-5px)';
+                                e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(0, 0, 0, 0.2)';
                             }}
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 8px 24px -8px rgba(0, 0, 0, 0.12)';
+                                e.currentTarget.style.boxShadow = '0 8px 24px -8px rgba(0, 0, 0, 0.15)';
                             }}
                         >
-                            {/* Animated Wavy German Flag Ribbons with Golden Triangles */}
+                            {/* Subtle Background Pattern Animation */}
                             <div style={{
                                 position: 'absolute',
-                                top: '0',
-                                left: '-10%',
-                                width: '120%',
-                                height: '100px',
-                                background: 'linear-gradient(90deg, #000000 0%, #000000 33.33%, #DC143C 33.33%, #DC143C 66.66%, #FFD700 66.66%, #FFD700 100%)',
-                                clipPath: 'polygon(0 20%, 100% 0%, 100% 80%, 0 100%)',
-                                animation: 'float 5s ease-in-out infinite',
-                                opacity: 0.85,
-                                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
-                                zIndex: 1
-                            }}>
-                                {/* Golden triangular shapes on ribbon */}
-                                {[...Array(6)].map((_, i) => (
-                                    <div key={`top-tri-${i}`} style={{
-                                        position: 'absolute',
-                                        left: `${15 + i * 15}%`,
-                                        top: '50%',
-                                        transform: 'translateY(-50%) rotate(45deg)',
-                                        width: '12px',
-                                        height: '12px',
-                                        backgroundColor: '#FFD700',
-                                        clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
-                                        animation: `pulse ${2 + i * 0.3}s ease-in-out infinite ${i * 0.2}s`,
-                                        opacity: 0.8
-                                    }}></div>
-                                ))}
-                            </div>
-                            <div style={{
-                                position: 'absolute',
-                                bottom: '0',
-                                right: '-10%',
-                                width: '120%',
-                                height: '100px',
-                                background: 'linear-gradient(90deg, #000000 0%, #000000 33.33%, #DC143C 33.33%, #DC143C 66.66%, #FFD700 66.66%, #FFD700 100%)',
-                                clipPath: 'polygon(0 20%, 100% 0%, 100% 80%, 0 100%)',
-                                animation: 'float 5s ease-in-out infinite 0.5s',
-                                opacity: 0.85,
-                                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
-                                zIndex: 1
-                            }}>
-                                {/* Golden triangular shapes on ribbon */}
-                                {[...Array(6)].map((_, i) => (
-                                    <div key={`bottom-tri-${i}`} style={{
-                                        position: 'absolute',
-                                        left: `${15 + i * 15}%`,
-                                        top: '50%',
-                                        transform: 'translateY(-50%) rotate(45deg)',
-                                        width: '12px',
-                                        height: '12px',
-                                        backgroundColor: '#FFD700',
-                                        clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
-                                        animation: `pulse ${2 + i * 0.3}s ease-in-out infinite ${i * 0.3}s`,
-                                        opacity: 0.8
-                                    }}></div>
-                                ))}
-                            </div>
-
-                            {/* Sparkles and Glow Effects */}
-                            {[...Array(12)].map((_, i) => (
-                                <div key={`sparkle-${i}`} style={{
-                                    position: 'absolute',
-                                    top: `${10 + (i % 4) * 25}%`,
-                                    left: `${8 + (Math.floor(i / 4) * 30)}%`,
-                                    width: i % 3 === 0 ? '8px' : '4px',
-                                    height: i % 3 === 0 ? '8px' : '4px',
-                                    backgroundColor: i % 2 === 0 ? '#FFFFFF' : '#FFD700',
-                                    borderRadius: '50%',
-                                    boxShadow: i % 2 === 0 ? '0 0 8px rgba(255, 255, 255, 0.8)' : '0 0 10px rgba(255, 215, 0, 0.8)',
-                                    animation: `pulse ${1.2 + (i * 0.15)}s ease-in-out infinite ${i * 0.1}s`,
-                                    opacity: 0.8,
-                                    zIndex: 2
-                                }}></div>
-                            ))}
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+                                animation: 'pulse 4s ease-in-out infinite',
+                                zIndex: 1,
+                                pointerEvents: 'none'
+                            }}></div>
 
                             <div style={{
                                 position: 'relative',
-                                zIndex: 10,
+                                zIndex: 2,
                                 display: 'flex',
-                                flexDirection: 'column',
                                 alignItems: 'center',
-                                textAlign: 'center',
-                                paddingTop: '2rem'
+                                gap: '3rem',
+                                flexWrap: 'wrap'
                             }}>
-                                {/* Academic Icons - Positioned around WIR */}
-                                {/* Graduation Cap - Top Left */}
+                                {/* Left Side - Image with Reward Icons */}
                                 <div style={{
-                                    position: 'absolute',
-                                    top: '20px',
-                                    left: '15%',
-                                    width: '50px',
-                                    height: '50px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: 'transparent',
-                                    stroke: '#FFD700',
-                                    strokeWidth: '2',
-                                    filter: 'drop-shadow(0 2px 6px rgba(255, 215, 0, 0.4))',
-                                    animation: 'float 4s ease-in-out infinite',
-                                    zIndex: 5
-                                }}>
-                                    <span className="material-symbols-outlined" style={{
-                                        fontSize: '2.5rem',
-                                        color: '#FFD700',
-                                        WebkitTextStroke: '2px #FFD700',
-                                        WebkitTextFillColor: 'transparent',
-                                        filter: 'drop-shadow(0 0 4px rgba(255, 215, 0, 0.6))'
-                                    }}>
-                                        school
-                                    </span>
-                                </div>
-                                {/* Graduation Cap - Top Right */}
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '20px',
-                                    right: '15%',
-                                    width: '50px',
-                                    height: '50px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    filter: 'drop-shadow(0 2px 6px rgba(255, 215, 0, 0.4))',
-                                    animation: 'float 4s ease-in-out infinite 0.3s',
-                                    zIndex: 5
-                                }}>
-                                    <span className="material-symbols-outlined" style={{
-                                        fontSize: '2.5rem',
-                                        color: '#FFD700',
-                                        WebkitTextStroke: '2px #FFD700',
-                                        WebkitTextFillColor: 'transparent',
-                                        filter: 'drop-shadow(0 0 4px rgba(255, 215, 0, 0.6))'
-                                    }}>
-                                        school
-                                    </span>
-                                </div>
-                                {/* Building - Below W on Left */}
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '45%',
-                                    left: '10%',
-                                    width: '50px',
-                                    height: '50px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    filter: 'drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3))',
-                                    animation: 'float 4s ease-in-out infinite 0.5s',
-                                    zIndex: 5
-                                }}>
-                                    <span className="material-symbols-outlined" style={{
-                                        fontSize: '2.5rem',
-                                        color: '#2c2c2c',
-                                        WebkitTextStroke: '2px #2c2c2c',
-                                        WebkitTextFillColor: 'transparent'
-                                    }}>
-                                        account_balance
-                                    </span>
-                                </div>
-                                {/* Globe - Above R on Right */}
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '25%',
-                                    right: '12%',
-                                    width: '50px',
-                                    height: '50px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    filter: 'drop-shadow(0 2px 6px rgba(255, 215, 0, 0.4))',
-                                    animation: 'float 4s ease-in-out infinite 0.7s',
-                                    zIndex: 5
-                                }}>
-                                    <span className="material-symbols-outlined" style={{
-                                        fontSize: '2.5rem',
-                                        color: '#FFD700',
-                                        WebkitTextStroke: '2px #FFD700',
-                                        WebkitTextFillColor: 'transparent',
-                                        filter: 'drop-shadow(0 0 4px rgba(255, 215, 0, 0.6))'
-                                    }}>
-                                        public
-                                    </span>
-                                </div>
-                                {/* Book - Above Globe */}
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '10%',
-                                    right: '12%',
-                                    width: '50px',
-                                    height: '50px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    filter: 'drop-shadow(0 2px 6px rgba(255, 215, 0, 0.4))',
-                                    animation: 'float 4s ease-in-out infinite 0.9s',
-                                    zIndex: 5
-                                }}>
-                                    <span className="material-symbols-outlined" style={{
-                                        fontSize: '2.5rem',
-                                        color: '#FFD700',
-                                        WebkitTextStroke: '2px #FFD700',
-                                        WebkitTextFillColor: 'transparent',
-                                        filter: 'drop-shadow(0 0 4px rgba(255, 215, 0, 0.6))'
-                                    }}>
-                                        menu_book
-                                    </span>
-                                </div>
-                                {/* Lightbulb - Below R on Right */}
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '50%',
-                                    right: '10%',
-                                    width: '50px',
-                                    height: '50px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    filter: 'drop-shadow(0 2px 6px rgba(220, 20, 60, 0.4))',
-                                    animation: 'pulse 2.5s ease-in-out infinite',
-                                    zIndex: 5
-                                }}>
-                                    <span className="material-symbols-outlined" style={{
-                                        fontSize: '2.5rem',
-                                        color: '#DC143C',
-                                        WebkitTextStroke: '2px #DC143C',
-                                        WebkitTextFillColor: 'transparent',
-                                        filter: 'drop-shadow(0 0 4px rgba(220, 20, 60, 0.6))'
-                                    }}>
-                                        lightbulb
-                                    </span>
-                                </div>
-
-                                {/* WIR Logo - Stylized with 3D Wavy Effect */}
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '0.3rem',
-                                    marginBottom: '2rem',
-                                    marginTop: '1rem',
+                                    position: 'relative',
+                                    flex: '0 0 auto',
+                                    width: '320px',
                                     animation: 'fadeInUp 1s ease-out 0.3s both'
                                 }}>
-                                    {/* W Letter - Glossy Dark Grey/Black, Fluid Wavy */}
+                                    {/* Reward Icons Around Image */}
+                                    {/* Trophy Icon - Top Left (Gold) */}
                                     <div style={{
-                                        fontSize: '6.5rem',
-                                        fontWeight: '800',
-                                        fontFamily: 'Arial, sans-serif',
-                                        background: 'linear-gradient(135deg, #1a1a1a 0%, #2c2c2c 50%, #1a1a1a 100%)',
-                                        WebkitBackgroundClip: 'text',
-                                        WebkitTextFillColor: 'transparent',
-                                        backgroundClip: 'text',
-                                        textShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-                                        filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.4))',
-                                        animation: 'float 3.5s ease-in-out infinite',
-                                        letterSpacing: '-0.08em',
-                                        transform: 'perspective(500px) rotateY(-5deg)',
-                                        position: 'relative'
+                                        position: 'absolute',
+                                        top: '-15px',
+                                        left: '-20px',
+                                        width: '60px',
+                                        height: '60px',
+                                        backgroundColor: '#FFFFFF',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: '0 4px 12px rgba(255, 215, 0, 0.3)',
+                                        animation: 'float 3s ease-in-out infinite',
+                                        zIndex: 5,
+                                        border: '3px solid #FFD700'
                                     }}>
-                                        W
+                                        <span className="material-symbols-outlined" style={{
+                                            fontSize: '2rem',
+                                            color: '#FFD700'
+                                        }}>
+                                            emoji_events
+                                        </span>
                                     </div>
-                                    {/* I Letter - Bold Vertical Brushstroke Red */}
+                                    {/* Wallet Icon - Top Right (Red) */}
                                     <div style={{
-                                        fontSize: '6.5rem',
-                                        fontWeight: '900',
-                                        fontFamily: 'Arial, sans-serif',
-                                        color: '#DC143C',
-                                        textShadow: '0 4px 12px rgba(220, 20, 60, 0.4), 0 0 20px rgba(220, 20, 60, 0.2)',
-                                        filter: 'drop-shadow(0 3px 6px rgba(220,20,60,0.5))',
-                                        animation: 'pulse 2.2s ease-in-out infinite',
-                                        letterSpacing: '-0.08em',
+                                        position: 'absolute',
+                                        top: '-10px',
+                                        right: '-25px',
+                                        width: '55px',
+                                        height: '55px',
+                                        backgroundColor: '#FFFFFF',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: '0 4px 12px rgba(220, 20, 60, 0.3)',
+                                        animation: 'float 3s ease-in-out infinite 0.3s',
+                                        zIndex: 5,
+                                        border: '3px solid #DC143C'
+                                    }}>
+                                        <span className="material-symbols-outlined" style={{
+                                            fontSize: '1.75rem',
+                                            color: '#DC143C'
+                                        }}>
+                                            account_balance_wallet
+                                        </span>
+                                    </div>
+                                    {/* Percentage Icon - Bottom Left (Black) */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: '-10px',
+                                        left: '-20px',
+                                        width: '55px',
+                                        height: '55px',
+                                        backgroundColor: '#FFFFFF',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                                        animation: 'float 3s ease-in-out infinite 0.6s',
+                                        zIndex: 5,
+                                        border: '3px solid #2c2c2c'
+                                    }}>
+                                        <span className="material-symbols-outlined" style={{
+                                            fontSize: '1.75rem',
+                                            color: '#2c2c2c'
+                                        }}>
+                                            percent
+                                        </span>
+                                    </div>
+                                    {/* Money Icon - Bottom Right (Gold) */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: '-15px',
+                                        right: '-25px',
+                                        width: '60px',
+                                        height: '60px',
+                                        backgroundColor: '#FFFFFF',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: '0 4px 12px rgba(255, 215, 0, 0.3)',
+                                        animation: 'float 3s ease-in-out infinite 0.9s',
+                                        zIndex: 5,
+                                        border: '3px solid #FFD700'
+                                    }}>
+                                        <span className="material-symbols-outlined" style={{
+                                            fontSize: '2rem',
+                                            color: '#FFD700'
+                                        }}>
+                                            attach_money
+                                        </span>
+                                    </div>
+
+                                    {/* Limited Time Badge */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '20px',
+                                        left: '-40px',
+                                        width: '120px',
+                                        height: '120px',
+                                        border: '4px solid #FFD700',
+                                        borderRadius: '20px',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transform: 'rotate(-15deg)',
+                                        boxShadow: '0 6px 16px rgba(255, 215, 0, 0.3)',
+                                        animation: 'pulse 2.5s ease-in-out infinite',
+                                        zIndex: 6
+                                    }}>
+                                        <span style={{
+                                            fontSize: '0.7rem',
+                                            fontWeight: '700',
+                                            color: '#2c2c2c',
+                                            textAlign: 'center',
+                                            lineHeight: '1.2',
+                                            letterSpacing: '0.05em'
+                                        }}>
+                                            LIMITED<br/>TIME<br/>OFFER
+                                        </span>
+                                    </div>
+
+                                    {/* Ad Image Container */}
+                                    <div style={{
                                         position: 'relative',
-                                        transform: 'scaleY(1.1)'
+                                        borderRadius: '1rem',
+                                        overflow: 'hidden',
+                                        boxShadow: '0 8px 20px rgba(0, 0, 0, 0.2)',
+                                        backgroundColor: '#FFFFFF',
+                                        padding: '0.5rem',
+                                        animation: 'float 4s ease-in-out infinite'
                                     }}>
-                                        I
-                                    </div>
-                                    {/* R Letter - Glossy Golden/Bronze, Fluid Wavy */}
-                                    <div style={{
-                                        fontSize: '6.5rem',
-                                        fontWeight: '800',
-                                        fontFamily: 'Arial, sans-serif',
-                                        background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FFD700 100%)',
-                                        WebkitBackgroundClip: 'text',
-                                        WebkitTextFillColor: 'transparent',
-                                        backgroundClip: 'text',
-                                        textShadow: '0 4px 12px rgba(255, 215, 0, 0.4)',
-                                        filter: 'drop-shadow(0 3px 6px rgba(255,215,0,0.5))',
-                                        animation: 'float 3.5s ease-in-out infinite 0.4s',
-                                        letterSpacing: '-0.08em',
-                                        transform: 'perspective(500px) rotateY(5deg)',
-                                        position: 'relative'
-                                    }}>
-                                        R
+                                        <img 
+                                            src="/assets/images/ad.png" 
+                                            alt="GUC WIR Loyalty Program"
+                                            style={{
+                                                width: '100%',
+                                                height: 'auto',
+                                                display: 'block',
+                                                objectFit: 'contain',
+                                                borderRadius: '0.75rem',
+                                                transition: 'transform 0.5s ease'
+                                            }}
+                                            onError={(e) => {
+                                                console.error('Failed to load ad image');
+                                                e.target.style.display = 'none';
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.target.style.transform = 'scale(1.05)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.target.style.transform = 'scale(1)';
+                                            }}
+                                        />
                                     </div>
                                 </div>
 
-                                {/* University Text */}
+                                {/* Right Side - Text Content */}
                                 <div style={{
-                                    marginBottom: '1.5rem',
-                                    animation: 'fadeInUp 1s ease-out 0.6s both'
+                                    flex: '1',
+                                    minWidth: '300px',
+                                    color: '#2c2c2c',
+                                    animation: 'fadeInUp 1s ease-out 0.5s both'
                                 }}>
-                                    <h3 style={{
+                                    {/* Logo/Brand */}
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.75rem',
+                                        marginBottom: '1.5rem'
+                                    }}>
+                                        <div style={{
+                                            width: '50px',
+                                            height: '50px',
+                                            backgroundColor: '#FFFFFF',
+                                            borderRadius: '12px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                                            border: '2px solid #FFD700'
+                                        }}>
+                                            <span className="material-symbols-outlined" style={{
+                                                fontSize: '2rem',
+                                                color: '#FFD700'
+                                            }}>
+                                                local_offer
+                                            </span>
+                                        </div>
+                                        <h3 style={{
+                                            fontSize: '1.5rem',
+                                            fontWeight: '700',
+                                            color: '#2c2c2c',
+                                            margin: 0
+                                        }}>
+                                            GUC Rewards
+                                        </h3>
+                                    </div>
+
+                                    {/* Main Headline */}
+                                    <h2 style={{
+                                        fontSize: '2.5rem',
+                                        fontWeight: '800',
                                         color: '#2c2c2c',
-                                        fontSize: '1.75rem',
-                                        fontWeight: '600',
                                         margin: 0,
-                                        marginBottom: '0.5rem',
-                                        letterSpacing: '0.03em',
-                                        fontFamily: 'Arial, sans-serif'
+                                        marginBottom: '1rem',
+                                        lineHeight: '1.2',
+                                        animation: 'slideInRight 0.8s ease-out 0.7s both'
                                     }}>
-                                        German International University
-                                    </h3>
+                                        Get Up to 50% Off<br/>Loyalty Partners
+                                    </h2>
+
+                                    {/* Description */}
                                     <p style={{
-                                        color: '#FFD700',
-                                        fontSize: '1.4rem',
-                                        fontWeight: '600',
+                                        fontSize: '1.1rem',
+                                        color: '#2c2c2c',
                                         margin: 0,
-                                        textShadow: '0 2px 8px rgba(255, 215, 0, 0.3), 0 0 15px rgba(255, 215, 0, 0.2)',
-                                        animation: 'glow 2.5s ease-in-out infinite',
-                                        fontFamily: 'Arial, sans-serif',
-                                        letterSpacing: '0.02em'
+                                        marginBottom: '2rem',
+                                        lineHeight: '1.6',
+                                        fontWeight: '500',
+                                        opacity: 0.9
                                     }}>
-                                        German University in Cairo
+                                        Savings, this way. Join GUC Loyalty Program to unlock exclusive discounts on food, shopping, entertainment, and more.
                                     </p>
+
+                                    {/* CTA Button */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate('/student/loyalty-vendors');
+                                        }}
+                                        style={{
+                                            padding: '1rem 2.5rem',
+                                            background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+                                            color: '#2c2c2c',
+                                            border: 'none',
+                                            borderRadius: '9999px',
+                                            fontSize: '1rem',
+                                            fontWeight: '700',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s ease',
+                                            boxShadow: '0 4px 12px rgba(255, 215, 0, 0.4)',
+                                            animation: 'fadeInUp 1s ease-out 0.9s both'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.target.style.background = 'linear-gradient(135deg, #FFA500 0%, #FFD700 100%)';
+                                            e.target.style.transform = 'translateY(-2px) scale(1.05)';
+                                            e.target.style.boxShadow = '0 6px 16px rgba(255, 215, 0, 0.5)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.target.style.background = 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)';
+                                            e.target.style.transform = 'translateY(0) scale(1)';
+                                            e.target.style.boxShadow = '0 4px 12px rgba(255, 215, 0, 0.4)';
+                                        }}
+                                    >
+                                        Learn More
+                                    </button>
                                 </div>
                             </div>
                         </div>

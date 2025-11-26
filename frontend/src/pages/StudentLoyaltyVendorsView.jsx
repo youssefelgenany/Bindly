@@ -204,6 +204,41 @@ const StudentLoyaltyVendorsView = () => {
   };
 
   return (
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        .banner-animate {
+          animation: fadeInUp 0.8s ease-out;
+        }
+        .banner-content-animate {
+          animation: slideInLeft 1s ease-out 0.2s both;
+        }
+        .search-container-animate {
+          animation: fadeInUp 0.6s ease-out 0.3s both;
+        }
+        .search-input-animate {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+      `}</style>
     <div style={{
       display: 'flex',
       flexDirection: 'column',
@@ -737,14 +772,26 @@ const StudentLoyaltyVendorsView = () => {
           marginRight: '0'
         }}>
           {/* Loyalty Program Banner with Background Image */}
-          <div style={{
-            position: 'relative',
-            height: '140px',
-            borderRadius: '0.75rem',
-            overflow: 'hidden',
-            marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-          }}>
+          <div 
+            className="banner-animate"
+            style={{
+              position: 'relative',
+              height: '140px',
+              borderRadius: '0.75rem',
+              overflow: 'hidden',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 12px -2px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+            }}
+          >
             {/* Background Image */}
             <div style={{
               position: 'absolute',
@@ -753,26 +800,31 @@ const StudentLoyaltyVendorsView = () => {
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
-              filter: 'blur(2px)'
+              filter: 'blur(2px)',
+              transition: 'transform 0.5s ease, filter 0.5s ease'
             }}></div>
             {/* Blue Overlay */}
             <div style={{
               position: 'absolute',
               inset: 0,
-              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+              backgroundColor: 'rgba(29, 53, 87, 0.75)',
+              transition: 'background-color 0.3s ease'
             }}></div>
             {/* Content */}
-            <div style={{
-              position: 'relative',
-              zIndex: 10,
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'flex-start',
-              padding: '2rem 2.5rem',
-              color: '#FFFFFF'
-            }}>
+            <div 
+              className="banner-content-animate"
+              style={{
+                position: 'relative',
+                zIndex: 10,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+                padding: '2rem 2.5rem',
+                color: '#FFFFFF'
+              }}
+            >
               <h3 style={{
                 color: '#FFFFFF',
                 fontSize: '1.75rem',
@@ -798,12 +850,15 @@ const StudentLoyaltyVendorsView = () => {
             padding: '0 0 2rem 0'
           }}>
             {/* Search Bar */}
-            <div style={{
-              marginBottom: '2rem',
-              display: 'flex',
-              gap: '1rem',
-              alignItems: 'center'
-            }}>
+            <div 
+              className="search-container-animate"
+              style={{
+                marginBottom: '2rem',
+                display: 'flex',
+                gap: '1rem',
+                alignItems: 'center'
+              }}
+            >
           <div style={{
             flex: 1,
             maxWidth: '520px',
@@ -816,7 +871,8 @@ const StudentLoyaltyVendorsView = () => {
               transform: 'translateY(-50%)',
               color: '#9ca3af',
               fontSize: '1.25rem',
-              pointerEvents: 'none'
+              pointerEvents: 'none',
+              transition: 'color 0.3s ease'
             }}>
               search
             </span>
@@ -825,6 +881,7 @@ const StudentLoyaltyVendorsView = () => {
               placeholder="Search vendors, categories, or promo codes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input-animate"
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem 0.75rem 3rem',
@@ -832,13 +889,17 @@ const StudentLoyaltyVendorsView = () => {
                 borderRadius: '0.5rem',
                 fontSize: '0.875rem',
                 outline: 'none',
-                transition: 'border-color 0.2s'
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
               }}
               onFocus={(e) => {
                 e.target.style.borderColor = '#2563eb';
+                e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                e.target.style.transform = 'scale(1.01)';
               }}
               onBlur={(e) => {
                 e.target.style.borderColor = '#d1d5db';
+                e.target.style.boxShadow = 'none';
+                e.target.style.transform = 'scale(1)';
               }}
             />
             </div>
@@ -1337,6 +1398,7 @@ const StudentLoyaltyVendorsView = () => {
         )}
       </main>
     </div>
+    </>
   );
 };
 

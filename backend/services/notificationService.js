@@ -15,52 +15,56 @@ exports.createEventReminders = async () => {
     const oneHourBefore = new Date(now.getTime() + 50 * 60 * 1000);
     const oneHourAfter = new Date(now.getTime() + 70 * 60 * 1000);
     
-    // Events
-    const eventsIn1Day = await Event.find({
-      startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
-    });
+    // Run all database queries in parallel for better performance
+    const [
+      eventsIn1Day,
+      eventsIn1Hour,
+      workshopsIn1Day,
+      workshopsIn1Hour,
+      tripsIn1Day,
+      tripsIn1Hour,
+      gymSessionsIn1Day,
+      gymSessionsIn1Hour
+    ] = await Promise.all([
+      Event.find({
+        startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
+      }),
+      Event.find({
+        startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
+      }),
+      Event.find({
+        type: 'workshop',
+        startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
+      }),
+      Event.find({
+        type: 'workshop',
+        startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
+      }),
+      Trip.find({
+        startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
+      }),
+      Trip.find({
+        startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
+      }),
+      GymSession.find({
+        startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
+      }),
+      GymSession.find({
+        startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
+      })
+    ]);
     
-    const eventsIn1Hour = await Event.find({
-      startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
-    });
-    
-    // Workshops (now in Event model with type: 'workshop')
-    const workshopsIn1Day = await Event.find({
-      type: 'workshop',
-      startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
-    });
-    
-    const workshopsIn1Hour = await Event.find({
-      type: 'workshop',
-      startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
-    });
-    
-    // Trips
-    const tripsIn1Day = await Trip.find({
-      startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
-    });
-    
-    const tripsIn1Hour = await Trip.find({
-      startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
-    });
-    
-    // Gym Sessions
-    const gymSessionsIn1Day = await GymSession.find({
-      startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
-    });
-    
-    const gymSessionsIn1Hour = await GymSession.find({
-      startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
-    });
-    
-    await processEventReminders(eventsIn1Day, '1 day');
-    await processEventReminders(eventsIn1Hour, '1 hour');
-    await processWorkshopReminders(workshopsIn1Day, '1 day');
-    await processWorkshopReminders(workshopsIn1Hour, '1 hour');
-    await processTripReminders(tripsIn1Day, '1 day');
-    await processTripReminders(tripsIn1Hour, '1 hour');
-    await processGymSessionReminders(gymSessionsIn1Day, '1 day');
-    await processGymSessionReminders(gymSessionsIn1Hour, '1 hour');
+    // Process all reminders in parallel since they're independent
+    await Promise.all([
+      processEventReminders(eventsIn1Day, '1 day'),
+      processEventReminders(eventsIn1Hour, '1 hour'),
+      processWorkshopReminders(workshopsIn1Day, '1 day'),
+      processWorkshopReminders(workshopsIn1Hour, '1 hour'),
+      processTripReminders(tripsIn1Day, '1 day'),
+      processTripReminders(tripsIn1Hour, '1 hour'),
+      processGymSessionReminders(gymSessionsIn1Day, '1 day'),
+      processGymSessionReminders(gymSessionsIn1Hour, '1 hour')
+    ]);
     
   } catch (error) {
     console.error('Error in createEventReminders:', error);

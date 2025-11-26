@@ -696,6 +696,81 @@ const StudentEventsView = () => {
   };
 
   return (
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        @keyframes shimmer {
+          0% {
+            background-position: -1000px 0;
+          }
+          100% {
+            background-position: 1000px 0;
+          }
+        }
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.7;
+          }
+        }
+        .banner-animate {
+          animation: fadeInUp 0.8s ease-out;
+        }
+        .banner-content-animate {
+          animation: slideInLeft 1s ease-out 0.2s both;
+        }
+        .search-container-animate {
+          animation: fadeIn 0.6s ease-out 0.3s both;
+        }
+        .search-input-animate {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .filter-button-animate {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .filter-button-animate:hover {
+          transform: translateY(-2px);
+        }
+      `}</style>
     <div style={{
       display: 'flex',
       flexDirection: 'column',
@@ -1259,14 +1334,26 @@ const StudentEventsView = () => {
             marginRight: '4rem'
           }}>
           {/* Page Title Banner */}
-          <div style={{
-            position: 'relative',
-            height: '140px',
-            borderRadius: '0.75rem',
-            overflow: 'hidden',
-            marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-          }}>
+          <div 
+            className="banner-animate"
+            style={{
+              position: 'relative',
+              height: '140px',
+              borderRadius: '0.75rem',
+              overflow: 'hidden',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 12px -2px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+            }}
+          >
             {/* Background Image */}
             <div style={{
               position: 'absolute',
@@ -1275,54 +1362,71 @@ const StudentEventsView = () => {
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
-              filter: 'blur(2px)'
+              filter: 'blur(2px)',
+              transition: 'transform 0.5s ease, filter 0.5s ease'
             }}></div>
             {/* Blue Overlay */}
             <div style={{
               position: 'absolute',
               inset: 0,
-              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+              backgroundColor: 'rgba(29, 53, 87, 0.75)',
+              transition: 'background-color 0.3s ease'
             }}></div>
             {/* Content */}
-            <div style={{
-              position: 'relative',
-              zIndex: 10,
-              height: '100%',
+            <div 
+              className="banner-content-animate"
+              style={{
+                position: 'relative',
+                zIndex: 10,
+                height: '100%',
                 display: 'flex',
-              flexDirection: 'column',
+                flexDirection: 'column',
                 justifyContent: 'center',
-              alignItems: 'flex-start',
-              padding: '2rem 2.5rem',
-              color: '#FFFFFF'
-            }}>
+                alignItems: 'flex-start',
+                padding: '2rem 2.5rem',
+                color: '#FFFFFF'
+              }}
+            >
               <h3 style={{
                 color: '#FFFFFF',
                 fontSize: '1.75rem',
-              fontWeight: '700',
+                fontWeight: '700',
                 margin: 0,
-                marginBottom: '0.5rem'
-            }}>
-              Discover Events
+                marginBottom: '0.5rem',
+                textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
+              }}>
+                Discover Events
               </h3>
               <p style={{
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '0.875rem',
                 fontWeight: '400',
-                margin: 0
+                margin: 0,
+                textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
               }}>
                 Browse and register for upcoming events.
               </p>
             </div>
-              </div>
+          </div>
 
           {/* Search and Filters */}
-          <div style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '0.75rem',
-            padding: '1rem 1.5rem',
-            marginBottom: '1.5rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-          }}>
+          <div 
+            className="search-container-animate"
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              padding: '1rem 1.5rem',
+              marginBottom: '1.5rem',
+              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+              transition: 'box-shadow 0.3s ease, transform 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+            }}
+          >
             {/* Search Bar and Filters Row */}
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', width: '100%', justifyContent: 'space-between', flexWrap: 'nowrap' }}>
               {/* Search Bar */}
@@ -1345,6 +1449,7 @@ const StudentEventsView = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    className="search-input-animate"
                     style={{
                       width: '100%',
                       padding: '0.875rem 0.875rem 0.875rem 2.75rem',
@@ -1353,16 +1458,18 @@ const StudentEventsView = () => {
                       backgroundColor: '#FFFFFF',
                       fontSize: '0.875rem',
                       outline: 'none',
-                      transition: 'all 0.2s',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       boxSizing: 'border-box'
                     }}
                     onFocus={(e) => {
                       e.target.style.borderColor = '#1e40af';
                       e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                      e.target.style.transform = 'scale(1.01)';
                     }}
                     onBlur={(e) => {
                       e.target.style.borderColor = '#e5e7eb';
                       e.target.style.boxShadow = 'none';
+                      e.target.style.transform = 'scale(1)';
                     }}
                   />
                 </div>
@@ -1377,18 +1484,20 @@ const StudentEventsView = () => {
                     cursor: 'pointer',
                     fontSize: '0.875rem',
                     fontWeight: '600',
-                    transition: 'all 0.2s',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     whiteSpace: 'nowrap',
                     boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                     flexShrink: 0
                   }}
                   onMouseEnter={(e) => {
                     e.target.style.backgroundColor = '#1e3a8a';
-                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                    e.target.style.boxShadow = '0 4px 8px 0 rgba(30, 64, 175, 0.3)';
+                    e.target.style.transform = 'translateY(-2px) scale(1.02)';
                   }}
                   onMouseLeave={(e) => {
                     e.target.style.backgroundColor = '#1e40af';
                     e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                    e.target.style.transform = 'translateY(0) scale(1)';
                   }}
                 >
                   Search
@@ -1404,6 +1513,7 @@ const StudentEventsView = () => {
                       setShowFilterDropdown(!showFilterDropdown);
                       setShowSortDropdown(false);
                     }}
+                    className="filter-button-animate"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -1416,7 +1526,7 @@ const StudentEventsView = () => {
                       cursor: 'pointer',
                       fontSize: '0.875rem',
                       fontWeight: '600',
-                      transition: 'all 0.2s',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       whiteSpace: 'nowrap',
                       boxShadow: filter !== 'all' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
                     }}
@@ -1424,16 +1534,22 @@ const StudentEventsView = () => {
                       if (filter === 'all') {
                         e.target.style.backgroundColor = '#f3f4f6';
                         e.target.style.borderColor = '#d1d5db';
+                        e.target.style.transform = 'translateY(-2px) scale(1.02)';
                       } else {
                         e.target.style.backgroundColor = '#1e3a8a';
+                        e.target.style.transform = 'translateY(-2px) scale(1.02)';
+                        e.target.style.boxShadow = '0 4px 8px 0 rgba(30, 64, 175, 0.3)';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (filter === 'all') {
                         e.target.style.backgroundColor = '#f9fafb';
                         e.target.style.borderColor = '#e5e7eb';
+                        e.target.style.transform = 'translateY(0) scale(1)';
                       } else {
                         e.target.style.backgroundColor = '#1e40af';
+                        e.target.style.transform = 'translateY(0) scale(1)';
+                        e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
                       }
                     }}
                   >
@@ -1502,6 +1618,7 @@ const StudentEventsView = () => {
                       setShowSortDropdown(!showSortDropdown);
                       setShowFilterDropdown(false);
                     }}
+                    className="filter-button-animate"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -1514,7 +1631,7 @@ const StudentEventsView = () => {
                       cursor: 'pointer',
                       fontSize: '0.875rem',
                       fontWeight: '600',
-                      transition: 'all 0.2s',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       whiteSpace: 'nowrap',
                       boxShadow: sortBy !== 'date-asc' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
                     }}
@@ -1522,16 +1639,22 @@ const StudentEventsView = () => {
                       if (sortBy === 'date-asc') {
                         e.target.style.backgroundColor = '#f3f4f6';
                         e.target.style.borderColor = '#d1d5db';
+                        e.target.style.transform = 'translateY(-2px) scale(1.02)';
                       } else {
                         e.target.style.backgroundColor = '#1e3a8a';
+                        e.target.style.transform = 'translateY(-2px) scale(1.02)';
+                        e.target.style.boxShadow = '0 4px 8px 0 rgba(30, 64, 175, 0.3)';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (sortBy === 'date-asc') {
                         e.target.style.backgroundColor = '#f9fafb';
                         e.target.style.borderColor = '#e5e7eb';
+                        e.target.style.transform = 'translateY(0) scale(1)';
                       } else {
                         e.target.style.backgroundColor = '#1e40af';
+                        e.target.style.transform = 'translateY(0) scale(1)';
+                        e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
                       }
                     }}
                   >
@@ -3299,6 +3422,7 @@ const StudentEventsView = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 
