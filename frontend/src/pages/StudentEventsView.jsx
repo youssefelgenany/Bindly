@@ -800,6 +800,8 @@ const StudentEventsView = () => {
               Bindly
             </h2>
           </Link>
+              </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
         </div>
         
         {/* Centered Navigation Menu */}
@@ -918,31 +920,31 @@ const StudentEventsView = () => {
                   loadNotifications();
                 }
               }}
-              style={{
+                style={{
                 position: 'relative',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
                 padding: '0.5rem',
                 borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
+                  display: 'flex',
+                  alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
+                }}
+                onMouseEnter={(e) => {
                 e.target.style.backgroundColor = '#f3f4f6';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'transparent';
-              }}
-            >
-              <span className="material-symbols-outlined" style={{
+                }}
+                onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ 
                 fontSize: '1.5rem',
                 color: '#1D3557'
-              }}>
+                }}>
                 notifications
-              </span>
+                </span>
               {unreadCount > 0 && (
                 <span style={{
                   position: 'absolute',
@@ -992,14 +994,14 @@ const StudentEventsView = () => {
                     fontSize: '1rem',
                     fontWeight: '600',
                     color: '#1D3557',
-                    margin: 0
-                  }}>
+                  margin: 0
+                }}>
                     Notifications
                   </h3>
                   {unreadCount > 0 && (
                     <button
                       onClick={handleMarkAllAsRead}
-                      style={{
+                style={{
                         background: 'none',
                         border: 'none',
                         color: '#1e40af',
@@ -1007,11 +1009,11 @@ const StudentEventsView = () => {
                         fontSize: '0.75rem',
                         fontWeight: '500',
                         padding: '0.25rem 0.5rem'
-                      }}
-                      onMouseEnter={(e) => {
+                }}
+                onMouseEnter={(e) => {
                         e.target.style.textDecoration = 'underline';
-                      }}
-                      onMouseLeave={(e) => {
+                }}
+                onMouseLeave={(e) => {
                         e.target.style.textDecoration = 'none';
                       }}
                     >
@@ -1031,7 +1033,7 @@ const StudentEventsView = () => {
                       fontSize: '0.875rem'
                     }}>
                       Loading...
-                    </div>
+        </div>
                   ) : notifications.length === 0 ? (
                     <div style={{
                       padding: '2rem',
@@ -1073,10 +1075,10 @@ const StudentEventsView = () => {
                             setShowNotificationsDropdown(false);
                           }
                         }}
-                        style={{
+            style={{
                           padding: '1rem',
                           borderBottom: '1px solid #f3f4f6',
-                          cursor: 'pointer',
+              cursor: 'pointer',
                           backgroundColor: notification.isRead 
                             ? '#FFFFFF' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
@@ -1086,15 +1088,15 @@ const StudentEventsView = () => {
                             ? '3px solid #ef4444'
                             : 'none',
                           transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
+            }}
+            onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = notification.isRead 
                             ? '#f9fafb' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
                               ? '#fee2e2'
                               : '#dbeafe';
-                        }}
-                        onMouseLeave={(e) => {
+            }}
+            onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = notification.isRead 
                             ? '#FFFFFF' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
@@ -1109,8 +1111,8 @@ const StudentEventsView = () => {
                           gap: '0.5rem'
                         }}>
                           <div style={{ flex: 1 }}>
-                            <p style={{
-                              fontSize: '0.875rem',
+              <p style={{
+                fontSize: '0.875rem',
                               fontWeight: notification.isRead ? '400' : '600',
                               color: '#1D3557',
                               margin: 0,
@@ -1122,11 +1124,11 @@ const StudentEventsView = () => {
                               <p style={{
                                 fontSize: '0.75rem',
                                 color: '#6b7280',
-                                margin: 0
-                              }}>
+                margin: 0
+              }}>
                                 {notification.message}
-                              </p>
-                            )}
+              </p>
+            )}
                             <p style={{
                               fontSize: '0.625rem',
                               color: '#9ca3af',
@@ -1134,7 +1136,7 @@ const StudentEventsView = () => {
                             }}>
                               {formatNotificationDate(notification.createdAt)}
                             </p>
-                          </div>
+          </div>
                           {!notification.isRead && (
                             <div style={{
                               width: '0.5rem',
@@ -1185,23 +1187,23 @@ const StudentEventsView = () => {
             </span>
           </Link>
 
-          <div style={{ textAlign: 'right' }}>
-            <p style={{
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              color: '#1D3557',
-              margin: 0
-            }}>
-              {displayName}
-            </p>
-            <p style={{
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              margin: 0
-            }}>
-              Student
-            </p>
-          </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#1D3557',
+                margin: 0
+              }}>
+                {displayName}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                margin: 0
+              }}>
+                Student
+              </p>
+            </div>
 
           {/* Student Profile Icon */}
           <div 
@@ -1310,8 +1312,8 @@ const StudentEventsView = () => {
               </div>
             )}
           </div>
-        </div>
-      </header>
+          </div>
+        </header>
 
       {/* Main Content */}
       <main style={{
@@ -1508,10 +1510,33 @@ const StudentEventsView = () => {
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
                 {/* Filter Dropdown */}
                 <div style={{ position: 'relative' }} data-filter-dropdown>
-                  <button
-                    onClick={() => {
+                <button
+                  onClick={() => {
                       setShowFilterDropdown(!showFilterDropdown);
                       setShowSortDropdown(false);
+                  }}
+                  style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.875rem 1.25rem',
+                    borderRadius: '0.5rem',
+                      backgroundColor: '#1e40af',
+                      color: '#FFFFFF',
+                      border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                      fontWeight: '600',
+                    transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                  }}
+                  onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#1e3a8a';
+                  }}
+                  onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#1e40af';
+                  }}
+                >
                     }}
                     className="filter-button-animate"
                     style={{
@@ -1557,7 +1582,7 @@ const StudentEventsView = () => {
                       filter_list
                     </span>
                     Filter
-                  </button>
+                </button>
                   {showFilterDropdown && (
                     <div style={{
                       position: 'absolute',
@@ -1572,41 +1597,41 @@ const StudentEventsView = () => {
                       minWidth: '180px',
                       overflow: 'hidden'
                     }}>
-                      {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
-                        <button
-                          key={type}
+              {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
+                <button
+                  key={type}
                           onClick={() => {
                             setFilter(type);
                             setShowFilterDropdown(false);
                           }}
-                          style={{
+                  style={{
                             width: '100%',
                             padding: '0.75rem 1rem',
                             textAlign: 'left',
                             backgroundColor: filter === type ? '#eff6ff' : 'transparent',
                             color: filter === type ? '#1e40af' : '#374151',
                             border: 'none',
-                            cursor: 'pointer',
+                    cursor: 'pointer',
                             fontSize: '0.875rem',
-                            fontWeight: filter === type ? '600' : '500',
-                            textTransform: 'capitalize',
-                            transition: 'all 0.2s',
+                    fontWeight: filter === type ? '600' : '500',
+                    textTransform: 'capitalize',
+                    transition: 'all 0.2s',
                             borderBottom: '1px solid #f3f4f6'
-                          }}
-                          onMouseEnter={(e) => {
-                            if (filter !== type) {
+                  }}
+                  onMouseEnter={(e) => {
+                    if (filter !== type) {
                               e.target.style.backgroundColor = '#f9fafb';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (filter !== type) {
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (filter !== type) {
                               e.target.style.backgroundColor = 'transparent';
-                            }
-                          }}
-                        >
-                          {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
-                        </button>
-                      ))}
+                    }
+                  }}
+                >
+                  {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
+                </button>
+              ))}
                     </div>
                   )}
                 </div>

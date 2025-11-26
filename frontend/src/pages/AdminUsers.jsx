@@ -249,30 +249,48 @@ const AdminUsers = () => {
     setMessageById(prev => ({ ...prev, [userId]: '' }));
 
     try {
+      console.log('🔄 Assigning role and sending verification:', { userId, role: selectedRole });
       // Use assignRoleAndSendVerification for Staff/TA/Professor registration requests
       const result = await adminApiService.assignRoleAndSendVerification(userId, selectedRole);
+      console.log('📬 Result from API:', result);
+      
       if (result.success) {
-        setMessageById(prev => ({ ...prev, [userId]: 'Role assigned and verification email sent successfully!' }));
+        // Show appropriate message based on email sending status
+        let successMessage = result.message || 'Role assigned and verification email sent successfully!';
+        
+        // If email wasn't sent, show a warning message
+        if (result.emailSent === false) {
+          successMessage = result.message || 'Role assigned, but verification email could not be sent. Please try again.';
+          console.warn('⚠️ Email not sent:', result.emailError);
+        }
+        
+        setMessageById(prev => ({ ...prev, [userId]: successMessage }));
+        
         // Update the user in the local state
+        // Note: Backend sets isVerified to true when admin assigns role
         setUsers(prev => prev.map(u => 
-          u._id === userId ? { ...u, userType: selectedRole, isVerified: false } : u
+          u._id === userId || u.id === userId ? { ...u, userType: selectedRole, isVerified: true } : u
         ));
         // Update verification status
-        setVerificationStatusById(prev => ({ ...prev, [userId]: false }));
+        setVerificationStatusById(prev => ({ ...prev, [userId]: true }));
+        
         // Reload users to update the sections
         setTimeout(() => {
           loadUsers();
         }, 1000);
         // Clear the pending role
         setPendingRoles(prev => ({ ...prev, [userId]: '' }));
-        // Clear message after 5 seconds
+        // Clear message after 5 seconds (or 8 seconds if email failed)
         setTimeout(() => {
           setMessageById(prev => ({ ...prev, [userId]: '' }));
-        }, 5000);
+        }, result.emailSent === false ? 8000 : 5000);
       } else {
-        setMessageById(prev => ({ ...prev, [userId]: result.message || 'Failed to assign role and send verification email.' }));
+        const errorMessage = result.message || 'Failed to assign role and send verification email.';
+        console.error('❌ Failed to assign role:', errorMessage);
+        setMessageById(prev => ({ ...prev, [userId]: errorMessage }));
       }
     } catch (err) {
+      console.error('❌ Exception in handleUpdateRole:', err);
       setMessageById(prev => ({ ...prev, [userId]: 'Failed to assign role and send verification email. Try again.' }));
     } finally {
       setUpdatingIds(prev => ({ ...prev, [userId]: false }));
@@ -498,7 +516,7 @@ const AdminUsers = () => {
     );
   }
 
-  return (
+    return (
     <div style={{
       display: 'flex',
       height: '100vh',
@@ -535,7 +553,7 @@ const AdminUsers = () => {
                 <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-              </div>
+            </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <h1 style={{
                   color: '#FFFFFF',
@@ -555,8 +573,8 @@ const AdminUsers = () => {
                 }}>
                   Platform Management
                 </p>
-              </div>
             </div>
+          </div>
           )}
 
           {/* Navigation */}
@@ -798,7 +816,7 @@ const AdminUsers = () => {
               </p>
             )}
           </button>
-        </div>
+      </div>
       </aside>
 
       <main style={{
@@ -996,7 +1014,7 @@ const AdminUsers = () => {
                 </div>
               </div>
 
-              {error && (
+            {error && (
                 <div style={{
                   padding: '0.75rem 1rem',
                   marginBottom: '1.5rem',
@@ -1009,8 +1027,8 @@ const AdminUsers = () => {
                   justifyContent: 'space-between'
                 }}>
                   <span>{error}</span>
-                  <button 
-                    onClick={loadUsers}
+                <button 
+                  onClick={loadUsers}
                     style={{
                       marginLeft: '1rem',
                       padding: '0.25rem 0.75rem',
@@ -1021,11 +1039,11 @@ const AdminUsers = () => {
                       cursor: 'pointer',
                       fontSize: '0.75rem'
                     }}
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
 
               {/* Search and Filters */}
               <div style={{
@@ -1054,11 +1072,11 @@ const AdminUsers = () => {
                       }}>
                         search
                       </span>
-                      <input
-                        type="text"
+              <input
+                type="text"
                         placeholder="Search by name, email, or ID..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && setSearchQuery(e.target.value)}
                         style={{
                           width: '100%',
@@ -1108,8 +1126,8 @@ const AdminUsers = () => {
                     >
                       Search
                     </button>
-                  </div>
-                  
+            </div>
+
                   {/* Filter Buttons */}
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', flexShrink: 0 }}>
                     {['all', 'Admin', 'Event Office', 'TA', 'Staff', 'Professor', 'Student', 'Vendor'].map((role) => (
@@ -1147,18 +1165,18 @@ const AdminUsers = () => {
                     ))}
                   </div>
                 </div>
-              </div>
+                            </div>
 
               {/* Pending Verification Users Section */}
               {filteredPendingUsers.length > 0 && (
-                <div style={{
+                            <div style={{ 
                   backgroundColor: '#FFFFFF',
                   borderRadius: '0.75rem',
                   boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                   marginBottom: '2rem',
                   overflow: 'hidden'
                 }}>
-                  <div style={{
+                            <div style={{ 
                     padding: '1rem 1.5rem',
                     borderBottom: '1px solid #e5e7eb',
                     backgroundColor: '#fef3c7'
@@ -1178,7 +1196,7 @@ const AdminUsers = () => {
                     }}>
                       Users awaiting role assignment and verification
                     </p>
-                  </div>
+                            </div>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#f9fafb' }}>
@@ -1302,9 +1320,9 @@ const AdminUsers = () => {
                               }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
                                   {needsRoleAssignment && (
-                                    <select
-                                      value={pendingRoles[userId] ?? ''}
-                                      onChange={(e) => handleRoleChange(userId, e.target.value)}
+                          <select
+                            value={pendingRoles[userId] ?? ''}
+                            onChange={(e) => handleRoleChange(userId, e.target.value)}
                                       style={{
                                         padding: '0.5rem 2.5rem 0.5rem 0.75rem',
                                         border: '1px solid #e5e7eb',
@@ -1321,14 +1339,14 @@ const AdminUsers = () => {
                                       }}
                                     >
                                       <option value="" disabled>Select role</option>
-                                      {roleOptions.map((r) => (
-                                        <option key={r} value={r}>{r}</option>
-                                      ))}
-                                    </select>
+                            {roleOptions.map((r) => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
                                   )}
                                   {needsRoleAssignment && (
-                                    <button
-                                      onClick={() => handleUpdateRole(userId)}
+                          <button
+                            onClick={() => handleUpdateRole(userId)}
                                       disabled={!!updatingIds[userId] || !pendingRoles[userId]}
                                       style={{
                                         padding: '0.5rem 1rem',
@@ -1342,7 +1360,7 @@ const AdminUsers = () => {
                                       }}
                                     >
                                       {updatingIds[userId] ? 'Assigning...' : 'Assign & Send Email'}
-                                    </button>
+                          </button>
                                   )}
                                   {!needsRoleAssignment && ['Staff', 'TA', 'Professor'].includes(u.userType) && (
                                     <button
@@ -1414,14 +1432,6 @@ const AdminUsers = () => {
                                       </div>
                                       <div>
                                         <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                          User ID
-                                        </h4>
-                                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                          {userId}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
                                           Joined Date
                                         </h4>
                                         <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
@@ -1429,7 +1439,7 @@ const AdminUsers = () => {
                                         </p>
                                       </div>
                                     </div>
-                                    {messageById[userId] && (
+                          {messageById[userId] && (
                                       <div style={{
                                         padding: '0.75rem 1rem',
                                         borderRadius: '0.5rem',
@@ -1437,7 +1447,7 @@ const AdminUsers = () => {
                                         color: messageById[userId].includes('success') ? '#065f46' : '#991b1b',
                                         fontSize: '0.875rem'
                                       }}>
-                                        {messageById[userId]}
+                              {messageById[userId]}
                                       </div>
                                     )}
                                     {verifyMsgById[userId] && (
@@ -1460,8 +1470,8 @@ const AdminUsers = () => {
                       })}
                     </tbody>
                   </table>
-                </div>
-              )}
+                        </div>
+                        )}
 
               {/* All Users Section */}
               <div style={{
@@ -1628,7 +1638,7 @@ const AdminUsers = () => {
                                     
                                     if (isAdmin || isEventOffice) {
                                       return (
-                                        <button
+                          <button
                                           onClick={() => handleDeleteClick(userId)}
                                           disabled={!!deletingIds[userId]}
                                           style={{
@@ -1654,7 +1664,7 @@ const AdminUsers = () => {
                                           }}
                                         >
                                           {deletingIds[userId] ? 'Deleting...' : 'Delete'}
-                                        </button>
+                          </button>
                                       );
                                     } else {
                                       const isBlocked = !activeStatusById[userId];
@@ -1694,14 +1704,14 @@ const AdminUsers = () => {
                                             <>
                                               <span className="material-symbols-outlined" style={{ fontSize: '1rem', animation: 'spin 1s linear infinite' }}>
                                                 hourglass_empty
-                                              </span>
+                          </span>
                                               Updating...
                                             </>
                                           ) : (
                                             <>
                                               <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
                                                 {isBlocked ? 'lock_open' : 'block'}
-                                              </span>
+                            </span>
                                               {isBlocked ? 'Unblock' : 'Block'}
                                             </>
                                           )}
@@ -1761,14 +1771,6 @@ const AdminUsers = () => {
                                       </div>
                                       <div>
                                         <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                          User ID
-                                        </h4>
-                                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                          {userId}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
                                           Joined Date
                                         </h4>
                                         <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
@@ -1791,8 +1793,8 @@ const AdminUsers = () => {
                                           <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
                                             {u.companyName}
                                           </p>
-                                        </div>
-                                      )}
+                        </div>
+                        )}
                                     </div>
                                     {u.userType === 'Vendor' && (
                                       <div style={{
@@ -1826,13 +1828,13 @@ const AdminUsers = () => {
                                               }}>
                                                 image
                                               </span>
-                                              <span style={{
+                          <span style={{ 
                                                 fontSize: '0.875rem',
                                                 color: '#111827',
-                                                fontWeight: '500'
-                                              }}>
+                            fontWeight: '500'
+                          }}>
                                                 Logo
-                                              </span>
+                          </span>
                                               <button
                                                 onClick={() => handleViewDocument(userId, 'logo')}
                                                 style={{
@@ -1876,8 +1878,8 @@ const AdminUsers = () => {
                                               >
                                                 Download
                                               </button>
-                                            </div>
-                                          )}
+                        </div>
+                        )}
                                           {(u.vendorTaxCardPath || u.hasTaxCard) && (
                                             <div style={{
                                               display: 'flex',
@@ -2115,7 +2117,7 @@ const AdminUsers = () => {
                       {formErrors.firstName}
                     </p>
                   )}
-                </div>
+                      </div>
 
                 <div>
                   <label style={{
@@ -2156,7 +2158,7 @@ const AdminUsers = () => {
                       {formErrors.lastName}
                     </p>
                   )}
-                </div>
+                    </div>
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>
@@ -2197,8 +2199,8 @@ const AdminUsers = () => {
                   <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '0.25rem 0 0 0' }}>
                     {formErrors.email}
                   </p>
-                )}
-              </div>
+              )}
+            </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 <div>
@@ -2240,7 +2242,7 @@ const AdminUsers = () => {
                       {formErrors.password}
                     </p>
                   )}
-                </div>
+          </div>
 
                 <div>
                   <label style={{
@@ -2289,8 +2291,8 @@ const AdminUsers = () => {
                       {formErrors.role}
                     </p>
                   )}
-                </div>
-              </div>
+        </div>
+      </div>
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
                 <button
