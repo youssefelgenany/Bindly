@@ -1323,80 +1323,78 @@ const StudentEventsView = () => {
             marginBottom: '1.5rem',
             boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              {/* Search Input and Button - Left Side */}
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: '0 1 auto' }}>
-                <div style={{ position: 'relative', width: '520px' }}>
-                <span className="material-symbols-outlined" style={{
-                  position: 'absolute',
-                  left: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#9ca3af',
-                  fontSize: '1.25rem',
-                    pointerEvents: 'none',
-                    zIndex: 1
-                }}>
-                  search
-                </span>
-                <input
-                  type="text"
-                  placeholder="Search by event name, professor name, location, or description..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+            {/* Search Bar and Filters Row */}
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', width: '100%', justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+              {/* Search Bar */}
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
+                <div style={{ position: 'relative', width: '400px' }}>
+                  <span className="material-symbols-outlined" style={{
+                    position: 'absolute',
+                    left: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#9ca3af',
+                    fontSize: '1.25rem',
+                    pointerEvents: 'none'
+                  }}>
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search by event name, professor name, location, or description..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: '#FFFFFF',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'all 0.2s',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#1e40af';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e5e7eb';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={handleSearch}
                   style={{
-                    width: '100%',
-                    padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                    padding: '0.875rem 1.75rem',
                     borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb',
-                      backgroundColor: '#ffffff',
+                    backgroundColor: '#1e40af',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    cursor: 'pointer',
                     fontSize: '0.875rem',
-                    outline: 'none',
+                    fontWeight: '600',
                     transition: 'all 0.2s',
-                    boxSizing: 'border-box'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#1e40af';
-                    e.target.style.backgroundColor = '#ffffff';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e5e7eb';
-                      e.target.style.backgroundColor = '#ffffff';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                />
-              </div>
-              <button
-                onClick={handleSearch}
-                style={{
-                  padding: '0.875rem 1.75rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#1e40af',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s',
-                  whiteSpace: 'nowrap',
+                    whiteSpace: 'nowrap',
                     boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                     flexShrink: 0
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#1e3a8a';
-                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#1e40af';
-                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                }}
-              >
-                Search
-              </button>
-            </div>
-            
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#1e3a8a';
+                    e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#1e40af';
+                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                  }}
+                >
+                  Search
+                </button>
+              </div>
+              
               {/* Filter and Sort Dropdowns - Right Side */}
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
                 {/* Filter Dropdown */}
@@ -1410,22 +1408,33 @@ const StudentEventsView = () => {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem',
-                      padding: '0.875rem 1.25rem',
+                      padding: '0.875rem 1.5rem',
                       borderRadius: '0.5rem',
-                      backgroundColor: '#1e40af',
-                      color: '#FFFFFF',
-                      border: 'none',
+                      backgroundColor: filter !== 'all' ? '#1e40af' : '#f9fafb',
+                      color: filter !== 'all' ? '#FFFFFF' : '#6b7280',
+                      border: filter !== 'all' ? 'none' : '1px solid #e5e7eb',
                       cursor: 'pointer',
                       fontSize: '0.875rem',
                       fontWeight: '600',
                       transition: 'all 0.2s',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                      whiteSpace: 'nowrap',
+                      boxShadow: filter !== 'all' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
                     }}
                     onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#1e3a8a';
+                      if (filter === 'all') {
+                        e.target.style.backgroundColor = '#f3f4f6';
+                        e.target.style.borderColor = '#d1d5db';
+                      } else {
+                        e.target.style.backgroundColor = '#1e3a8a';
+                      }
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#1e40af';
+                      if (filter === 'all') {
+                        e.target.style.backgroundColor = '#f9fafb';
+                        e.target.style.borderColor = '#e5e7eb';
+                      } else {
+                        e.target.style.backgroundColor = '#1e40af';
+                      }
                     }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
@@ -1497,22 +1506,33 @@ const StudentEventsView = () => {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem',
-                      padding: '0.875rem 1.25rem',
+                      padding: '0.875rem 1.5rem',
                       borderRadius: '0.5rem',
-                      backgroundColor: '#1e40af',
-                      color: '#FFFFFF',
-                      border: 'none',
+                      backgroundColor: sortBy !== 'date-asc' ? '#1e40af' : '#f9fafb',
+                      color: sortBy !== 'date-asc' ? '#FFFFFF' : '#6b7280',
+                      border: sortBy !== 'date-asc' ? 'none' : '1px solid #e5e7eb',
                       cursor: 'pointer',
                       fontSize: '0.875rem',
                       fontWeight: '600',
                       transition: 'all 0.2s',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                      whiteSpace: 'nowrap',
+                      boxShadow: sortBy !== 'date-asc' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
                     }}
                     onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#1e3a8a';
+                      if (sortBy === 'date-asc') {
+                        e.target.style.backgroundColor = '#f3f4f6';
+                        e.target.style.borderColor = '#d1d5db';
+                      } else {
+                        e.target.style.backgroundColor = '#1e3a8a';
+                      }
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#1e40af';
+                      if (sortBy === 'date-asc') {
+                        e.target.style.backgroundColor = '#f9fafb';
+                        e.target.style.borderColor = '#e5e7eb';
+                      } else {
+                        e.target.style.backgroundColor = '#1e40af';
+                      }
                     }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
