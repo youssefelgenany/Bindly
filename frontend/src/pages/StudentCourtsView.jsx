@@ -334,6 +334,35 @@ const StudentCourtsView = () => {
     : user?.name || 'User';
 
   return (
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        .banner-animate {
+          animation: fadeInUp 0.8s ease-out;
+        }
+        .banner-content-animate {
+          animation: slideInLeft 1s ease-out 0.2s both;
+        }
+      `}</style>
     <div style={{
       display: 'flex',
       flexDirection: 'column',
@@ -2183,6 +2212,7 @@ const StudentCourtsView = () => {
         }
       `}</style>
     </div>
+    </>
   );
 };
 
