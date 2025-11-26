@@ -152,6 +152,17 @@ app.get('/', (req, res) => {
   res.send('Server is running and connected to MongoDB');
 });
 
-// Start server
+// Start server (initialize HTTP server and Socket.IO)
+const http = require('http');
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+// Initialize Socket.IO service
+try {
+  const { init } = require('./services/socket');
+  init(server, { corsOrigins: ['http://localhost:3000'] });
+} catch (e) {
+  console.warn('⚠️ Socket service initialization failed:', e.message);
+}
+
+server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

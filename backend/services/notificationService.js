@@ -300,6 +300,7 @@ exports.notifyNewEventCreated = async (event) => {
     let skippedCount = 0;
     let errorCount = 0;
     
+    const creatorIdStr = event.createdBy ? event.createdBy.toString() : null;
     for (const user of allUsers) {
       try {
         // Check if notification already exists for this user and event
@@ -308,8 +309,19 @@ exports.notifyNewEventCreated = async (event) => {
           type: 'event_announcement',
           'metadata.eventId': event._id.toString()
         });
-        
+
+        // If the event is approved, the creator (professor) already receives a dedicated
+        // 'workshop_approved' notification via the approval flow. To avoid duplicate
+        // notifications for the creator, skip creating a generic event announcement
+        // when the recipient is the creator and the event is approved.
+        const isCreator = creatorIdStr && user._id.toString() === creatorIdStr;
+        if (event.status === 'approved' && isCreator) {
+          skippedCount++;
+          continue;
+        }
+
         if (!existingNotification) {
+          // Generic announcement for other users (students, other professors, staff, etc.)
           await Notification.create({
             recipient: user._id,
             type: 'event_announcement',
@@ -329,7 +341,6 @@ exports.notifyNewEventCreated = async (event) => {
             }
           });
           notificationCount++;
-          
           // Log specifically for TA users
           if (user.userType === 'TA') {
             console.log(`✅ Created notification for TA user: ${user.email} (${user.firstName} ${user.lastName})`);

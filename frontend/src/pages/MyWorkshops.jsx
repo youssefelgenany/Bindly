@@ -102,7 +102,22 @@ const MyWorkshops = () => {
     const interval = setInterval(() => {
       loadNotifications();
     }, 30000);
-    return () => clearInterval(interval);
+    // Listen for real-time notifications and update UI immediately
+    const onNewNotification = (e) => {
+      try {
+        const notif = e.detail;
+        if (!notif) return;
+        setNotifications(prev => [notif, ...(prev || [])]);
+        setUnreadCount(prev => (prev || 0) + 1);
+      } catch (err) {
+        console.error('Error handling new_notification event:', err);
+      }
+    };
+    window.addEventListener('new_notification', onNewNotification);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('new_notification', onNewNotification);
+    };
   }, [loadNotifications]);
 
   // Mark notification as read
