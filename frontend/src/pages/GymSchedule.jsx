@@ -1886,13 +1886,14 @@ const GymSchedule = () => {
                                     {timeStr}
                                   </div>
                                   {isEventsOffice && !isCancelled && (
-                                    <div style={{
-                                      display: 'flex',
-                                      gap: '0.125rem',
-                                      marginTop: '0.125rem',
-                                      justifyContent: 'flex-end'
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
+                                    <div
+                                      style={{
+                                        display: 'flex',
+                                        gap: '0.3rem',
+                                        marginTop: '0.15rem',
+                                        justifyContent: 'flex-end'
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
                                     >
                                       <button
                                         onClick={(e) => {
@@ -1900,21 +1901,29 @@ const GymSchedule = () => {
                                           handleEditClick(s);
                                         }}
                                         style={{
-                                          background: '#1e40af',
-                                          border: 'none',
-                                          borderRadius: '0.125rem',
-                                          padding: '0.0625rem 0.25rem',
+                                          background: '#f8fafc',
+                                          border: '1px solid #cbd5f5',
+                                          borderRadius: '0.3125rem',
+                                          padding: '0.2rem 0.35rem',
                                           cursor: 'pointer',
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center',
-                                          color: '#FFFFFF',
-                                          fontSize: '0.5rem'
+                                          color: '#1e3a8a',
+                                          transition: 'background 0.2s, border-color 0.2s'
                                         }}
                                         title="Edit session"
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.background = '#eef2ff';
+                                          e.currentTarget.style.borderColor = '#a5b4fc';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.background = '#f8fafc';
+                                          e.currentTarget.style.borderColor = '#cbd5f5';
+                                        }}
                                       >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '0.625rem' }}>
-                                          edit
+                                        <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>
+                                          edit_square
                                         </span>
                                       </button>
                                       <button
@@ -1923,21 +1932,29 @@ const GymSchedule = () => {
                                           handleCancelClick(s);
                                         }}
                                         style={{
-                                          background: '#dc2626',
-                                          border: 'none',
-                                          borderRadius: '0.125rem',
-                                          padding: '0.0625rem 0.25rem',
+                                          background: '#fff5f5',
+                                          border: '1px solid #fecaca',
+                                          borderRadius: '0.3125rem',
+                                          padding: '0.2rem 0.35rem',
                                           cursor: 'pointer',
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center',
-                                          color: '#FFFFFF',
-                                          fontSize: '0.5rem'
+                                          color: '#b91c1c',
+                                          transition: 'background 0.2s, border-color 0.2s'
                                         }}
                                         title="Cancel session"
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.background = '#fee2e2';
+                                          e.currentTarget.style.borderColor = '#fecaca';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.background = '#fff5f5';
+                                          e.currentTarget.style.borderColor = '#fecaca';
+                                        }}
                                       >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '0.625rem' }}>
-                                          cancel
+                                        <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>
+                                          delete
                                         </span>
                                       </button>
                                     </div>

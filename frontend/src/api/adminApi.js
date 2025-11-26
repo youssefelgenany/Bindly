@@ -129,18 +129,36 @@ export const adminApiService = {
   // Assign role and send verification email (for Staff/TA/Professor registration requests)
   assignRoleAndSendVerification: async (userId, role) => {
     try {
+      console.log('📧 Calling assignRoleAndSendVerification:', { userId, role });
       const response = await adminApi.post('/users/assign-role-and-verify', { userId, role });
+      console.log('✅ Response from backend:', response.data);
+      
+      // Backend returns { msg: "...", token: "...", emailSent: true/false }
+      const message = response.data?.msg || response.data?.message || 'Role assigned and verification email sent successfully';
+      const emailSent = response.data?.emailSent !== false; // Default to true if not specified
+      
       return {
         success: true,
         data: response.data,
-        message: response.data.msg || 'Role assigned and verification email sent successfully',
+        message: message,
+        emailSent: emailSent,
+        emailError: response.data?.emailError
       };
     } catch (error) {
-      console.error('Error assigning role and sending verification:', error);
+      console.error('❌ Error assigning role and sending verification:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      
+      const errorMessage = error.response?.data?.msg || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          'Failed to assign role and send verification email';
+      
       return {
         success: false,
-        message: error.response?.data?.msg || error.response?.data?.message || 'Failed to assign role and send verification email',
+        message: errorMessage,
         error: error.response?.data || error.message,
+        emailSent: false
       };
     }
   },

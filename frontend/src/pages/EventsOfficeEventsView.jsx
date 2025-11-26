@@ -2124,50 +2124,41 @@ const EventsOfficeEventsView = () => {
                       }}>
                         Event Type
                       </h5>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        {[
-                          { value: 'all', label: 'All Events' },
-                          { value: 'bazaar', label: 'Bazaars' },
-                          { value: 'trip', label: 'Trips' },
-                          { value: 'workshop', label: 'Workshops' },
-                          { value: 'conference', label: 'Conferences' },
-                          { value: 'booth', label: 'Booths' }
-                        ].map(type => (
-                          <label
-                            key={type.value}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.75rem',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                              color: '#374151'
-                            }}
-                          >
-                            <input
-                              type="radio"
-                              name="eventType"
-                              value={type.value}
-                              checked={filter === type.value}
-                              onChange={(e) => {
-                                setFilter(e.target.value);
-                                handleSearch();
-                              }}
-                              style={{
-                                width: '1rem',
-                                height: '1rem',
-                                cursor: 'pointer',
-                                accentColor: '#1e40af'
-                              }}
-                            />
-                            <span>{type.label}</span>
-                          </label>
-                        ))}
-                      </div>
+                      <select
+                        value={filter}
+                        onChange={(e) => {
+                          setFilter(e.target.value);
+                          handleSearch();
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          outline: 'none',
+                          backgroundColor: '#FFFFFF',
+                          cursor: 'pointer',
+                          transition: 'border-color 0.2s'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#1e40af';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = '#e5e7eb';
+                        }}
+                      >
+                        <option value="all">All Events</option>
+                        <option value="bazaar">Bazaars</option>
+                        <option value="trip">Trips</option>
+                        <option value="workshop">Workshops</option>
+                        <option value="conference">Conferences</option>
+                        <option value="booth">Booths</option>
+                      </select>
                     </div>
 
-                    {/* Professor Name Filter - Only show for workshop/conference */}
-                    {(filter === 'workshop' || filter === 'conference') && (
+                    {/* Professor Name Filter - Only show for workshop */}
+                    {filter === 'workshop' && (
                       <div>
                         <h5 style={{
                           fontSize: '0.875rem',
@@ -5229,6 +5220,9 @@ const EventsOfficeEventsView = () => {
                               Revenue
                             </th>
                             <th style={{ padding: '1rem 1.5rem', textAlign: 'center', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Refunds
+                            </th>
+                            <th style={{ padding: '1rem 1.5rem', textAlign: 'center', fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                               Payments
                             </th>
                           </tr>
@@ -5275,6 +5269,15 @@ const EventsOfficeEventsView = () => {
                                 textAlign: 'center'
                               }}>
                                 ${(event.revenue || 0).toFixed(2)}
+                              </td>
+                              <td style={{
+                                padding: '1rem 1.5rem',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                color: '#b91c1c',
+                                textAlign: 'center'
+                              }}>
+                                -${(event.refundedAmount || 0).toFixed(2)}{event.refundCount ? ` (${event.refundCount})` : ''}
                               </td>
                               <td style={{
                                 padding: '1rem 1.5rem',

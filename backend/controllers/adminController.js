@@ -46,11 +46,20 @@ exports.assignRoleAndSendVerification = async (req, res) => {
     
     if (emailResult.sent) {
       console.log('✅ Verification email sent successfully to:', user.email);
+      res.json({ 
+        msg: "Role assigned and verification email sent successfully.", 
+        token: user.verificationToken,
+        emailSent: true
+      });
     } else {
       console.error('❌ Verification email not sent:', emailResult.reason || emailResult.error);
+      res.json({ 
+        msg: "Role assigned successfully, but verification email could not be sent. " + (emailResult.reason || emailResult.error || "Please try sending the email again."), 
+        token: user.verificationToken,
+        emailSent: false,
+        emailError: emailResult.reason || emailResult.error
+      });
     }
-
-    res.json({ msg: "Role assigned and verification email sent successfully.", token: user.verificationToken });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Server error" });
@@ -854,17 +863,20 @@ exports.getSalesReport = async (req, res) => {
     // Get successful payments for these events
     const payments = await Payment.find({
       event: { $in: eventIds },
-      status: 'success'
+      status: { $in: ['success', 'refunded'] }
     }).lean();
 
-    console.log(`💳 Found ${payments.length} successful payments`);
+    const successfulPayments = payments.filter(payment => payment.status === 'success');
+    console.log(`💳 Found ${successfulPayments.length} successful payments (${payments.length} including refunds)`);
 
     // Build report structure
     const report = {
       summary: {
         totalEvents: allEvents.length,
         totalRevenue: 0,
-        totalPayments: payments.length
+        totalPayments: 0,
+        refundedPayments: 0,
+        totalRefundedAmount: 0
       },
       byEventType: {},
       byEvent: []
@@ -872,23 +884,42 @@ exports.getSalesReport = async (req, res) => {
 
     // Aggregate revenue by event
     const revenueByEvent = {};
+    let successfulPaymentsCount = 0;
+    let refundedPaymentsCount = 0;
+    let refundedAmountTotal = 0;
+
     payments.forEach(payment => {
+      if (!payment.event) return;
+
       const eventId = payment.event.toString();
       if (!revenueByEvent[eventId]) {
         revenueByEvent[eventId] = {
           totalRevenue: 0,
-          paymentCount: 0
+          paymentCount: 0,
+          refundedAmount: 0,
+          refundCount: 0
         };
       }
-      revenueByEvent[eventId].totalRevenue += payment.amount;
-      revenueByEvent[eventId].paymentCount += 1;
+
+      if (payment.status === 'success') {
+        revenueByEvent[eventId].totalRevenue += payment.amount;
+        revenueByEvent[eventId].paymentCount += 1;
+        successfulPaymentsCount += 1;
+      } else if (payment.status === 'refunded') {
+        const refundAmount = payment.amount || 0;
+        revenueByEvent[eventId].totalRevenue -= refundAmount;
+        revenueByEvent[eventId].refundedAmount += refundAmount;
+        revenueByEvent[eventId].refundCount += 1;
+        refundedPaymentsCount += 1;
+        refundedAmountTotal += refundAmount;
+      }
     });
 
     // Build per-event details
     allEvents.forEach(event => {
       const eventId = event._id.toString();
       const eventType = event.type || 'other';
-      const revenue = revenueByEvent[eventId] || { totalRevenue: 0, paymentCount: 0 };
+      const revenue = revenueByEvent[eventId] || { totalRevenue: 0, paymentCount: 0, refundedAmount: 0, refundCount: 0 };
 
       // Initialize event type in report if not exists
       if (!report.byEventType[eventType]) {
@@ -915,12 +946,17 @@ exports.getSalesReport = async (req, res) => {
         price: event.price || 0,
         revenue: revenue.totalRevenue,
         paymentCount: revenue.paymentCount,
+        refundedAmount: revenue.refundedAmount,
+        refundCount: revenue.refundCount,
         status: event.status
       });
     });
 
-    // Calculate total revenue
-    report.summary.totalRevenue = payments.reduce((sum, payment) => sum + payment.amount, 0);
+    // Calculate totals
+    report.summary.totalRevenue = report.byEvent.reduce((sum, event) => sum + event.revenue, 0);
+    report.summary.totalPayments = successfulPaymentsCount;
+    report.summary.refundedPayments = refundedPaymentsCount;
+    report.summary.totalRefundedAmount = refundedAmountTotal;
 
     // Sort events by revenue
     if (sortBy === 'revenue-asc') {

@@ -490,7 +490,7 @@ const AdminLoyaltyProgramVendors = () => {
             borderRadius: '0.75rem',
             overflow: 'hidden',
             marginBottom: '2rem',
-            backgroundImage: 'url(/assets/images/admin-users.jpg)',
+            backgroundImage: 'url(/assets/images/LoyaltyProgram.png)',
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}>

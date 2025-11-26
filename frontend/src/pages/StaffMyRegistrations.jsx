@@ -442,13 +442,13 @@ const StaffMyRegistrations = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
-                fontSize: '0.875rem',
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
                 fontWeight: '600'
-              }}>
+                }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'S').toUpperCase()}
-              </div>
-            )}
+          </div>
+        )}
             {showLogoutDropdown && (
               <div style={{
                 position: 'absolute',
@@ -463,9 +463,9 @@ const StaffMyRegistrations = () => {
                 minWidth: '150px'
               }}>
                 {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
-                  <Link
+              <Link
                     to="/wallet"
-                    style={{
+                style={{
                       width: '100%',
                       padding: '0.75rem 1rem',
                       textAlign: 'left',
@@ -474,28 +474,28 @@ const StaffMyRegistrations = () => {
                       cursor: 'pointer',
                       fontSize: '0.875rem',
                       color: '#1D3557',
-                      display: 'flex',
-                      alignItems: 'center',
+                  display: 'flex',
+                  alignItems: 'center',
                       gap: '0.5rem',
-                      textDecoration: 'none'
-                    }}
-                    onMouseEnter={(e) => {
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => {
                       e.target.style.backgroundColor = '#f3f4f6';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'transparent';
+                }}
+                onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
                     }}
                     onClick={() => setShowLogoutDropdown(false)}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
                       account_balance_wallet
-                    </span>
+                </span>
                     My Wallet
-                  </Link>
+              </Link>
                 )}
                 <button
                   onClick={handleLogout}
-                  style={{
+                style={{
                     width: '100%',
                     padding: '0.75rem 1rem',
                     textAlign: 'left',
@@ -504,20 +504,20 @@ const StaffMyRegistrations = () => {
                     cursor: 'pointer',
                     fontSize: '0.875rem',
                     color: '#1D3557',
-                    display: 'flex',
-                    alignItems: 'center',
+                  display: 'flex',
+                  alignItems: 'center',
                     gap: '0.5rem'
-                  }}
-                  onMouseEnter={(e) => {
+                }}
+                onMouseEnter={(e) => {
                     e.target.style.backgroundColor = '#f3f4f6';
-                  }}
-                  onMouseLeave={(e) => {
+                }}
+                onMouseLeave={(e) => {
                     e.target.style.backgroundColor = 'transparent';
                   }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
                     logout
-                  </span>
+                </span>
                   Logout
                 </button>
               </div>
@@ -559,11 +559,11 @@ const StaffMyRegistrations = () => {
               borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
-            Discover Events
-          </Link>
-          <Link
-            to="/staff/my-registrations"
-            style={{
+                  Discover Events
+              </Link>
+              <Link
+                to="/staff/my-registrations"
+                style={{
               textDecoration: 'none',
               color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
@@ -572,11 +572,11 @@ const StaffMyRegistrations = () => {
               borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
             }}
           >
-            My Events
-          </Link>
-          <Link
+                  My Events
+              </Link>
+              <Link
             to="/staff/favorites"
-            style={{
+                style={{
               textDecoration: 'none',
               color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
               fontSize: '0.875rem',
@@ -586,7 +586,7 @@ const StaffMyRegistrations = () => {
             }}
           >
             My Favorites
-          </Link>
+              </Link>
           <Link
             to="/gym-schedule"
             style={{
@@ -653,9 +653,9 @@ const StaffMyRegistrations = () => {
               position: 'relative',
               zIndex: 10,
               height: '100%',
-              display: 'flex',
+                display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center',
+                justifyContent: 'center',
               alignItems: 'flex-start',
               padding: '2rem 2.5rem',
               color: '#FFFFFF'
@@ -663,11 +663,11 @@ const StaffMyRegistrations = () => {
               <h3 style={{
                 color: '#FFFFFF',
                 fontSize: '1.75rem',
-                fontWeight: '700',
+              fontWeight: '700',
                 margin: 0,
                 marginBottom: '0.5rem'
-              }}>
-                My Events
+            }}>
+              My Events
               </h3>
               <p style={{
                 color: 'rgba(255, 255, 255, 0.9)',
@@ -678,8 +678,8 @@ const StaffMyRegistrations = () => {
                 View and manage your event registrations.
               </p>
             </div>
-          </div>
-          {error && (
+        </div>
+      {error && (
             <div style={{
               padding: '0.75rem 1rem',
               marginBottom: '1.5rem',
@@ -689,8 +689,8 @@ const StaffMyRegistrations = () => {
               fontSize: '0.875rem'
             }}>
               {error}
-            </div>
-          )}
+        </div>
+      )}
 
           {!loading && registrations.length === 0 ? (
             <div style={{
@@ -875,18 +875,18 @@ const StaffMyRegistrations = () => {
                     
                     <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                        <div style={{
-                          padding: '0.375rem 0.875rem',
-                          borderRadius: '0.5rem',
-                          backgroundColor: getEventTypeColor(registration.eventType),
-                          color: '#FFFFFF',
-                          fontSize: '0.6875rem',
-                          fontWeight: '700',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
-                          {registration.eventType}
-                        </div>
+                      <div style={{
+                        padding: '0.375rem 0.875rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: getEventTypeColor(registration.eventType),
+                        color: '#FFFFFF',
+                        fontSize: '0.6875rem',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        {registration.eventType}
+                      </div>
                         <div
                           onClick={(e) => {
                             e.stopPropagation();
@@ -896,13 +896,13 @@ const StaffMyRegistrations = () => {
                             }
                           }}
                           style={{
-                            padding: '0.375rem 0.875rem',
-                            borderRadius: '0.5rem',
-                            backgroundColor: getStatusColor(registration.status),
-                            color: '#FFFFFF',
-                            fontSize: '0.6875rem',
-                            fontWeight: '700',
-                            textTransform: 'uppercase',
+                        padding: '0.375rem 0.875rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: getStatusColor(registration.status),
+                        color: '#FFFFFF',
+                        fontSize: '0.6875rem',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
                             letterSpacing: '0.05em',
                             cursor: registration.status?.toLowerCase() === 'approved' ? 'pointer' : 'default',
                             transition: registration.status?.toLowerCase() === 'approved' ? 'all 0.2s' : 'none'
@@ -920,28 +920,28 @@ const StaffMyRegistrations = () => {
                             }
                           }}
                         >
-                          {getDisplayStatus(registration.status)}
-                        </div>
+                        {getDisplayStatus(registration.status)}
                       </div>
+                    </div>
 
-                      <h3 style={{
-                        color: '#1D3557',
-                        fontSize: '1.125rem',
-                        fontWeight: '600',
+                    <h3 style={{
+                      color: '#1D3557',
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
                         marginBottom: '0.75rem',
-                        marginTop: 0,
-                        lineHeight: '1.4'
-                      }}>
-                        {registration.eventTitle}
-                      </h3>
-                      
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
+                      marginTop: 0,
+                      lineHeight: '1.4'
+                    }}>
+                      {registration.eventTitle}
+                    </h3>
+                    
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
                         gap: '0.5rem',
                         marginBottom: '0.75rem',
-                        flex: 1
-                      }}>
+                      flex: 1
+                    }}>
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -973,8 +973,8 @@ const StaffMyRegistrations = () => {
                       
                       {/* Rating and Comment Icons - Only for Past Events */}
                       {hasEventPassed(registration.eventDate, registration.eventEndDate) && (
-                        <div style={{
-                          display: 'flex',
+                      <div style={{
+                        display: 'flex',
                           gap: '0.5rem',
                           marginTop: '0.5rem',
                           marginBottom: '0.5rem'
@@ -1012,12 +1012,12 @@ const StaffMyRegistrations = () => {
                             }}
                             title="Rate this event"
                           >
-                            <span className="material-symbols-outlined" style={{
+                        <span className="material-symbols-outlined" style={{
                               fontSize: '1.25rem',
                               color: '#1e40af'
-                            }}>
+                        }}>
                               star
-                            </span>
+                        </span>
                           </button>
                           <button
                             onClick={(e) => {
@@ -1035,8 +1035,8 @@ const StaffMyRegistrations = () => {
                               backgroundColor: 'transparent',
                               border: '1px solid #e5e7eb',
                               cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
+                          display: 'flex',
+                          alignItems: 'center',
                               justifyContent: 'center',
                               transition: 'all 0.2s',
                               zIndex: 10,
@@ -1052,15 +1052,15 @@ const StaffMyRegistrations = () => {
                             }}
                             title="Comment on this event"
                           >
-                            <span className="material-symbols-outlined" style={{
+                          <span className="material-symbols-outlined" style={{
                               fontSize: '1.25rem',
                               color: '#1e40af'
-                            }}>
+                          }}>
                               comment
-                            </span>
+                          </span>
                           </button>
-                        </div>
-                      )}
+        </div>
+      )}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1076,27 +1076,27 @@ const StaffMyRegistrations = () => {
                         </span>
                         <span>{registration.eventLocation}</span>
                       </div>
-                      </div>
+                    </div>
 
-                      {registration.eventDescription && (
-                        <p style={{
-                          color: '#6b7280',
-                          fontSize: '0.8125rem',
+                    {registration.eventDescription && (
+                      <p style={{
+                        color: '#6b7280',
+                        fontSize: '0.8125rem',
                           marginBottom: '0.75rem',
-                          marginTop: 0,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          lineHeight: '1.5'
-                        }}>
-                          {registration.eventDescription}
-                        </p>
-                      )}
+                        marginTop: 0,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        lineHeight: '1.5'
+                      }}>
+                        {registration.eventDescription}
+                      </p>
+                    )}
                     </div>
                   </div>
                 ))}
-              </div>
+        </div>
             </>
           )}
           </div>
@@ -1137,7 +1137,7 @@ const StaffMyRegistrations = () => {
             {/* Event Image at Top with Close Button Overlay */}
             <div style={{ position: 'relative' }}>
               {getEventTypeImage(selectedRegistration.eventType) && (
-                <div style={{
+            <div style={{
                   width: '100%',
                   height: '200px',
                   overflow: 'hidden',
