@@ -1146,9 +1146,8 @@ const StaffMyRegistrations = () => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main style={{
-        flex: 1,
+      {/* Navigation */}
+      <nav style={{
         display: 'flex',
         alignItems: 'center',
         padding: '1rem 2rem',
@@ -1508,19 +1507,6 @@ const StaffMyRegistrations = () => {
                       }}>
                         {registration.eventType}
                       </div>
-                        <div
-                        <div style={{
-                          padding: '0.375rem 0.875rem',
-                          borderRadius: '0.5rem',
-                          backgroundColor: getEventTypeColor(registration.eventType),
-                          color: '#FFFFFF',
-                          fontSize: '0.6875rem',
-                          fontWeight: '700',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
-                          {registration.eventType}
-                        </div>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1537,13 +1523,6 @@ const StaffMyRegistrations = () => {
                             setShowCancelModal(true);
                           }}
                           style={{
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: getStatusColor(registration.status),
-                        color: '#FFFFFF',
-                        fontSize: '0.6875rem',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
                             padding: '0.375rem 0.875rem',
                             borderRadius: '0.5rem',
                             border: 'none',
@@ -1558,9 +1537,6 @@ const StaffMyRegistrations = () => {
                           }}
                           title={canStaffCancel(registration) ? 'Tap to cancel & refund to wallet' : ''}
                         >
-                        {getDisplayStatus(registration.status)}
-                      </div>
-                    </div>
                           {getDisplayStatus(registration.status)}
                         </button>
                       </div>
@@ -1630,11 +1606,7 @@ const StaffMyRegistrations = () => {
                             onClick={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              setSelectedEventForRating({
-                                eventId: registration.eventId,
-                                eventTitle: registration.eventTitle
-                              });
-                              setShowRatingModal(true);
+                              handleViewRatingsComments(registration, { focus: 'rating' });
                             }}
                             style={{
                               padding: '0.5rem',
@@ -1670,11 +1642,7 @@ const StaffMyRegistrations = () => {
                             onClick={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              setSelectedEventForComment({
-                                eventId: registration.eventId,
-                                eventTitle: registration.eventTitle
-                              });
-                              setShowCommentModal(true);
+                              handleViewRatingsComments(registration, { focus: 'comment' });
                             }}
                             style={{
                               padding: '0.5rem',
@@ -1729,7 +1697,7 @@ const StaffMyRegistrations = () => {
                       <p style={{
                         color: '#6b7280',
                         fontSize: '0.8125rem',
-                          marginBottom: '0.75rem',
+                        marginBottom: '0.75rem',
                         marginTop: 0,
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
@@ -1740,16 +1708,6 @@ const StaffMyRegistrations = () => {
                         {registration.eventDescription}
                       </p>
                     )}
-                          marginTop: 0,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          lineHeight: '1.5'
-                        }}>
-                          {registration.eventDescription}
-                        </p>
-                      )}
 
                       <div style={{
                         marginTop: 'auto',

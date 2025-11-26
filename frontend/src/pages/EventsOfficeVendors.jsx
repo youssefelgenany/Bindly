@@ -12,8 +12,6 @@ const EventsOfficeVendors = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
-  const [viewingDocument, setViewingDocument] = useState(null);
-  const [documentUrl, setDocumentUrl] = useState(null);
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -69,14 +67,7 @@ const EventsOfficeVendors = () => {
       const token = localStorage.getItem('token');
       const url = `http://localhost:5000/api/vendor/${vendorId}/documents/${documentType}`;
       
-      // Open in new tab for viewing
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.setAttribute('download', '');
-      link.style.display = 'none';
-      
-      // Add authorization header via fetch
+      // Fetch document with authorization header
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -86,11 +77,14 @@ const EventsOfficeVendors = () => {
       if (response.ok) {
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
-        setDocumentUrl(blobUrl);
-        setViewingDocument({ vendorId, documentType });
         
         // Open in new window
         window.open(blobUrl, '_blank');
+        
+        // Clean up the blob URL after a delay to allow the window to open
+        setTimeout(() => {
+          window.URL.revokeObjectURL(blobUrl);
+        }, 100);
       } else {
         alert('Failed to load document');
       }
