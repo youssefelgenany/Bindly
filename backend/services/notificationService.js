@@ -296,6 +296,7 @@ exports.notifyNewEventCreated = async (event) => {
     let skippedCount = 0;
     let errorCount = 0;
     
+    const creatorIdStr = event.createdBy ? event.createdBy.toString() : null;
     for (const user of allUsers) {
       try {
         // Check if notification already exists for this user and event
@@ -304,20 +305,24 @@ exports.notifyNewEventCreated = async (event) => {
           type: 'event_announcement',
           'metadata.eventId': event._id.toString()
         });
-        
-        if (!existingNotification) {
-          const isApproved = event.status === 'approved';
-          const typeLabel = (event.type === 'workshop') ? 'Workshop' : (event.type === 'conference' ? 'Conference' : 'Event');
-          const titleText = isApproved ? `${typeLabel} Approved: ${event.title}` : `New ${typeLabel}: ${event.title}`;
-          const messageText = isApproved
-            ? `The ${typeLabel.toLowerCase()} "${event.title}" has been approved and is open for registration on ${new Date(event.startDate).toLocaleDateString()} at ${event.location}`
-            : `A new ${typeLabel.toLowerCase()} "${event.title}" has been added on ${new Date(event.startDate).toLocaleDateString()} at ${event.location}`;
 
+        // If the event is approved, the creator (professor) already receives a dedicated
+        // 'workshop_approved' notification via the approval flow. To avoid duplicate
+        // notifications for the creator, skip creating a generic event announcement
+        // when the recipient is the creator and the event is approved.
+        const isCreator = creatorIdStr && user._id.toString() === creatorIdStr;
+        if (event.status === 'approved' && isCreator) {
+          skippedCount++;
+          continue;
+        }
+
+        if (!existingNotification) {
+          // Generic announcement for other users (students, other professors, staff, etc.)
           await Notification.create({
             recipient: user._id,
             type: 'event_announcement',
-            title: titleText,
-            message: messageText,
+            title: `New Event: ${event.title}`,
+            message: `A new event "${event.title}" has been added on ${new Date(event.startDate).toLocaleDateString()} at ${event.location}`,
             relatedEvent: event._id,
             priority: 'medium',
             metadata: {
@@ -332,7 +337,6 @@ exports.notifyNewEventCreated = async (event) => {
             }
           });
           notificationCount++;
-
           // Log specifically for TA users
           if (user.userType === 'TA') {
             console.log(`✅ Created notification for TA user: ${user.email} (${user.firstName} ${user.lastName})`);
