@@ -12,8 +12,12 @@ const EventsOfficeVendors = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
-  const [viewingDocument, setViewingDocument] = useState(null);
-  const [documentUrl, setDocumentUrl] = useState(null);
+  const [documentPreview, setDocumentPreview] = useState({
+    visible: false,
+    url: '',
+    type: '',
+    title: ''
+  });
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -52,6 +56,14 @@ const EventsOfficeVendors = () => {
     loadVendors();
   }, [loadVendors]);
 
+  useEffect(() => {
+    return () => {
+      if (documentPreview.url) {
+        window.URL.revokeObjectURL(documentPreview.url);
+      }
+    };
+  }, [documentPreview.url]);
+
   const toggleRow = (vendorId) => {
     setExpandedRows(prev => {
       const newSet = new Set(prev);
@@ -64,19 +76,24 @@ const EventsOfficeVendors = () => {
     });
   };
 
+  const closeDocumentPreview = () => {
+    if (documentPreview.url) {
+      window.URL.revokeObjectURL(documentPreview.url);
+    }
+    setDocumentPreview({
+      visible: false,
+      url: '',
+      type: '',
+      title: ''
+    });
+  };
+
   const handleViewDocument = async (vendorId, documentType) => {
     try {
       const token = localStorage.getItem('token');
       const url = `http://localhost:5000/api/vendor/${vendorId}/documents/${documentType}`;
       
-      // Open in new tab for viewing
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.setAttribute('download', '');
-      link.style.display = 'none';
-      
-      // Add authorization header via fetch
+      // Fetch document with authorization header
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -86,11 +103,22 @@ const EventsOfficeVendors = () => {
       if (response.ok) {
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
-        setDocumentUrl(blobUrl);
-        setViewingDocument({ vendorId, documentType });
-        
-        // Open in new window
-        window.open(blobUrl, '_blank');
+        const vendor = vendors.find(v => (v.id || v._id) === vendorId);
+        const vendorName = vendor?.companyName || 'Vendor Document';
+        const contentType = blob.type || '';
+        const type = contentType.includes('pdf') ? 'pdf' : 'image';
+
+        // Revoke previous preview URL before setting a new one
+        if (documentPreview.url) {
+          window.URL.revokeObjectURL(documentPreview.url);
+        }
+
+        setDocumentPreview({
+          visible: true,
+          url: blobUrl,
+          type,
+          title: `${vendorName} — ${documentType === 'logo' ? 'Logo' : 'Tax Card'}`
+        });
       } else {
         alert('Failed to load document');
       }
@@ -634,43 +662,58 @@ const EventsOfficeVendors = () => {
         }}>
           {/* Page Title Banner */}
           <div style={{
-            backgroundImage: 'linear-gradient(135deg, #1D3557 0%, #457B9D 100%)',
-            borderRadius: '1rem',
-            padding: '3rem 2.5rem',
-            marginBottom: '2rem',
             position: 'relative',
-            overflow: 'hidden'
+            height: '160px',
+            borderRadius: '1rem',
+            overflow: 'hidden',
+            marginBottom: '2rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
           }}>
+            {/* Background Image */}
             <div style={{
               position: 'absolute',
-              top: 0,
-              right: 0,
-              width: '200px',
-              height: '200px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '50%',
-              transform: 'translate(30%, -30%)'
+              inset: 0,
+              backgroundImage: 'url(/assets/images/bazaar-background.jpg)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
             }}></div>
-            <h1 style={{
-              color: '#FFFFFF',
-              fontSize: '2rem',
-              fontWeight: '700',
-              margin: 0,
-              marginBottom: '0.5rem',
+            {/* Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Content */}
+            <div style={{
               position: 'relative',
-              zIndex: 1
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '2.5rem',
+              color: '#FFFFFF'
             }}>
-              Vendors
-            </h1>
-            <p style={{
-              color: 'rgba(255, 255, 255, 0.9)',
-              fontSize: '1rem',
-              margin: 0,
-              position: 'relative',
-              zIndex: 1
-            }}>
-              View and manage all registered vendors
-            </p>
+              <h1 style={{
+                color: '#FFFFFF',
+                fontSize: '2rem',
+                fontWeight: '700',
+                margin: 0,
+                marginBottom: '0.5rem'
+              }}>
+                Vendors
+              </h1>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '1rem',
+                margin: 0
+              }}>
+                View and manage all registered vendors
+              </p>
+            </div>
           </div>
 
           {/* Vendors Table */}
@@ -1039,6 +1082,90 @@ const EventsOfficeVendors = () => {
           )}
         </div>
       </main>
+
+      {documentPreview.visible && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 200
+          }}
+          onClick={closeDocumentPreview}
+        >
+          <div
+            style={{
+              width: '65%',
+              maxWidth: '720px',
+              backgroundColor: '#fff',
+              borderRadius: '0.75rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', color: '#111827' }}>{documentPreview.title}</h3>
+              <button
+                onClick={closeDocumentPreview}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: '1.25rem',
+                  color: '#6b7280'
+                }}
+                aria-label="Close document preview"
+              >
+                ×
+              </button>
+            </div>
+            <div style={{
+              padding: '1rem',
+              minHeight: '50vh',
+              maxHeight: '75vh',
+              backgroundColor: '#f9fafb'
+            }}>
+              {documentPreview.type === 'pdf' ? (
+                <iframe
+                  src={documentPreview.url}
+                  title={documentPreview.title}
+                  style={{
+                    width: '100%',
+                    height: '70vh',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#fff'
+                  }}
+                />
+              ) : (
+                <img
+                  src={documentPreview.url}
+                  alt={documentPreview.title}
+                  style={{
+                    width: '100%',
+                    maxHeight: '70vh',
+                    objectFit: 'contain',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#fff'
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

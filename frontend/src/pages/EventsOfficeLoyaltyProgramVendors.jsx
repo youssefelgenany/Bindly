@@ -572,7 +572,7 @@ const EventsOfficeLoyaltyProgramVendors = () => {
           <div style={{
             position: 'absolute',
             inset: 0,
-            backgroundImage: 'url(/assets/images/events-banner.jpeg)',
+            backgroundImage: 'url(/assets/images/LoyaltyProgram.png)',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
             backgroundSize: 'cover',

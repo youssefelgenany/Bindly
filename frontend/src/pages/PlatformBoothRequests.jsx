@@ -15,6 +15,20 @@ const PlatformBoothRequests = () => {
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [processingIds, setProcessingIds] = useState({});
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'accepted', 'rejected'
+  const [showCreatePollModal, setShowCreatePollModal] = useState(false);
+  const [pollTitle, setPollTitle] = useState('');
+  const [pollDescription, setPollDescription] = useState('');
+  const [selectedRequests, setSelectedRequests] = useState(new Set());
+  const [filterDuration, setFilterDuration] = useState('');
+  const [filterLocation, setFilterLocation] = useState('');
+  const [creatingPoll, setCreatingPoll] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [showPollsModal, setShowPollsModal] = useState(false);
+  const [polls, setPolls] = useState([]);
+  const [loadingPolls, setLoadingPolls] = useState(false);
+  const [selectedPoll, setSelectedPoll] = useState(null);
+  const [pollResults, setPollResults] = useState(null);
+  const [loadingResults, setLoadingResults] = useState(false);
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -38,9 +52,20 @@ const PlatformBoothRequests = () => {
         }
       });
 
-      const allRequests = Array.isArray(response.data) 
-        ? response.data 
-        : (response.data?.requests || []);
+      // Check if response indicates an error
+      if (response.data?.message && response.data.message.includes('Error')) {
+        throw new Error(response.data.message);
+      }
+
+      // Handle different response formats
+      let allRequests = [];
+      if (Array.isArray(response.data)) {
+        allRequests = response.data;
+      } else if (response.data?.requests) {
+        allRequests = response.data.requests;
+      } else if (response.data?.success && response.data?.requests) {
+        allRequests = response.data.requests;
+      }
 
       console.log('🔍 All vendor requests:', allRequests);
       console.log('🔍 Total requests:', allRequests.length);
@@ -64,8 +89,23 @@ const PlatformBoothRequests = () => {
       setRequests(platformBoothRequests);
     } catch (err) {
       console.error('Error loading platform booth requests:', err);
-      setError('Failed to load platform booth requests');
-      setRequests([]);
+      // Check if it's an axios error with response data
+      if (err.response && err.response.status === 500) {
+        const errorMessage = err.response.data?.message || err.message || 'Failed to load platform booth requests';
+        // If backend returns error but we can still work with empty data, don't show error
+        if (errorMessage.toLowerCase().includes('error fetching vendor')) {
+          console.warn('Vendor request fetch had issues, continuing with empty list');
+          setError('');
+          setRequests([]);
+        } else {
+          setError(errorMessage);
+          setRequests([]);
+        }
+      } else {
+        // For other errors, show a generic message
+        setError('Failed to load platform booth requests. Please try again.');
+        setRequests([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -149,6 +189,184 @@ const PlatformBoothRequests = () => {
   const filteredRequests = statusFilter === 'all'
     ? requests
     : requests.filter(r => (r.status || 'pending') === statusFilter);
+
+  // Filter requests for poll creation (by duration and location)
+  const getPollFilteredRequests = () => {
+    return requests.filter(req => {
+      if (req.status !== 'pending') return false;
+      if (filterDuration && req.durationWeeks !== parseInt(filterDuration)) {
+        return false;
+      }
+      if (filterLocation && req.boothLocation !== filterLocation) {
+        return false;
+      }
+      return true;
+    });
+  };
+
+  // Group requests by duration and location for poll creation
+  const getGroupedRequests = () => {
+    const filtered = getPollFilteredRequests();
+    return filtered.reduce((acc, req) => {
+      const key = `${req.durationWeeks || 'N/A'}-${req.boothLocation || 'N/A'}`;
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(req);
+      return acc;
+    }, {});
+  };
+
+  const toggleRequestSelection = (requestId) => {
+    const newSelected = new Set(selectedRequests);
+    if (newSelected.has(requestId)) {
+      newSelected.delete(requestId);
+    } else {
+      newSelected.add(requestId);
+    }
+    setSelectedRequests(newSelected);
+  };
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  };
+
+  const handleCreatePoll = async () => {
+    if (!pollTitle.trim()) {
+      showToast('Please enter a poll title', 'error');
+      return;
+    }
+    if (!pollDescription.trim()) {
+      showToast('Please enter a poll description', 'error');
+      return;
+    }
+    if (selectedRequests.size < 2) {
+      showToast('Please select at least 2 vendor requests to create a poll', 'error');
+      return;
+    }
+
+    setCreatingPoll(true);
+    try {
+      const result = await vendorRequestApi.createPoll({
+        title: pollTitle.trim(),
+        description: pollDescription.trim(),
+        vendorRequestIds: Array.from(selectedRequests)
+      });
+
+      if (result.success) {
+        showToast('Poll created successfully!', 'success');
+        // Reset form
+        setPollTitle('');
+        setPollDescription('');
+        setSelectedRequests(new Set());
+        setFilterDuration('');
+        setFilterLocation('');
+        setShowCreatePollModal(false);
+        // Reload requests and polls if polls modal is open
+        await loadPlatformBoothRequests();
+        if (showPollsModal) {
+          await loadPolls();
+        }
+      } else {
+        showToast(result.message || 'Failed to create poll', 'error');
+      }
+    } catch (err) {
+      console.error('Error creating poll:', err);
+      showToast('Failed to create poll', 'error');
+    } finally {
+      setCreatingPoll(false);
+    }
+  };
+
+  const loadPolls = async () => {
+    try {
+      setLoadingPolls(true);
+      console.log('🔍 Loading polls...');
+      const result = await vendorRequestApi.getAllPolls();
+      console.log('🔍 Polls API result:', result);
+      
+      if (result.success) {
+        // Filter out any polls with invalid data
+        const validPolls = (result.polls || []).filter(poll => {
+          return poll && poll._id && poll.title;
+        });
+        console.log('🔍 Valid polls:', validPolls.length, validPolls);
+        setPolls(validPolls);
+        if (validPolls.length === 0 && result.polls && result.polls.length > 0) {
+          console.warn('Some polls were filtered out due to invalid data');
+        }
+      } else {
+        console.error('❌ Failed to load polls:', result.message);
+        showToast(result.message || 'Failed to load polls', 'error');
+        setPolls([]);
+      }
+    } catch (err) {
+      console.error('❌ Error loading polls:', err);
+      showToast(err.message || 'Failed to load polls', 'error');
+      setPolls([]);
+    } finally {
+      setLoadingPolls(false);
+    }
+  };
+
+  const loadPollResults = async (pollId) => {
+    try {
+      setLoadingResults(true);
+      const result = await vendorRequestApi.getPollResults(pollId);
+      if (result.success) {
+        setPollResults(result.poll);
+      } else {
+        showToast(result.message || 'Failed to load poll results', 'error');
+      }
+    } catch (err) {
+      console.error('Error loading poll results:', err);
+      showToast('Failed to load poll results', 'error');
+    } finally {
+      setLoadingResults(false);
+    }
+  };
+
+  const handleViewPollResults = (poll) => {
+    setSelectedPoll(poll);
+    setPollResults(null);
+    loadPollResults(poll._id);
+  };
+
+  const handleClosePoll = async (pollId) => {
+    if (!window.confirm('Are you sure you want to close this poll? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      const result = await vendorRequestApi.closePoll(pollId);
+      if (result.success) {
+        showToast('Poll closed successfully', 'success');
+        await loadPolls();
+        if (selectedPoll && selectedPoll._id === pollId) {
+          setSelectedPoll(null);
+          setPollResults(null);
+        }
+      } else {
+        showToast(result.message || 'Failed to close poll', 'error');
+      }
+    } catch (err) {
+      console.error('Error closing poll:', err);
+      showToast('Failed to close poll', 'error');
+    }
+  };
+
+  const getLocationName = (location) => {
+    const locationNames = {
+      'sports-area': 'Sports Area',
+      'parking': 'Parking',
+      'main-gate': 'Main Gate',
+      'platform': 'Platform',
+      'exam-halls': 'Exam Halls'
+    };
+    return locationNames[location] || location;
+  };
 
   const displayName = user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Events Office';
 
@@ -528,12 +746,25 @@ const PlatformBoothRequests = () => {
   );
 
   return (
-    <div style={{
-      display: 'flex',
-      height: '100vh',
-      fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f8f6f6'
-    }}>
+    <>
+      <style>{`
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
+      <div style={{
+        display: 'flex',
+        height: '100vh',
+        fontFamily: 'Inter, sans-serif',
+        backgroundColor: '#f8f6f6'
+      }}>
       {renderSidebar()}
 
       <main style={{
@@ -689,7 +920,7 @@ const PlatformBoothRequests = () => {
             </div>
           </div>
 
-          {/* Filter Buttons */}
+          {/* Filter Buttons and Create Poll Button */}
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '0.75rem',
@@ -700,9 +931,11 @@ const PlatformBoothRequests = () => {
             <div style={{
               display: 'flex',
               gap: '0.5rem',
-              flexWrap: 'nowrap',
-              alignItems: 'center'
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between'
             }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {['all', 'pending', 'accepted', 'rejected'].map((status) => {
               const getLabel = (s) => {
                 switch(s) {
@@ -748,6 +981,75 @@ const PlatformBoothRequests = () => {
                 </button>
               );
             })}
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={() => {
+                    setError(''); // Clear any previous errors
+                    setShowPollsModal(true);
+                    loadPolls();
+                  }}
+                  style={{
+                    padding: '0.875rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#f9fafb',
+                    color: '#6b7280',
+                    border: '1px solid #e5e7eb',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.borderColor = '#d1d5db';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#f9fafb';
+                    e.target.style.borderColor = '#e5e7eb';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    visibility
+                  </span>
+                  View Polls
+                </button>
+                <button
+                  onClick={() => setShowCreatePollModal(true)}
+                  style={{
+                    padding: '0.875rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#f9fafb',
+                    color: '#6b7280',
+                    border: '1px solid #e5e7eb',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.borderColor = '#d1d5db';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#f9fafb';
+                    e.target.style.borderColor = '#e5e7eb';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    poll
+                  </span>
+                  Create Poll
+                </button>
+              </div>
             </div>
           </div>
 
@@ -755,15 +1057,36 @@ const PlatformBoothRequests = () => {
             <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
               Loading platform booth requests...
             </div>
-          ) : error ? (
+          ) : error && !showPollsModal && !showCreatePollModal ? (
             <div style={{
               backgroundColor: '#fee2e2',
               color: '#991b1b',
               padding: '1rem',
               borderRadius: '0.5rem',
-              marginBottom: '1.5rem'
+              marginBottom: '1.5rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
-              {error}
+              <span>{error}</span>
+              <button
+                onClick={() => setError('')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#991b1b',
+                  cursor: 'pointer',
+                  padding: '0.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: '1rem'
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                  close
+                </span>
+              </button>
             </div>
           ) : filteredRequests.length === 0 ? (
             <div style={{
@@ -979,7 +1302,870 @@ const PlatformBoothRequests = () => {
           )}
         </div>
       </main>
-    </div>
+
+      {/* Create Poll Modal */}
+      {showCreatePollModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '2rem'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowCreatePollModal(false);
+          }
+        }}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            width: '100%',
+            maxWidth: '800px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                color: '#111827',
+                margin: 0
+              }}>
+                Create Vendor Poll
+              </h3>
+              <button
+                onClick={() => setShowCreatePollModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6b7280'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  close
+                </span>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Poll Details */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Poll Title *
+                </label>
+                <input
+                  type="text"
+                  value={pollTitle}
+                  onChange={(e) => setPollTitle(e.target.value)}
+                  placeholder="e.g., Platform Booth Selection - Sports Area (2 weeks)"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e5e7eb',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1e40af';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Poll Description *
+                </label>
+                <textarea
+                  value={pollDescription}
+                  onChange={(e) => setPollDescription(e.target.value)}
+                  placeholder="Describe the poll and why these vendors are being voted on..."
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e5e7eb',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1e40af';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              {/* Filters */}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Duration (weeks)
+                  </label>
+                  <select
+                    value={filterDuration}
+                    onChange={(e) => setFilterDuration(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e5e7eb',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      backgroundColor: '#FFFFFF',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">All Durations</option>
+                    <option value="1">1 Week</option>
+                    <option value="2">2 Weeks</option>
+                    <option value="3">3 Weeks</option>
+                    <option value="4">4 Weeks</option>
+                  </select>
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Location
+                  </label>
+                  <select
+                    value={filterLocation}
+                    onChange={(e) => setFilterLocation(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e5e7eb',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      backgroundColor: '#FFFFFF',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">All Locations</option>
+                    <option value="sports-area">Sports Area</option>
+                    <option value="parking">Parking</option>
+                    <option value="main-gate">Main Gate</option>
+                    <option value="platform">Platform</option>
+                    <option value="exam-halls">Exam Halls</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Vendor Requests Selection */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h4 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#111827',
+                    margin: 0
+                  }}>
+                    Select Vendor Requests ({selectedRequests.size} selected)
+                  </h4>
+                  {selectedRequests.size > 0 && (
+                    <button
+                      onClick={() => setSelectedRequests(new Set())}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        backgroundColor: '#f9fafb',
+                        color: '#374151',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Clear Selection
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '300px', overflowY: 'auto' }}>
+                  {Object.entries(getGroupedRequests()).map(([key, requests]) => {
+                    const [duration, location] = key.split('-');
+                    return (
+                      <div key={key} style={{
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '0.75rem',
+                        padding: '1rem',
+                        backgroundColor: '#f9fafb'
+                      }}>
+                        <h5 style={{
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#111827',
+                          marginBottom: '0.75rem'
+                        }}>
+                          {getLocationName(location)} - {duration} Week{duration !== '1' ? 's' : ''}
+                        </h5>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {requests.map((req) => {
+                            const vendor = req.vendor || {};
+                            const isSelected = selectedRequests.has(req._id);
+                            
+                            return (
+                              <div
+                                key={req._id}
+                                onClick={() => toggleRequestSelection(req._id)}
+                                style={{
+                                  padding: '0.75rem',
+                                  borderRadius: '0.5rem',
+                                  border: `2px solid ${isSelected ? '#1e40af' : '#e5e7eb'}`,
+                                  backgroundColor: isSelected ? '#eff6ff' : '#FFFFFF',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isSelected) {
+                                    e.currentTarget.style.borderColor = '#93c5fd';
+                                    e.currentTarget.style.backgroundColor = '#f0f9ff';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isSelected) {
+                                    e.currentTarget.style.borderColor = '#e5e7eb';
+                                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                                  }
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleRequestSelection(req._id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{
+                                      width: '1.25rem',
+                                      height: '1.25rem',
+                                      cursor: 'pointer',
+                                      accentColor: '#1e40af'
+                                    }}
+                                  />
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{
+                                      fontSize: '0.875rem',
+                                      fontWeight: '600',
+                                      color: '#111827',
+                                      marginBottom: '0.25rem'
+                                    }}>
+                                      {vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Unknown Vendor'}
+                                    </div>
+                                    <div style={{
+                                      fontSize: '0.75rem',
+                                      color: '#6b7280',
+                                      display: 'flex',
+                                      gap: '0.75rem',
+                                      flexWrap: 'wrap'
+                                    }}>
+                                      <span>Booth Size: {req.boothSize || 'N/A'}</span>
+                                      <span>Duration: {req.durationWeeks || 'N/A'} week{req.durationWeeks !== 1 ? 's' : ''}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {Object.keys(getGroupedRequests()).length === 0 && (
+                  <div style={{
+                    padding: '2rem',
+                    textAlign: 'center',
+                    color: '#6b7280',
+                    fontSize: '0.875rem'
+                  }}>
+                    No pending platform booth requests found matching the filters
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '1.5rem',
+              borderTop: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '1rem'
+            }}>
+              <button
+                onClick={() => {
+                  setShowCreatePollModal(false);
+                  setPollTitle('');
+                  setPollDescription('');
+                  setSelectedRequests(new Set());
+                  setFilterDuration('');
+                  setFilterLocation('');
+                }}
+                style={{
+                  padding: '0.875rem 1.75rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f9fafb';
+                  e.target.style.borderColor = '#d1d5db';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#FFFFFF';
+                  e.target.style.borderColor = '#e5e7eb';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreatePoll}
+                disabled={creatingPoll || selectedRequests.size < 2 || !pollTitle.trim() || !pollDescription.trim()}
+                style={{
+                  padding: '0.875rem 1.75rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  backgroundColor: (creatingPoll || selectedRequests.size < 2 || !pollTitle.trim() || !pollDescription.trim()) ? '#9ca3af' : '#1e40af',
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: (creatingPoll || selectedRequests.size < 2 || !pollTitle.trim() || !pollDescription.trim()) ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (!creatingPoll && selectedRequests.size >= 2 && pollTitle.trim() && pollDescription.trim()) {
+                    e.target.style.backgroundColor = '#1e3a8a';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!creatingPoll && selectedRequests.size >= 2 && pollTitle.trim() && pollDescription.trim()) {
+                    e.target.style.backgroundColor = '#1e40af';
+                  }
+                }}
+              >
+                {creatingPoll ? 'Creating...' : 'Create Poll'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '2rem',
+          right: '2rem',
+          zIndex: 10000,
+          backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444',
+          color: '#FFFFFF',
+          padding: '1rem 1.5rem',
+          borderRadius: '0.5rem',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          minWidth: '300px',
+          animation: 'slideIn 0.3s ease-out'
+        }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+            {toast.type === 'success' ? 'check_circle' : 'error'}
+          </span>
+          <span style={{ fontSize: '0.875rem', fontWeight: '500', flex: 1 }}>
+            {toast.message}
+          </span>
+          <button
+            onClick={() => setToast(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#FFFFFF',
+              cursor: 'pointer',
+              padding: '0.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+              close
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* View Polls Modal */}
+      {showPollsModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '2rem'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowPollsModal(false);
+            setSelectedPoll(null);
+            setPollResults(null);
+          }
+        }}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            width: '100%',
+            maxWidth: '900px',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                color: '#111827',
+                margin: 0
+              }}>
+                {selectedPoll ? 'Poll Results' : 'All Polls'}
+              </h3>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {selectedPoll && (
+                  <button
+                    onClick={() => {
+                      setSelectedPoll(null);
+                      setPollResults(null);
+                    }}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: '#f9fafb',
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Back
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setShowPollsModal(false);
+                    setSelectedPoll(null);
+                    setPollResults(null);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#6b7280'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                    close
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
+              {selectedPoll ? (
+                // Poll Results View
+                <div>
+                  {loadingResults ? (
+                    <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                      Loading results...
+                    </div>
+                  ) : pollResults ? (
+                    <div>
+                      <div style={{ marginBottom: '2rem' }}>
+                        <h4 style={{
+                          fontSize: '1.5rem',
+                          fontWeight: '700',
+                          color: '#111827',
+                          margin: 0,
+                          marginBottom: '0.5rem'
+                        }}>
+                          {pollResults.title}
+                        </h4>
+                        <p style={{
+                          fontSize: '0.875rem',
+                          color: '#6b7280',
+                          margin: 0,
+                          marginBottom: '1rem'
+                        }}>
+                          {pollResults.description}
+                        </p>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '1rem',
+                          fontSize: '0.875rem',
+                          color: '#6b7280'
+                        }}>
+                          <span>Status: <strong style={{ color: pollResults.status === 'active' ? '#10b981' : '#6b7280' }}>
+                            {pollResults.status === 'active' ? 'Active' : 'Closed'}
+                          </strong></span>
+                          <span>Total Votes: <strong>{pollResults.totalVotes || 0}</strong></span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {pollResults.results && pollResults.results.length > 0 ? (
+                          (() => {
+                            const sortedResults = pollResults.results.sort((a, b) => b.voteCount - a.voteCount);
+                            const isClosed = pollResults.status === 'closed';
+                            const hasWinner = isClosed && sortedResults.length > 0 && 
+                              (sortedResults.length === 1 || sortedResults[0].voteCount > sortedResults[1]?.voteCount);
+                            
+                            return sortedResults.map((result, index) => {
+                              const vendorRequest = result.vendorRequest || {};
+                              const vendor = vendorRequest?.vendor || {};
+                              const percentage = pollResults.totalVotes > 0 
+                                ? (result.voteCount / pollResults.totalVotes) * 100 
+                                : 0;
+                              const isWinner = hasWinner && index === 0;
+
+                              return (
+                                <div
+                                  key={result.optionIndex}
+                                  style={{
+                                    border: isWinner ? '2px solid #10b981' : '1px solid #e5e7eb',
+                                    borderRadius: '0.5rem',
+                                    padding: '1.5rem',
+                                    backgroundColor: isWinner ? '#f0fdf4' : '#f9fafb'
+                                  }}
+                                >
+                                  <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'flex-start',
+                                    marginBottom: '1rem'
+                                  }}>
+                                    <div style={{ flex: 1 }}>
+                                      {isWinner && (
+                                        <span style={{
+                                          display: 'inline-block',
+                                          padding: '0.25rem 0.75rem',
+                                          borderRadius: '9999px',
+                                          backgroundColor: '#10b981',
+                                          color: '#FFFFFF',
+                                          fontSize: '0.75rem',
+                                          fontWeight: '600',
+                                          marginBottom: '0.5rem'
+                                        }}>
+                                          🏆 Winner
+                                        </span>
+                                      )}
+                                      <div style={{
+                                        fontSize: '1rem',
+                                        fontWeight: '600',
+                                        color: '#111827',
+                                        marginBottom: '0.5rem'
+                                      }}>
+                                        {vendor?.companyName || `${vendor?.firstName || ''} ${vendor?.lastName || ''}`.trim() || 'Unknown Vendor'}
+                                      </div>
+                                      <div style={{
+                                        fontSize: '0.875rem',
+                                        color: '#6b7280',
+                                        display: 'flex',
+                                        gap: '1rem',
+                                        flexWrap: 'wrap'
+                                      }}>
+                                        <span>Booth Size: {vendorRequest?.boothSize || 'N/A'}</span>
+                                        <span>Duration: {vendorRequest?.durationWeeks || 'N/A'} week{vendorRequest?.durationWeeks !== 1 ? 's' : ''}</span>
+                                        <span>Location: {getLocationName(vendorRequest?.boothLocation)}</span>
+                                      </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                      <div style={{
+                                        fontSize: '1.5rem',
+                                        fontWeight: '700',
+                                        color: '#111827'
+                                      }}>
+                                        {result.voteCount}
+                                      </div>
+                                      <div style={{
+                                        fontSize: '0.875rem',
+                                        color: '#6b7280'
+                                      }}>
+                                        votes ({percentage.toFixed(1)}%)
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div style={{
+                                    width: '100%',
+                                    height: '0.75rem',
+                                    backgroundColor: '#e5e7eb',
+                                    borderRadius: '9999px',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <div style={{
+                                      width: `${percentage}%`,
+                                      height: '100%',
+                                      backgroundColor: isWinner ? '#10b981' : '#3b82f6',
+                                      transition: 'width 0.3s ease'
+                                    }}></div>
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()
+                        ) : (
+                          <div style={{
+                            textAlign: 'center',
+                            padding: '3rem',
+                            color: '#6b7280'
+                          }}>
+                            No votes yet
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                      Failed to load results
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Polls List View
+                <div>
+                  {loadingPolls ? (
+                    <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                      Loading polls...
+                    </div>
+                  ) : polls.length === 0 ? (
+                    <div style={{
+                      textAlign: 'center',
+                      padding: '3rem',
+                      color: '#6b7280'
+                    }}>
+                      No polls created yet
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {polls.map((poll) => (
+                        <div
+                          key={poll._id}
+                          style={{
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '0.5rem',
+                            padding: '1.5rem',
+                            backgroundColor: '#f9fafb'
+                          }}
+                        >
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            marginBottom: '1rem'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <h4 style={{
+                                fontSize: '1.125rem',
+                                fontWeight: '600',
+                                color: '#111827',
+                                margin: 0,
+                                marginBottom: '0.5rem'
+                              }}>
+                                {poll.title}
+                              </h4>
+                              <p style={{
+                                fontSize: '0.875rem',
+                                color: '#6b7280',
+                                margin: 0,
+                                marginBottom: '0.75rem'
+                              }}>
+                                {poll.description}
+                              </p>
+                              <div style={{
+                                display: 'flex',
+                                gap: '1rem',
+                                fontSize: '0.75rem',
+                                color: '#6b7280'
+                              }}>
+                                <span>Status: <strong style={{ color: poll.status === 'active' ? '#10b981' : '#6b7280' }}>
+                                  {poll.status === 'active' ? 'Active' : 'Closed'}
+                                </strong></span>
+                                <span>Created: {new Date(poll.createdAt).toLocaleDateString()}</span>
+                                {poll.options && (
+                                  <span>Options: {poll.options.length}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button
+                                onClick={() => handleViewPollResults(poll)}
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  borderRadius: '0.5rem',
+                                  border: '1px solid #e5e7eb',
+                                  backgroundColor: '#FFFFFF',
+                                  color: '#374151',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '500',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.5rem'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.target.style.backgroundColor = '#f3f4f6';
+                                  e.target.style.borderColor = '#d1d5db';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.backgroundColor = '#FFFFFF';
+                                  e.target.style.borderColor = '#e5e7eb';
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                  bar_chart
+                                </span>
+                                View Results
+                              </button>
+                              {poll.status === 'active' && (
+                                <button
+                                  onClick={() => handleClosePoll(poll._id)}
+                                  style={{
+                                    padding: '0.5rem 1rem',
+                                    borderRadius: '0.5rem',
+                                    border: '1px solid #e5e7eb',
+                                    backgroundColor: '#FFFFFF',
+                                    color: '#ef4444',
+                                    fontSize: '0.875rem',
+                                    fontWeight: '500',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.target.style.backgroundColor = '#fef2f2';
+                                    e.target.style.borderColor = '#fecaca';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.target.style.backgroundColor = '#FFFFFF';
+                                    e.target.style.borderColor = '#e5e7eb';
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                    lock
+                                  </span>
+                                  Close Poll
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+    </>
   );
 };
 

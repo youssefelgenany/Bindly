@@ -54,7 +54,7 @@ const EventsOfficeDashboard = () => {
       const headers = { Authorization: `Bearer ${token}` };
 
       // Fetch all data in parallel
-      const [eventsRes, vendorRequestsRes, notificationsRes, unreadCountRes] = await Promise.all([
+      const [eventsRes, vendorRequestsRes, notificationsRes, unreadCountRes, vendorNotificationsRes, pendingVendorRes] = await Promise.all([
         axios.get('http://localhost:5000/api/events', { headers }).catch(err => {
           console.error('Error fetching events:', err);
           return { data: [] };
@@ -70,6 +70,14 @@ const EventsOfficeDashboard = () => {
         axios.get('http://localhost:5000/api/notifications/unread-count', { headers }).catch(err => {
           console.error('Error fetching unread count:', err);
           return { data: { success: false, unreadCount: 0 } };
+        }),
+        axios.get('http://localhost:5000/api/notifications/by-type/vendor_request?limit=50', { headers }).catch(err => {
+          console.error('Error fetching vendor notifications:', err);
+          return { data: { success: false, data: { notifications: [] } } };
+        }),
+        axios.get('http://localhost:5000/api/vendor-requests/pending/notifications?limit=25', { headers }).catch(err => {
+          console.error('Error fetching pending vendor notifications:', err);
+          return { data: { success: false, notifications: [] } };
         })
       ]);
       
@@ -98,27 +106,53 @@ const EventsOfficeDashboard = () => {
       if (notificationsRes.data?.success && notificationsRes.data.data?.notifications) {
         notificationsData = notificationsRes.data.data.notifications;
       }
-      
-      console.log('📬 Notifications received:', {
-        success: notificationsRes.data?.success,
-        rawResponse: notificationsRes.data,
-        notificationsCount: notificationsData.length,
-        allNotifications: notificationsData,
-        workshopNotifications: notificationsData.filter(n => n && n.type === 'workshop_submission').map(n => ({
-          id: n._id || n.id,
-          type: n.type,
-          title: n.title,
-          message: n.message,
-          metadata: n.metadata,
-          professorName: n.metadata?.professorName,
-          professorFirstName: n.metadata?.professorFirstName,
-          professorLastName: n.metadata?.professorLastName,
-          isRead: n.isRead,
-          createdAt: n.createdAt
-        }))
+      let vendorNotificationsData = [];
+      if (vendorNotificationsRes.data?.success) {
+        vendorNotificationsData =
+          vendorNotificationsRes.data.data?.notifications ||
+          vendorNotificationsRes.data.notifications ||
+          [];
+      }
+      const pendingVendorNotifications =
+        pendingVendorRes.data?.success && Array.isArray(pendingVendorRes.data.notifications)
+          ? pendingVendorRes.data.notifications.map((req) => ({
+              _id: `vendor_req_${req.id || req._id}`,
+              type: 'vendor_request',
+              title: req.vendor?.companyName || 'Vendor Request',
+              message: `${req.vendor?.companyName || 'Vendor'} submitted a ${
+                req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
+              } request for "${req.event?.name || req.eventName || 'Event'}".`,
+              createdAt: req.submittedAt || req.createdAt || new Date().toISOString(),
+              metadata: {
+                vendorName:
+                  req.vendor?.companyName ||
+                  `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim() ||
+                  'Vendor',
+                eventName: req.event?.name || req.eventName || 'Event',
+                eventType: req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
+              },
+              isRead: false
+            }))
+          : [];
+
+      const mergedNotificationMap = new Map();
+      notificationsData.forEach((notif) => {
+        const id = notif?._id || notif?.id;
+        if (id) mergedNotificationMap.set(id, notif);
       });
+      vendorNotificationsData.forEach((notif) => {
+        const id = notif?._id || notif?.id;
+        if (id) mergedNotificationMap.set(id, notif);
+      });
+      pendingVendorNotifications.forEach((notif) => {
+        const id = notif?._id || notif?.id;
+        if (id && !mergedNotificationMap.has(id)) mergedNotificationMap.set(id, notif);
+      });
+      const mergedNotifications = Array.from(mergedNotificationMap.values()).sort(
+        (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0)
+      );
       
-      setNotifications(notificationsData);
+      setNotifications(mergedNotifications);
       
       // Handle unread count
       const unreadCountValue = unreadCountRes.data?.success ? unreadCountRes.data.unreadCount : 0;

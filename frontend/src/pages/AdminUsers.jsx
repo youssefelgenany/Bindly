@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { adminApiService } from '../api/adminApi';
+import VendorNotificationBell from '../components/VendorNotificationBell';
 
 const AdminUsers = () => {
   const { user, logout } = useAuth();
@@ -16,12 +17,22 @@ const AdminUsers = () => {
   const [pendingRoles, setPendingRoles] = useState({}); // id -> role
   const [updatingIds, setUpdatingIds] = useState({}); // id -> boolean
   const [messageById, setMessageById] = useState({}); // id -> message
+  const [sectionExpanded, setSectionExpanded] = useState({
+    pending: false,
+    all: true
+  });
 
   // Users state - will be loaded from API
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [documentPreview, setDocumentPreview] = useState({
+    visible: false,
+    url: '',
+    type: '',
+    title: ''
+  });
   
   // Verification controls - declared early so they can be used in useMemo
   const [verificationStatusById, setVerificationStatusById] = useState({});
@@ -53,6 +64,13 @@ const AdminUsers = () => {
       newExpanded.add(userId);
     }
     setExpandedRows(newExpanded);
+  };
+
+  const toggleSectionExpansion = (section) => {
+    setSectionExpanded(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
   };
 
   // Separate users into pending verification and verified
@@ -204,6 +222,14 @@ const AdminUsers = () => {
     loadUsers();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (documentPreview.url) {
+        window.URL.revokeObjectURL(documentPreview.url);
+      }
+    };
+  }, [documentPreview.url]);
+
   const loadUsers = async () => {
     try {
       setLoading(true);
@@ -249,30 +275,48 @@ const AdminUsers = () => {
     setMessageById(prev => ({ ...prev, [userId]: '' }));
 
     try {
+      console.log('🔄 Assigning role and sending verification:', { userId, role: selectedRole });
       // Use assignRoleAndSendVerification for Staff/TA/Professor registration requests
       const result = await adminApiService.assignRoleAndSendVerification(userId, selectedRole);
+      console.log('📬 Result from API:', result);
+      
       if (result.success) {
-        setMessageById(prev => ({ ...prev, [userId]: 'Role assigned and verification email sent successfully!' }));
+        // Show appropriate message based on email sending status
+        let successMessage = result.message || 'Role assigned and verification email sent successfully!';
+        
+        // If email wasn't sent, show a warning message
+        if (result.emailSent === false) {
+          successMessage = result.message || 'Role assigned, but verification email could not be sent. Please try again.';
+          console.warn('⚠️ Email not sent:', result.emailError);
+        }
+        
+        setMessageById(prev => ({ ...prev, [userId]: successMessage }));
+        
         // Update the user in the local state
+        // Note: Backend sets isVerified to true when admin assigns role
         setUsers(prev => prev.map(u => 
-          u._id === userId ? { ...u, userType: selectedRole, isVerified: false } : u
+          u._id === userId || u.id === userId ? { ...u, userType: selectedRole, isVerified: true } : u
         ));
         // Update verification status
-        setVerificationStatusById(prev => ({ ...prev, [userId]: false }));
+        setVerificationStatusById(prev => ({ ...prev, [userId]: true }));
+        
         // Reload users to update the sections
         setTimeout(() => {
           loadUsers();
         }, 1000);
         // Clear the pending role
         setPendingRoles(prev => ({ ...prev, [userId]: '' }));
-        // Clear message after 5 seconds
+        // Clear message after 5 seconds (or 8 seconds if email failed)
         setTimeout(() => {
           setMessageById(prev => ({ ...prev, [userId]: '' }));
-        }, 5000);
+        }, result.emailSent === false ? 8000 : 5000);
       } else {
-        setMessageById(prev => ({ ...prev, [userId]: result.message || 'Failed to assign role and send verification email.' }));
+        const errorMessage = result.message || 'Failed to assign role and send verification email.';
+        console.error('❌ Failed to assign role:', errorMessage);
+        setMessageById(prev => ({ ...prev, [userId]: errorMessage }));
       }
     } catch (err) {
+      console.error('❌ Exception in handleUpdateRole:', err);
       setMessageById(prev => ({ ...prev, [userId]: 'Failed to assign role and send verification email. Try again.' }));
     } finally {
       setUpdatingIds(prev => ({ ...prev, [userId]: false }));
@@ -327,6 +371,18 @@ const AdminUsers = () => {
     setDeleteConfirm({ show: true, userId });
   };
 
+  const closeDocumentPreview = () => {
+    if (documentPreview.url) {
+      window.URL.revokeObjectURL(documentPreview.url);
+    }
+    setDocumentPreview({
+      visible: false,
+      url: '',
+      type: '',
+      title: ''
+    });
+  };
+
   const handleViewDocument = async (vendorId, documentType) => {
     try {
       const token = localStorage.getItem('token');
@@ -341,7 +397,21 @@ const AdminUsers = () => {
       if (response.ok) {
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
+        const vendor = users.find(v => (v._id || v.id) === vendorId);
+        const vendorName = vendor?.companyName || `${vendor?.firstName || ''} ${vendor?.lastName || ''}`.trim() || 'Vendor Document';
+        const contentType = blob.type || '';
+        const type = contentType.includes('pdf') ? 'pdf' : 'image';
+
+        if (documentPreview.url) {
+          window.URL.revokeObjectURL(documentPreview.url);
+        }
+
+        setDocumentPreview({
+          visible: true,
+          url: blobUrl,
+          type,
+          title: `${vendorName} — ${documentType === 'logo' ? 'Logo' : 'Tax Card'}`
+        });
       } else {
         alert('Failed to load document');
       }
@@ -498,7 +568,7 @@ const AdminUsers = () => {
     );
   }
 
-  return (
+    return (
     <div style={{
       display: 'flex',
       height: '100vh',
@@ -535,7 +605,7 @@ const AdminUsers = () => {
                 <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-              </div>
+            </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <h1 style={{
                   color: '#FFFFFF',
@@ -555,8 +625,8 @@ const AdminUsers = () => {
                 }}>
                   Platform Management
                 </p>
-              </div>
             </div>
+          </div>
           )}
 
           {/* Navigation */}
@@ -798,7 +868,7 @@ const AdminUsers = () => {
               </p>
             )}
           </button>
-        </div>
+      </div>
       </aside>
 
       <main style={{
@@ -845,6 +915,7 @@ const AdminUsers = () => {
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <VendorNotificationBell managePath="/admin/platform-booth-requests" />
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
@@ -996,7 +1067,7 @@ const AdminUsers = () => {
                 </div>
               </div>
 
-              {error && (
+            {error && (
                 <div style={{
                   padding: '0.75rem 1rem',
                   marginBottom: '1.5rem',
@@ -1009,8 +1080,8 @@ const AdminUsers = () => {
                   justifyContent: 'space-between'
                 }}>
                   <span>{error}</span>
-                  <button 
-                    onClick={loadUsers}
+                <button 
+                  onClick={loadUsers}
                     style={{
                       marginLeft: '1rem',
                       padding: '0.25rem 0.75rem',
@@ -1021,11 +1092,11 @@ const AdminUsers = () => {
                       cursor: 'pointer',
                       fontSize: '0.75rem'
                     }}
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
 
               {/* Search and Filters */}
               <div style={{
@@ -1039,10 +1110,31 @@ const AdminUsers = () => {
                 alignItems: 'center'
               }}>
                 {/* Search Bar and Filters Row */}
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', width: '100%', justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: sidebarOpen ? '1fr' : 'minmax(320px, 420px) auto',
+                    gap: '1rem',
+                    width: '100%',
+                    alignItems: 'start'
+                  }}
+                >
                   {/* Search Bar */}
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
-                    <div style={{ position: 'relative', width: '400px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.75rem',
+                      alignItems: 'center',
+                      flexWrap: 'nowrap'
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        maxWidth: '420px'
+                      }}
+                    >
                       <span className="material-symbols-outlined" style={{
                         position: 'absolute',
                         left: '0.75rem',
@@ -1054,11 +1146,11 @@ const AdminUsers = () => {
                       }}>
                         search
                       </span>
-                      <input
-                        type="text"
+              <input
+                type="text"
                         placeholder="Search by name, email, or ID..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && setSearchQuery(e.target.value)}
                         style={{
                           width: '100%',
@@ -1108,10 +1200,18 @@ const AdminUsers = () => {
                     >
                       Search
                     </button>
-                  </div>
-                  
+            </div>
+
                   {/* Filter Buttons */}
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', flexShrink: 0 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.5rem',
+                      flexWrap: sidebarOpen ? 'wrap' : 'nowrap',
+                      alignItems: 'center',
+                      justifyContent: sidebarOpen ? 'flex-start' : 'flex-end'
+                    }}
+                  >
                     {['all', 'Admin', 'Event Office', 'TA', 'Staff', 'Professor', 'Student', 'Vendor'].map((role) => (
                       <button
                         key={role}
@@ -1127,7 +1227,9 @@ const AdminUsers = () => {
                           fontWeight: roleFilter === role ? '600' : '500',
                           textTransform: 'capitalize',
                           transition: 'all 0.2s',
-                          boxShadow: roleFilter === role ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+                          boxShadow: roleFilter === role ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                          minWidth: '90px',
+                          textAlign: 'center'
                         }}
                         onMouseEnter={(e) => {
                           if (roleFilter !== role) {
@@ -1147,22 +1249,27 @@ const AdminUsers = () => {
                     ))}
                   </div>
                 </div>
-              </div>
+                            </div>
 
               {/* Pending Verification Users Section */}
               {filteredPendingUsers.length > 0 && (
-                <div style={{
+                <div style={{ 
                   backgroundColor: '#FFFFFF',
                   borderRadius: '0.75rem',
                   boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                   marginBottom: '2rem',
                   overflow: 'hidden'
                 }}>
-                  <div style={{
+                <div style={{ 
                     padding: '1rem 1.5rem',
                     borderBottom: '1px solid #e5e7eb',
-                    backgroundColor: '#fef3c7'
+                    backgroundColor: '#fef3c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem'
                   }}>
+                  <div>
                     <h4 style={{
                       fontSize: '1rem',
                       fontWeight: '600',
@@ -1179,6 +1286,39 @@ const AdminUsers = () => {
                       Users awaiting role assignment and verification
                     </p>
                   </div>
+                  <button
+                    onClick={() => toggleSectionExpansion('pending')}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      borderRadius: '9999px',
+                      padding: '0.25rem',
+                      cursor: 'pointer',
+                      color: '#92400e',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    aria-label="Toggle pending verification section"
+                  >
+                    <span
+                      className="material-symbols-outlined"
+                      style={{
+                        fontSize: '1.5rem',
+                        display: 'inline-block',
+                        transition: 'transform 0.2s',
+                        transform: sectionExpanded.pending ? 'rotate(180deg)' : 'rotate(0deg)'
+                      }}
+                    >
+                      expand_more
+                    </span>
+                  </button>
+                </div>
+                {sectionExpanded.pending && (
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#f9fafb' }}>
@@ -1302,9 +1442,9 @@ const AdminUsers = () => {
                               }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
                                   {needsRoleAssignment && (
-                                    <select
-                                      value={pendingRoles[userId] ?? ''}
-                                      onChange={(e) => handleRoleChange(userId, e.target.value)}
+                          <select
+                            value={pendingRoles[userId] ?? ''}
+                            onChange={(e) => handleRoleChange(userId, e.target.value)}
                                       style={{
                                         padding: '0.5rem 2.5rem 0.5rem 0.75rem',
                                         border: '1px solid #e5e7eb',
@@ -1321,14 +1461,14 @@ const AdminUsers = () => {
                                       }}
                                     >
                                       <option value="" disabled>Select role</option>
-                                      {roleOptions.map((r) => (
-                                        <option key={r} value={r}>{r}</option>
-                                      ))}
-                                    </select>
+                            {roleOptions.map((r) => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
                                   )}
                                   {needsRoleAssignment && (
-                                    <button
-                                      onClick={() => handleUpdateRole(userId)}
+                          <button
+                            onClick={() => handleUpdateRole(userId)}
                                       disabled={!!updatingIds[userId] || !pendingRoles[userId]}
                                       style={{
                                         padding: '0.5rem 1rem',
@@ -1342,7 +1482,7 @@ const AdminUsers = () => {
                                       }}
                                     >
                                       {updatingIds[userId] ? 'Assigning...' : 'Assign & Send Email'}
-                                    </button>
+                          </button>
                                   )}
                                   {!needsRoleAssignment && ['Staff', 'TA', 'Professor'].includes(u.userType) && (
                                     <button
@@ -1414,14 +1554,6 @@ const AdminUsers = () => {
                                       </div>
                                       <div>
                                         <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                          User ID
-                                        </h4>
-                                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                          {userId}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
                                           Joined Date
                                         </h4>
                                         <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
@@ -1429,7 +1561,7 @@ const AdminUsers = () => {
                                         </p>
                                       </div>
                                     </div>
-                                    {messageById[userId] && (
+                          {messageById[userId] && (
                                       <div style={{
                                         padding: '0.75rem 1rem',
                                         borderRadius: '0.5rem',
@@ -1437,7 +1569,7 @@ const AdminUsers = () => {
                                         color: messageById[userId].includes('success') ? '#065f46' : '#991b1b',
                                         fontSize: '0.875rem'
                                       }}>
-                                        {messageById[userId]}
+                              {messageById[userId]}
                                       </div>
                                     )}
                                     {verifyMsgById[userId] && (
@@ -1460,7 +1592,8 @@ const AdminUsers = () => {
                       })}
                     </tbody>
                   </table>
-                </div>
+                )}
+              </div>
               )}
 
               {/* All Users Section */}
@@ -1473,30 +1606,68 @@ const AdminUsers = () => {
                 <div style={{
                   padding: '1rem 1.5rem',
                   borderBottom: '1px solid #e5e7eb',
-                  backgroundColor: '#f9fafb'
+                  backgroundColor: '#f9fafb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '1rem'
                 }}>
-                  <h4 style={{
-                    fontSize: '1rem',
-                    fontWeight: '600',
-                    color: '#111827',
-                    margin: 0
-                  }}>
-                    All Users ({filteredVerifiedUsers.length})
-                  </h4>
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: '#6b7280',
-                    margin: '0.25rem 0 0 0'
-                  }}>
-                    Verified and active users
-                  </p>
-                </div>
-                {filteredVerifiedUsers.length === 0 ? (
-                  <div style={{ padding: '3rem 2rem', textAlign: 'center', color: '#6b7280' }}>
-                    {users.length === 0 ? 'No users found.' : 'No users match your search.'}
+                  <div>
+                    <h4 style={{
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      color: '#111827',
+                      margin: 0
+                    }}>
+                      All Users ({filteredVerifiedUsers.length})
+                    </h4>
+                    <p style={{
+                      fontSize: '0.875rem',
+                      color: '#6b7280',
+                      margin: '0.25rem 0 0 0'
+                    }}>
+                      Verified and active users
+                    </p>
                   </div>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <button
+                    onClick={() => toggleSectionExpansion('all')}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      borderRadius: '9999px',
+                      padding: '0.25rem',
+                      cursor: 'pointer',
+                      color: '#111827',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    aria-label="Toggle all users section"
+                  >
+                    <span
+                      className="material-symbols-outlined"
+                      style={{
+                        fontSize: '1.5rem',
+                        display: 'inline-block',
+                        transition: 'transform 0.2s',
+                        transform: sectionExpanded.all ? 'rotate(180deg)' : 'rotate(0deg)'
+                      }}
+                    >
+                      expand_more
+                    </span>
+                  </button>
+                </div>
+                {sectionExpanded.all && (
+                  filteredVerifiedUsers.length === 0 ? (
+                    <div style={{ padding: '3rem 2rem', textAlign: 'center', color: '#6b7280' }}>
+                      {users.length === 0 ? 'No users found.' : 'No users match your search.'}
+                    </div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#f9fafb' }}>
                         <th style={{
@@ -1628,7 +1799,7 @@ const AdminUsers = () => {
                                     
                                     if (isAdmin || isEventOffice) {
                                       return (
-                                        <button
+                          <button
                                           onClick={() => handleDeleteClick(userId)}
                                           disabled={!!deletingIds[userId]}
                                           style={{
@@ -1654,7 +1825,7 @@ const AdminUsers = () => {
                                           }}
                                         >
                                           {deletingIds[userId] ? 'Deleting...' : 'Delete'}
-                                        </button>
+                          </button>
                                       );
                                     } else {
                                       const isBlocked = !activeStatusById[userId];
@@ -1694,14 +1865,14 @@ const AdminUsers = () => {
                                             <>
                                               <span className="material-symbols-outlined" style={{ fontSize: '1rem', animation: 'spin 1s linear infinite' }}>
                                                 hourglass_empty
-                                              </span>
+                          </span>
                                               Updating...
                                             </>
                                           ) : (
                                             <>
                                               <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
                                                 {isBlocked ? 'lock_open' : 'block'}
-                                              </span>
+                            </span>
                                               {isBlocked ? 'Unblock' : 'Block'}
                                             </>
                                           )}
@@ -1761,14 +1932,6 @@ const AdminUsers = () => {
                                       </div>
                                       <div>
                                         <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                          User ID
-                                        </h4>
-                                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                          {userId}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
                                           Joined Date
                                         </h4>
                                         <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
@@ -1791,8 +1954,8 @@ const AdminUsers = () => {
                                           <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
                                             {u.companyName}
                                           </p>
-                                        </div>
-                                      )}
+                        </div>
+                        )}
                                     </div>
                                     {u.userType === 'Vendor' && (
                                       <div style={{
@@ -1826,13 +1989,13 @@ const AdminUsers = () => {
                                               }}>
                                                 image
                                               </span>
-                                              <span style={{
+                          <span style={{ 
                                                 fontSize: '0.875rem',
                                                 color: '#111827',
-                                                fontWeight: '500'
-                                              }}>
+                            fontWeight: '500'
+                          }}>
                                                 Logo
-                                              </span>
+                          </span>
                                               <button
                                                 onClick={() => handleViewDocument(userId, 'logo')}
                                                 style={{
@@ -1876,8 +2039,8 @@ const AdminUsers = () => {
                                               >
                                                 Download
                                               </button>
-                                            </div>
-                                          )}
+                        </div>
+                        )}
                                           {(u.vendorTaxCardPath || u.hasTaxCard) && (
                                             <div style={{
                                               display: 'flex',
@@ -1973,7 +2136,8 @@ const AdminUsers = () => {
                         );
                       })}
                     </tbody>
-                  </table>
+                    </table>
+                  )
                 )}
               </div>
             </>
@@ -2115,7 +2279,7 @@ const AdminUsers = () => {
                       {formErrors.firstName}
                     </p>
                   )}
-                </div>
+                      </div>
 
                 <div>
                   <label style={{
@@ -2156,7 +2320,7 @@ const AdminUsers = () => {
                       {formErrors.lastName}
                     </p>
                   )}
-                </div>
+                    </div>
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>
@@ -2197,8 +2361,8 @@ const AdminUsers = () => {
                   <p style={{ color: '#ef4444', fontSize: '0.75rem', margin: '0.25rem 0 0 0' }}>
                     {formErrors.email}
                   </p>
-                )}
-              </div>
+              )}
+            </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 <div>
@@ -2240,7 +2404,7 @@ const AdminUsers = () => {
                       {formErrors.password}
                     </p>
                   )}
-                </div>
+          </div>
 
                 <div>
                   <label style={{
@@ -2289,8 +2453,8 @@ const AdminUsers = () => {
                       {formErrors.role}
                     </p>
                   )}
-                </div>
-              </div>
+        </div>
+      </div>
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
                 <button
@@ -2351,6 +2515,91 @@ const AdminUsers = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {documentPreview.visible && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1.5rem'
+          }}
+          onClick={closeDocumentPreview}
+        >
+          <div
+            style={{
+              width: '65%',
+              maxWidth: '720px',
+              backgroundColor: '#fff',
+              borderRadius: '0.75rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', color: '#111827' }}>{documentPreview.title}</h3>
+              <button
+                onClick={closeDocumentPreview}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: '1.25rem',
+                  color: '#6b7280'
+                }}
+                aria-label="Close document preview"
+              >
+                ×
+              </button>
+            </div>
+            <div style={{
+              padding: '1rem',
+              minHeight: '50vh',
+              maxHeight: '75vh',
+              backgroundColor: '#f9fafb'
+            }}>
+              {documentPreview.type === 'pdf' ? (
+                <iframe
+                  src={documentPreview.url}
+                  title={documentPreview.title}
+                  style={{
+                    width: '100%',
+                    height: '70vh',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#fff'
+                  }}
+                />
+              ) : (
+                <img
+                  src={documentPreview.url}
+                  alt={documentPreview.title}
+                  style={{
+                    width: '100%',
+                    maxHeight: '70vh',
+                    objectFit: 'contain',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#fff'
+                  }}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}

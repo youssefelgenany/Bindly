@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { adminApiService } from '../api/adminApi';
+import VendorNotificationBell from '../components/VendorNotificationBell';
 //test
 const AdminEvents = () => {
   const { user } = useAuth();
@@ -197,9 +198,12 @@ const AdminEvents = () => {
     <div style={{ padding: '2rem' }}>
       <div className="container">
         <div className="card">
-          <div className="card-header">
-            <h1 className="card-title" style={{ color: 'var(--guc-red)' }}>Events Management</h1>
-            <p className="card-subtitle">View and manage all platform events</p>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+            <div>
+              <h1 className="card-title" style={{ color: 'var(--guc-red)', margin: 0 }}>Events Management</h1>
+              <p className="card-subtitle" style={{ margin: 0 }}>View and manage all platform events</p>
+            </div>
+            <VendorNotificationBell managePath="/admin/platform-booth-requests" />
           </div>
 
           <div style={{ padding: '1rem', display: 'grid', gap: '1rem' }}>

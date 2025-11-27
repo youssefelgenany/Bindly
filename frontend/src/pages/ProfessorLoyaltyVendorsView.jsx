@@ -220,7 +220,7 @@ const ProfessorLoyaltyVendorsView = () => {
         padding: '1rem 2.5rem',
         backgroundColor: '#FFFFFF'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#1D3557',
@@ -234,7 +234,125 @@ const ProfessorLoyaltyVendorsView = () => {
             </h2>
           </Link>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+        
+        {/* Centered Navigation Menu */}
+        <nav style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+          gap: '1.25rem'
+        }}>
+          <Link
+            to="/dashboard"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              dashboard
+            </span>
+            Dashboard
+          </Link>
+          <Link
+            to="/professor/all-events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              explore
+            </span>
+            Discover Events
+          </Link>
+          <Link
+            to="/professor/events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              event
+            </span>
+            My Events
+          </Link>
+          <Link
+            to="/gym"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/gym') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              fitness_center
+            </span>
+            Gym Sessions
+          </Link>
+        </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          {/* Heart Icon - Favorites */}
+          <Link
+            to="/professor/favorites"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              textDecoration: 'none',
+              color: 'inherit'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{
+              fontSize: '1.5rem',
+              color: '#1D3557'
+            }}>
+              favorite
+            </span>
+          </Link>
+
           {/* Notifications Bell */}
           <div style={{ position: 'relative' }} data-notifications-dropdown>
             <button
@@ -538,6 +656,35 @@ const ProfessorLoyaltyVendorsView = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
+                <Link
+                  to="/wallet"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => setShowLogoutDropdown(false)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    account_balance_wallet
+                  </span>
+                  My Wallet
+                </Link>
                 <button
                   onClick={handleLogout}
                   style={{
@@ -570,83 +717,6 @@ const ProfessorLoyaltyVendorsView = () => {
           </div>
         </div>
       </header>
-
-      {/* Horizontal Menu Bar */}
-      <nav style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '1rem 2rem',
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #e2e8f0'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <Link
-            to="/dashboard"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/professor/all-events"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Discover Events
-          </Link>
-          <Link
-            to="/professor/events"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Events
-          </Link>
-          <Link
-            to="/professor/my-workshops"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Workshops
-          </Link>
-          <Link
-            to="/professor/gym-schedule"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/gym-schedule') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            View Gym Sessions
-          </Link>
-        </div>
-      </nav>
 
       {/* Main Content */}
       <main style={{
@@ -840,19 +910,29 @@ const ProfessorLoyaltyVendorsView = () => {
                           }}
                         >
                           {/* Vendor Logo/Icon */}
-                          {vendor.logoUrl ? (
-                            <img
-                              src={vendor.logoUrl}
-                              alt={vendor.vendorName}
-                              style={{
-                                width: '4rem',
-                                height: '4rem',
-                                borderRadius: '0.5rem',
-                                objectFit: 'cover',
-                                marginBottom: '1rem'
-                              }}
-                            />
-                          ) : (
+                      {vendor.logoUrl ? (
+                        <div style={{
+                          width: '3.75rem',
+                          height: '3.75rem',
+                          borderRadius: '9999px',
+                          border: '2px solid rgba(99, 102, 241, 0.25)',
+                          backgroundColor: '#f4f6ff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden'
+                        }}>
+                          <img
+                            src={vendor.logoUrl}
+                            alt={vendor.vendorName}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover'
+                            }}
+                          />
+                        </div>
+                      ) : (
                             <div style={{
                               width: '4rem',
                               height: '4rem',
@@ -1022,17 +1102,28 @@ const ProfessorLoyaltyVendorsView = () => {
               }}>
                 <div style={{ flex: 1 }}>
                   {selectedVendor.logoUrl ? (
-                    <img
-                      src={selectedVendor.logoUrl}
-                      alt={selectedVendor.vendorName}
-                      style={{
-                        width: '4rem',
-                        height: '4rem',
-                        borderRadius: '0.5rem',
-                        objectFit: 'cover',
-                        marginBottom: '1rem'
-                      }}
-                    />
+                    <div style={{
+                      width: '4rem',
+                      height: '4rem',
+                      borderRadius: '9999px',
+                      border: '2px solid rgba(99, 102, 241, 0.25)',
+                      backgroundColor: '#f4f6ff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      marginBottom: '1rem'
+                    }}>
+                      <img
+                        src={selectedVendor.logoUrl}
+                        alt={selectedVendor.vendorName}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                    </div>
                   ) : (
                     <div style={{
                       width: '4rem',

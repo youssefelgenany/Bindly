@@ -42,7 +42,7 @@
 .submit-btn {
   width: 100%;
   padding: 14px 24px;
-  background: var(--primary-blue);
+  background: var(--primary-blue, #1e40af);
   color: white;
   border: none;
   border-radius: 8px;
@@ -54,7 +54,7 @@
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: var(--primary-blue-dark);
+  background: var(--primary-blue-dark, #1c3d99);
 }
 
 .submit-btn:disabled {

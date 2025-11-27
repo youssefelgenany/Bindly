@@ -575,6 +575,35 @@ const StudentMyRegistrations = () => {
   };
 
   return (
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        .banner-animate {
+          animation: fadeInUp 0.8s ease-out;
+        }
+        .banner-content-animate {
+          animation: slideInLeft 1s ease-out 0.2s both;
+        }
+      `}</style>
     <div style={{
       display: 'flex',
       flexDirection: 'column',
@@ -1137,14 +1166,26 @@ const StudentMyRegistrations = () => {
             marginRight: '4rem'
           }}>
           {/* Page Title Box */}
-          <div style={{
-            position: 'relative',
-            height: '140px',
-            borderRadius: '0.75rem',
-            overflow: 'hidden',
-            marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-          }}>
+          <div 
+            className="banner-animate"
+            style={{
+              position: 'relative',
+              height: '140px',
+              borderRadius: '0.75rem',
+              overflow: 'hidden',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 12px -2px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+            }}
+          >
             {/* Background Image */}
             <div style={{
               position: 'absolute',
@@ -1153,26 +1194,31 @@ const StudentMyRegistrations = () => {
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
-              filter: 'blur(2px)'
+              filter: 'blur(2px)',
+              transition: 'transform 0.5s ease, filter 0.5s ease'
             }}></div>
             {/* Blue Overlay */}
             <div style={{
               position: 'absolute',
               inset: 0,
-              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+              backgroundColor: 'rgba(29, 53, 87, 0.75)',
+              transition: 'background-color 0.3s ease'
             }}></div>
             {/* Content */}
-            <div style={{
-              position: 'relative',
-              zIndex: 10,
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'flex-start',
-              padding: '2rem 2.5rem',
-              color: '#FFFFFF'
-            }}>
+            <div 
+              className="banner-content-animate"
+              style={{
+                position: 'relative',
+                zIndex: 10,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+                padding: '2rem 2.5rem',
+                color: '#FFFFFF'
+              }}
+            >
               <h3 style={{
                 color: '#FFFFFF',
                 fontSize: '1.75rem',
@@ -2949,6 +2995,7 @@ const StudentMyRegistrations = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 

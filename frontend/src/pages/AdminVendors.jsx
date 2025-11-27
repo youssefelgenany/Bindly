@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { adminApiService } from '../api/adminApi';
+import VendorNotificationBell from '../components/VendorNotificationBell';
 
 const AdminVendors = () => {
   const { user } = useAuth();

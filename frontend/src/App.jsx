@@ -60,6 +60,8 @@ import VendorAcceptedEvents from './pages/VendorAcceptedEvents';
 import VendorMyRequests from './pages/VendorMyRequests';
 import PlatformBoothRequests from './pages/PlatformBoothRequests';
 import VendorLoyaltyProgram from './pages/VendorLoyaltyProgram';
+import EventsOfficeCreatePoll from './pages/EventsOfficeCreatePoll';
+import BoothPolls from './pages/BoothPolls';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -433,6 +435,24 @@ const AppContent = () => {
               <EventsOfficeOnly>
                 <PlatformBoothRequests />
               </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/event-office/create-poll"
+          element={
+            <ProtectedRoute>
+              <EventsOfficeOnly>
+                <EventsOfficeCreatePoll />
+              </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/booth-polls"
+          element={
+            <ProtectedRoute>
+              <BoothPolls />
             </ProtectedRoute>
           }
         />

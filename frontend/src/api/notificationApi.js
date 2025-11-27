@@ -45,6 +45,26 @@ export const notificationApiService = {
     }
   },
 
+  // Get notifications by type (e.g., vendor_request)
+  getNotificationsByType: async (type, options = {}) => {
+    try {
+      const { limit = 50, skip = 0 } = options;
+      const params = new URLSearchParams();
+      if (limit) params.append('limit', limit);
+      if (skip) params.append('skip', skip);
+
+      const queryString = params.toString();
+      const response = await notificationApi.get(`/by-type/${type}?${queryString}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || `Failed to fetch ${type} notifications`,
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
   // Get unread count
   getUnreadCount: async () => {
     try {
