@@ -862,6 +862,65 @@ const VendorAcceptedEvents = () => {
                                 {event.description}
                               </p>
                             )}
+                            
+                            {/* Vendor QR Code Display */}
+                            {event.qrCode && (
+                              <div style={{
+                                marginTop: '0.75rem',
+                                padding: '0.75rem',
+                                backgroundColor: '#f9fafb',
+                                borderRadius: '0.5rem',
+                                border: '1px solid #e5e7eb'
+                              }}>
+                                <p style={{
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600',
+                                  color: '#374151',
+                                  margin: '0 0 0.5rem 0'
+                                }}>
+                                  Your Vendor QR Code
+                                </p>
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem'
+                                }}>
+                                  <img
+                                    src={event.qrCode}
+                                    alt="Vendor QR Code"
+                                    style={{
+                                      width: '80px',
+                                      height: '80px',
+                                      border: '1px solid #d1d5db',
+                                      borderRadius: '0.375rem',
+                                      padding: '4px',
+                                      backgroundColor: '#FFFFFF'
+                                    }}
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                      const parent = e.target.parentElement;
+                                      if (parent && !parent.querySelector('.qr-placeholder')) {
+                                        const placeholder = document.createElement('div');
+                                        placeholder.className = 'qr-placeholder';
+                                        placeholder.textContent = 'QR Code';
+                                        placeholder.style.cssText = 'width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; border: 1px solid #d1d5db; border-radius: 0.375rem; background-color: #f3f4f6; color: #6b7280; font-size: 0.75rem;';
+                                        parent.appendChild(placeholder);
+                                      }
+                                    }}
+                                  />
+                                  <div style={{ flex: 1 }}>
+                                    <p style={{
+                                      fontSize: '0.6875rem',
+                                      color: '#6b7280',
+                                      margin: 0,
+                                      lineHeight: '1.4'
+                                    }}>
+                                      Use this QR code for vendor check-in at the event.
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                           {/* Footer with Payment and Cancel buttons aligned bottom-right */}
                           <div style={{ padding: '0.75rem 1rem 1rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: 'auto', flexWrap: 'wrap' }}>

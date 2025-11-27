@@ -12,8 +12,6 @@ const EventsOfficeVendors = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
-  const [viewingDocument, setViewingDocument] = useState(null);
-  const [documentUrl, setDocumentUrl] = useState(null);
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -69,14 +67,7 @@ const EventsOfficeVendors = () => {
       const token = localStorage.getItem('token');
       const url = `http://localhost:5000/api/vendor/${vendorId}/documents/${documentType}`;
       
-      // Open in new tab for viewing
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.setAttribute('download', '');
-      link.style.display = 'none';
-      
-      // Add authorization header via fetch
+      // Fetch document with authorization header
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -86,11 +77,14 @@ const EventsOfficeVendors = () => {
       if (response.ok) {
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
-        setDocumentUrl(blobUrl);
-        setViewingDocument({ vendorId, documentType });
         
         // Open in new window
         window.open(blobUrl, '_blank');
+        
+        // Clean up the blob URL after a delay to allow the window to open
+        setTimeout(() => {
+          window.URL.revokeObjectURL(blobUrl);
+        }, 100);
       } else {
         alert('Failed to load document');
       }
@@ -634,43 +628,58 @@ const EventsOfficeVendors = () => {
         }}>
           {/* Page Title Banner */}
           <div style={{
-            backgroundImage: 'linear-gradient(135deg, #1D3557 0%, #457B9D 100%)',
-            borderRadius: '1rem',
-            padding: '3rem 2.5rem',
-            marginBottom: '2rem',
             position: 'relative',
-            overflow: 'hidden'
+            height: '160px',
+            borderRadius: '1rem',
+            overflow: 'hidden',
+            marginBottom: '2rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
           }}>
+            {/* Background Image */}
             <div style={{
               position: 'absolute',
-              top: 0,
-              right: 0,
-              width: '200px',
-              height: '200px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '50%',
-              transform: 'translate(30%, -30%)'
+              inset: 0,
+              backgroundImage: 'url(/assets/images/bazaar-background.jpg)',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              filter: 'blur(2px)'
             }}></div>
-            <h1 style={{
-              color: '#FFFFFF',
-              fontSize: '2rem',
-              fontWeight: '700',
-              margin: 0,
-              marginBottom: '0.5rem',
+            {/* Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Content */}
+            <div style={{
               position: 'relative',
-              zIndex: 1
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '2.5rem',
+              color: '#FFFFFF'
             }}>
-              Vendors
-            </h1>
-            <p style={{
-              color: 'rgba(255, 255, 255, 0.9)',
-              fontSize: '1rem',
-              margin: 0,
-              position: 'relative',
-              zIndex: 1
-            }}>
-              View and manage all registered vendors
-            </p>
+              <h1 style={{
+                color: '#FFFFFF',
+                fontSize: '2rem',
+                fontWeight: '700',
+                margin: 0,
+                marginBottom: '0.5rem'
+              }}>
+                Vendors
+              </h1>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '1rem',
+                margin: 0
+              }}>
+                View and manage all registered vendors
+              </p>
+            </div>
           </div>
 
           {/* Vendors Table */}

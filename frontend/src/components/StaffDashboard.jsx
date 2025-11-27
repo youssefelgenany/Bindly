@@ -407,6 +407,25 @@ const StaffDashboard = () => {
                         </span>
                         Gym Sessions
                     </Link>
+                    <Link
+                        to="/booth-polls"
+                        style={{
+                            textDecoration: 'none',
+                            color: isActiveRoute('/booth-polls') ? '#2563eb' : '#6b7280',
+                            fontSize: '0.875rem',
+                            fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+                            paddingBottom: '0.5rem',
+                            borderBottom: isActiveRoute('/booth-polls') ? '2px solid #2563eb' : '2px solid transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                            poll
+                        </span>
+                        Vendor Polls
+                    </Link>
                 </nav>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>

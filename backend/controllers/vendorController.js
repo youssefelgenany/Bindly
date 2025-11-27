@@ -278,13 +278,23 @@ module.exports.viewUpcomingEvents = async (req, res) => {
 // Apply to bazaar or booth
 module.exports.applyToEvent = async (req, res) => {
   try {
+    console.log('🔍 applyToEvent - Request received');
+    console.log('🔍 applyToEvent - User:', req.user?.email || req.user?._id);
+    console.log('🔍 applyToEvent - Body keys:', Object.keys(req.body || {}));
+    console.log('🔍 applyToEvent - Files:', req.files?.length || 0);
+    
     // Check if user is authenticated
     if (!req.user) {
-      return res.status(401).json({ message: 'Authentication required' });
+      return res.status(401).json({ message: 'Authentication required', success: false });
     }
 
     const vendorId = req.user._id || req.user.id;
     const { eventId, attendees: rawAttendees, boothSize, durationWeeks, boothLocation, message, eventType, isStandalone } = req.body;
+    
+    console.log('🔍 applyToEvent - eventId:', eventId);
+    console.log('🔍 applyToEvent - eventType:', eventType);
+    console.log('🔍 applyToEvent - boothSize:', boothSize);
+    console.log('🔍 applyToEvent - attendees count:', Array.isArray(rawAttendees) ? rawAttendees.length : typeof rawAttendees);
 
     // Parse attendees when sent as JSON string (multipart/form-data) or ensure it's an array
     let attendees = rawAttendees;
@@ -300,11 +310,24 @@ module.exports.applyToEvent = async (req, res) => {
 
     // Validate vendor role
     const vendor = await User.findById(vendorId);
-    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
-    if (vendor.userType !== 'Vendor') return res.status(403).json({ message: 'Unauthorized' });
+    if (!vendor) {
+      console.error('❌ Vendor not found:', vendorId);
+      return res.status(404).json({ message: 'Vendor not found', success: false });
+    }
+    if (vendor.userType !== 'Vendor') {
+      console.error('❌ User is not a vendor:', vendor.userType);
+      return res.status(403).json({ message: 'Unauthorized. Only vendors can apply to events.', success: false });
+    }
 
-    // Attendees validated by frontend selection (max 5), no error message needed
-    if (attendees.length > 5) return res.status(400).json({ message: 'Max 5 attendees exceeded' });
+    // Validate attendees
+    if (!attendees || attendees.length === 0) {
+      console.error('❌ No attendees provided');
+      return res.status(400).json({ message: 'At least one attendee is required', success: false });
+    }
+    if (attendees.length > 5) {
+      console.error('❌ Too many attendees:', attendees.length);
+      return res.status(400).json({ message: 'Maximum 5 attendees allowed', success: false });
+    }
 
     // Fetch event from 'events' collection or standalone booth from 'booths' collection
     let event = await Event.findById(eventId);
@@ -324,14 +347,19 @@ module.exports.applyToEvent = async (req, res) => {
       }
     }
 
-    if (!event) return res.status(404).json({ message: 'Invalid event or booth' });
+    if (!event) {
+      console.error('❌ Event not found:', eventId);
+      return res.status(404).json({ message: 'Event or booth not found. Please check the event ID.', success: false });
+    }
     if (event.type !== 'bazaar' && event.type !== 'booth') {
-      return res.status(400).json({ message: 'Event type must be bazaar or booth' });
+      console.error('❌ Invalid event type:', event.type);
+      return res.status(400).json({ message: `Invalid event type: ${event.type}. Only bazaar and booth events are supported.`, success: false });
     }
 
     // Validate specific requirements based on event type
     if (event.type === 'bazaar' && !boothSize) {
-      return res.status(400).json({ message: 'Booth size required for bazaar' });
+      console.error('❌ Booth size missing for bazaar');
+      return res.status(400).json({ message: 'Booth size is required for bazaar applications', success: false });
     }
     if (event.type === 'booth') {
       // Check if this is a standalone booth event based on eventType parameter
@@ -350,9 +378,7 @@ module.exports.applyToEvent = async (req, res) => {
 
         // Validate booth location is from predefined list
         const validLocations = [
-          'main-entrance', 'food-court', 'central-plaza', 'student-center',
-          'library-area', 'gym-entrance', 'parking-lot', 'garden-section',
-          'auditorium-hall', 'cafeteria-area'
+          'sports-area', 'parking', 'main-gate', 'platform', 'exam-halls'
         ];
 
         if (!boothLocation || boothLocation.trim() === '' || !validLocations.includes(boothLocation)) {
@@ -385,7 +411,8 @@ module.exports.applyToEvent = async (req, res) => {
       }
       if (typeof message === 'string') existingRequest.message = message;
       await existingRequest.save();
-      return res.status(200).json({ message: 'Application updated' });
+      console.log('✅ Application updated successfully');
+      return res.status(200).json({ message: 'Application updated successfully', success: true });
     }
 
     const requestData = {
@@ -416,7 +443,7 @@ module.exports.applyToEvent = async (req, res) => {
     console.log('🔍 Creating new VendorRequest with data:', requestData);
     const request = new VendorRequest(requestData);
     await request.save();
-    console.log('🔍 Saved VendorRequest with ID:', request._id);
+    console.log('✅ Saved VendorRequest with ID:', request._id);
     
     // Notify Events Office users about the new vendor request
     try {
@@ -431,10 +458,42 @@ module.exports.applyToEvent = async (req, res) => {
       // Don't fail the request if notification fails
     }
     
-    res.status(201).json({ message: 'Application submitted' });
+    res.status(201).json({ message: 'Application submitted', success: true });
   } catch (error) {
-    console.error('Server error in applyToEvent:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('❌ Server error in applyToEvent:', error);
+    console.error('❌ Error name:', error.name);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = {};
+      Object.keys(error.errors).forEach(key => {
+        validationErrors[key] = error.errors[key].message;
+      });
+      return res.status(400).json({ 
+        message: 'Validation error',
+        error: error.message,
+        validationErrors: Object.values(validationErrors),
+        success: false
+      });
+    }
+    
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      return res.status(409).json({ 
+        message: 'A vendor request with these details already exists',
+        error: error.message,
+        success: false
+      });
+    }
+    
+    // Return detailed error message in development, generic in production
+    res.status(500).json({ 
+      message: process.env.NODE_ENV === 'development' ? error.message : 'Server error. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      success: false
+    });
   }
 };
 
@@ -599,7 +658,9 @@ module.exports.getMyRequests = async (req, res) => {
             paymentStatus: r.paymentStatus || 'pending',
             paidAt: r.paidAt || null,
             attendees: r.attendees || [],
-            boothSize: r.boothSize || undefined
+            boothSize: r.boothSize || undefined,
+            qrCode: r.qrCode || undefined,
+            qrCodeData: r.qrCodeData || undefined
           }));
       }
       if (t === 'booth') {
@@ -623,7 +684,9 @@ module.exports.getMyRequests = async (req, res) => {
             paidAt: r.paidAt || null,
             attendees: r.attendees || [],
             durationWeeks: r.durationWeeks || undefined,
-            boothLocation: r.boothLocation || undefined
+            boothLocation: r.boothLocation || undefined,
+            qrCode: r.qrCode || undefined,
+            qrCodeData: r.qrCodeData || undefined
           }));
       }
       return [];
@@ -657,7 +720,9 @@ module.exports.getMyRequests = async (req, res) => {
         boothLocation: r.boothLocation || undefined,
         boothId: r.boothId || undefined,
         createdAt: r.createdAt,
-        message: r.message || undefined
+        message: r.message || undefined,
+        qrCode: r.qrCode || undefined,
+        qrCodeData: r.qrCodeData || undefined
       }));
     };
 

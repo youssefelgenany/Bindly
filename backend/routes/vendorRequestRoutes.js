@@ -12,6 +12,7 @@ const {
   cancelVendorRequest,
   createBoothPoll,
   getBoothPolls,
+  getPublicBoothPolls,
   voteInBoothPoll,
   closeBoothPoll,
   getBoothPollResults,
@@ -49,7 +50,27 @@ router.get('/payment-success', handleStripePaymentSuccess);
 // Route to upload individual IDs for an existing vendor request - Vendor
 router.put('/:requestId/upload-ids', protect, permit('vendor'), uploadIndividualIdsArray, uploadIndividualIds);
 
+// Booth Poll Routes - MUST be before /:id routes to prevent route conflicts
+// Create booth poll - Events Office / Admin
+router.post('/polls', protect, permit('event_office', 'admin'), createBoothPoll);
+
+// Get all booth polls - Events Office / Admin (full details)
+router.get('/polls', protect, permit('event_office', 'admin'), getBoothPolls);
+
+// Get public booth polls - Students, Staff, TA, Professor (for voting)
+router.get('/polls/public', protect, permit('Student', 'Staff', 'TA', 'Professor'), getPublicBoothPolls);
+
+// Vote in booth poll - Students, Staff, TA, Professor
+router.post('/polls/:pollId/vote', protect, permit('Student', 'Staff', 'TA', 'Professor'), voteInBoothPoll);
+
+// Close booth poll - Events Office / Admin
+router.patch('/polls/:pollId/close', protect, permit('event_office', 'admin'), closeBoothPoll);
+
+// Get booth poll results - Events Office / Admin
+router.get('/polls/:pollId/results', protect, permit('event_office', 'admin'), getBoothPollResults);
+
 // Route to get a single vendor request by ID - Events Office / Admin
+// MUST be after /polls routes to prevent /polls from matching as /:id
 router.get(
   '/:id',
   protect,
@@ -71,22 +92,6 @@ router.get('/:id/votes', protect, getVendorRequestVotes);
 
 // Route to cancel vendor request - Vendor (only if not paid yet)
 router.delete('/:requestId/cancel', protect, permit('vendor'), cancelVendorRequest);
-
-// Booth Poll Routes
-// Create booth poll - Events Office / Admin
-router.post('/polls', protect, permit('event_office', 'admin'), createBoothPoll);
-
-// Get all booth polls - Events Office / Admin
-router.get('/polls', protect, permit('event_office', 'admin'), getBoothPolls);
-
-// Vote in booth poll - Vendors
-router.post('/polls/:pollId/vote', protect, permit('vendor'), voteInBoothPoll);
-
-// Close booth poll - Events Office / Admin
-router.patch('/polls/:pollId/close', protect, permit('event_office', 'admin'), closeBoothPoll);
-
-// Get booth poll results - Events Office / Admin
-router.get('/polls/:pollId/results', protect, permit('event_office', 'admin'), getBoothPollResults);
 
 // Payment endpoints for vendor requests - Vendor owners
 // Get payment details

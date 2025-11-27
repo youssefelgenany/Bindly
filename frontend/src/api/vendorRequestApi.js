@@ -225,6 +225,329 @@ export const vendorRequestApi = {
         error: error
       };
     }
+  },
+
+  // Poll functions
+  // Create a booth poll (Events Office/Admin)
+  createPoll: async (pollData) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return {
+          success: false,
+          message: 'No authentication token found. Please log in again.'
+        };
+      }
+
+      const response = await fetch(`${API_BASE}/vendor-requests/polls`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(pollData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          return {
+            success: false,
+            message: 'Invalid/expired token. Please log in again.',
+            requiresLogin: true
+          };
+        }
+
+        return {
+          success: false,
+          message: data.message || data.error || 'Failed to create poll',
+          error: data
+        };
+      }
+
+      return {
+        success: true,
+        message: data.message || 'Poll created successfully',
+        poll: data.poll
+      };
+    } catch (error) {
+      console.error('Error creating poll:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to create poll',
+        error: error
+      };
+    }
+  },
+
+  // Get all polls (Events Office/Admin)
+  getAllPolls: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return {
+          success: false,
+          message: 'No authentication token found. Please log in again.'
+        };
+      }
+
+      const response = await fetch(`${API_BASE}/vendor-requests/polls`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          return {
+            success: false,
+            message: 'Invalid/expired token. Please log in again.',
+            requiresLogin: true
+          };
+        }
+
+        return {
+          success: false,
+          message: data.message || data.error || 'Failed to fetch polls',
+          error: data
+        };
+      }
+
+      return {
+        success: true,
+        polls: data.polls || []
+      };
+    } catch (error) {
+      console.error('Error fetching polls:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch polls',
+        error: error
+      };
+    }
+  },
+
+  // Get public polls (Students/Staff/TA/Professor)
+  getPublicPolls: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return {
+          success: false,
+          message: 'No authentication token found. Please log in again.'
+        };
+      }
+
+      const response = await fetch(`${API_BASE}/vendor-requests/polls/public`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          return {
+            success: false,
+            message: 'Invalid/expired token. Please log in again.',
+            requiresLogin: true
+          };
+        }
+
+        return {
+          success: false,
+          message: data.message || data.error || 'Failed to fetch polls',
+          error: data
+        };
+      }
+
+      return {
+        success: true,
+        polls: data.polls || []
+      };
+    } catch (error) {
+      console.error('Error fetching public polls:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch polls',
+        error: error
+      };
+    }
+  },
+
+  // Vote in a poll (Students/Staff/TA/Professor)
+  voteInPoll: async (pollId, optionIndex) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return {
+          success: false,
+          message: 'No authentication token found. Please log in again.'
+        };
+      }
+
+      const response = await fetch(`${API_BASE}/vendor-requests/polls/${pollId}/vote`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ optionIndex })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          return {
+            success: false,
+            message: 'Invalid/expired token. Please log in again.',
+            requiresLogin: true
+          };
+        }
+
+        return {
+          success: false,
+          message: data.message || data.error || 'Failed to vote',
+          error: data
+        };
+      }
+
+      return {
+        success: true,
+        message: data.message || 'Vote recorded successfully'
+      };
+    } catch (error) {
+      console.error('Error voting in poll:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to vote',
+        error: error
+      };
+    }
+  },
+
+  // Close a poll (Events Office/Admin)
+  closePoll: async (pollId) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return {
+          success: false,
+          message: 'No authentication token found. Please log in again.'
+        };
+      }
+
+      const response = await fetch(`${API_BASE}/vendor-requests/polls/${pollId}/close`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          return {
+            success: false,
+            message: 'Invalid/expired token. Please log in again.',
+            requiresLogin: true
+          };
+        }
+
+        return {
+          success: false,
+          message: data.message || data.error || 'Failed to close poll',
+          error: data
+        };
+      }
+
+      return {
+        success: true,
+        message: data.message || 'Poll closed successfully',
+        poll: data.poll
+      };
+    } catch (error) {
+      console.error('Error closing poll:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to close poll',
+        error: error
+      };
+    }
+  },
+
+  // Get poll results (Events Office/Admin)
+  getPollResults: async (pollId) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return {
+          success: false,
+          message: 'No authentication token found. Please log in again.'
+        };
+      }
+
+      const response = await fetch(`${API_BASE}/vendor-requests/polls/${pollId}/results`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          return {
+            success: false,
+            message: 'Invalid/expired token. Please log in again.',
+            requiresLogin: true
+          };
+        }
+
+        return {
+          success: false,
+          message: data.message || data.error || 'Failed to fetch poll results',
+          error: data
+        };
+      }
+
+      return {
+        success: true,
+        poll: data.poll
+      };
+    } catch (error) {
+      console.error('Error fetching poll results:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch poll results',
+        error: error
+      };
+    }
   }
 };
 

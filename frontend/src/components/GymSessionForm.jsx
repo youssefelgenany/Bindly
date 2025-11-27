@@ -50,7 +50,10 @@ const GymSessionForm = ({ onSubmit, loading = false, submitLabel = 'Create Gym S
     { value: 'aerobics', label: 'Aerobics' },
     { value: 'zumba', label: 'Zumba' },
     { value: 'cross circuit', label: 'Cross Circuit' },
-    { value: 'kick-boxing', label: 'Kick-boxing' }
+    { value: 'kick-boxing', label: 'Kick-boxing' },
+    { value: 'strength', label: 'Strength' },
+    { value: 'cardio', label: 'Cardio' },
+    { value: 'other', label: 'Other' }
   ];
 
   return (
@@ -163,7 +166,7 @@ const GymSessionForm = ({ onSubmit, loading = false, submitLabel = 'Create Gym S
 
       <button 
         type="submit" 
-        className="btn btn-primary submit-btn"
+        className="submit-btn"
         disabled={loading}
       >
         {loading ? loadingLabel : submitLabel}

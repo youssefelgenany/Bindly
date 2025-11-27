@@ -56,24 +56,36 @@ export const vendorApi = {
     },
 
     applyToEvent: async (payload) => {
-        // If payload is FormData (file included), send multipart request
-        if (payload instanceof FormData) {
-            // Let axios set the correct Content-Type with boundary for FormData
-            const res = await api.post('/apply', payload);
-            return res.data;
-        }
+        try {
+            // If payload is FormData (file included), send multipart request
+            if (payload instanceof FormData) {
+                // Let axios set the correct Content-Type with boundary for FormData
+                const res = await api.post('/apply', payload);
+                return res.data;
+            }
 
-        const { eventType, eventId, attendees, boothSize, durationWeeks, boothLocation, message } = payload;
-        const res = await api.post('/apply', {
-            eventType,
-            eventId,
-            attendees,
-            boothSize,
-            durationWeeks,
-            boothLocation,
-            message
-        });
-        return res.data;
+            const { eventType, eventId, attendees, boothSize, durationWeeks, boothLocation, message } = payload;
+            const res = await api.post('/apply', {
+                eventType,
+                eventId,
+                attendees,
+                boothSize,
+                durationWeeks,
+                boothLocation,
+                message
+            });
+            return res.data;
+        } catch (error) {
+            console.error('❌ Error in applyToEvent API call:', error);
+            console.error('❌ Error response:', error.response?.data);
+            // Re-throw with better error information
+            if (error.response?.data) {
+                const errorWithData = new Error(error.response.data.message || error.message);
+                errorWithData.response = error.response;
+                throw errorWithData;
+            }
+            throw error;
+        }
     },
 
     // List upcoming events the current vendor is accepted for
