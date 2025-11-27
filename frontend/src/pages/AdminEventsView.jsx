@@ -605,20 +605,6 @@ const AdminEventsView = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  // Handle event status change (Accept/Reject for workshops)
-  const handleEventStatusChange = async (eventId, newStatus) => {
-    setProcessingIds(prev => ({ ...prev, [eventId]: true }));
-    try {
-      const result = await eventsApiService.updateEventStatus(eventId, { status: newStatus });
-      if (result.success) {
-        await loadEvents();
-      }
-    } catch (error) {
-      console.error('Error updating event status:', error);
-    } finally {
-      setProcessingIds(prev => ({ ...prev, [eventId]: false }));
-    }
-  };
 
   // Edit handlers
   const openBazaarEdit = (eventItem) => {
@@ -1461,27 +1447,27 @@ const AdminEventsView = () => {
                   style={{
                     padding: '0.875rem 1.5rem',
                     borderRadius: '0.5rem',
-                    backgroundColor: (filter !== 'all' || professorNameFilter || locationFilter || dateFilter) ? '#1e40af' : '#f9fafb',
-                    color: (filter !== 'all' || professorNameFilter || locationFilter || dateFilter) ? '#FFFFFF' : '#6b7280',
-                    border: (filter !== 'all' || professorNameFilter || locationFilter || dateFilter) ? 'none' : '1px solid #e5e7eb',
+                    backgroundColor: (filter !== 'all' || professorNameFilter || locationFilter || dateFilter || sortBy !== 'suggested') ? '#1e40af' : '#f9fafb',
+                    color: (filter !== 'all' || professorNameFilter || locationFilter || dateFilter || sortBy !== 'suggested') ? '#FFFFFF' : '#6b7280',
+                    border: (filter !== 'all' || professorNameFilter || locationFilter || dateFilter || sortBy !== 'suggested') ? 'none' : '1px solid #e5e7eb',
                     cursor: 'pointer',
                     fontSize: '0.875rem',
                     fontWeight: '600',
                     transition: 'all 0.2s',
                     whiteSpace: 'nowrap',
-                    boxShadow: (filter !== 'all' || professorNameFilter || locationFilter || dateFilter) ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                    boxShadow: (filter !== 'all' || professorNameFilter || locationFilter || dateFilter || sortBy !== 'suggested') ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem'
                   }}
                   onMouseEnter={(e) => {
-                    if (!(professorNameFilter || locationFilter || dateFilter || filter !== 'all')) {
+                    if (!(professorNameFilter || locationFilter || dateFilter || filter !== 'all' || sortBy !== 'suggested')) {
                       e.target.style.backgroundColor = '#f3f4f6';
                       e.target.style.borderColor = '#d1d5db';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!(professorNameFilter || locationFilter || dateFilter || filter !== 'all')) {
+                    if (!(professorNameFilter || locationFilter || dateFilter || filter !== 'all' || sortBy !== 'suggested')) {
                       e.target.style.backgroundColor = '#f9fafb';
                       e.target.style.borderColor = '#e5e7eb';
                     }
@@ -1490,8 +1476,8 @@ const AdminEventsView = () => {
                   <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
                     filter_list
                   </span>
-                  Filters
-                  {(filter !== 'all' || professorNameFilter || locationFilter || dateFilter) && (
+                  Filter & Sort
+                  {(filter !== 'all' || professorNameFilter || locationFilter || dateFilter || sortBy !== 'suggested') && (
                     <span style={{
                       backgroundColor: 'rgba(255, 255, 255, 0.3)',
                       borderRadius: '9999px',
@@ -1499,8 +1485,7 @@ const AdminEventsView = () => {
                       fontSize: '0.75rem',
                       fontWeight: '600'
                     }}>
-                      {[filter !== 'all' ? 1 : 0, professorNameFilter, locationFilter, dateFilter].filter(Boolean).length
-                      }
+                      {[filter !== 'all' ? 1 : 0, professorNameFilter, locationFilter, dateFilter, sortBy !== 'suggested' ? 1 : 0].filter(f => f).length}
                     </span>
                   )}
                 </button>
@@ -1698,65 +1683,6 @@ const AdminEventsView = () => {
                             textAlign: 'right'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                              {/* Workshop Accept/Reject buttons */}
-                              {event.type === 'workshop' && event.status === 'pending' && (
-                                <>
-                                  <button
-                                    onClick={() => handleEventStatusChange(event.id, 'approved')}
-                                    disabled={!!processingIds[event.id]}
-                                    style={{
-                                      padding: '0.5rem',
-                                      borderRadius: '0.5rem',
-                                      border: 'none',
-                                      backgroundColor: 'transparent',
-                                      color: canEdit ? '#137fec' : '#d1d5db',
-                                      cursor: canEdit ? 'pointer' : 'not-allowed',
-                                      opacity: canEdit ? 1 : 0.5
-                                    }}
-                                    title={canEdit ? 'Accept Workshop' : 'Workshop already accepted'}
-                                    onMouseEnter={(e) => {
-                                      if (canEdit) {
-                                        e.target.style.backgroundColor = '#f3f4f6';
-                                        e.target.style.color = '#137fec';
-                                      }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      if (canEdit) {
-                                        e.target.style.backgroundColor = 'transparent';
-                                        e.target.style.color = '#137fec';
-                                      }
-                                    }}
-                                  >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                      check_circle
-                                    </span>
-                                  </button>
-                                  <button
-                                    onClick={() => handleEventStatusChange(event.id, 'rejected')}
-                                    disabled={!!processingIds[event.id]}
-                                    style={{
-                                      padding: '0.5rem',
-                                      borderRadius: '0.5rem',
-                                      border: 'none',
-                                      backgroundColor: 'transparent',
-                                      color: '#ef4444',
-                                      cursor: 'pointer'
-                                    }}
-                                    title="Reject Workshop"
-                                    onMouseEnter={(e) => {
-                                      e.target.style.backgroundColor = '#fee2e2';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.target.style.backgroundColor = 'transparent';
-                                    }}
-                                  >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                      cancel
-                                    </span>
-                                  </button>
-                                </>
-                              )}
-                              
                               {/* Edit Button */}
                               <button
                                 onClick={() => {

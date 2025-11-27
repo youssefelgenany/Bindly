@@ -90,15 +90,43 @@ const VendorBazaars = () => {
 
   const handleBoothApplicationSubmit = async (applicationData) => {
     try {
-      if (applicationData.eventId.startsWith('mock-booth-')) {
-        return {
-          success: true,
-          message: 'Booth application submitted successfully! (Demo Mode)'
-        };
+      // Validate applicationData
+      if (!applicationData) {
+        throw new Error('Application data is missing');
       }
+      
+      // Handle FormData (for file uploads)
+      if (applicationData instanceof FormData) {
+        // Extract eventId from FormData to check if it's a mock
+        const eventId = applicationData.get('eventId');
+        if (eventId && typeof eventId === 'string' && eventId.startsWith('mock-booth-')) {
+          return {
+            success: true,
+            message: 'Booth application submitted successfully! (Demo Mode)'
+          };
+        }
+        // Validate eventId exists
+        if (!eventId) {
+          throw new Error('Event ID is required');
+        }
+      } else {
+        // Handle regular object
+        if (!applicationData.eventId) {
+          throw new Error('Event ID is required');
+        }
+        
+        if (applicationData.eventId && typeof applicationData.eventId === 'string' && applicationData.eventId.startsWith('mock-booth-')) {
+          return {
+            success: true,
+            message: 'Booth application submitted successfully! (Demo Mode)'
+          };
+        }
+      }
+      
       const result = await vendorApi.applyToEvent(applicationData);
       return result;
     } catch (error) {
+      console.error('❌ Error in handleBoothApplicationSubmit:', error);
       throw error;
     }
   };

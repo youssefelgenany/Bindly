@@ -29,7 +29,8 @@ const {
   archiveEvent,
   unarchiveEvent,
   getArchivedEvents,
-  exportRegistrations
+  exportRegistrations,
+  sendQRCodesToVendors
 } = require("../controllers/eventController");
 const { verifyPayment } = require("../controllers/paymentVerificationController");
 const { sendWorkshopCompletionEmails } = require("../controllers/workshopCompletionController");
@@ -114,6 +115,14 @@ router.get(
   protect,
   permit("event_office", "Event Office", "Events Office", "admin"),
   exportRegistrations
+);
+
+// 📧 Send QR codes to all accepted vendors for an event (Events Office, Admin)
+router.post(
+  "/:id/send-qr-codes",
+  protect,
+  permit("event_office", "Event Office", "Events Office", "admin"),
+  sendQRCodesToVendors
 );
 
 // 📊 Get ratings and comments for an event (all authenticated users can view)

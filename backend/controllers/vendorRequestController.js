@@ -80,9 +80,21 @@ const getAllVendorRequests = async (req, res) => {
   try {
     console.log('🔍 getAllVendorRequests - Fetching all vendor requests');
     const requests = await VendorRequest.find()
-      .populate('vendor', 'companyName firstName lastName email')
-      .populate('bazaar', 'title name location startDate endDate description')
-      .populate('booth', 'title name location startDate endDate description')
+      .populate({
+        path: 'vendor',
+        select: 'companyName firstName lastName email',
+        options: { strictPopulate: false }
+      })
+      .populate({
+        path: 'bazaar',
+        select: 'title name location startDate endDate description',
+        options: { strictPopulate: false }
+      })
+      .populate({
+        path: 'booth',
+        select: 'title name location startDate endDate description',
+        options: { strictPopulate: false }
+      })
       .lean();
     console.log('🔍 getAllVendorRequests - Found requests:', requests.length);
 
@@ -167,7 +179,37 @@ const getAllVendorRequests = async (req, res) => {
     return res.status(200).json({ success: true, requests: normalized });
   } catch (error) {
     console.error('getAllVendorRequests error:', error);
-    return res.status(500).json({ message: "Error fetching vendor requests", error: error.message });
+    // Try to return partial results if possible
+    // If we can't, return empty array to prevent UI breaking
+    try {
+      const fallbackRequests = await VendorRequest.find()
+        .select('_id status eventType boothSize durationWeeks boothLocation createdAt updatedAt')
+        .lean();
+      const minimalNormalized = fallbackRequests.map(r => ({
+        _id: r._id,
+        status: r.status,
+        eventType: r.eventType || null,
+        vendor: null,
+        event: null,
+        bazaar: null,
+        booth: null,
+        standaloneBooth: null,
+        attendees: [],
+        boothSize: r.boothSize,
+        durationWeeks: r.durationWeeks,
+        boothLocation: r.boothLocation,
+        boothId: null,
+        startDate: null,
+        message: '',
+        voteCount: 0,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt
+      }));
+      return res.status(200).json({ success: true, requests: minimalNormalized });
+    } catch (fallbackError) {
+      console.error('Fallback also failed:', fallbackError);
+      return res.status(200).json({ success: true, requests: [] });
+    }
   }
 };
 
@@ -340,9 +382,7 @@ const createVendorRequest = async (req, res) => {
     // Validate boothLocation if provided
     if (boothLocation) {
       const validLocations = [
-        'main-entrance', 'food-court', 'central-plaza', 'student-center',
-        'library-area', 'gym-entrance', 'parking-lot', 'garden-section',
-        'auditorium-hall', 'cafeteria-area'
+        'sports-area', 'parking', 'main-gate', 'platform', 'exam-halls'
       ];
       if (!validLocations.includes(boothLocation)) {
         return res.status(400).json({
@@ -1460,22 +1500,69 @@ const createBoothPoll = async (req, res) => {
 // @access Events Office / Admin
 const getBoothPolls = async (req, res) => {
   try {
+    console.log('🔍 getBoothPolls - Function called');
+    console.log('🔍 getBoothPolls - User:', req.user?.email || req.user?._id);
+    
+    // Use the same approach as getPublicBoothPolls - Mongoose populate handles missing references gracefully
     const polls = await BoothPoll.find()
       .populate('createdBy', 'firstName lastName email')
-      .populate('options.vendorRequest', 'vendor boothSize durationWeeks boothLocation')
-      .populate('options.vendorRequest.vendor', 'companyName firstName lastName')
+      .populate({
+        path: 'options.vendorRequest',
+        select: 'vendor boothSize durationWeeks boothLocation message eventName eventType',
+        populate: {
+          path: 'vendor',
+          select: 'companyName firstName lastName',
+          model: 'User',
+          options: { strictPopulate: false }
+        },
+        options: { strictPopulate: false }
+      })
       .sort({ createdAt: -1 });
+    
+    console.log('🔍 getBoothPolls - Found polls:', polls.length);
 
+    // Calculate vote counts and format response
+    const pollsWithVotes = polls.map(poll => {
+      const voteCounts = {};
+      if (poll.votes && Array.isArray(poll.votes)) {
+        poll.votes.forEach(vote => {
+          const index = vote.optionIndex;
+          voteCounts[index] = (voteCounts[index] || 0) + 1;
+        });
+      }
+
+      return {
+        _id: poll._id,
+        title: poll.title,
+        description: poll.description,
+        status: poll.status,
+        createdBy: poll.createdBy,
+        options: poll.options.map((option, index) => ({
+          ...option,
+          vendorRequest: option.vendorRequest || null, // Mongoose populate handles missing refs
+          voteCount: voteCounts[index] || 0
+        })),
+        totalVotes: poll.votes ? poll.votes.length : 0,
+        createdAt: poll.createdAt,
+        updatedAt: poll.updatedAt
+      };
+    });
+
+    console.log('🔍 getBoothPolls - Returning polls:', pollsWithVotes.length);
     res.json({
       success: true,
-      polls
+      polls: pollsWithVotes
     });
   } catch (error) {
-    console.error('Error fetching booth polls:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching booth polls',
-      error: error.message
+    console.error('❌ Error fetching booth polls:', error);
+    console.error('❌ Error name:', error.name);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    // Return empty array instead of error to prevent UI breaking
+    res.status(200).json({
+      success: true,
+      polls: [],
+      message: 'Error loading polls, but continuing with empty list'
     });
   }
 };
@@ -1591,6 +1678,62 @@ const closeBoothPoll = async (req, res) => {
   }
 };
 
+// @desc Get public booth polls (for Students/Staff/TA/Professor to vote)
+// @route GET /api/vendor-requests/polls/public
+// @access Students, Staff, TA, Professor
+const getPublicBoothPolls = async (req, res) => {
+  try {
+    const polls = await BoothPoll.find({ status: 'active' })
+      .populate('createdBy', 'firstName lastName email')
+      .populate({
+        path: 'options.vendorRequest',
+        populate: {
+          path: 'vendor',
+          select: 'companyName firstName lastName'
+        },
+        select: 'vendor boothSize durationWeeks boothLocation message'
+      })
+      .sort({ createdAt: -1 });
+
+    // Check which polls the user has already voted in
+    const userId = req.user._id;
+    const pollsWithVoteStatus = polls.map(poll => {
+      const userVote = poll.votes.find(vote => vote.user.toString() === userId.toString());
+      const voteCounts = poll.options.map((_, index) => 
+        poll.votes.filter(v => v.optionIndex === index).length
+      );
+      
+      return {
+        _id: poll._id,
+        title: poll.title,
+        description: poll.description,
+        status: poll.status,
+        options: poll.options.map((option, index) => ({
+          vendorRequest: option.vendorRequest,
+          description: option.description,
+          voteCount: voteCounts[index]
+        })),
+        totalVotes: poll.votes.length,
+        hasVoted: !!userVote,
+        userVoteIndex: userVote ? userVote.optionIndex : null,
+        createdAt: poll.createdAt
+      };
+    });
+
+    res.json({
+      success: true,
+      polls: pollsWithVoteStatus
+    });
+  } catch (error) {
+    console.error('Error fetching public booth polls:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching polls',
+      error: error.message
+    });
+  }
+};
+
 // @desc Get booth poll results
 // @route GET /api/vendor-requests/polls/:pollId/results
 // @access Events Office / Admin
@@ -1599,9 +1742,19 @@ const getBoothPollResults = async (req, res) => {
     const { pollId } = req.params;
 
     const poll = await BoothPoll.findById(pollId)
-      .populate('options.vendorRequest', 'vendor boothSize durationWeeks boothLocation')
-      .populate('options.vendorRequest.vendor', 'companyName firstName lastName')
-      .populate('votes.user', 'companyName firstName lastName');
+      .populate({
+        path: 'options.vendorRequest',
+        select: 'vendor boothSize durationWeeks boothLocation message eventName eventType',
+        populate: {
+          path: 'vendor',
+          select: 'companyName firstName lastName',
+          model: 'User',
+          options: { strictPopulate: false }
+        },
+        options: { strictPopulate: false }
+      })
+      .populate('votes.user', 'companyName firstName lastName')
+      .lean();
 
     if (!poll) {
       return res.status(404).json({
@@ -1620,13 +1773,32 @@ const getBoothPollResults = async (req, res) => {
       voteCounts[vote.optionIndex]++;
     });
 
-    // Sort options by vote count descending
-    const results = poll.options.map((option, index) => ({
-      optionIndex: index,
-      vendorRequest: option.vendorRequest,
-      description: option.description,
-      voteCount: voteCounts[index]
-    })).sort((a, b) => b.voteCount - a.voteCount);
+    // Sort options by vote count descending and handle missing vendor requests
+    const results = poll.options.map((option, index) => {
+      const vendorRequest = option.vendorRequest || {};
+      const vendor = vendorRequest?.vendor || {};
+      
+      return {
+        optionIndex: index,
+        vendorRequest: vendorRequest._id ? {
+          _id: vendorRequest._id,
+          vendor: vendor._id ? {
+            _id: vendor._id,
+            companyName: vendor.companyName || '',
+            firstName: vendor.firstName || '',
+            lastName: vendor.lastName || ''
+          } : null,
+          boothSize: vendorRequest.boothSize || null,
+          durationWeeks: vendorRequest.durationWeeks || null,
+          boothLocation: vendorRequest.boothLocation || null,
+          message: vendorRequest.message || null,
+          eventName: vendorRequest.eventName || null,
+          eventType: vendorRequest.eventType || null
+        } : null,
+        description: option.description,
+        voteCount: voteCounts[index] || 0
+      };
+    }).sort((a, b) => b.voteCount - a.voteCount);
 
     res.json({
       success: true,
@@ -1814,6 +1986,7 @@ module.exports = {
   cancelVendorRequest,
   createBoothPoll,
   getBoothPolls,
+  getPublicBoothPolls,
   voteInBoothPoll,
   closeBoothPoll,
   getBoothPollResults,

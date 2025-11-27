@@ -47,9 +47,7 @@ const vendorRequestSchema = new mongoose.Schema({
     type: String,
     required: false,
     enum: [
-      'main-entrance', 'food-court', 'central-plaza', 'student-center',
-      'library-area', 'gym-entrance', 'parking-lot', 'garden-section',
-      'auditorium-hall', 'cafeteria-area'
+      'sports-area', 'parking', 'main-gate', 'platform', 'exam-halls'
     ]
   },
   // Platform booth specific fields
@@ -69,6 +67,15 @@ const vendorRequestSchema = new mongoose.Schema({
   individualIdsPaths: {
     type: [String],
     default: []
+  },
+  // Vendor QR code (for vendor check-in)
+  qrCode: {
+    type: String, // Base64 encoded QR code image
+    required: false
+  },
+  qrCodeData: {
+    type: String, // JSON string encoded in QR code
+    required: false
   },
   // Payment information
   participationFee: {

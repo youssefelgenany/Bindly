@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const Email = require('../models/EmailModel');
+const { Buffer } = require('buffer');
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -12,13 +13,14 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * Send QR codes to vendor for all registered visitors
+ * Send QR codes to vendor
  * @param {Object} vendor - Vendor object with email
  * @param {Object} event - Event/Bazaar/Booth object
- * @param {Array} registrations - Array of registration objects with QR codes
+ * @param {Array} registrations - Array of registration objects with QR codes (for event participants)
+ * @param {Object} vendorQRCode - Optional: QR code for the vendor themselves
  * @returns {Promise<Object>} Result object
  */
-async function sendQRCodesToVendor(vendor, event, registrations = []) {
+async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCode = null) {
   try {
     if (!vendor || !vendor.email) {
       return {
@@ -28,41 +30,191 @@ async function sendQRCodesToVendor(vendor, event, registrations = []) {
       };
     }
 
-    if (!registrations || registrations.length === 0) {
+    // Handle vendor QR code (for the vendor themselves) and event participant QR codes
+    const hasVendorQR = !!(vendorQRCode && vendorQRCode.qrCode);
+    const registrationsWithQR = registrations && registrations.length > 0
+      ? registrations.filter(reg => reg.qrCode)
+      : [];
+    const hasParticipantRegistrations = registrationsWithQR.length > 0;
+    
+    // Must have either vendor QR code or participant registrations
+    if (!hasVendorQR && !hasParticipantRegistrations) {
+      console.log('⚠️ No QR codes to send:', { hasVendorQR, vendorQRCode, registrationsCount: registrations?.length, registrationsWithQRCount: registrationsWithQR.length });
       return {
         sent: false,
         stored: false,
-        error: 'No registrations with QR codes found'
+        error: 'No QR codes to send (neither vendor QR code nor participant registrations)'
       };
     }
+    
+    console.log('📧 Preparing email:', { 
+      vendorEmail: vendor.email, 
+      hasVendorQR, 
+      vendorQRCodeExists: !!vendorQRCode,
+      vendorQRCodeValue: vendorQRCode?.qrCode ? 'exists' : 'missing',
+      hasParticipantRegistrations,
+      participantCount: registrationsWithQR.length 
+    });
 
-    // Filter registrations with QR codes
-    const registrationsWithQR = registrations.filter(reg => reg.qrCode);
-
-    if (registrationsWithQR.length === 0) {
-      return {
-        sent: false,
-        stored: false,
-        error: 'No registrations have QR codes generated'
-      };
+    // Create HTML for vendor QR code (if provided) and prepare attachments
+    let vendorQRCodeHTML = '';
+    let emailAttachments = [];
+    let vendorQRCID = null;
+    
+    if (hasVendorQR && vendorQRCode && vendorQRCode.qrCode) {
+      let qrCodeImageSrc = vendorQRCode.qrCode;
+      
+      // Ensure the data URL is properly formatted
+      if (!qrCodeImageSrc || typeof qrCodeImageSrc !== 'string') {
+        console.error('❌ QR code is not a valid string:', typeof qrCodeImageSrc);
+        qrCodeImageSrc = '';
+      } else if (!qrCodeImageSrc.startsWith('data:image/')) {
+        console.warn('⚠️ QR code data URL does not start with "data:image/" - fixing format');
+        const base64Match = qrCodeImageSrc.match(/^[A-Za-z0-9+/=\s]+$/);
+        if (base64Match) {
+          qrCodeImageSrc = `data:image/png;base64,${qrCodeImageSrc.trim()}`;
+        } else {
+          console.error('❌ QR code does not appear to be valid base64');
+        }
+      }
+      
+      // Check if QR code is valid
+      const isValidQRCode = qrCodeImageSrc && 
+                            qrCodeImageSrc.length > 100 && 
+                            qrCodeImageSrc.startsWith('data:image/');
+      
+      if (isValidQRCode) {
+        // Convert data URL to buffer for email attachment
+        try {
+          const base64Data = qrCodeImageSrc.replace(/^data:image\/png;base64,/, '');
+          const imageBuffer = Buffer.from(base64Data, 'base64');
+          
+          // Generate unique CID for the vendor QR code
+          vendorQRCID = `vendor-qr-${vendor._id || vendor.id || Date.now()}`;
+          
+          // Add as attachment
+          emailAttachments.push({
+            filename: 'vendor-qr-code.png',
+            content: imageBuffer,
+            cid: vendorQRCID,
+            contentType: 'image/png'
+          });
+          
+          console.log('✅ Vendor QR code converted to attachment, CID:', vendorQRCID);
+          
+          // Use CID reference in HTML instead of data URL
+          vendorQRCodeHTML = `
+            <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
+              <h3 style="color: #333; margin-top: 0;">Your Vendor QR Code</h3>
+              <p style="color: #666; margin-bottom: 15px;">This is your QR code as a participating vendor. You can use this for check-in and identification at the event.</p>
+              <div style="text-align: center; padding: 20px;">
+                <img src="cid:${vendorQRCID}" alt="Vendor QR Code" style="width: 200px; height: 200px; border: 2px solid #ddd; padding: 10px; background: white; display: block; margin: 0 auto;" />
+              </div>
+              <p style="color: #666; font-size: 14px; text-align: center; margin-top: 15px;">
+                <strong>Vendor:</strong> ${vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim()}
+              </p>
+            </div>
+          `;
+          console.log('✅ Vendor QR code HTML generated with CID, length:', vendorQRCodeHTML.length);
+        } catch (bufferError) {
+          console.error('❌ Error converting QR code to buffer:', bufferError);
+          vendorQRCodeHTML = `
+            <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
+              <h3 style="color: #333; margin-top: 0;">Your Vendor QR Code</h3>
+              <p style="color: #dc2626; margin-bottom: 15px;">⚠️ QR code could not be processed. Please contact support.</p>
+            </div>
+          `;
+        }
+      } else {
+        console.error('❌ QR code image source is invalid');
+        vendorQRCodeHTML = `
+          <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
+            <h3 style="color: #333; margin-top: 0;">Your Vendor QR Code</h3>
+            <p style="color: #dc2626; margin-bottom: 15px;">⚠️ QR code could not be generated. Please contact support.</p>
+          </div>
+        `;
+      }
+    } else {
+      console.warn('⚠️ Vendor QR code HTML not generated:', { 
+        hasVendorQR, 
+        vendorQRCode: !!vendorQRCode, 
+        qrCode: !!vendorQRCode?.qrCode 
+      });
     }
-
-    // Create HTML table with QR codes
-    const qrCodesHTML = registrationsWithQR.map((registration, index) => {
-      const user = registration.user || {};
-      return `
-        <tr style="border-bottom: 1px solid #ddd;">
-          <td style="padding: 12px; text-align: center;">${index + 1}</td>
-          <td style="padding: 12px;">${user.firstName || 'N/A'} ${user.lastName || ''}</td>
-          <td style="padding: 12px;">${user.email || 'N/A'}</td>
-          <td style="padding: 12px; text-align: center;">
-            <img src="${registration.qrCode}" alt="QR Code" style="width: 100px; height: 100px; border: 1px solid #ddd; padding: 5px;" />
+    
+    // Create HTML table with participant QR codes (if any) and add as attachments
+    let participantQRCodesHTML = '';
+    if (hasParticipantRegistrations) {
+      participantQRCodesHTML = registrationsWithQR.map((registration, index) => {
+        const user = registration.user || {};
+        let qrCodeSrc = registration.qrCode;
+        let qrCodeCID = null;
+        
+        // Convert participant QR codes to attachments too
+        if (qrCodeSrc && qrCodeSrc.startsWith('data:image/')) {
+          try {
+            const base64Data = qrCodeSrc.replace(/^data:image\/png;base64,/, '');
+            const imageBuffer = Buffer.from(base64Data, 'base64');
+            qrCodeCID = `participant-qr-${registration._id || registration.id || index}`;
+            
+            emailAttachments.push({
+              filename: `participant-qr-${index + 1}.png`,
+              content: imageBuffer,
+              cid: qrCodeCID,
+              contentType: 'image/png'
+            });
+            
+            qrCodeSrc = `cid:${qrCodeCID}`;
+          } catch (bufferError) {
+            console.error(`❌ Error converting participant QR code ${index} to buffer:`, bufferError);
+            qrCodeSrc = '';
+          }
+        } else if (qrCodeSrc && !qrCodeSrc.startsWith('data:')) {
+          // Try to fix format
+          if (qrCodeSrc.match(/^[A-Za-z0-9+/=\s]+$/)) {
+            qrCodeSrc = `data:image/png;base64,${qrCodeSrc.trim()}`;
+            try {
+              const base64Data = qrCodeSrc.replace(/^data:image\/png;base64,/, '');
+              const imageBuffer = Buffer.from(base64Data, 'base64');
+              qrCodeCID = `participant-qr-${registration._id || registration.id || index}`;
+              
+              emailAttachments.push({
+                filename: `participant-qr-${index + 1}.png`,
+                content: imageBuffer,
+                cid: qrCodeCID,
+                contentType: 'image/png'
+              });
+              
+              qrCodeSrc = `cid:${qrCodeCID}`;
+            } catch (bufferError) {
+              console.error(`❌ Error converting participant QR code ${index} to buffer:`, bufferError);
+              qrCodeSrc = '';
+            }
+          }
+        }
+        
+        return `
+          <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 12px; text-align: center;">${index + 1}</td>
+            <td style="padding: 12px;">${user.firstName || 'N/A'} ${user.lastName || ''}</td>
+            <td style="padding: 12px;">${user.email || 'N/A'}</td>
+            <td style="padding: 12px; text-align: center;">
+              ${qrCodeSrc ? `<img src="${qrCodeSrc}" alt="QR Code" style="width: 100px; height: 100px; border: 1px solid #ddd; padding: 5px; display: block; margin: 0 auto;" />` : '<span style="color: #999;">QR Code unavailable</span>'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      participantQRCodesHTML = `
+        <tr>
+          <td colspan="4" style="padding: 20px; text-align: center; color: #666; font-style: italic;">
+            No event participants have registered for this bazaar yet. QR codes for participants will be automatically generated and sent to you once they register to attend the event.
           </td>
         </tr>
       `;
-    }).join('');
+    }
 
-    const vendorName = vendor.companyName || `${vendor.firstName} ${vendor.lastName}`;
+    const vendorName = vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Vendor';
     const eventName = event.name || event.title || 'Event';
     const eventDate = event.startDate ? new Date(event.startDate).toLocaleDateString() : 'TBD';
 
@@ -74,10 +226,15 @@ async function sendQRCodesToVendor(vendor, event, registrations = []) {
         </div>
         
         <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-          <h2 style="color: #333; margin-top: 0;">Visitor QR Codes for Your Event</h2>
+          <h2 style="color: #333; margin-top: 0;">${hasVendorQR ? 'Your Vendor QR Code' : 'Visitor QR Codes for Your Event'}</h2>
           <p>Hi ${vendorName},</p>
-          <p>Great news! We have generated QR codes for all registered visitors to your bazaar/booth. You can use these QR codes to verify attendance at your event.</p>
+          ${hasVendorQR 
+            ? '<p>Your QR code as a participating vendor has been generated. You can use this QR code for check-in and identification at the event.</p>'
+            : '<p>Great news! We have generated QR codes for all registered visitors to your bazaar/booth. You can use these QR codes to verify attendance at your event.</p>'
+          }
         </div>
+
+        ${vendorQRCodeHTML}
 
         <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
           <h3 style="color: #333; margin-top: 0;">Event Details</h3>
@@ -90,13 +247,16 @@ async function sendQRCodesToVendor(vendor, event, registrations = []) {
               <td style="padding: 8px; font-weight: bold;">Event Date:</td>
               <td style="padding: 8px;">${eventDate}</td>
             </tr>
+            ${hasParticipantRegistrations ? `
             <tr>
               <td style="padding: 8px; font-weight: bold;">Total Visitors:</td>
               <td style="padding: 8px; font-weight: bold; color: #27ae60;">${registrationsWithQR.length}</td>
             </tr>
+            ` : ''}
           </table>
         </div>
 
+        ${hasParticipantRegistrations ? `
         <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
           <h3 style="color: #333; margin-top: 0;">Registered Visitors</h3>
           <table style="width: 100%; border-collapse: collapse; background: white; border: 1px solid #e9ecef;">
@@ -109,15 +269,24 @@ async function sendQRCodesToVendor(vendor, event, registrations = []) {
               </tr>
             </thead>
             <tbody>
-              ${qrCodesHTML}
+              ${participantQRCodesHTML}
             </tbody>
           </table>
         </div>
+        ` : ''}
 
         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
           <p style="margin: 0; color: #666; font-size: 14px;">
-            <strong>How to use QR codes:</strong> You can scan these QR codes at your event to verify visitor attendance. 
-            Each QR code contains the visitor's name, email, and registration ID.
+            ${hasVendorQR 
+              ? '<strong>Your Vendor QR Code:</strong> Use this QR code for vendor check-in and identification at the event. '
+              : ''
+            }
+            ${hasParticipantRegistrations 
+              ? '<strong>Visitor QR Codes:</strong> You can scan these QR codes at your event to verify visitor attendance. Each QR code contains the visitor\'s name, email, and registration ID.'
+              : hasVendorQR 
+                ? 'Present this QR code when you arrive at the event for vendor check-in.'
+                : ''
+            }
           </p>
         </div>
 
@@ -126,6 +295,33 @@ async function sendQRCodesToVendor(vendor, event, registrations = []) {
         </div>
       </div>
     `;
+    
+    // Debug: Log the HTML length to ensure it's not empty
+    console.log('📧 Email HTML Debug:', {
+      htmlLength: html?.length || 0,
+      hasVendorQR,
+      hasParticipantRegistrations,
+      vendorQRCodeHTMLLength: vendorQRCodeHTML?.length || 0,
+      participantQRCodesHTMLLength: participantQRCodesHTML?.length || 0,
+      vendorName,
+      eventName
+    });
+    
+    if (!html || html.trim().length < 100) {
+      console.error('❌ Email HTML is empty or too short!', { 
+        htmlLength: html?.length, 
+        hasVendorQR, 
+        hasParticipantRegistrations,
+        vendorQRCodeHTMLLength: vendorQRCodeHTML?.length || 0
+      });
+      return {
+        sent: false,
+        stored: false,
+        error: 'Email HTML is empty or invalid'
+      };
+    } else {
+      console.log('✅ Email HTML generated successfully, length:', html.length);
+    }
 
     const defaultFrom = process.env.SMTP_FROM && process.env.SMTP_FROM.trim()
       ? process.env.SMTP_FROM.trim()
@@ -135,8 +331,11 @@ async function sendQRCodesToVendor(vendor, event, registrations = []) {
       from: defaultFrom,
       to: vendor.email,
       subject: `Visitor QR Codes - ${eventName}`,
-      html
+      html,
+      attachments: emailAttachments.length > 0 ? emailAttachments : undefined
     };
+    
+    console.log('📎 Email attachments:', emailAttachments.length, 'attachments prepared');
 
     // Try to send email
     if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
@@ -219,6 +418,12 @@ async function sendQRCodesToVendor(vendor, event, registrations = []) {
     }
   } catch (error) {
     console.error('❌ Error in sendQRCodesToVendor:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      vendorEmail: vendor?.email
+    });
     return {
       sent: false,
       stored: false,

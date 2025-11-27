@@ -591,10 +591,92 @@ exports.getAllEvents = async (req, res) => {
     });
     
     // For bazaars and booths, get vendor information
+    // Also recalculate registeredCount from actual registrations for accuracy
+    const Registration = require('../models/registrationModel');
+    const mongoose = require('mongoose');
     const eventsWithVendors = await Promise.all(events.map(async (e) => {
       const creatorFullName = e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null;
+      
+      // For bazaars and booths, registeredCount = number of accepted vendor requests (participating vendors)
+      // For other events, registeredCount = number of event participants
+      let finalCount = e.registeredCount || 0;
+      
+      if (e.type === 'bazaar' || e.type === 'booth') {
+        // Count accepted vendor requests (participating vendors)
+        const VendorRequest = require('../models/vendorRequest');
+        let eventIdForQuery = e._id;
+        if (mongoose.Types.ObjectId.isValid(e._id)) {
+          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
+        } else if (typeof e._id === 'string' && mongoose.Types.ObjectId.isValid(e._id)) {
+          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
+        }
+        
+        const vendorCount = await VendorRequest.countDocuments({
+          $or: [
+            { bazaar: eventIdForQuery, status: 'accepted' },
+            { booth: eventIdForQuery, status: 'accepted' },
+            { standaloneBooth: eventIdForQuery, status: 'accepted' }
+          ]
+        });
+        
+        // Try string format if ObjectId didn't work
+        if (vendorCount === 0 && typeof e._id === 'string') {
+          const stringVendorCount = await VendorRequest.countDocuments({
+            $or: [
+              { bazaar: e._id, status: 'accepted' },
+              { booth: e._id, status: 'accepted' },
+              { standaloneBooth: e._id, status: 'accepted' }
+            ]
+          });
+          finalCount = stringVendorCount;
+        } else {
+          finalCount = vendorCount;
+        }
+        
+        console.log(`🔍 Event ${String(e._id)} (${e.title || e.name}) - Bazaar/Booth: Found ${finalCount} accepted vendor(s)`);
+      } else {
+        // For other events, count actual event participants
+        let eventIdForQuery = e._id;
+        if (mongoose.Types.ObjectId.isValid(e._id)) {
+          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
+        } else if (typeof e._id === 'string' && mongoose.Types.ObjectId.isValid(e._id)) {
+          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
+        }
+        
+        // Count from Registration model
+        const regCount = await Registration.countDocuments({ 
+          event: eventIdForQuery,
+          status: { $ne: 'cancelled' }
+        });
+        
+        // Also check StudentRegistration (for workshops and trips)
+        const StudentRegistration = require('../models/studentRegistrationModel');
+        const studentRegCount = await StudentRegistration.countDocuments({ 
+          event: eventIdForQuery,
+          status: { $ne: 'cancelled' }
+        });
+        
+        finalCount = regCount + studentRegCount;
+        
+        // If still 0, try with string format
+        if (finalCount === 0 && typeof e._id === 'string') {
+          const stringRegCount = await Registration.countDocuments({ 
+            event: e._id,
+            status: { $ne: 'cancelled' }
+          });
+          const stringStudentCount = await StudentRegistration.countDocuments({ 
+            event: e._id,
+            status: { $ne: 'cancelled' }
+          });
+          finalCount = stringRegCount + stringStudentCount;
+        }
+        
+        console.log(`🔍 Event ${String(e._id)} (${e.title || e.name}): Registration=${regCount}, StudentRegistration=${studentRegCount}, Total=${finalCount}`);
+      }
+      
       const baseEvent = {
         ...e,
+        registeredCount: finalCount, // Use actual count from registrations
         creatorName: creatorFullName,
         professorName: creatorFullName,
         createdByName: creatorFullName,
@@ -1899,6 +1981,284 @@ exports.generateQRCode = async (req, res) => {
     res.status(200).json({ qrCode: qrImage });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Send QR codes to all accepted vendors for an event
+exports.sendQRCodesToVendors = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const mongoose = require('mongoose');
+    const Event = require('../models/eventModel');
+    const VendorRequest = require('../models/vendorRequest');
+    const Registration = require('../models/registrationModel');
+    const { sendQRCodesToVendor } = require('../utils/sendQRCodesToVendor');
+
+    console.log('🔍 sendQRCodesToVendors - Event ID:', eventId);
+    console.log('🔍 sendQRCodesToVendors - Event ID type:', typeof eventId);
+    console.log('🔍 sendQRCodesToVendors - Is valid ObjectId:', mongoose.Types.ObjectId.isValid(eventId));
+
+    // Find the event - try both string and ObjectId
+    let event = await Event.findById(eventId);
+    if (!event && mongoose.Types.ObjectId.isValid(eventId)) {
+      event = await Event.findById(new mongoose.Types.ObjectId(eventId));
+    }
+    if (!event) {
+      console.error('❌ Event not found for ID:', eventId);
+      return res.status(404).json({ success: false, message: 'Event not found' });
+    }
+    
+    // Use the event's actual _id from database for queries
+    const actualEventId = event._id;
+    console.log('✅ Event found:', event.title || event.name, 'Type:', event.type);
+    console.log('✅ Event actual _id:', actualEventId, 'Type:', typeof actualEventId);
+
+    // Only allow for bazaar/booth events
+    if (!['bazaar', 'booth', 'platformBooth', 'standaloneBooth'].includes(event.type)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'QR codes can only be sent for bazaar or booth events' 
+      });
+    }
+
+    // Find all accepted vendor requests for this event (use actual event ID)
+    const vendorRequests = await VendorRequest.find({
+      $or: [
+        { bazaar: actualEventId, status: 'accepted' },
+        { booth: actualEventId, status: 'accepted' },
+        { standaloneBooth: actualEventId, status: 'accepted' }
+      ]
+    }).populate('vendor', 'email firstName lastName companyName');
+
+    if (vendorRequests.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No accepted vendor requests found for this event' 
+      });
+    }
+
+    // Generate QR codes for vendors themselves (not event participants)
+    const { generateQRCode } = require('../utils/generateQRCode');
+    const vendorsWithQRCodes = [];
+    
+    for (const vendorRequest of vendorRequests) {
+      const vendor = vendorRequest.vendor;
+      if (!vendor || !vendor.email) continue;
+      
+      try {
+        // Generate QR code for this vendor
+        const vendorName = vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim();
+        const qrResult = await generateQRCode(
+          vendorRequest._id.toString(),
+          {
+            vendorId: vendor._id.toString(),
+            vendorRequestId: vendorRequest._id.toString(),
+            eventId: actualEventId.toString(),
+            eventName: event.title || event.name,
+            vendorName: vendorName,
+            vendorEmail: vendor.email,
+            vendorType: 'participating_vendor'
+          }
+        );
+
+        if (qrResult.success && qrResult.qrCodeDataUrl) {
+          // Validate QR code data URL format
+          console.log(`🔍 QR Code generated for vendor ${vendorName}:`, {
+            success: qrResult.success,
+            hasQRCodeDataUrl: !!qrResult.qrCodeDataUrl,
+            qrCodeLength: qrResult.qrCodeDataUrl?.length || 0,
+            startsWithData: qrResult.qrCodeDataUrl?.startsWith('data:'),
+            startsWithDataImage: qrResult.qrCodeDataUrl?.startsWith('data:image/'),
+            preview: qrResult.qrCodeDataUrl?.substring(0, 80) + '...'
+          });
+          
+          // Validate QR code data URL
+          if (qrResult.qrCodeDataUrl.length > 1000000) { // 1MB limit
+            console.warn(`⚠️ QR code data URL too large for vendor ${vendorName}: ${qrResult.qrCodeDataUrl.length} bytes`);
+          }
+          
+          if (!qrResult.qrCodeDataUrl.startsWith('data:image/')) {
+            console.error(`❌ QR code data URL format is invalid for vendor ${vendorName}. Expected 'data:image/...', got: ${qrResult.qrCodeDataUrl.substring(0, 50)}`);
+          }
+          
+          // Store QR code in vendorRequest
+          try {
+            vendorRequest.qrCode = qrResult.qrCodeDataUrl;
+            vendorRequest.qrCodeData = qrResult.qrDataString;
+            await vendorRequest.save();
+            console.log(`✅ Saved QR code to vendorRequest ${vendorRequest._id}`);
+            
+            vendorsWithQRCodes.push({
+              vendor: vendor,
+              vendorRequest: vendorRequest,
+              qrCode: qrResult.qrCodeDataUrl,
+              qrCodeData: qrResult.qrDataString
+            });
+            console.log(`✅ Generated and stored QR code for vendor: ${vendorName} (${vendor.email})`);
+          } catch (saveError) {
+            console.error(`❌ Error saving QR code to vendorRequest ${vendorRequest._id}:`, saveError);
+            console.error('Save error details:', {
+              message: saveError.message,
+              name: saveError.name,
+              code: saveError.code,
+              stack: saveError.stack
+            });
+            // Still add to vendorsWithQRCodes even if save fails
+            vendorsWithQRCodes.push({
+              vendor: vendor,
+              vendorRequest: vendorRequest,
+              qrCode: qrResult.qrCodeDataUrl,
+              qrCodeData: qrResult.qrDataString
+            });
+            console.log(`⚠️ Continuing without saving QR code to database for vendor: ${vendorName}`);
+          }
+        } else {
+          console.warn(`⚠️ Failed to generate QR code for vendor ${vendorName}:`, qrResult.error || 'Unknown error');
+          console.warn('QR result:', { success: qrResult.success, hasQRCode: !!qrResult.qrCodeDataUrl });
+        }
+      } catch (error) {
+        console.error(`❌ Error generating QR code for vendor ${vendor.email}:`, error);
+        console.error('Error stack:', error.stack);
+      }
+    }
+
+    if (vendorsWithQRCodes.length === 0) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to generate QR codes for vendors' 
+      });
+    }
+
+    // Get event participant registrations (optional - for visitor QR codes)
+    // Use the actual event ID from the database
+    const StudentRegistration = require('../models/studentRegistrationModel');
+    const User = require('../models/userModel');
+    
+    let allRegistrations = await Registration.find({ 
+      event: actualEventId,
+      status: { $ne: 'cancelled' }
+    })
+      .populate('user', 'email firstName lastName name')
+      .sort({ registeredAt: -1 });
+
+    console.log(`🔍 Found ${allRegistrations.length} event participant Registration(s) for event ${actualEventId}`);
+    
+    // Generate QR codes for event participant registrations that don't have them yet
+    for (const registration of allRegistrations) {
+      if (!registration.qrCode && registration.user) {
+        try {
+          const user = await User.findById(registration.user._id || registration.user);
+          const qrResult = await generateQRCode(
+            registration._id.toString(),
+            {
+              userId: registration.user._id || registration.user,
+              eventId: actualEventId.toString(),
+              eventName: event.title || event.name,
+              userName: user?.firstName && user?.lastName
+                ? `${user.firstName} ${user.lastName}`
+                : user?.name || user?.email || 'Visitor',
+              userEmail: user?.email || null
+            }
+          );
+
+          if (qrResult.success) {
+            registration.qrCode = qrResult.qrCodeDataUrl;
+            registration.qrCodeData = qrResult.qrDataString;
+            await registration.save();
+            console.log(`✅ Generated QR code for event participant registration: ${registration._id}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error generating QR code for registration ${registration._id}:`, error);
+        }
+      }
+    }
+    
+    // Reload registrations to get updated QR codes
+    allRegistrations = await Registration.find({ 
+      event: actualEventId,
+      status: { $ne: 'cancelled' }
+    })
+      .populate('user', 'email firstName lastName name')
+      .sort({ registeredAt: -1 });
+    
+    const registrationsWithQR = allRegistrations.filter(reg => reg.qrCode);
+    console.log(`🔍 Found ${registrationsWithQR.length} event participant registration(s) with QR codes`);
+
+    // Deduplicate vendors by email
+    const seenVendorKeys = new Set();
+    const uniqueVendors = [];
+    const results = [];
+
+    for (const vr of vendorRequests) {
+      const v = vr.vendor;
+      if (!v) continue;
+      const emailKey = v.email ? String(v.email).toLowerCase().trim() : null;
+      const idKey = v._id ? String(v._id) : (v.id ? String(v.id) : null);
+      const vid = emailKey || idKey;
+      if (!vid || seenVendorKeys.has(vid)) continue;
+      
+      seenVendorKeys.add(vid);
+      uniqueVendors.push(v);
+    }
+
+    // Send QR codes to each unique vendor
+    // Include vendor's own QR code and event participant QR codes (if any)
+    for (const vendorQRData of vendorsWithQRCodes) {
+      const vendor = vendorQRData.vendor;
+      if (vendor && vendor.email) {
+        try {
+          // Find this vendor's QR code data
+          const vendorQRCode = {
+            qrCode: vendorQRData.qrCode,
+            qrCodeData: vendorQRData.qrCodeData
+          };
+          
+          const result = await sendQRCodesToVendor(vendor, event, registrationsWithQR, vendorQRCode);
+          results.push({
+            vendorEmail: vendor.email,
+            vendorName: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim(),
+            sent: result.sent,
+            stored: result.stored,
+            error: result.error || result.reason
+          });
+        } catch (error) {
+          console.error(`❌ Error sending QR codes to vendor ${vendor.email}:`, error);
+          console.error('Error stack:', error.stack);
+          results.push({
+            vendorEmail: vendor.email,
+            vendorName: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim(),
+            sent: false,
+            stored: false,
+            error: error.message || 'Unknown error'
+          });
+        }
+      }
+    }
+
+    const successCount = results.filter(r => r.sent || r.stored).length;
+    const failCount = results.length - successCount;
+
+    res.status(200).json({
+      success: true,
+      message: `QR codes sent to ${successCount} vendor(s)${failCount > 0 ? `, ${failCount} failed` : ''}`,
+      results,
+      totalVendors: uniqueVendors.length,
+      totalRegistrations: registrationsWithQR.length
+    });
+  } catch (error) {
+    console.error('❌ Error in sendQRCodesToVendors:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      code: error.code
+    });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 
