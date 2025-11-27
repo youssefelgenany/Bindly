@@ -99,9 +99,28 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
             }, 2000);
 
         } catch (error) {
+            console.error('❌ Error submitting booth application:', error);
+            console.error('❌ Error response:', error.response);
+            
+            let errorMessage = 'Failed to submit application. Please try again.';
+            
+            if (error.response?.data) {
+                const data = error.response.data;
+                // Check for validation errors
+                if (data.validationErrors && Array.isArray(data.validationErrors) && data.validationErrors.length > 0) {
+                    errorMessage = data.validationErrors.join('. ');
+                } else if (data.message) {
+                    errorMessage = data.message;
+                } else if (data.error) {
+                    errorMessage = typeof data.error === 'string' ? data.error : data.error.message || errorMessage;
+                }
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
             setSubmitMessage({
                 type: 'error',
-                text: error.response?.data?.message || 'Failed to submit application. Please try again.'
+                text: errorMessage
             });
         } finally {
             setSubmitting(false);

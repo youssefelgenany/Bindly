@@ -377,6 +377,20 @@ export const eventsApiService = {
         error: error.response?.data || error.message,
       };
     }
+  },
+
+  // 📧 Send QR codes to all accepted vendors for an event
+  sendQRCodesToVendors: async (eventId) => {
+    try {
+      const response = await eventsApi.post(`/${eventId}/send-qr-codes`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to send QR codes',
+        error: error.response?.data || error.message,
+      };
+    }
   }
 };
 
