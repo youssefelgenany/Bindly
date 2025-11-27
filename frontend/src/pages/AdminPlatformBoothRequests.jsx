@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { vendorRequestApi } from '../api/vendorRequestApi';
 import axios from 'axios';
+import VendorNotificationBell from '../components/VendorNotificationBell';
 
 const AdminPlatformBoothRequests = () => {
   const { user, logout } = useAuth();
@@ -499,6 +500,7 @@ const AdminPlatformBoothRequests = () => {
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <VendorNotificationBell managePath="/admin/platform-booth-requests" />
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',

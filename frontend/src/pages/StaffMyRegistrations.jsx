@@ -1523,8 +1523,8 @@ const StaffMyRegistrations = () => {
                             setShowCancelModal(true);
                           }}
                           style={{
-                            padding: '0.375rem 0.875rem',
-                            borderRadius: '0.5rem',
+                        padding: '0.375rem 0.875rem',
+                        borderRadius: '0.5rem',
                             border: 'none',
                             backgroundColor: getStatusColor(registration.status),
                             color: '#FFFFFF',
@@ -1697,17 +1697,17 @@ const StaffMyRegistrations = () => {
                       <p style={{
                         color: '#6b7280',
                         fontSize: '0.8125rem',
-                        marginBottom: '0.75rem',
-                        marginTop: 0,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        lineHeight: '1.5'
-                      }}>
-                        {registration.eventDescription}
-                      </p>
-                    )}
+                          marginBottom: '0.75rem',
+                          marginTop: 0,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          lineHeight: '1.5'
+                        }}>
+                          {registration.eventDescription}
+                        </p>
+                      )}
 
                       <div style={{
                         marginTop: 'auto',

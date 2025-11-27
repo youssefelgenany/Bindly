@@ -54,6 +54,49 @@ export const vendorRequestApi = {
     }
   },
 
+  getPendingNotifications: async (limit = 10) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return {
+          success: false,
+          message: 'No authentication token found. Please log in again.'
+        };
+      }
+
+      const response = await fetch(`${API_BASE}/vendor-requests/pending/notifications?limit=${limit}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: data.message || 'Failed to fetch pending notifications',
+          error: data
+        };
+      }
+
+      return {
+        success: true,
+        notifications: data.notifications || [],
+        totalPending: data.totalPending ?? (data.notifications?.length || 0)
+      };
+    } catch (error) {
+      console.error('Error fetching pending vendor notifications:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch pending notifications',
+        error
+      };
+    }
+  },
+
   // Get vendor requests for a specific event
   getByEvent: async (eventId, eventType) => {
     try {

@@ -363,26 +363,53 @@ exports.notifyNewEventCreated = async (event) => {
 
 exports.notifyWorkshopSubmitted = async (event, submitter) => {
   try {
-    // Find all events office users
-    const eventsOfficeUsers = await User.find({ userType: 'event_office' });
-    
-    for (const user of eventsOfficeUsers) {
+    const recipientsRaw = await User.find({
+      $or: [
+        { userType: { $in: ['Event Office', 'Events Office', 'event_office'] } },
+        { role: { $in: ['Event Office', 'event_office'] } },
+        { userType: { $in: ['Admin', 'admin'] } },
+        { role: { $in: ['Admin', 'admin'] } }
+      ]
+    });
+
+    if (!recipientsRaw.length) return;
+
+    const recipientMap = new Map();
+    recipientsRaw.forEach((user) => {
+      if (user && user._id) {
+        recipientMap.set(String(user._id), user);
+      }
+    });
+    const recipients = Array.from(recipientMap.values());
+
+    for (const user of recipients) {
+      const existingNotification = await Notification.findOne({
+        recipient: user._id,
+        type: 'workshop_submission',
+        'metadata.eventId': event._id.toString()
+      });
+
+      if (existingNotification) continue;
+
       await Notification.create({
         recipient: user._id,
         type: 'workshop_submission',
         title: `New Workshop Request: ${event.title}`,
-        message: `Dr. ${submitter.firstName} ${submitter.lastName} has submitted a workshop request: "${event.title}" scheduled for ${new Date(event.startDate).toLocaleDateString()}`,
+        message: `Professor ${submitter.firstName} ${submitter.lastName} created a new workshop "${event.title}" scheduled for ${new Date(event.startDate).toLocaleDateString()}.`,
         relatedEvent: event._id,
         priority: 'high',
         metadata: {
           eventTitle: event.title,
+          workshopName: event.title,
           eventDate: event.startDate,
           eventType: event.type,
           location: event.location,
           description: event.description,
           eventId: event._id.toString(),
           submittedBy: submitter._id.toString(),
-          submitterName: `${submitter.firstName} ${submitter.lastName}`,
+          professorName: `${submitter.firstName} ${submitter.lastName}`,
+          professorFirstName: submitter.firstName,
+          professorLastName: submitter.lastName,
           submitterEmail: submitter.email,
           createdAt: new Date()
         }
@@ -393,46 +420,69 @@ exports.notifyWorkshopSubmitted = async (event, submitter) => {
   }
 };
 
-// Notify Events Office users about new vendor requests
+// Notify Events Office users and Admins about new vendor requests
 exports.notifyVendorRequest = async (vendorRequest, vendor, event) => {
   try {
-    // Find all events office users
-    const eventsOfficeUsers = await User.find({ 
+    if (!vendorRequest || !vendor || !event) {
+      console.warn('notifyVendorRequest called with missing data', {
+        hasRequest: !!vendorRequest,
+        hasVendor: !!vendor,
+        hasEvent: !!event
+      });
+    }
+
+    // Find all Events Office users and Admins
+    const potentialRecipients = await User.find({
       $or: [
-        { userType: 'Event Office' },
-        { userType: 'Events Office' },
-        { userType: 'event_office' },
-        { role: 'Event Office' },
-        { role: 'event_office' }
+        { userType: { $in: ['Event Office', 'Events Office', 'event_office'] } },
+        { role: { $in: ['Event Office', 'event_office'] } },
+        { userType: { $in: ['Admin', 'admin'] } },
+        { role: { $in: ['Admin', 'admin'] } }
       ]
     });
+
+    if (!potentialRecipients.length) {
+      console.warn('notifyVendorRequest: no recipients found for vendor request notifications');
+      return;
+    }
+
+    // Deduplicate recipients by _id
+    const recipientMap = new Map();
+    potentialRecipients.forEach(user => {
+      if (user && user._id) {
+        recipientMap.set(String(user._id), user);
+      }
+    });
+    const recipients = Array.from(recipientMap.values());
     
     const vendorName = vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || vendor.email;
-    const eventName = event?.title || event?.name || 'Event';
-    const eventType = vendorRequest.eventType || event?.type || 'bazaar';
+    const eventName = event?.title || event?.name || vendorRequest?.eventName || 'Event';
+    const eventType = (vendorRequest.eventType || event?.type || 'bazaar').toLowerCase();
+    const formattedEventType = eventType.includes('booth') ? 'Platform Booth' : 'Bazaar';
+    const message = `${vendorName} submitted a ${formattedEventType} vendor request for "${eventName}".`;
     
-    for (const eventsOfficeUser of eventsOfficeUsers) {
+    for (const recipient of recipients) {
       // Check if notification already exists
       const existingNotification = await Notification.findOne({
-        recipient: eventsOfficeUser._id,
+        recipient: recipient._id,
         type: 'vendor_request',
         'metadata.requestId': vendorRequest._id.toString()
       });
       
       if (!existingNotification) {
         await Notification.create({
-          recipient: eventsOfficeUser._id,
+          recipient: recipient._id,
           type: 'vendor_request',
           title: `New Vendor Request: ${vendorName}`,
-          message: `${vendorName} has submitted a vendor request for "${eventName}" (${eventType})`,
-          priority: 'medium',
+          message,
+          priority: recipient.userType?.toLowerCase().includes('admin') ? 'high' : 'medium',
           metadata: {
             requestId: vendorRequest._id.toString(),
             vendorId: vendor._id.toString(),
             vendorName: vendorName,
             eventId: event?._id?.toString() || null,
             eventName: eventName,
-            eventType: eventType,
+            eventType: formattedEventType,
             status: vendorRequest.status || 'pending',
             createdAt: new Date()
           }
