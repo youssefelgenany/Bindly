@@ -1028,27 +1028,34 @@ const StudentLoyaltyVendorsView = () => {
                           height: '4rem',
                           borderRadius: '9999px',
                           border: '2px solid rgba(212, 188, 138, 0.8)',
-                          backgroundColor: '#ffffff',
+                          backgroundColor: '#fefaf1',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          overflow: 'hidden',
+                          padding: '0.15rem',
                           boxShadow: 'inset 0 0 12px rgba(212, 188, 138, 0.35)'
                         };
                         if (logoSrc) {
                           return (
                             <div style={baseCircleStyle}>
-                              <img
-                                src={logoSrc}
-                                alt={vendor.vendorName}
-                                style={{
-                                  width: '88%',
-                                  height: '88%',
-                                  objectFit: 'contain',
-                                  objectPosition: 'center',
-                                  display: 'block'
-                                }}
-                              />
+                              <div style={{
+                                width: '100%',
+                                height: '100%',
+                                borderRadius: '9999px',
+                                overflow: 'hidden'
+                              }}>
+                                <img
+                                  src={logoSrc}
+                                  alt={vendor.vendorName}
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    objectPosition: 'center',
+                                    display: 'block'
+                                  }}
+                                />
+                              </div>
                             </div>
                           );
                         }
@@ -1226,25 +1233,33 @@ const StudentLoyaltyVendorsView = () => {
                           width: '4.25rem',
                           height: '4.25rem',
                           borderRadius: '9999px',
-                          border: '2px solid rgba(99, 102, 241, 0.25)',
-                          backgroundColor: '#f4f6ff',
+                          border: '2px solid rgba(99, 102, 241, 0.35)',
+                          backgroundColor: '#fefaf1',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           marginBottom: '1rem',
-                          overflow: 'hidden'
+                          padding: '0.15rem',
+                          boxShadow: 'inset 0 0 12px rgba(212, 188, 138, 0.35)'
                         }}>
-                          <img
-                            src={logoSrc}
-                            alt={selectedVendor.vendorName}
-                            style={{
-                              width: '90%',
-                              height: '90%',
-                              objectFit: 'contain',
-                              objectPosition: 'center',
-                              display: 'block'
-                            }}
-                          />
+                          <div style={{
+                            width: '100%',
+                            height: '100%',
+                            borderRadius: '9999px',
+                            overflow: 'hidden'
+                          }}>
+                            <img
+                              src={logoSrc}
+                              alt={selectedVendor.vendorName}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                objectPosition: 'center',
+                                display: 'block'
+                              }}
+                            />
+                          </div>
                         </div>
                       );
                     }
