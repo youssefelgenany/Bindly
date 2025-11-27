@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { eventsApiService, bazaarApi, tripApi } from '../api/eventsApi';
 import { adminApiService } from '../api/adminApi';
 import { vendorRequestApi } from '../api/vendorRequestApi';
+import VendorNotificationBell from '../components/VendorNotificationBell';
 import BazaarForm from '../components/BazaarForm';
 import ConferenceForm from '../components/ConferenceForm';
 import TripForm from '../components/TripForm';
@@ -1177,6 +1178,7 @@ const AdminEventsView = () => {
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <VendorNotificationBell managePath="/admin/platform-booth-requests" />
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',

@@ -12,6 +12,12 @@ const EventsOfficeVendors = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [documentPreview, setDocumentPreview] = useState({
+    visible: false,
+    url: '',
+    type: '',
+    title: ''
+  });
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -50,6 +56,14 @@ const EventsOfficeVendors = () => {
     loadVendors();
   }, [loadVendors]);
 
+  useEffect(() => {
+    return () => {
+      if (documentPreview.url) {
+        window.URL.revokeObjectURL(documentPreview.url);
+      }
+    };
+  }, [documentPreview.url]);
+
   const toggleRow = (vendorId) => {
     setExpandedRows(prev => {
       const newSet = new Set(prev);
@@ -59,6 +73,18 @@ const EventsOfficeVendors = () => {
         newSet.add(vendorId);
       }
       return newSet;
+    });
+  };
+
+  const closeDocumentPreview = () => {
+    if (documentPreview.url) {
+      window.URL.revokeObjectURL(documentPreview.url);
+    }
+    setDocumentPreview({
+      visible: false,
+      url: '',
+      type: '',
+      title: ''
     });
   };
 
@@ -77,14 +103,22 @@ const EventsOfficeVendors = () => {
       if (response.ok) {
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
-        
-        // Open in new window
-        window.open(blobUrl, '_blank');
-        
-        // Clean up the blob URL after a delay to allow the window to open
-        setTimeout(() => {
-          window.URL.revokeObjectURL(blobUrl);
-        }, 100);
+        const vendor = vendors.find(v => (v.id || v._id) === vendorId);
+        const vendorName = vendor?.companyName || 'Vendor Document';
+        const contentType = blob.type || '';
+        const type = contentType.includes('pdf') ? 'pdf' : 'image';
+
+        // Revoke previous preview URL before setting a new one
+        if (documentPreview.url) {
+          window.URL.revokeObjectURL(documentPreview.url);
+        }
+
+        setDocumentPreview({
+          visible: true,
+          url: blobUrl,
+          type,
+          title: `${vendorName} — ${documentType === 'logo' ? 'Logo' : 'Tax Card'}`
+        });
       } else {
         alert('Failed to load document');
       }
@@ -1048,6 +1082,90 @@ const EventsOfficeVendors = () => {
           )}
         </div>
       </main>
+
+      {documentPreview.visible && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 200
+          }}
+          onClick={closeDocumentPreview}
+        >
+          <div
+            style={{
+              width: '65%',
+              maxWidth: '720px',
+              backgroundColor: '#fff',
+              borderRadius: '0.75rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', color: '#111827' }}>{documentPreview.title}</h3>
+              <button
+                onClick={closeDocumentPreview}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: '1.25rem',
+                  color: '#6b7280'
+                }}
+                aria-label="Close document preview"
+              >
+                ×
+              </button>
+            </div>
+            <div style={{
+              padding: '1rem',
+              minHeight: '50vh',
+              maxHeight: '75vh',
+              backgroundColor: '#f9fafb'
+            }}>
+              {documentPreview.type === 'pdf' ? (
+                <iframe
+                  src={documentPreview.url}
+                  title={documentPreview.title}
+                  style={{
+                    width: '100%',
+                    height: '70vh',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#fff'
+                  }}
+                />
+              ) : (
+                <img
+                  src={documentPreview.url}
+                  alt={documentPreview.title}
+                  style={{
+                    width: '100%',
+                    maxHeight: '70vh',
+                    objectFit: 'contain',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#fff'
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

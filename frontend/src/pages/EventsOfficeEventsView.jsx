@@ -305,7 +305,7 @@ const EventsOfficeEventsView = () => {
       if (!token) return;
       
       const headers = { Authorization: `Bearer ${token}` };
-      const [notificationsRes, unreadCountRes] = await Promise.all([
+      const [notificationsRes, unreadCountRes, vendorNotificationsRes, pendingVendorRes] = await Promise.all([
         axios.get('http://localhost:5000/api/notifications?limit=50', { headers }).catch(err => {
           console.error('Error fetching notifications:', err);
           return { data: { success: false, data: { notifications: [] } } };
@@ -313,6 +313,14 @@ const EventsOfficeEventsView = () => {
         axios.get('http://localhost:5000/api/notifications/unread-count', { headers }).catch(err => {
           console.error('Error fetching unread count:', err);
           return { data: { success: false, unreadCount: 0 } };
+        }),
+        axios.get('http://localhost:5000/api/notifications/by-type/vendor_request?limit=50', { headers }).catch(err => {
+          console.error('Error fetching vendor notifications:', err);
+          return { data: { success: false, data: { notifications: [] } } };
+        }),
+        axios.get('http://localhost:5000/api/vendor-requests/pending/notifications?limit=25', { headers }).catch(err => {
+          console.error('Error fetching pending vendor notifications:', err);
+          return { data: { success: false, notifications: [] } };
         })
       ]);
       
@@ -320,8 +328,53 @@ const EventsOfficeEventsView = () => {
       if (notificationsRes.data?.success && notificationsRes.data.data?.notifications) {
         notificationsData = notificationsRes.data.data.notifications;
       }
+      let vendorNotificationsData = [];
+      if (vendorNotificationsRes.data?.success) {
+        vendorNotificationsData =
+          vendorNotificationsRes.data.data?.notifications ||
+          vendorNotificationsRes.data.notifications ||
+          [];
+      }
+      const pendingVendorNotifications =
+        pendingVendorRes.data?.success && Array.isArray(pendingVendorRes.data.notifications)
+          ? pendingVendorRes.data.notifications.map((req) => ({
+              _id: `vendor_req_${req.id || req._id}`,
+              type: 'vendor_request',
+              title: req.vendor?.companyName || 'Vendor Request',
+              message: `${req.vendor?.companyName || 'Vendor'} submitted a ${
+                req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
+              } request for "${req.event?.name || req.eventName || 'Event'}".`,
+              createdAt: req.submittedAt || req.createdAt || new Date().toISOString(),
+              metadata: {
+                vendorName:
+                  req.vendor?.companyName ||
+                  `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim() ||
+                  'Vendor',
+                eventName: req.event?.name || req.eventName || 'Event',
+                eventType: req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
+              },
+              isRead: false
+            }))
+          : [];
+
+      const mergedMap = new Map();
+      notificationsData.forEach((notif) => {
+        const id = notif?._id || notif?.id;
+        if (id) mergedMap.set(id, notif);
+      });
+      vendorNotificationsData.forEach((notif) => {
+        const id = notif?._id || notif?.id;
+        if (id) mergedMap.set(id, notif);
+      });
+      pendingVendorNotifications.forEach((notif) => {
+        const id = notif?._id || notif?.id;
+        if (id && !mergedMap.has(id)) mergedMap.set(id, notif);
+      });
+      const mergedNotifications = Array.from(mergedMap.values()).sort(
+        (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0)
+      );
       
-      setNotifications(notificationsData);
+      setNotifications(mergedNotifications);
       const unreadCountValue = unreadCountRes.data?.success ? unreadCountRes.data.unreadCount : 0;
       setUnreadCount(unreadCountValue);
     } catch (error) {

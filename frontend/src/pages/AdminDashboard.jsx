@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
+import VendorNotificationBell from '../components/VendorNotificationBell';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -594,6 +595,7 @@ const AdminDashboard = () => {
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <VendorNotificationBell managePath="/admin/platform-booth-requests" />
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',

@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { adminApiService } from '../api/adminApi';
+import VendorNotificationBell from '../components/VendorNotificationBell';
 
 const AdminUsers = () => {
   const { user, logout } = useAuth();
@@ -16,12 +17,22 @@ const AdminUsers = () => {
   const [pendingRoles, setPendingRoles] = useState({}); // id -> role
   const [updatingIds, setUpdatingIds] = useState({}); // id -> boolean
   const [messageById, setMessageById] = useState({}); // id -> message
+  const [sectionExpanded, setSectionExpanded] = useState({
+    pending: false,
+    all: true
+  });
 
   // Users state - will be loaded from API
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [documentPreview, setDocumentPreview] = useState({
+    visible: false,
+    url: '',
+    type: '',
+    title: ''
+  });
   
   // Verification controls - declared early so they can be used in useMemo
   const [verificationStatusById, setVerificationStatusById] = useState({});
@@ -53,6 +64,13 @@ const AdminUsers = () => {
       newExpanded.add(userId);
     }
     setExpandedRows(newExpanded);
+  };
+
+  const toggleSectionExpansion = (section) => {
+    setSectionExpanded(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
   };
 
   // Separate users into pending verification and verified
@@ -204,6 +222,14 @@ const AdminUsers = () => {
     loadUsers();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (documentPreview.url) {
+        window.URL.revokeObjectURL(documentPreview.url);
+      }
+    };
+  }, [documentPreview.url]);
+
   const loadUsers = async () => {
     try {
       setLoading(true);
@@ -345,6 +371,18 @@ const AdminUsers = () => {
     setDeleteConfirm({ show: true, userId });
   };
 
+  const closeDocumentPreview = () => {
+    if (documentPreview.url) {
+      window.URL.revokeObjectURL(documentPreview.url);
+    }
+    setDocumentPreview({
+      visible: false,
+      url: '',
+      type: '',
+      title: ''
+    });
+  };
+
   const handleViewDocument = async (vendorId, documentType) => {
     try {
       const token = localStorage.getItem('token');
@@ -359,7 +397,21 @@ const AdminUsers = () => {
       if (response.ok) {
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
+        const vendor = users.find(v => (v._id || v.id) === vendorId);
+        const vendorName = vendor?.companyName || `${vendor?.firstName || ''} ${vendor?.lastName || ''}`.trim() || 'Vendor Document';
+        const contentType = blob.type || '';
+        const type = contentType.includes('pdf') ? 'pdf' : 'image';
+
+        if (documentPreview.url) {
+          window.URL.revokeObjectURL(documentPreview.url);
+        }
+
+        setDocumentPreview({
+          visible: true,
+          url: blobUrl,
+          type,
+          title: `${vendorName} — ${documentType === 'logo' ? 'Logo' : 'Tax Card'}`
+        });
       } else {
         alert('Failed to load document');
       }
@@ -863,6 +915,7 @@ const AdminUsers = () => {
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <VendorNotificationBell managePath="/admin/platform-booth-requests" />
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
@@ -1057,10 +1110,31 @@ const AdminUsers = () => {
                 alignItems: 'center'
               }}>
                 {/* Search Bar and Filters Row */}
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', width: '100%', justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: sidebarOpen ? '1fr' : 'minmax(320px, 420px) auto',
+                    gap: '1rem',
+                    width: '100%',
+                    alignItems: 'start'
+                  }}
+                >
                   {/* Search Bar */}
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
-                    <div style={{ position: 'relative', width: '400px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.75rem',
+                      alignItems: 'center',
+                      flexWrap: 'nowrap'
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        maxWidth: '420px'
+                      }}
+                    >
                       <span className="material-symbols-outlined" style={{
                         position: 'absolute',
                         left: '0.75rem',
@@ -1129,7 +1203,15 @@ const AdminUsers = () => {
             </div>
 
                   {/* Filter Buttons */}
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', flexShrink: 0 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.5rem',
+                      flexWrap: sidebarOpen ? 'wrap' : 'nowrap',
+                      alignItems: 'center',
+                      justifyContent: sidebarOpen ? 'flex-start' : 'flex-end'
+                    }}
+                  >
                     {['all', 'Admin', 'Event Office', 'TA', 'Staff', 'Professor', 'Student', 'Vendor'].map((role) => (
                       <button
                         key={role}
@@ -1145,7 +1227,9 @@ const AdminUsers = () => {
                           fontWeight: roleFilter === role ? '600' : '500',
                           textTransform: 'capitalize',
                           transition: 'all 0.2s',
-                          boxShadow: roleFilter === role ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+                          boxShadow: roleFilter === role ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                          minWidth: '90px',
+                          textAlign: 'center'
                         }}
                         onMouseEnter={(e) => {
                           if (roleFilter !== role) {
@@ -1169,18 +1253,23 @@ const AdminUsers = () => {
 
               {/* Pending Verification Users Section */}
               {filteredPendingUsers.length > 0 && (
-                            <div style={{ 
+                <div style={{ 
                   backgroundColor: '#FFFFFF',
                   borderRadius: '0.75rem',
                   boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                   marginBottom: '2rem',
                   overflow: 'hidden'
                 }}>
-                            <div style={{ 
+                <div style={{ 
                     padding: '1rem 1.5rem',
                     borderBottom: '1px solid #e5e7eb',
-                    backgroundColor: '#fef3c7'
+                    backgroundColor: '#fef3c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem'
                   }}>
+                  <div>
                     <h4 style={{
                       fontSize: '1rem',
                       fontWeight: '600',
@@ -1196,7 +1285,40 @@ const AdminUsers = () => {
                     }}>
                       Users awaiting role assignment and verification
                     </p>
-                            </div>
+                  </div>
+                  <button
+                    onClick={() => toggleSectionExpansion('pending')}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      borderRadius: '9999px',
+                      padding: '0.25rem',
+                      cursor: 'pointer',
+                      color: '#92400e',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    aria-label="Toggle pending verification section"
+                  >
+                    <span
+                      className="material-symbols-outlined"
+                      style={{
+                        fontSize: '1.5rem',
+                        display: 'inline-block',
+                        transition: 'transform 0.2s',
+                        transform: sectionExpanded.pending ? 'rotate(180deg)' : 'rotate(0deg)'
+                      }}
+                    >
+                      expand_more
+                    </span>
+                  </button>
+                </div>
+                {sectionExpanded.pending && (
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#f9fafb' }}>
@@ -1470,8 +1592,9 @@ const AdminUsers = () => {
                       })}
                     </tbody>
                   </table>
-                        </div>
-                        )}
+                )}
+              </div>
+              )}
 
               {/* All Users Section */}
               <div style={{
@@ -1483,30 +1606,68 @@ const AdminUsers = () => {
                 <div style={{
                   padding: '1rem 1.5rem',
                   borderBottom: '1px solid #e5e7eb',
-                  backgroundColor: '#f9fafb'
+                  backgroundColor: '#f9fafb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '1rem'
                 }}>
-                  <h4 style={{
-                    fontSize: '1rem',
-                    fontWeight: '600',
-                    color: '#111827',
-                    margin: 0
-                  }}>
-                    All Users ({filteredVerifiedUsers.length})
-                  </h4>
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: '#6b7280',
-                    margin: '0.25rem 0 0 0'
-                  }}>
-                    Verified and active users
-                  </p>
-                </div>
-                {filteredVerifiedUsers.length === 0 ? (
-                  <div style={{ padding: '3rem 2rem', textAlign: 'center', color: '#6b7280' }}>
-                    {users.length === 0 ? 'No users found.' : 'No users match your search.'}
+                  <div>
+                    <h4 style={{
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      color: '#111827',
+                      margin: 0
+                    }}>
+                      All Users ({filteredVerifiedUsers.length})
+                    </h4>
+                    <p style={{
+                      fontSize: '0.875rem',
+                      color: '#6b7280',
+                      margin: '0.25rem 0 0 0'
+                    }}>
+                      Verified and active users
+                    </p>
                   </div>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <button
+                    onClick={() => toggleSectionExpansion('all')}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      borderRadius: '9999px',
+                      padding: '0.25rem',
+                      cursor: 'pointer',
+                      color: '#111827',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    aria-label="Toggle all users section"
+                  >
+                    <span
+                      className="material-symbols-outlined"
+                      style={{
+                        fontSize: '1.5rem',
+                        display: 'inline-block',
+                        transition: 'transform 0.2s',
+                        transform: sectionExpanded.all ? 'rotate(180deg)' : 'rotate(0deg)'
+                      }}
+                    >
+                      expand_more
+                    </span>
+                  </button>
+                </div>
+                {sectionExpanded.all && (
+                  filteredVerifiedUsers.length === 0 ? (
+                    <div style={{ padding: '3rem 2rem', textAlign: 'center', color: '#6b7280' }}>
+                      {users.length === 0 ? 'No users found.' : 'No users match your search.'}
+                    </div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#f9fafb' }}>
                         <th style={{
@@ -1975,7 +2136,8 @@ const AdminUsers = () => {
                         );
                       })}
                     </tbody>
-                  </table>
+                    </table>
+                  )
                 )}
               </div>
             </>
@@ -2353,6 +2515,91 @@ const AdminUsers = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {documentPreview.visible && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1.5rem'
+          }}
+          onClick={closeDocumentPreview}
+        >
+          <div
+            style={{
+              width: '65%',
+              maxWidth: '720px',
+              backgroundColor: '#fff',
+              borderRadius: '0.75rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', color: '#111827' }}>{documentPreview.title}</h3>
+              <button
+                onClick={closeDocumentPreview}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: '1.25rem',
+                  color: '#6b7280'
+                }}
+                aria-label="Close document preview"
+              >
+                ×
+              </button>
+            </div>
+            <div style={{
+              padding: '1rem',
+              minHeight: '50vh',
+              maxHeight: '75vh',
+              backgroundColor: '#f9fafb'
+            }}>
+              {documentPreview.type === 'pdf' ? (
+                <iframe
+                  src={documentPreview.url}
+                  title={documentPreview.title}
+                  style={{
+                    width: '100%',
+                    height: '70vh',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#fff'
+                  }}
+                />
+              ) : (
+                <img
+                  src={documentPreview.url}
+                  alt={documentPreview.title}
+                  style={{
+                    width: '100%',
+                    maxHeight: '70vh',
+                    objectFit: 'contain',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#fff'
+                  }}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}
