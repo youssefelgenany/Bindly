@@ -34,43 +34,39 @@ exports.initializeNotificationScheduler = () => {
     timezone: "Africa/Cairo"
   });
   
-  // Schedule workshop completion emails to run daily at 9:00 AM
-  // This checks for workshops that ended yesterday or earlier and sends completion emails
-  let isCompletionEmailJobRunning = false;
-  const completionEmailJob = cron.schedule('0 9 * * *', async () => {
-    // Skip if previous execution is still running
-    if (isCompletionEmailJobRunning) {
-      console.log('⏭️  [Scheduled Task] Workshop completion email job skipped - previous execution still running');
-      return;
-    }
-    
-    isCompletionEmailJobRunning = true;
+  // Workshop completion email job function
+  const runWorkshopCompletionJob = async (triggerSource) => {
+    console.log(`📧 [Scheduled Task] Checking for workshops that ended and need completion emails (trigger: ${triggerSource})...`);
     const startTime = Date.now();
-    
     try {
-      console.log('📧 [Scheduled Task] Checking for workshops that ended and need completion emails...');
       // Create a mock request/response object for the controller
       const mockReq = {};
       const mockRes = {
         json: (data) => {
-          console.log('📧 [Scheduled Task] Workshop completion emails result:', data);
+          console.log(`📧 [${triggerSource}] Workshop completion emails result:`, data);
         },
         status: (code) => ({
           json: (data) => {
-            console.error('❌ [Scheduled Task] Workshop completion emails error:', data);
+            console.error(`❌ [${triggerSource}] Workshop completion emails error:`, data);
           }
         })
       };
-      
+
       await sendWorkshopCompletionEmails(mockReq, mockRes);
       const executionTime = Date.now() - startTime;
       console.log(`✅ [Scheduled Task] Workshop completion email job completed in ${executionTime}ms`);
     } catch (error) {
       const executionTime = Date.now() - startTime;
       console.error(`❌ [Scheduled Task] Error in workshop completion email job after ${executionTime}ms:`, error);
-    } finally {
-      isCompletionEmailJobRunning = false;
     }
+  };
+  
+  // Run job shortly after bootstrapping so recently finished workshops get processed
+  runWorkshopCompletionJob('startup');
+  
+  // Schedule workshop completion emails to run every 15 minutes
+  const completionEmailJob = cron.schedule('*/15 * * * *', async () => {
+    await runWorkshopCompletionJob('scheduled');
   }, {
     scheduled: true,
     timezone: "Africa/Cairo"
@@ -78,7 +74,7 @@ exports.initializeNotificationScheduler = () => {
   
   console.log('✅ Notification scheduler initialized');
   console.log('   - Event reminders: Every minute');
-  console.log('   - Workshop completion emails: Daily at 9:00 AM');
+  console.log('   - Workshop completion emails: Every 15 minutes');
   
   return { reminderJob, completionEmailJob };
 };

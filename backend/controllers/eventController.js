@@ -57,6 +57,17 @@ exports.createEvent = async (req, res) => {
       return res.status(400).json({ msg: "Title and location cannot be empty" });
     }
 
+    // Filter out Admin and Events Office from allowedUserTypes (they can always see all events)
+    const restrictedUserTypes = allowedUserTypes && Array.isArray(allowedUserTypes) 
+      ? allowedUserTypes.filter(type => 
+          type !== 'Admin' && 
+          type !== 'admin' && 
+          type !== 'event_office' && 
+          type !== 'Event Office' && 
+          type !== 'Events Office'
+        )
+      : [];
+
     const newEvent = new Event({
       title,
       description,
@@ -73,9 +84,9 @@ exports.createEvent = async (req, res) => {
       professors,
       extraResources,
       bannerFile,
-      // User type restrictions
-      isRestricted: allowedUserTypes && allowedUserTypes.length > 0,
-      allowedUserTypes: allowedUserTypes && allowedUserTypes.length > 0 ? allowedUserTypes : []
+      // User type restrictions (Admin and Events Office excluded - they can always see all events)
+      isRestricted: restrictedUserTypes.length > 0,
+      allowedUserTypes: restrictedUserTypes
     });
 
     await newEvent.save();
@@ -125,8 +136,23 @@ exports.createConference = async (req, res) => {
       createdBy: req.user ? req.user._id : undefined,
       status: "approved",
       // User type restrictions
-      isRestricted: allowedUserTypes && allowedUserTypes.length > 0,
-      allowedUserTypes: allowedUserTypes && allowedUserTypes.length > 0 ? allowedUserTypes : []
+      // Filter out Admin and Events Office from allowedUserTypes (they can always see all events)
+      isRestricted: allowedUserTypes && Array.isArray(allowedUserTypes) && allowedUserTypes.filter(type => 
+        type !== 'Admin' && 
+        type !== 'admin' && 
+        type !== 'event_office' && 
+        type !== 'Event Office' && 
+        type !== 'Events Office'
+      ).length > 0,
+      allowedUserTypes: allowedUserTypes && Array.isArray(allowedUserTypes) 
+        ? allowedUserTypes.filter(type => 
+            type !== 'Admin' && 
+            type !== 'admin' && 
+            type !== 'event_office' && 
+            type !== 'Event Office' && 
+            type !== 'Events Office'
+          )
+        : []
     });
 
     await newConference.save();
@@ -562,7 +588,8 @@ exports.getAllEvents = async (req, res) => {
     }
 
     // Filter by user type restrictions
-    if (req.user && req.user.userType) {
+    // Admin and Events Office users should see ALL events (including restricted ones)
+    if (req.user && req.user.userType && !isAdminOrEventOffice) {
       const userType = req.user.userType;
       events = events.filter(event => {
         // If event has restrictions and allowedUserTypes array
@@ -574,6 +601,7 @@ exports.getAllEvents = async (req, res) => {
         return true;
       });
     }
+    // Admin and Events Office users see all events (no filtering by restrictions)
 
     const workshopEvents = events.filter(e => e.type === 'workshop');
     console.log('🔍 getAllEvents - Query results:', {
@@ -1149,8 +1177,21 @@ exports.getAllEventsForStudents = async (req, res) => {
     // POST-FILTER: Removed - All users should see ALL events (including past ones)
     console.log('🔍 All users - Showing ALL events (including past events)');
 
+    // Check if user is Admin or Events Office (they should see ALL events including restricted ones)
+    const userTypeLower = req.user?.userType?.toLowerCase();
+    const roleLower = req.user?.role?.toLowerCase();
+    const isAdminOrEventOffice = req.user && (
+      userTypeLower === 'admin' ||
+      req.user.userType === 'Admin' ||
+      isEventOffice ||
+      roleLower === 'admin' ||
+      req.user.role === 'admin' ||
+      req.user.role === 'Event Office'
+    );
+
     // Filter by user type restrictions
-    if (req.user && req.user.userType) {
+    // Admin and Events Office users should see ALL events (including restricted ones)
+    if (req.user && req.user.userType && !isAdminOrEventOffice) {
       const userType = req.user.userType;
       events = events.filter(event => {
         // If event has restrictions and allowedUserTypes array
@@ -1162,6 +1203,7 @@ exports.getAllEventsForStudents = async (req, res) => {
         return true;
       });
     }
+    // Admin and Events Office users see all events (no filtering by restrictions)
 
     console.log('🔍 Found events after all filters:', events.length);
     if (q) {
@@ -1252,7 +1294,8 @@ exports.getAllEventsForAdmin = async (req, res) => {
         { title: { $ne: '' } },
         { location: { $exists: true } },
         { location: { $ne: null } },
-        { location: { $ne: '' } }
+        { location: { $ne: '' } },
+        { archived: false } // Exclude archived events (matching TA endpoint behavior)
       ]
     };
 
@@ -1263,17 +1306,64 @@ exports.getAllEventsForAdmin = async (req, res) => {
         { location: new RegExp(q, "i") },
       ];
     }
-    if (type && type !== 'all') filter.type = type;
-    if (status && status !== 'all') filter.status = status;
+    if (type && type !== 'all' && type.trim() !== '') {
+      // Normalize type filter to match valid types
+      const typeMap = {
+        workshops: 'workshop',
+        trips: 'trip',
+        bazaars: 'bazaar',
+        bazaar: 'bazaar',
+        booths: 'booth',
+        booth: 'booth',
+        confrence: 'conference',
+        conference: 'conference',
+        workshop: 'workshop',
+        trip: 'trip'
+      };
+      const normalizedType = type.toString().trim().toLowerCase();
+      const mappedType = typeMap[normalizedType] || normalizedType;
+      
+      // Only apply type filter if it's a valid type
+      if (validTypes.includes(mappedType)) {
+        filter.type = mappedType;
+      } else {
+        // Invalid type - return no results
+        filter.type = { $in: [] };
+      }
+    }
+    if (status && status !== 'all' && status.trim() !== '') {
+      filter.status = status.trim();
+    }
 
-    console.log('🔍 Filter applied:', filter);
+    console.log('🔍 Filter applied:', JSON.stringify(filter, null, 2));
 
     const events = await Event.find(filter)
       .populate('createdBy', 'firstName lastName email')
       .sort({ createdAt: -1 });
 
     console.log('📊 Found events:', events.length);
-    console.log('📊 Events data:', events);
+    console.log('📊 Event titles:', events.map(e => ({ title: e.title, type: e.type, status: e.status, archived: e.archived })));
+    
+    // Debug: Check if "completion certificate test" exists in DB
+    const testEvent = await Event.findOne({ title: /completion certificate test/i });
+    if (testEvent) {
+      console.log('🔍 DEBUG - Found "completion certificate test" event:', {
+        _id: testEvent._id,
+        title: testEvent.title,
+        type: testEvent.type,
+        status: testEvent.status,
+        archived: testEvent.archived,
+        isRestricted: testEvent.isRestricted,
+        allowedUserTypes: testEvent.allowedUserTypes,
+        hasTitle: !!testEvent.title,
+        hasLocation: !!testEvent.location,
+        matchesTypeFilter: validTypes.includes(testEvent.type),
+        matchesStatusFilter: !status || status === 'all' || status === testEvent.status,
+        matchesArchivedFilter: testEvent.archived === false
+      });
+    } else {
+      console.log('🔍 DEBUG - "completion certificate test" event NOT found in DB');
+    }
 
     // Add vendor information for workshops and booths
     const eventsWithVendors = await Promise.all(events.map(async (event) => {
@@ -1392,6 +1482,18 @@ exports.updateEvent = async (req, res) => {
 
     const wasPending = event.status === 'pending';
     const isNowApproved = updates.status === 'approved';
+
+    // Filter out Admin and Events Office from allowedUserTypes if being updated
+    if (updates.allowedUserTypes && Array.isArray(updates.allowedUserTypes)) {
+      updates.allowedUserTypes = updates.allowedUserTypes.filter(type => 
+        type !== 'Admin' && 
+        type !== 'admin' && 
+        type !== 'event_office' && 
+        type !== 'Event Office' && 
+        type !== 'Events Office'
+      );
+      updates.isRestricted = updates.allowedUserTypes.length > 0;
+    }
 
     Object.assign(event, updates);
     await event.save();
@@ -2277,6 +2379,25 @@ exports.registerForEvent = async (req, res) => {
       return res.status(400).json({ msg: 'Event is not available for registration' });
     }
 
+    // Check if user is Admin or Events Office - they cannot register for events
+    const userTypeLower = req.user?.userType?.toLowerCase();
+    const roleLower = req.user?.role?.toLowerCase();
+    const isAdminOrEventOffice = req.user && (
+      userTypeLower === 'admin' ||
+      req.user.userType === 'Admin' ||
+      req.user.userType === 'Event Office' ||
+      req.user.userType === 'Events Office' ||
+      req.user.userType === 'event_office' ||
+      roleLower === 'admin' ||
+      req.user.role === 'admin' ||
+      req.user.role === 'event_office' ||
+      req.user.role === 'Event Office'
+    );
+
+    if (isAdminOrEventOffice) {
+      return res.status(403).json({ msg: 'Admin and Events Office users cannot register for events' });
+    }
+
     // Check user type restrictions
     if (event.isRestricted && event.allowedUserTypes && event.allowedUserTypes.length > 0) {
       const userType = req.user.userType;
@@ -3103,16 +3224,17 @@ exports.deleteComment = async (req, res) => {
     event.comments.pull(commentId);
     await event.save();
 
-    // Send warning email if deleted for being inappropriate and user is not the owner
-    if (isInappropriate && !isOwner && commentUser && commentUser.email) {
+    // Send warning email if deleted for being inappropriate - always send to the comment author
+    if (isInappropriate && commentUser && commentUser.email) {
       try {
         const userName = commentUser.firstName
           ? `${commentUser.firstName} ${commentUser.lastName || ''}`.trim()
           : commentUser.email;
 
-        // Only send email to Student, Staff, Events Office, TA, or Professor
-        const allowedUserTypes = ['Student', 'Staff', 'event_office', 'Event Office', 'Events Office', 'TA', 'Professor'];
+        // Only send email to Student, Staff, TA, or Professor (exclude admin and events office)
+        const allowedUserTypes = ['Student', 'Staff', 'TA', 'Professor'];
         if (allowedUserTypes.includes(commentUser.userType)) {
+          console.log(`📧 Sending comment warning email to ${commentUser.userType}:`, commentUser.email);
           const emailResult = await sendCommentWarningEmail(
             commentUser.email,
             userName,
@@ -3125,6 +3247,8 @@ exports.deleteComment = async (req, res) => {
           } else {
             console.error('❌ Comment warning email not sent:', emailResult.error || emailResult.reason);
           }
+        } else {
+          console.log(`⚠️ Skipping email for user type: ${commentUser.userType} (not eligible for warnings)`);
         }
       } catch (emailError) {
         console.error('❌ Exception while sending comment warning email:', emailError);
