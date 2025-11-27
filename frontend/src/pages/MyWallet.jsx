@@ -1,15 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { eventsApiService } from '../api/eventsApi';
+import { notificationApiService } from '../api/notificationApi';
 
 const MyWallet = () => {
   const { user, logout, updateUser, refreshUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [walletBalance, setWalletBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const isProfessor = user?.userType === 'Professor';
 
   useEffect(() => {
     loadWalletData();
@@ -29,6 +36,9 @@ const MyWallet = () => {
     const handleClickOutside = (e) => {
       if (!e.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
+      }
+      if (!e.target.closest('[data-notifications-dropdown]')) {
+        setShowNotificationsDropdown(false);
       }
     };
     document.addEventListener('click', handleClickOutside);
@@ -156,101 +166,556 @@ const MyWallet = () => {
     }
   };
 
+  const loadNotifications = useCallback(async () => {
+    if (!isProfessor) return;
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(
+          notificationsResult.data.data.notifications ||
+          notificationsResult.data.data ||
+          []
+        );
+      }
+
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, [isProfessor]);
+
+  useEffect(() => {
+    if (!isProfessor) return;
+    loadNotifications();
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications, isProfessor]);
+
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev =>
+          prev.map(n => (n._id === notificationId ? { ...n, isRead: true } : n))
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
+
+  const formatNotificationDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   const displayName = user?.firstName && user?.lastName
     ? `${user.firstName} ${user.lastName}`
     : user?.name || user?.email || 'User';
 
   const userRole = user?.userType || 'User';
 
+  const isActiveRoute = (path) => {
+    const currentPath = location.pathname;
+    if (currentPath === path) return true;
+    if (path === '/dashboard') {
+      return currentPath === '/dashboard';
+    }
+    return currentPath.startsWith(path);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#f6f7f8' }}>
       {/* Header */}
-      <header style={{
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #e2e8f0',
-        padding: '1rem 2rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div>
-          <Link to="/dashboard" style={{ textDecoration: 'none' }}>
-            <h2 style={{
-              color: '#1D3557',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              lineHeight: '1.25',
-              margin: 0,
-              cursor: 'pointer'
-            }}>
-              Bindly
-            </h2>
-          </Link>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              color: '#1D3557',
-              margin: 0
-            }}>
-              {displayName}
-            </p>
-            <p style={{
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              margin: 0
-            }}>
-              {userRole}
-            </p>
+      {isProfessor ? (
+        <header style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '1rem 2.5rem',
+          backgroundColor: '#FFFFFF'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+            <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                lineHeight: '1.25',
+                margin: 0,
+                cursor: 'pointer'
+              }}>
+                Bindly
+              </h2>
+            </Link>
           </div>
-          <div 
-            data-profile-dropdown
-            style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
-          >
-            {user?.profilePicturePath ? (
-              <img
-                src={`http://localhost:5000${user.profilePicturePath}`}
-                alt="User profile"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '50%',
-                  objectFit: 'cover'
-                }}
-              />
-            ) : (
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
+
+          <nav style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flex: 1,
+            gap: '1.25rem'
+          }}>
+            <Link
+              to="/dashboard"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                dashboard
+              </span>
+              Dashboard
+            </Link>
+            <Link
+              to="/professor/all-events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                explore
+              </span>
+              Discover Events
+            </Link>
+            <Link
+              to="/professor/events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                event
+              </span>
+              My Events
+            </Link>
+            <Link
+              to="/gym"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/gym') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                fitness_center
+              </span>
+              Gym Sessions
+            </Link>
+          </nav>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+            <Link
+              to="/professor/favorites"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#1D3557',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
+                transition: 'all 0.2s',
+                textDecoration: 'none',
+                color: 'inherit'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem', color: '#1D3557' }}>
+                favorite
+              </span>
+            </Link>
+
+            <div style={{ position: 'relative' }} data-notifications-dropdown>
+              <button
+                onClick={() => {
+                  setShowNotificationsDropdown(!showNotificationsDropdown);
+                  setShowLogoutDropdown(false);
+                  if (!showNotificationsDropdown) {
+                    loadNotifications();
+                  }
+                }}
+                style={{
+                  position: 'relative',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem', color: '#1D3557' }}>
+                  notifications
+                </span>
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '0.25rem',
+                    right: '0.25rem',
+                    backgroundColor: '#ef4444',
+                    color: '#FFFFFF',
+                    borderRadius: '50%',
+                    width: '1.125rem',
+                    height: '1.125rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.625rem',
+                    fontWeight: '700',
+                    border: '2px solid #FFFFFF'
+                  }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              {showNotificationsDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '0.5rem',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  zIndex: 1001,
+                  width: '360px',
+                  maxHeight: '500px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    padding: '1rem',
+                    borderBottom: '1px solid #e2e8f0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <h3 style={{
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      color: '#1D3557',
+                      margin: 0
+                    }}>
+                      Notifications
+                    </h3>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={handleMarkAllAsRead}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#1e40af',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          padding: '0.25rem 0.5rem'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.textDecoration = 'underline';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.textDecoration = 'none';
+                        }}
+                      >
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ overflowY: 'auto', maxHeight: '400px' }}>
+                    {loadingNotifications ? (
+                      <div style={{
+                        padding: '2rem',
+                        textAlign: 'center',
+                        color: '#6b7280',
+                        fontSize: '0.875rem'
+                      }}>
+                        Loading...
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div style={{
+                        padding: '2rem',
+                        textAlign: 'center',
+                        color: '#6b7280',
+                        fontSize: '0.875rem'
+                      }}>
+                        No notifications
+                      </div>
+                    ) : (
+                      notifications.map((notification) => (
+                        <div
+                          key={notification._id}
+                          onClick={() => {
+                            if (!notification.isRead) {
+                              handleMarkAsRead(notification._id);
+                            }
+                            if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                              navigate('/professor/all-events');
+                              setShowNotificationsDropdown(false);
+                            } else if (
+                              (notification.type === 'event_reminder' ||
+                                notification.type === 'workshop_reminder' ||
+                                notification.type === 'trip_reminder' ||
+                                notification.type === 'gym_session_reminder') &&
+                              (notification.metadata?.eventId ||
+                                notification.metadata?.workshopId ||
+                                notification.metadata?.tripId ||
+                                notification.metadata?.gymSessionId)
+                            ) {
+                              navigate('/professor/events');
+                              setShowNotificationsDropdown(false);
+                            } else if (
+                              notification.type === 'new_loyalty_partner' ||
+                              notification.type === 'loyalty_partner_added' ||
+                              (notification.type === 'system' && notification.metadata?.vendorId)
+                            ) {
+                              navigate('/professor/loyalty-vendors');
+                              setShowNotificationsDropdown(false);
+                            }
+                          }}
+                          style={{
+                            padding: '1rem',
+                            borderBottom: '1px solid #f3f4f6',
+                            cursor: 'pointer',
+                            backgroundColor: notification.isRead
+                              ? '#FFFFFF'
+                              : (notification.priority === 'high' &&
+                                (notification.type === 'event_reminder' ||
+                                  notification.type === 'workshop_reminder' ||
+                                  notification.type === 'trip_reminder' ||
+                                  notification.type === 'gym_session_reminder'))
+                                ? '#fef2f2'
+                                : '#eff6ff',
+                            borderLeft: notification.priority === 'high' &&
+                              (notification.type === 'event_reminder' ||
+                                notification.type === 'workshop_reminder' ||
+                                notification.type === 'trip_reminder' ||
+                                notification.type === 'gym_session_reminder') &&
+                              !notification.isRead
+                              ? '3px solid #ef4444'
+                              : 'none',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = notification.isRead
+                              ? '#f9fafb'
+                              : (notification.priority === 'high' &&
+                                (notification.type === 'event_reminder' ||
+                                  notification.type === 'workshop_reminder' ||
+                                  notification.type === 'trip_reminder' ||
+                                  notification.type === 'gym_session_reminder'))
+                                ? '#fee2e2'
+                                : '#dbeafe';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = notification.isRead
+                              ? '#FFFFFF'
+                              : (notification.priority === 'high' &&
+                                (notification.type === 'event_reminder' ||
+                                  notification.type === 'workshop_reminder' ||
+                                  notification.type === 'trip_reminder' ||
+                                  notification.type === 'gym_session_reminder'))
+                                ? '#fef2f2'
+                                : '#eff6ff';
+                          }}
+                        >
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            gap: '0.5rem'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <p style={{
+                                fontSize: '0.875rem',
+                                fontWeight: notification.isRead ? '400' : '600',
+                                color: '#1D3557',
+                                margin: 0,
+                                marginBottom: '0.25rem'
+                              }}>
+                                {notification.title || notification.message}
+                              </p>
+                              {notification.message && notification.message !== notification.title && (
+                                <p style={{
+                                  fontSize: '0.75rem',
+                                  color: '#6b7280',
+                                  margin: 0
+                                }}>
+                                  {notification.message}
+                                </p>
+                              )}
+                              <p style={{
+                                fontSize: '0.625rem',
+                                color: '#9ca3af',
+                                margin: '0.5rem 0 0 0'
+                              }}>
+                                {formatNotificationDate(notification.createdAt)}
+                              </p>
+                            </div>
+                            {!notification.isRead && (
+                              <div style={{
+                                width: '0.5rem',
+                                height: '0.5rem',
+                                borderRadius: '50%',
+                                backgroundColor: '#1e40af',
+                                flexShrink: 0,
+                                marginTop: '0.25rem'
+                              }} />
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
                 fontSize: '0.875rem',
-                fontWeight: '600'
+                fontWeight: '600',
+                color: '#1D3557',
+                margin: 0
               }}>
-                {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
-              </div>
-            )}
-            {showLogoutDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                right: 0,
-                marginTop: '0.5rem',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #e2e8f0',
-                borderRadius: '0.5rem',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                zIndex: 1000,
-                minWidth: '150px'
+                {displayName}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                margin: 0
               }}>
-                {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
+                Professor
+              </p>
+            </div>
+            <div 
+              data-profile-dropdown
+              style={{ position: 'relative', cursor: 'pointer' }}
+              onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            >
+              {user?.profilePicturePath ? (
+                <img
+                  src={`http://localhost:5000${user.profilePicturePath}`}
+                  alt="User profile"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: '50%',
+                    objectFit: 'cover'
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  backgroundColor: '#1D3557',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#FFFFFF',
+                  fontWeight: '600'
+                }}>
+                  {(user?.firstName?.[0] || user?.name?.[0] || 'P').toUpperCase()}
+                </div>
+              )}
+              {showLogoutDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '0.5rem',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                  zIndex: 1000,
+                  minWidth: '150px'
+                }}>
                   <Link
                     to="/wallet"
                     style={{
@@ -265,14 +730,13 @@ const MyWallet = () => {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem',
-                      textDecoration: 'none',
-                      backgroundColor: '#eff6ff'
+                      textDecoration: 'none'
                     }}
                     onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#dbeafe';
+                      e.target.style.backgroundColor = '#f3f4f6';
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#eff6ff';
+                      e.target.style.backgroundColor = 'transparent';
                     }}
                     onClick={() => setShowLogoutDropdown(false)}
                   >
@@ -281,39 +745,188 @@ const MyWallet = () => {
                     </span>
                     My Wallet
                   </Link>
-                )}
-                <button
-                  onClick={handleLogout}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    textAlign: 'left',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    color: '#1D3557',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#f3f4f6';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                    logout
-                  </span>
-                  Logout
-                </button>
-              </div>
-            )}
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#1D3557',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      logout
+                    </span>
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      ) : (
+        <header style={{
+          backgroundColor: '#FFFFFF',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '1rem 2rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <Link to="/dashboard" style={{ textDecoration: 'none' }}>
+              <h2 style={{
+                color: '#1D3557',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                lineHeight: '1.25',
+                margin: 0,
+                cursor: 'pointer'
+              }}>
+                Bindly
+              </h2>
+            </Link>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#1D3557',
+                margin: 0
+              }}>
+                {displayName}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                margin: 0
+              }}>
+                {userRole}
+              </p>
+            </div>
+            <div
+              data-profile-dropdown
+              style={{ position: 'relative', cursor: 'pointer' }}
+              onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            >
+              {user?.profilePicturePath ? (
+                <img
+                  src={`http://localhost:5000${user.profilePicturePath}`}
+                  alt="User profile"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: '50%',
+                    objectFit: 'cover'
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  backgroundColor: '#1D3557',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}>
+                  {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
+                </div>
+              )}
+              {showLogoutDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '0.5rem',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                  zIndex: 1000,
+                  minWidth: '150px'
+                }}>
+                  {(user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Student') && (
+                    <Link
+                      to="/wallet"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        textAlign: 'left',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#1D3557',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        textDecoration: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#f3f4f6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'transparent';
+                      }}
+                      onClick={() => setShowLogoutDropdown(false)}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                        account_balance_wallet
+                      </span>
+                      My Wallet
+                    </Link>
+                  )}
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#1D3557',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      logout
+                    </span>
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+      )}
 
       {/* Content */}
       <div style={{

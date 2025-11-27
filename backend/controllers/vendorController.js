@@ -8,6 +8,27 @@ const { sampleVendors } = require('../scripts/test-vendor-loyalty-program.js');
 const path = require('path');
 const fs = require('fs').promises;
 
+const APP_BASE_URL =
+  process.env.APP_BASE_URL ||
+  process.env.BASE_URL ||
+  process.env.BACKEND_BASE_URL ||
+  'http://localhost:5000';
+
+const buildAbsoluteLogoUrl = (rawPath) => {
+  if (!rawPath || typeof rawPath !== 'string') return null;
+  const cleaned = rawPath.trim().replace(/\\/g, '/');
+  if (!cleaned) return null;
+  if (
+    cleaned.startsWith('http://') ||
+    cleaned.startsWith('https://') ||
+    cleaned.startsWith('data:')
+  ) {
+    return cleaned;
+  }
+  const normalized = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+  return `${APP_BASE_URL}${normalized}`;
+};
+
 // Get all vendors (for admin/events office to get vendor IDs)
 module.exports.getAllVendors = async (req, res) => {
   try {
@@ -52,6 +73,27 @@ module.exports.getLoyaltyProgramVendors = async (req, res) => {
       .sort({ vendorName: 1 })
       .lean();
 
+    let logoFallbackMap = new Map();
+    const vendorNameKeys = vendors
+      .map((vendor) => (vendor.vendorName || '').trim())
+      .filter(Boolean);
+
+    if (vendorNameKeys.length) {
+      const vendorDocs = await User.find({
+        userType: 'Vendor',
+        companyName: { $in: vendorNameKeys }
+      })
+        .select('companyName vendorLogoPath')
+        .lean();
+
+      vendorDocs.forEach((doc) => {
+        const key = (doc.companyName || '').trim().toLowerCase();
+        if (key && doc.vendorLogoPath) {
+          logoFallbackMap.set(key, doc.vendorLogoPath);
+        }
+      });
+    }
+
     const formattedVendors = vendors.map((vendor) => ({
       id: vendor._id.toString(),
       vendorName: vendor.vendorName,
@@ -63,7 +105,10 @@ module.exports.getLoyaltyProgramVendors = async (req, res) => {
       termsAndConditions: vendor.termsAndConditions,
       validFrom: vendor.validFrom || null,
       validUntil: vendor.validUntil || null,
-      logoUrl: vendor.logoUrl || null,
+      logoUrl: buildAbsoluteLogoUrl(
+        vendor.logoUrl ||
+        logoFallbackMap.get((vendor.vendorName || '').trim().toLowerCase())
+      ),
       isActive: vendor.isActive,
       createdAt: vendor.createdAt,
       updatedAt: vendor.updatedAt || null
@@ -835,7 +880,9 @@ module.exports.applyToLoyaltyProgram = async (req, res) => {
       validFrom: validFrom ? new Date(validFrom) : new Date(),
       validUntil: validUntil ? new Date(validUntil) : null,
       isActive: true,
-      logoUrl: vendor.vendorLogoPath || null
+      logoUrl: buildAbsoluteLogoUrl(
+        vendor.vendorLogoPath || vendor.logoUrl || vendor.companyLogo
+      )
     });
 
     await loyaltyApplication.save();
@@ -906,7 +953,7 @@ module.exports.getMyLoyaltyApplication = async (req, res) => {
         validFrom: application.validFrom,
         validUntil: application.validUntil,
         isActive: application.isActive,
-        logoUrl: application.logoUrl,
+        logoUrl: buildAbsoluteLogoUrl(application.logoUrl),
         createdAt: application.createdAt,
         updatedAt: application.updatedAt
       }
