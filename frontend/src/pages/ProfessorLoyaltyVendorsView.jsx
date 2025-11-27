@@ -656,6 +656,35 @@ const ProfessorLoyaltyVendorsView = () => {
                 zIndex: 1000,
                 minWidth: '150px'
               }}>
+                <Link
+                  to="/wallet"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#1D3557',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => setShowLogoutDropdown(false)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                    account_balance_wallet
+                  </span>
+                  My Wallet
+                </Link>
                 <button
                   onClick={handleLogout}
                   style={{
@@ -881,19 +910,29 @@ const ProfessorLoyaltyVendorsView = () => {
                           }}
                         >
                           {/* Vendor Logo/Icon */}
-                          {vendor.logoUrl ? (
-                            <img
-                              src={vendor.logoUrl}
-                              alt={vendor.vendorName}
-                              style={{
-                                width: '4rem',
-                                height: '4rem',
-                                borderRadius: '0.5rem',
-                                objectFit: 'cover',
-                                marginBottom: '1rem'
-                              }}
-                            />
-                          ) : (
+                      {vendor.logoUrl ? (
+                        <div style={{
+                          width: '3.75rem',
+                          height: '3.75rem',
+                          borderRadius: '9999px',
+                          border: '2px solid rgba(99, 102, 241, 0.25)',
+                          backgroundColor: '#f4f6ff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden'
+                        }}>
+                          <img
+                            src={vendor.logoUrl}
+                            alt={vendor.vendorName}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover'
+                            }}
+                          />
+                        </div>
+                      ) : (
                             <div style={{
                               width: '4rem',
                               height: '4rem',
@@ -1063,17 +1102,28 @@ const ProfessorLoyaltyVendorsView = () => {
               }}>
                 <div style={{ flex: 1 }}>
                   {selectedVendor.logoUrl ? (
-                    <img
-                      src={selectedVendor.logoUrl}
-                      alt={selectedVendor.vendorName}
-                      style={{
-                        width: '4rem',
-                        height: '4rem',
-                        borderRadius: '0.5rem',
-                        objectFit: 'cover',
-                        marginBottom: '1rem'
-                      }}
-                    />
+                    <div style={{
+                      width: '4rem',
+                      height: '4rem',
+                      borderRadius: '9999px',
+                      border: '2px solid rgba(99, 102, 241, 0.25)',
+                      backgroundColor: '#f4f6ff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      marginBottom: '1rem'
+                    }}>
+                      <img
+                        src={selectedVendor.logoUrl}
+                        alt={selectedVendor.vendorName}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                    </div>
                   ) : (
                     <div style={{
                       width: '4rem',
