@@ -133,16 +133,7 @@ exports.registerStudentForEvent = async (req, res) => {
     
     // Check if User already exists
     let user = await User.findOne({ email: studentEmail.toLowerCase().trim() });
-    if (!user) {
-      user = new User({
-        email: studentEmail,
-        name: studentName,
-        userType: 'Student',
-        gucId: studentId, // map to gucId
-        password: tempPassword
-      });
-      await user.save();  // <-- fails here
-}
+    
     // Generate verification token and expiry
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
@@ -156,6 +147,7 @@ exports.registerStudentForEvent = async (req, res) => {
         email: studentEmail.toLowerCase().trim(),
         password: tempPassword, // Temporary password - user should reset via password reset
         userType: 'Student',
+        gucId: studentId.trim(), // Map studentId to gucId (required field)
         firstName: studentName.split(' ')[0] || studentName,
         lastName: studentName.split(' ').slice(1).join(' ') || '',
         isVerified: false,

@@ -8,10 +8,7 @@ const TYPES = [
   { label: 'Aerobics', value: 'aerobics' },
   { label: 'Zumba', value: 'zumba' },
   { label: 'Cross Circuit', value: 'cross circuit' },
-  { label: 'Kick-boxing', value: 'kick-boxing' },
-  { label: 'Strength Training', value: 'strength' },
-  { label: 'Cardio', value: 'cardio' },
-  { label: 'Other', value: 'other' }
+  { label: 'Kick-boxing', value: 'kick-boxing' }
 ];
 
 const normalize = (s) => (s || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '');

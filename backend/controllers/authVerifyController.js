@@ -6,21 +6,43 @@ exports.verifyByToken = async (req, res) => {
     const { token } = req.query;
     if (!token) return res.status(400).send("Invalid link");
 
+    // Check if token exists and is not expired
     const user = await User.findOne({
       verificationToken: token,
       verificationExpiresAt: { $gt: new Date() },
     });
-    if (!user) return res.status(400).send("Link invalid or expired");
+    
+    if (!user) {
+      // Check if token exists but is expired
+      const expiredUser = await User.findOne({ verificationToken: token });
+      if (expiredUser) {
+        console.warn('⚠️ verifyByToken: Token expired for user:', expiredUser.email);
+        return res.status(400).send("Verification link has expired. Please request a new verification email.");
+      }
+      console.warn('⚠️ verifyByToken: Invalid token');
+      return res.status(400).send("Link invalid or expired");
+    }
+
+    console.log(`🔐 verifyByToken: Found user ${user.email} (isVerified=${user.isVerified}) - verifying now`);
 
     user.isVerified = true;
     user.verificationToken = null;
     user.verificationExpiresAt = null;
+
+    // Set status to active after verification for students and Staff/TA/Professor
+    if (user.status === 'blocked') {
+      if (user.userType === 'Student' || ['Staff', 'TA', 'Professor'].includes(user.userType)) {
+        user.status = 'active';
+      }
+    }
+
     await user.save();
+    console.log(`✅ verifyByToken: User ${user.email} verified and activated`);
 
     const redirectUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     res.redirect(`${redirectUrl}/login`);
   } catch (err) {
-    console.error(err);
+    console.error('❌ verifyByToken error:', err);
     res.status(500).send("Server error");
   }
 };
