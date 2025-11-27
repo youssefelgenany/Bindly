@@ -16,41 +16,166 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const stripTrailingSlash = (value) => (value ? value.replace(/\/+$/, "") : value);
+
+function resolveUrl(candidates, fallback) {
+  for (const candidate of candidates) {
+    if (candidate) {
+      return stripTrailingSlash(candidate);
+    }
+  }
+  return stripTrailingSlash(fallback);
+}
+
 async function sendVerificationEmail(to, token, name) {
-  console.log('📧 sendVerificationEmail called with:', { to, token, name });
-  
-  // Prefer publicly reachable base URLs to avoid spam filters flagging localhost links
-  const backendUrl =
-    process.env.VERIFICATION_BASE_URL ||
-    process.env.PUBLIC_BACKEND_URL ||
-    process.env.BACKEND_URL ||
-    process.env.API_BASE_URL ||
-    "https://bindly.app";
-  const frontendUrl = process.env.FRONTEND_URL || process.env.APP_LOGIN_URL?.replace('/login', '') || "http://localhost:3000";
-  const verifyUrl = `${backendUrl}/api/auth/verify-email?token=${token}`;
-  const loginRedirect = `${frontendUrl}/login`;
+  console.log("📧 sendVerificationEmail called with:", { to, token, name });
+
+  const fallbackFrontend =
+    process.env.NODE_ENV === "production" ? "https://bindly.app" : "http://localhost:3000";
+  const fallbackBackend =
+    process.env.NODE_ENV === "production" ? "https://api.bindly.app" : "http://localhost:5000";
+
+  // Prefer explicitly configured URLs but fall back gracefully for dev/prod
+  const frontendUrl = resolveUrl(
+    [
+      process.env.VERIFICATION_APP_URL,
+      process.env.FRONTEND_URL,
+      process.env.PUBLIC_FRONTEND_URL,
+      process.env.APP_BASE_URL,
+      process.env.APP_LOGIN_URL ? process.env.APP_LOGIN_URL.replace(/\/login$/, "") : undefined,
+    ],
+    fallbackFrontend
+  );
+
+  const backendUrl = resolveUrl(
+    [
+      process.env.VERIFICATION_BASE_URL,
+      process.env.PUBLIC_BACKEND_URL,
+      process.env.BACKEND_URL,
+      process.env.API_BASE_URL,
+    ],
+    fallbackBackend
+  );
+
+  const configuredVerifyPage = stripTrailingSlash(process.env.VERIFICATION_LINK_BASE);
+  const verifyPageUrl = configuredVerifyPage || `${frontendUrl}/verify-email`;
+  const verifyUrl = `${verifyPageUrl}${verifyPageUrl.includes("?") ? "&" : "?"}token=${encodeURIComponent(
+    token
+  )}`;
+
+  const apiVerifyUrl = `${backendUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+  const loginRedirect =
+    stripTrailingSlash(process.env.APP_LOGIN_URL) || `${frontendUrl}/login`;
+
+  console.log("🔗 Resolved verification URLs:", {
+    frontendUrl,
+    backendUrl,
+    verifyUrl,
+    apiVerifyUrl,
+    loginRedirect,
+  });
   
   const sentAt = new Date().toUTCString();
 
   const textBody = [
     `Hi ${name || "there"},`,
     "",
-    "Thanks for registering with Bindly. Please verify your email to activate your account:",
-    verifyUrl,
+    "Welcome to Bindly! Please verify your email within the next 24 hours so you can access your account.",
     "",
-    "This link expires in 24 hours. If you did not request this, you can safely ignore this email.",
+    `1) Primary link: ${verifyUrl}`,
+    "2) Fallback (direct API endpoint):",
+    `   ${apiVerifyUrl}`,
+    "",
+    `You'll be redirected to ${loginRedirect} once verification succeeds.`,
     "",
     `Sent at: ${sentAt}`,
-    `Bindly • ${frontendUrl.replace(/^https?:\/\//, '')}`
-  ].join('\n');
+    "Bindly • GUC Events Platform",
+  ].join("\n");
 
   const html = `
-    <p>Hi ${name || "there"},</p>
-    <p>Thanks for registering with <strong>Bindly</strong>. Please verify your email to activate your account:</p>
-    <p><a href="${verifyUrl}">${verifyUrl}</a></p>
-    <p>This link expires in 24 hours. If you did not request this, you can safely ignore this email.</p>
-    <p>Sent at: ${sentAt}</p>
-    <p>Bindly • ${frontendUrl.replace(/^https?:\/\//, '')}</p>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verify your Bindly account</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#F4F6FB;font-family:'Manrope','Segoe UI','Helvetica Neue',Arial,sans-serif;color:#111827;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F6FB;padding:32px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background-color:#FFFFFF;border-radius:24px;border:1px solid #E3E8F4;box-shadow:0 18px 45px rgba(16,24,40,0.12);overflow:hidden;">
+            <tr>
+              <td style="padding:32px;background:linear-gradient(120deg,#1D3557,#2F5C8F);color:#FFFFFF;">
+                <p style="margin:0;font-size:26px;font-weight:700;letter-spacing:-0.02em;">Bindly</p>
+                <p style="margin:8px 0 0;font-size:14px;opacity:0.85;">GUC Events Platform</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:40px 40px 32px;">
+                <div style="display:flex;justify-content:center;">
+                  <div style="width:64px;height:64px;border-radius:20px;background-color:#E8F1FA;border:2px solid #C7DAF0;display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#1D3557" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="5" width="18" height="14" rx="2" ry="2"></rect>
+                      <polyline points="3 7 12 13 21 7"></polyline>
+                    </svg>
+                  </div>
+                </div>
+                <p style="margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#94A3B8;text-align:center;">Action needed</p>
+                <p style="margin:0 0 12px;font-size:24px;font-weight:700;color:#1D3557;text-align:center;letter-spacing:-0.01em;">Verify your Bindly account</p>
+                <p style="margin:0 0 16px;font-size:15px;color:#4B5563;line-height:1.7;">
+                  Hi ${name || "there"}, your account is almost ready. Please confirm your email within
+                  the next 24 hours so we can activate your access to Bindly.
+                </p>
+                <div style="text-align:center;margin:28px 0;">
+                  <a href="${verifyUrl}" style="display:inline-block;padding:14px 46px;border-radius:999px;background-color:#1D3557;color:#FFFFFF;font-weight:600;font-size:16px;text-decoration:none;box-shadow:0 8px 24px rgba(29,53,87,0.25);">
+                    Verify My Account
+                  </a>
+                </div>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;border:1px solid #E2E8F0;border-radius:18px;">
+                  <tr>
+                    <td style="padding:20px 24px;">
+                      <p style="margin:0 0 10px;font-size:14px;font-weight:600;color:#1D3557;">What's next?</p>
+                      <ol style="margin:0;padding-left:18px;color:#4B5563;font-size:14px;line-height:1.6;">
+                        <li style="margin-bottom:6px;">Click the button above (or the link below) to confirm your email.</li>
+                        <li style="margin-bottom:6px;">We'll verify the token instantly.</li>
+                        <li style="margin:0;">You'll be redirected to <strong>${loginRedirect}</strong> to sign in.</li>
+                      </ol>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#1D4ED8;">Primary verification link</p>
+                <p style="margin:0 0 18px;font-size:13px;color:#1D4ED8;word-break:break-all;">
+                  <a href="${verifyUrl}" style="color:#1D4ED8;text-decoration:none;">${verifyUrl}</a>
+                </p>
+                <div style="background-color:#F8F5FF;border:1px solid #C4B5FD;border-radius:16px;padding:18px 20px;margin:6px 0 24px;">
+                  <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#4C1D95;">If the button doesn't work</p>
+                  <p style="margin:0;font-size:13px;color:#4C1D95;line-height:1.6;">
+                    Use our secure fallback endpoint:
+                  </p>
+                  <p style="margin:10px 0 0;font-size:13px;color:#4C1D95;word-break:break-all;">
+                    <a href="${apiVerifyUrl}" style="color:#4C1D95;text-decoration:underline;">${apiVerifyUrl}</a>
+                  </p>
+                </div>
+                <p style="margin:0 0 10px;font-size:13px;color:#6B7280;">
+                  Need help? Reply to this email or contact your Bindly administrator and mention the address
+                  <strong>${to}</strong>.
+                </p>
+                <p style="margin:0;font-size:13px;color:#6B7280;">
+                  Best regards,<br />
+                  <strong>The Bindly Team</strong>
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:18px 0 0;font-size:12px;color:#94A3B8;">
+            Sent at ${sentAt} • ${frontendUrl.replace(/^https?:\/\//, "")}
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
   `;
   
   // Check if SMTP is configured

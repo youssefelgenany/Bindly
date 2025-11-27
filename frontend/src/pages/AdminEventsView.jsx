@@ -48,6 +48,7 @@ const AdminEventsView = () => {
   const [selectedEventForRatings, setSelectedEventForRatings] = useState(null);
   const [showDeleteCommentModal, setShowDeleteCommentModal] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState(null);
+  const [commentDeleteReason, setCommentDeleteReason] = useState('inappropriate');
   const [deletingComment, setDeletingComment] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -444,6 +445,7 @@ const AdminEventsView = () => {
 
   const handleDeleteCommentClick = (commentId) => {
     setCommentToDelete(commentId);
+    setCommentDeleteReason('inappropriate');
     setShowDeleteCommentModal(true);
   };
 
@@ -455,7 +457,7 @@ const AdminEventsView = () => {
       const result = await eventsApiService.deleteComment(
         selectedEventForRatings._id || selectedEventForRatings.id,
         commentToDelete,
-        'Deleted by admin'
+        commentDeleteReason === 'inappropriate' ? 'inappropriate' : 'admin_cleanup'
       );
       if (result.success) {
         // Reload ratings and comments
@@ -465,6 +467,7 @@ const AdminEventsView = () => {
         }
         setShowDeleteCommentModal(false);
         setCommentToDelete(null);
+        setCommentDeleteReason('inappropriate');
       } else {
         alert(result.message || 'Failed to delete comment');
       }
@@ -2729,6 +2732,70 @@ const AdminEventsView = () => {
               This action cannot be undone.
             </p>
 
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#1F2937',
+                marginBottom: '0.75rem'
+              }}>
+                Reason for removing this comment
+              </p>
+              <label style={{
+                display: 'flex',
+                gap: '0.5rem',
+                alignItems: 'flex-start',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                border: commentDeleteReason === 'inappropriate' ? '1px solid #1D3557' : '1px solid #E5E7EB',
+                marginBottom: '0.75rem',
+                cursor: 'pointer',
+                backgroundColor: commentDeleteReason === 'inappropriate' ? '#F8FAFC' : '#FFFFFF'
+              }}>
+                <input
+                  type="radio"
+                  name="comment-delete-reason"
+                  value="inappropriate"
+                  checked={commentDeleteReason === 'inappropriate'}
+                  onChange={() => setCommentDeleteReason('inappropriate')}
+                  style={{ marginTop: '0.25rem' }}
+                />
+                <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+                  Inappropriate / violates community guidelines
+                  <br />
+                  <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
+                    Sends a warning email to the attendee (Student, Staff, TA, Professor)
+                  </span>
+                </span>
+              </label>
+              <label style={{
+                display: 'flex',
+                gap: '0.5rem',
+                alignItems: 'flex-start',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                border: commentDeleteReason === 'general' ? '1px solid #1D3557' : '1px solid #E5E7EB',
+                cursor: 'pointer',
+                backgroundColor: commentDeleteReason === 'general' ? '#F8FAFC' : '#FFFFFF'
+              }}>
+                <input
+                  type="radio"
+                  name="comment-delete-reason"
+                  value="general"
+                  checked={commentDeleteReason === 'general'}
+                  onChange={() => setCommentDeleteReason('general')}
+                  style={{ marginTop: '0.25rem' }}
+                />
+                <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+                  General cleanup (spam, duplicates, admin request)
+                  <br />
+                  <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
+                    Removes the comment without emailing the participant
+                  </span>
+                </span>
+              </label>
+            </div>
+
             {/* Buttons */}
             <div style={{
               display: 'flex',
@@ -4619,6 +4686,7 @@ const AdminEventsView = () => {
                 onClick={() => {
                   setShowDeleteCommentModal(false);
                   setCommentToDelete(null);
+                  setCommentDeleteReason('inappropriate');
                 }}
                 disabled={deletingComment}
                 style={{
