@@ -1510,35 +1510,12 @@ const StudentEventsView = () => {
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
                 {/* Filter Dropdown */}
                 <div style={{ position: 'relative' }} data-filter-dropdown>
-                <button
-                  onClick={() => {
+                  <button
+                    className="filter-button-animate"
+                    onClick={() => {
                       setShowFilterDropdown(!showFilterDropdown);
                       setShowSortDropdown(false);
-                  }}
-                  style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.875rem 1.25rem',
-                    borderRadius: '0.5rem',
-                      backgroundColor: '#1e40af',
-                      color: '#FFFFFF',
-                      border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                      fontWeight: '600',
-                    transition: 'all 0.2s',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                  }}
-                  onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#1e3a8a';
-                  }}
-                  onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#1e40af';
-                  }}
-                >
                     }}
-                    className="filter-button-animate"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -1582,7 +1559,7 @@ const StudentEventsView = () => {
                       filter_list
                     </span>
                     Filter
-                </button>
+                  </button>
                   {showFilterDropdown && (
                     <div style={{
                       position: 'absolute',
