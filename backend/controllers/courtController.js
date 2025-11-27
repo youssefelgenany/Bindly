@@ -247,11 +247,13 @@ exports.bookCourt = async (req, res) => {
     }
 
     // Create booking with automatically included student information
+    // Use provided studentName and studentGucId from request body if available,
+    // otherwise use the extracted values from user profile
     const booking = new CourtBooking({
       court: courtId,
       user: userId,
-      studentName: studentName,
-      studentGucId: studentGucId,
+      studentName: req.body.studentName || studentName, // Use from request if provided, otherwise from user profile
+      studentGucId: req.body.studentId || studentGucId, // Use from request if provided, otherwise from user profile
       bookingDate: new Date(bookingDate),
       startTime,
       endTime,

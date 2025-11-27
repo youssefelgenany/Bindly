@@ -906,14 +906,52 @@ exports.getAllEventsForStudents = async (req, res) => {
                          req.user.userType === 'event office' ||
                          req.user.role === 'event office';
     
-    // Build date filter: ALL users should see ALL events (including past ones)
-    // No date filter - show all events regardless of date
+    // Build date filter: For non-admin/event-office users, exclude past events
+    // Admin and Events Office users should see ALL events (including past ones)
     const now = new Date();
     console.log('🔍 Date filter - Current time:', now.toISOString());
     console.log('🔍 isEventOffice:', isEventOffice);
-    console.log('🔍 Showing ALL events (including past events) for all users');
     
-    let dateFilter = {}; // Empty date filter - no date restrictions
+    // Check if user is Admin or Events Office (they should see ALL events including past ones)
+    const userTypeLower = req.user?.userType?.toLowerCase();
+    const roleLower = req.user?.role?.toLowerCase();
+    const isAdminOrEventOffice = req.user && (
+      userTypeLower === 'admin' ||
+      req.user.userType === 'Admin' ||
+      isEventOffice ||
+      roleLower === 'admin' ||
+      req.user.role === 'admin' ||
+      req.user.role === 'Event Office'
+    );
+    
+    let dateFilter = {}; // Default: no date restrictions (for admin/event office)
+    
+    // For non-admin/event-office users, filter out past events
+    if (!isAdminOrEventOffice) {
+      dateFilter = {
+        $or: [
+          // Case 1: Event has endDate and it's in the future
+          {
+            endDate: { $gt: now }
+          },
+          // Case 2: Event has no endDate but has startDate in the future
+          {
+            $and: [
+              {
+                $or: [
+                  { endDate: { $exists: false } },
+                  { endDate: null }
+                ]
+              },
+              { startDate: { $gt: now } }
+            ]
+          }
+        ]
+      };
+      console.log('🔍 Non-admin/event-office user - WILL EXCLUDE events where endDate <=', now.toISOString(), 'OR (no endDate AND startDate <=', now.toISOString(), ')');
+    } else {
+      console.log('🔍 Admin/Events Office user - Showing ALL events (including past events)');
+    }
     
     // Base filter conditions
     const baseFilter = {
@@ -962,16 +1000,16 @@ exports.getAllEventsForStudents = async (req, res) => {
       console.log('🔍 No type filter or type is "all", showing all valid types');
     }
     
-    // Build filter - conditionally include dateFilter only for non-Events Office users
+    // Build filter - conditionally include dateFilter for non-admin/event-office users
     // Combine baseFilter (which has $and) with typeFilter and conditionally dateFilter
     let filter = {
       ...baseFilter,
       ...typeFilter
     };
     
-    // Only add dateFilter if it's not empty (i.e., for non-Events Office users)
-    // For Events Office users, dateFilter will be empty {}, so we don't add it
-    if (!isEventOffice && dateFilter && Object.keys(dateFilter).length > 0) {
+    // Only add dateFilter if it's not empty (i.e., for non-admin/event-office users)
+    // For Admin/Events Office users, dateFilter will be empty {}, so we don't add it
+    if (!isAdminOrEventOffice && dateFilter && Object.keys(dateFilter).length > 0) {
       // Merge dateFilter into the existing filter
       // Since dateFilter has $or, we can add it at the root level alongside $and
       filter = {
@@ -1174,20 +1212,42 @@ exports.getAllEventsForStudents = async (req, res) => {
       throw aggError; // Re-throw to be caught by outer catch
     }
 
-    // POST-FILTER: Removed - All users should see ALL events (including past ones)
-    console.log('🔍 All users - Showing ALL events (including past events)');
+    // POST-FILTER: Remove past events for non-admin/event-office users
+    // Students, TA, Staff, and Professors should NOT see past events in Discover Events
+    // Admin and Events Office users should see ALL events (including past ones)
+    // Note: isAdminOrEventOffice, userTypeLower, and roleLower are already defined earlier in the function for the date filter
 
-    // Check if user is Admin or Events Office (they should see ALL events including restricted ones)
-    const userTypeLower = req.user?.userType?.toLowerCase();
-    const roleLower = req.user?.role?.toLowerCase();
-    const isAdminOrEventOffice = req.user && (
-      userTypeLower === 'admin' ||
-      req.user.userType === 'Admin' ||
-      isEventOffice ||
-      roleLower === 'admin' ||
-      req.user.role === 'admin' ||
-      req.user.role === 'Event Office'
-    );
+    if (!isAdminOrEventOffice) {
+      const nowPostFilter = new Date();
+      const initialCount = events.length;
+      events = events.filter(event => {
+        // If event has endDate, check if it's in the future
+        if (event.endDate) {
+          const endDate = new Date(event.endDate);
+          if (endDate <= nowPostFilter) {
+            console.log('🚫 getAllEventsForStudents POST-FILTER: Removing past event:', event.title, 'endDate:', event.endDate, 'now:', nowPostFilter.toISOString());
+            return false;
+          }
+        } else if (event.startDate) {
+          // If no endDate, check startDate
+          const startDate = new Date(event.startDate);
+          if (startDate <= nowPostFilter) {
+            console.log('🚫 getAllEventsForStudents POST-FILTER: Removing past event (no endDate):', event.title, 'startDate:', event.startDate, 'now:', nowPostFilter.toISOString());
+            return false;
+          }
+        } else {
+          // No dates at all - exclude it
+          console.log('🚫 getAllEventsForStudents POST-FILTER: Removing event with no dates:', event.title);
+          return false;
+        }
+        return true;
+      });
+      if (events.length < initialCount) {
+        console.log('🚫 getAllEventsForStudents POST-FILTER: Removed', (initialCount - events.length), 'past events');
+      }
+    } else {
+      console.log('🔍 Admin/Events Office user - Skipping post-filter, showing ALL events (including past)');
+    }
 
     // Filter by user type restrictions
     // Admin and Events Office users should see ALL events (including restricted ones)

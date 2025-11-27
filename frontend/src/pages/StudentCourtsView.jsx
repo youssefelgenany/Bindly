@@ -19,6 +19,8 @@ const StudentCourtsView = () => {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [bookingData, setBookingData] = useState({
+    studentName: '',
+    studentId: '',
     purpose: '',
     participants: [{ name: '', email: '' }],
     notes: ''
@@ -252,7 +254,13 @@ const StudentCourtsView = () => {
 
   const handleSlotClick = (slot) => {
     setSelectedSlot(slot);
+    // Auto-fill student name and ID from user data
+    const fullName = user?.firstName && user?.lastName 
+      ? `${user.firstName} ${user.lastName}`.trim()
+      : user?.name || '';
     setBookingData({
+      studentName: fullName,
+      studentId: user?.gucId || '',
       purpose: '',
       participants: [{ name: '', email: '' }],
       notes: ''
@@ -276,9 +284,9 @@ const StudentCourtsView = () => {
         bookingDate: selectedDate,
         startTime: selectedSlot.startTime,
         endTime: selectedSlot.endTime,
-        purpose: bookingData.purpose,
-        participants: bookingData.participants.filter(p => p.name && p.email),
-        notes: bookingData.notes
+        studentName: bookingData.studentName,
+        studentId: bookingData.studentId,
+        participants: bookingData.participants.filter(p => p.name && p.email)
       });
 
       if (result.success) {
@@ -286,7 +294,13 @@ const StudentCourtsView = () => {
         setTimeout(() => {
           setShowBookingForm(false);
           setSelectedSlot(null);
+          // Auto-fill student name and ID from user data
+          const fullName = user?.firstName && user?.lastName 
+            ? `${user.firstName} ${user.lastName}`.trim()
+            : user?.name || '';
           setBookingData({
+            studentName: fullName,
+            studentId: user?.gucId || '',
             purpose: '',
             participants: [{ name: '', email: '' }],
             notes: ''
@@ -1916,59 +1930,97 @@ const StudentCourtsView = () => {
                     </div>
                   </div>
 
-                  {/* Student Info Notice */}
-                  <div style={{
-                    backgroundColor: '#dbeafe',
-                    border: '1px solid #3b82f6',
-                    borderRadius: '0.5rem',
-                    padding: '0.75rem',
-                    marginBottom: '1.5rem'
-                  }}>
-                    <p style={{
-                      color: '#1e40af',
-                      fontSize: '0.875rem',
-                      margin: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-                        info
-                      </span>
-                      Your name ({user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.name || 'N/A'}) and GUC ID ({user?.gucId || 'N/A'}) will be automatically included in the reservation.
-                    </p>
-                  </div>
-
-                  {/* Purpose */}
+                  {/* Student Information */}
                   <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{
-                      display: 'block',
-                      color: '#374151',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      marginBottom: '0.5rem'
+                    <h3 style={{
+                      color: '#1D3557',
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      marginBottom: '1rem',
+                      marginTop: 0,
+                      paddingBottom: '0.5rem',
+                      borderBottom: '2px solid #1e40af'
                     }}>
-                      Purpose <span style={{ color: '#dc2626' }}>*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={bookingData.purpose}
-                      onChange={(e) => setBookingData({ ...bookingData, purpose: e.target.value })}
-                      placeholder="e.g., Basketball practice, Tennis match"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #e5e7eb',
-                        fontSize: '0.875rem',
-                        outline: 'none',
-                        transition: 'border-color 0.2s',
-                        boxSizing: 'border-box'
-                      }}
-                      onFocus={(e) => e.target.style.borderColor = '#1e40af'}
-                      onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-                    />
+                      Student Information
+                    </h3>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      <div>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Full Name <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={bookingData.studentName}
+                          onChange={(e) => setBookingData({ ...bookingData, studentName: e.target.value })}
+                          required
+                          placeholder="Enter your full name"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            backgroundColor: '#f3f4f6',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            transition: 'border-color 0.2s, background-color 0.2s',
+                            boxSizing: 'border-box'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#1e40af';
+                            e.target.style.backgroundColor = '#ffffff';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#e5e7eb';
+                            e.target.style.backgroundColor = '#f3f4f6';
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          color: '#374151',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Student ID <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={bookingData.studentId}
+                          onChange={(e) => setBookingData({ ...bookingData, studentId: e.target.value })}
+                          required
+                          placeholder="Enter your student ID"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            backgroundColor: '#f3f4f6',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            transition: 'border-color 0.2s, background-color 0.2s',
+                            boxSizing: 'border-box'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#1e40af';
+                            e.target.style.backgroundColor = '#ffffff';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#e5e7eb';
+                            e.target.style.backgroundColor = '#f3f4f6';
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Participants */}
@@ -2077,39 +2129,6 @@ const StudentCourtsView = () => {
                         + Add Participant
                       </button>
                     )}
-                  </div>
-
-                  {/* Notes */}
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{
-                      display: 'block',
-                      color: '#374151',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Notes (Optional)
-                    </label>
-                    <textarea
-                      value={bookingData.notes}
-                      onChange={(e) => setBookingData({ ...bookingData, notes: e.target.value })}
-                      placeholder="Any additional notes..."
-                      rows="3"
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #e5e7eb',
-                        fontSize: '0.875rem',
-                        outline: 'none',
-                        transition: 'border-color 0.2s',
-                        boxSizing: 'border-box',
-                        fontFamily: 'inherit',
-                        resize: 'vertical'
-                      }}
-                      onFocus={(e) => e.target.style.borderColor = '#1e40af'}
-                      onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-                    />
                   </div>
 
                   {/* Error Message */}
