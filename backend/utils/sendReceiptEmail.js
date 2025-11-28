@@ -50,30 +50,30 @@ async function sendReceiptEmail(email, name, eventTitle, amount, paymentMethod, 
     const eventTypeDisplay = eventTypeMap[receiptDetails.eventType] || receiptDetails.eventType;
 
     detailsHTML = `
-      <div style="background: linear-gradient(135deg, #457B9D 0%, #1D3557 100%); padding: 20px; border-radius: 8px; margin-bottom: 20px; color: white;">
-        <h3 style="color: white; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600;">📍 Event Details</h3>
+      <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <h3 style="color: #1D3557; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600;">📍 Event Details</h3>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
           <div>
-            <p style="margin: 0 0 5px 0; font-size: 12px; opacity: 0.9;">Event Type</p>
-            <p style="margin: 0; font-size: 14px; font-weight: 600;">${eventTypeDisplay}</p>
+            <p style="margin: 0 0 5px 0; font-size: 12px; color: #6B7280;">Event Type</p>
+            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1D3557;">${eventTypeDisplay}</p>
           </div>
           
           <div>
-            <p style="margin: 0 0 5px 0; font-size: 12px; opacity: 0.9;">Booth Size</p>
-            <p style="margin: 0; font-size: 14px; font-weight: 600;">${receiptDetails.boothSize || 'Standard'}</p>
+            <p style="margin: 0 0 5px 0; font-size: 12px; color: #6B7280;">Booth Size</p>
+            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1D3557;">${receiptDetails.boothSize || 'Standard'}</p>
           </div>
         </div>
       </div>
 
-      <div style="background: linear-gradient(135deg, #457B9D 0%, #1D3557 100%); padding: 20px; border-radius: 8px; margin-bottom: 20px; color: white;">
-        <h3 style="color: white; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600;">⏱️ Duration</h3>
-        <p style="margin: 0; font-size: 14px; font-weight: 600; line-height: 1.6;">${durationDisplay}</p>
+      <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <h3 style="color: #1D3557; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600;">⏱️ Duration</h3>
+        <p style="margin: 0; font-size: 14px; font-weight: 600; line-height: 1.6; color: #1D3557;">${durationDisplay}</p>
       </div>
 
-      <div style="background: linear-gradient(135deg, #457B9D 0%, #1D3557 100%); padding: 20px; border-radius: 8px; margin-bottom: 20px; color: white;">
-        <h3 style="color: white; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600;">📌 Location</h3>
-        <p style="margin: 0; font-size: 14px; font-weight: 600; line-height: 1.6;">${locationDisplay}</p>
+      <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <h3 style="color: #1D3557; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600;">📌 Location</h3>
+        <p style="margin: 0; font-size: 14px; font-weight: 600; line-height: 1.6; color: #1D3557;">${locationDisplay}</p>
       </div>
     `;
   }
@@ -89,10 +89,10 @@ async function sendReceiptEmail(email, name, eventTitle, amount, paymentMethod, 
       <!-- Content Container -->
       <div style="background-color: #FFFFFF; margin: 20px; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
         <!-- Success Box -->
-        <div style="background: linear-gradient(135deg, #457B9D 0%, #1D3557 100%); padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-          <h2 style="color: #FFFFFF; margin: 0 0 10px 0; font-size: 20px; font-weight: 600;">✓ Payment Receipt</h2>
-          <p style="color: #FFFFFF; margin: 8px 0; font-size: 14px; line-height: 1.6;">Hi ${name || 'there'},</p>
-          <p style="color: #FFFFFF; margin: 8px 0 0 0; font-size: 14px; line-height: 1.6;">Thank you for your payment. Your transaction has been completed successfully.</p>
+        <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+          <h2 style="color: #1D3557; margin: 0 0 10px 0; font-size: 20px; font-weight: 600;">✓ Payment Receipt</h2>
+          <p style="color: #1D3557; margin: 8px 0; font-size: 14px; line-height: 1.6;">Hi ${name || 'there'},</p>
+          <p style="color: #1D3557; margin: 8px 0 0 0; font-size: 14px; line-height: 1.6;">Thank you for your payment. Your transaction has been completed successfully.</p>
         </div>
 
         <!-- Payment Details Table -->
@@ -118,9 +118,9 @@ async function sendReceiptEmail(email, name, eventTitle, amount, paymentMethod, 
         ${detailsHTML}
 
         <!-- Confirmation Notice -->
-        <div style="background: linear-gradient(135deg, #457B9D 0%, #1D3557 100%); padding: 18px; border-radius: 8px; margin-bottom: 25px;">
-          <p style="margin: 0; color: #FFFFFF; font-size: 14px; line-height: 1.6;">
-            <strong style="font-size: 15px; color: #FFFFFF;">✓ Payment Confirmed</strong><br>
+        <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 18px; border-radius: 8px; margin-bottom: 25px;">
+          <p style="margin: 0; color: #1D3557; font-size: 14px; line-height: 1.6;">
+            <strong style="font-size: 15px; color: #1D3557;">✓ Payment Confirmed</strong><br>
             Your participation fee has been paid successfully. We look forward to seeing you at the event!
           </p>
         </div>

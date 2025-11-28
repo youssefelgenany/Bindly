@@ -1072,36 +1072,6 @@ const StudentFavorites = () => {
                     </span>
                     Discover Events
                   </Link>
-                  <Link
-                    to="/student/courts"
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: '#1D3557',
-                      color: '#FFFFFF',
-                      textDecoration: 'none',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      transition: 'all 0.2s',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#152a47';
-                      e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#1D3557';
-                      e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                    }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                      sports_tennis
-                    </span>
-                    Campus Courts
-                  </Link>
                 </div>
               </div>
             ) : (

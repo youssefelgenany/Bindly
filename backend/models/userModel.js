@@ -151,6 +151,14 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
+// Normalize email to lowercase before saving (case-insensitive)
+userSchema.pre('save', function(next) {
+  if (this.email && typeof this.email === 'string') {
+    this.email = this.email.toLowerCase().trim();
+  }
+  next();
+});
+
 // Validate GUC email format (case-insensitive) without mutating stored email
 userSchema.pre('save', function(next) {
   if (['Student', 'Staff', 'TA', 'Professor'].includes(this.userType)) {
@@ -191,5 +199,49 @@ userSchema.pre('save', function(next) {
     next(e);
   }
 });
+
+// Delete all related registrations when a user is deleted
+userSchema.pre('deleteOne', { document: true, query: false }, async function(next) {
+  try {
+    const userId = this._id;
+    const userEmail = this.email?.toLowerCase();
+    
+    console.log('🗑️ Pre-delete hook: Deleting user:', userId, 'email:', userEmail);
+    
+    // Use the cleanup utility function
+    const { cleanupUserRegistrations } = require('../utils/cleanupUserRegistrations');
+    await cleanupUserRegistrations(userId, userEmail);
+    
+    next();
+  } catch (error) {
+    console.error('❌ Error in pre-delete hook deleting related registrations:', error);
+    // Don't block user deletion if registration cleanup fails
+    next();
+  }
+});
+
+// Also handle findOneAndDelete and findByIdAndDelete (used by scripts and direct queries)
+userSchema.pre('findOneAndDelete', async function(next) {
+  try {
+    const user = await this.model.findOne(this.getQuery());
+    if (user) {
+      const userId = user._id;
+      const userEmail = user.email?.toLowerCase();
+      
+      console.log('🗑️ Pre-findOneAndDelete hook: Deleting user:', userId, 'email:', userEmail);
+      
+      // Use the cleanup utility function
+      const { cleanupUserRegistrations } = require('../utils/cleanupUserRegistrations');
+      await cleanupUserRegistrations(userId, userEmail);
+    }
+    next();
+  } catch (error) {
+    console.error('❌ Error in pre-findOneAndDelete hook deleting related registrations:', error);
+    // Don't block user deletion if registration cleanup fails
+    next();
+  }
+});
+
+// Note: findByIdAndDelete internally uses findOneAndDelete, so the findOneAndDelete hook above will handle it
 
 module.exports = mongoose.model('User', userSchema);

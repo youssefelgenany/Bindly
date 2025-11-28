@@ -7,6 +7,14 @@ const adminSchema = new mongoose.Schema({
   role: { type: String, default: 'Admin' }  // ✅ add this
 });
 
+// Normalize email to lowercase before saving (case-insensitive)
+adminSchema.pre('save', function(next) {
+  if (this.email && typeof this.email === 'string') {
+    this.email = this.email.toLowerCase().trim();
+  }
+  next();
+});
+
 // Hash password before save
 adminSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();

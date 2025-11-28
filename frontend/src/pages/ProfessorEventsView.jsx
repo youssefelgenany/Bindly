@@ -419,35 +419,34 @@ const ProfessorEventsView = () => {
   };
 
   // Load user's registrations to check which events they're registered for
+  // Professor users should use the regular Registration API, not StudentRegistration
   useEffect(() => {
     const loadUserRegistrations = async () => {
-      if (!user?.email) return;
+      if (!user) return;
       
       try {
-        // Professors register through StudentRegistrationForm which uses studentRegistrationApi
-        // So we need to check the student registration API, not the professor registration API
-        const result = await studentRegistrationApi.getMyRegistrations(user.email);
-        if (result.success && result.data.registrations) {
-          // Extract event IDs from PAID registrations only
+        // Use the regular events API for Professor registrations (not student registration API)
+        const result = await eventsApiService.getMyRegistrations();
+        if (result.success && result.data) {
+          // Backend returns an array of registrations directly
+          const registrations = Array.isArray(result.data) ? result.data : [];
           const registeredIds = new Set();
-          result.data.registrations.forEach(reg => {
-            // Only include paid registrations
-            if (reg.paid !== true) return;
-            
-            // Check for eventId in the formatted response
-            if (reg.eventId) {
-              registeredIds.add(String(reg.eventId));
-            }
-            // Fallback: check if event object exists with _id
-            else if (reg.event && typeof reg.event === 'object' && reg.event._id) {
-              registeredIds.add(String(reg.event._id));
-            } 
-            // Fallback: check if event is a string ID
-            else if (reg.event && typeof reg.event === 'string') {
-              registeredIds.add(reg.event);
+          registrations.forEach(reg => {
+            // Registration model has event field that can be populated or just an ID
+            if (reg.event) {
+              if (typeof reg.event === 'object' && reg.event._id) {
+                // Populated event object
+                registeredIds.add(String(reg.event._id));
+              } else if (typeof reg.event === 'string') {
+                // Event ID as string
+                registeredIds.add(reg.event);
+              } else if (reg.event.toString) {
+                // Event ID as ObjectId
+                registeredIds.add(reg.event.toString());
+              }
             }
           });
-          console.log('✅ Professor registered event IDs:', Array.from(registeredIds));
+          console.log('✅ Professor registrations loaded:', Array.from(registeredIds));
           setRegisteredEventIds(registeredIds);
         }
       } catch (error) {
@@ -708,6 +707,25 @@ const ProfessorEventsView = () => {
               event
             </span>
             My Events
+          </Link>
+          <Link
+            to="/professor/my-workshops"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              school
+            </span>
+            My Workshops
           </Link>
           <Link
             to="/gym"

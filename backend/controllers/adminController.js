@@ -30,14 +30,14 @@ exports.assignRoleAndSendVerification = async (req, res) => {
         : user.email.split('@')[0]; // fallback to email prefix
     }
 
-    // Update userType + activate and verify account
-    // When admin assigns a role, it's considered approval, so verify immediately
+    // Update userType and generate verification token
+    // User must click verification link in email to verify their account
     user.userType = role;
-    user.isVerified = true; // Verify immediately when admin assigns role
+    user.isVerified = false; // Keep user unverified until they click the email link
     user.status = 'active'; // Activate the account when admin assigns role
-    // Still generate token for email confirmation (optional)
-    user.verificationToken = crypto.randomBytes(24).toString("hex");
-    user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    // Generate verification token - user must click link to verify
+    user.verificationToken = crypto.randomBytes(32).toString("hex");
+    user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     await user.save();
 
     // Send verification email (use first + last name if available)
@@ -47,14 +47,14 @@ exports.assignRoleAndSendVerification = async (req, res) => {
     if (emailResult.sent) {
       console.log('✅ Verification email sent successfully to:', user.email);
       res.json({ 
-        msg: "Role assigned and verification email sent successfully.", 
+        msg: "Role assigned and verification email sent successfully. User must click the verification link to activate their account.", 
         token: user.verificationToken,
         emailSent: true
       });
     } else {
       console.error('❌ Verification email not sent:', emailResult.reason || emailResult.error);
       res.json({ 
-        msg: "Role assigned successfully, but verification email could not be sent. " + (emailResult.reason || emailResult.error || "Please try sending the email again."), 
+        msg: "Role assigned successfully, but verification email could not be sent. " + (emailResult.reason || emailResult.error || "Please try sending the email again.") + " User must click the verification link to activate their account.", 
         token: user.verificationToken,
         emailSent: false,
         emailError: emailResult.reason || emailResult.error
@@ -360,9 +360,12 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
+    // Normalize email to lowercase (emails are stored in lowercase)
+    const normalizedEmail = email ? email.toLowerCase().trim() : user.email;
+    
     // Check if email is already taken by another user
-    if (email !== user.email) {
-      const existingUser = await User.findOne({ email });
+    if (normalizedEmail !== user.email) {
+      const existingUser = await User.findOne({ email: normalizedEmail });
       if (existingUser) {
         return res.status(400).json({
           success: false,
@@ -374,7 +377,7 @@ exports.updateProfile = async (req, res) => {
     // Update user profile
     user.firstName = firstName;
     user.lastName = lastName;
-    user.email = email;
+    user.email = normalizedEmail;
     await user.save();
 
     res.status(200).json({

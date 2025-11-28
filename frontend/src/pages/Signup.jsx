@@ -102,7 +102,7 @@ const Signup = () => {
     } else {
       setFormData(prev => ({
         ...prev,
-        [name]: value
+        [name]: name === 'email' ? value.toLowerCase() : value
       }));
     }
     
@@ -256,10 +256,11 @@ const Signup = () => {
       
       if (result.success) {
         setMessage('Account created successfully! Redirecting...');
-        // Store email for verification page
+        // Store email and userType for verification page
         localStorage.setItem('pendingVerificationEmail', formData.email);
+        localStorage.setItem('pendingVerificationUserType', actualUserType);
         // Immediately redirect to verification page
-        navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+        navigate(`/verify-email?email=${encodeURIComponent(formData.email)}&userType=${encodeURIComponent(actualUserType)}`);
       } else {
         setMessage(result.message);
         console.error('Signup failed:', result.message);
