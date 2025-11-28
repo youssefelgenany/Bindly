@@ -70,19 +70,31 @@ const signup = async (req, res) => {
       });
     }
 
-    // Check for existing user with case-insensitive email search
+    // Normalize email to lowercase for case-insensitive handling
     const normalizedEmail = email.toLowerCase().trim();
-    const existingUser = await User.findOne({ 
-      email: { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
-    });
+    
+    // Check for existing user with normalized email (now stored in lowercase)
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(409).json({ success: false, message: 'User with this email already exists' });
+    }
+
+    // Clean up any orphaned registrations for this email (in case old account was deleted)
+    // This ensures a fresh start for new accounts with the same email
+    try {
+      const { cleanupUserRegistrations } = require('../utils/cleanupUserRegistrations');
+      // Pass null for userId since user doesn't exist yet, but clean up by email
+      await cleanupUserRegistrations(null, normalizedEmail);
+      console.log('🧹 Cleaned up any orphaned registrations for email:', normalizedEmail);
+    } catch (cleanupError) {
+      // Don't fail signup if cleanup fails, just log it
+      console.warn('⚠️ Warning: Could not clean up orphaned registrations during signup:', cleanupError.message);
     }
 
     // GUC email validation for academic users
     if (['Student', 'Staff', 'TA', 'Professor'].includes(userType)) {
       const gucEmailRegex = /^[a-z0-9._%+-]+@student\.guc\.edu\.eg$|^[a-z0-9._%+-]+@guc\.edu\.eg$/;
-      if (!gucEmailRegex.test(String(email).toLowerCase())) {
+      if (!gucEmailRegex.test(normalizedEmail)) {
         return res.status(400).json({
           success: false,
           message: 'GUC users must use a valid GUC email address (@student.guc.edu.eg or @guc.edu.eg)'
@@ -91,7 +103,7 @@ const signup = async (req, res) => {
     }
 
     const userData = {
-      email,
+      email: normalizedEmail,
       password,
       userType,
       // Do not auto-verify users on signup. Users must click the verification
@@ -257,16 +269,16 @@ const login = async (req, res) => {
 
     console.log("Login attempt for email:", email);
 
-    // Try to find user in User model first (case-insensitive search)
+    // Normalize email to lowercase for case-insensitive lookup (emails are stored in lowercase)
     const normalizedEmail = email.toLowerCase().trim();
-    let user = await User.findOne({ 
-      email: { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
-    });
+    let user = await User.findOne({ email: normalizedEmail });
     console.log("User found in User model:", user ? 'Yes' : 'No');
 
-    // If not found in User model, try Admin model
+    // If not found in User model, try Admin model (case-insensitive)
     if (!user) {
-      user = await Admin.findOne({ email });
+      user = await Admin.findOne({ 
+        email: { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
       console.log("User found in Admin model:", user ? 'Yes' : 'No');
     }
 
@@ -426,8 +438,10 @@ async function verifyEmail(req, res) {
       // Extract email from query if available, or check all recent unverified students
       const emailFromQuery = req.query.email;
       if (emailFromQuery) {
+        // Normalize email to lowercase (emails are stored in lowercase)
+        const normalizedQueryEmail = emailFromQuery.toLowerCase().trim();
         const userByEmail = await User.findOne({ 
-          email: { $regex: new RegExp(`^${emailFromQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          email: normalizedQueryEmail,
           userType: 'Student'
         });
         if (userByEmail) {
@@ -587,7 +601,9 @@ async function resendVerification(req, res) {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
-    const user = await User.findOne({ email });
+    // Normalize email to lowercase (emails are stored in lowercase)
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     
     // Allow resending for all user types that need verification (Student, Staff, TA, Professor)
@@ -659,14 +675,17 @@ const updateProfile = async (req, res) => {
       });
     }
 
-    // Check if email is already taken by another user
-    if (email !== user.email) {
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email is already taken by another user'
-        });
+    // Check if email is already taken by another user (normalize to lowercase)
+    if (email) {
+      const normalizedNewEmail = email.toLowerCase().trim();
+      if (normalizedNewEmail !== user.email) {
+        const existingUser = await User.findOne({ email: normalizedNewEmail });
+        if (existingUser) {
+          return res.status(400).json({
+            success: false,
+            message: 'Email is already taken by another user'
+          });
+        }
       }
     }
 

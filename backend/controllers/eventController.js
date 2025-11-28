@@ -42,7 +42,7 @@ exports.createEvent = async (req, res) => {
       allowedUserTypes
     } = req.body;
 
-    if (!title || !type || !startDate || !endDate || !location) {
+    if (!title || !type || !startDate || !endDate || !location || !description) {
       return res.status(400).json({ msg: "Missing required fields" });
     }
 
@@ -52,9 +52,9 @@ exports.createEvent = async (req, res) => {
       return res.status(400).json({ msg: `Invalid event type. Allowed types: ${validTypes.join(', ')}` });
     }
 
-    // Validate that title and location are not empty
-    if (!title.trim() || !location.trim()) {
-      return res.status(400).json({ msg: "Title and location cannot be empty" });
+    // Validate that title, location, and description are not empty
+    if (!title.trim() || !location.trim() || !description.trim()) {
+      return res.status(400).json({ msg: "Title, location, and description cannot be empty" });
     }
 
     // Filter out Admin and Events Office from allowedUserTypes (they can always see all events)
@@ -122,11 +122,16 @@ exports.createEvent = async (req, res) => {
 exports.createConference = async (req, res) => {
   try {
     const {
-      title, startDate, endDate, location, agenda, website, budget, fundingSource
+      title, startDate, endDate, location, agenda, website, budget, fundingSource, description
     } = req.body || {};
 
-    if (!title || !startDate || !endDate || !location || !agenda || !website || budget == null || !fundingSource) {
+    if (!title || !startDate || !endDate || !location || !agenda || !website || budget == null || !fundingSource || !description) {
       return res.status(400).json({ msg: "Missing required conference fields" });
+    }
+
+    // Validate that description is not empty
+    if (!description.trim()) {
+      return res.status(400).json({ msg: "Description cannot be empty" });
     }
 
     const { allowedUserTypes, ...otherFields } = req.body;
@@ -2618,9 +2623,10 @@ exports.payForEvent = async (req, res) => {
       }
 
         // Send receipt email
+      console.log('📧 Sending receipt email for wallet payment...');
       try {
         const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
-        await sendReceiptEmail(
+        const emailResult = await sendReceiptEmail(
           user.email,
           userName,
           event.title,
@@ -2628,8 +2634,18 @@ exports.payForEvent = async (req, res) => {
           'wallet',
           new Date()
         );
+        if (emailResult.sent) {
+          console.log('✅ Receipt email sent successfully to:', user.email);
+        } else {
+          console.error('❌ Receipt email not sent:', emailResult.reason || emailResult.error);
+          if (emailResult.reason === 'SMTP not configured') {
+            console.error('   ⚠️  Please configure SMTP settings in .env file');
+          }
+        }
       } catch (emailError) {
-        console.error('❌ Failed to send receipt email:', emailError);
+        console.error('❌ Exception while sending receipt email:', emailError);
+        console.error('   Error details:', emailError.message);
+        // Don't fail the whole process if email fails
       }
 
         return res.status(200).json({
@@ -2767,6 +2783,21 @@ exports.cancelRegistration = async (req, res) => {
         success: false,
         msg: "Cannot cancel registration for an event that has already started"
       });
+    }
+
+    // Check if less than 2 weeks remain until event start
+    if (event.startDate) {
+      const eventStartDate = new Date(event.startDate);
+      const now = new Date();
+      const twoWeeksInMs = 14 * 24 * 60 * 60 * 1000; // 14 days in milliseconds
+      const timeUntilEvent = eventStartDate.getTime() - now.getTime();
+      
+      if (timeUntilEvent < twoWeeksInMs && timeUntilEvent > 0) {
+        return res.status(400).json({ 
+          success: false,
+          msg: "Cannot cancel registration. Less than 2 weeks remain until the event starts."
+        });
+      }
     }
 
     // Find payment if exists - try multiple ways

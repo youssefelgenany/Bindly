@@ -151,12 +151,13 @@ const TripForm = ({ onSubmit, loading = false, initialData = {}, submitLabel = '
       </div>
 
       <div style={formGroupStyle}>
-        <label style={labelStyle}>Description</label>
+        <label style={labelStyle}>Description <span style={{ color: '#ef4444' }}>*</span></label>
         <textarea
           name="description"
           rows="4"
           value={formData.description}
           onChange={handleChange}
+          required
           placeholder="Enter a short description"
           style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
           onFocus={(e) => {

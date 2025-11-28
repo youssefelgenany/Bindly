@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/userModel");
 const Admin = require("../models/AdminModel");
+const { cleanupUserRegistrations } = require("../utils/cleanupUserRegistrations");
 
 // Admin creates new admin/event office accounts
 exports.createAdminOrEventOffice = async (req, res) => {
@@ -26,7 +27,9 @@ exports.createAdminOrEventOffice = async (req, res) => {
         message: "Invalid role. Must be Admin or Event Office"
       });
 
-    const exists = await User.findOne({ email });
+    // Normalize email to lowercase (emails are stored in lowercase)
+    const normalizedEmail = email.toLowerCase().trim();
+    const exists = await User.findOne({ email: normalizedEmail });
     if (exists) return res.status(400).json({
       success: false,
       message: "Email already exists"
@@ -39,7 +42,7 @@ exports.createAdminOrEventOffice = async (req, res) => {
     const fullName = `${firstName} ${lastName}`.trim();
     const payload = {
       name: fullName || role,
-      email,
+      email: normalizedEmail, // Use normalized email (lowercase)
       password,
       userType: mappedUserType,
       isVerified: true, // All admin and event office accounts are auto-verified
@@ -95,13 +98,25 @@ exports.deleteAdminOrEventOffice = async (req, res) => {
     if (!["admin", "event_office"].includes(user.userType.toLowerCase()))
       return res.status(400).json({ msg: "Not an admin/event office account" });
 
+    const userId = user._id;
+    const userEmail = user.email?.toLowerCase();
+    
+    console.log('🗑️ Deleting user account:', userId, 'email:', userEmail);
+    
+    // Explicitly delete all related registrations BEFORE deleting the user
+    const cleanupResult = await cleanupUserRegistrations(userId, userEmail);
+    console.log('🗑️ Cleanup result:', cleanupResult);
+    
+    // Now delete the user
     await user.deleteOne();
+    
+    console.log('✅ User account and all related registrations deleted successfully:', req.params.id);
     res.status(200).json({
       success: true,
       message: "Account deleted successfully"
     });
   } catch (err) {
-    console.error(err);
+    console.error('❌ Error deleting user account:', err);
     res.status(500).json({
       success: false,
       message: "Server error"

@@ -401,11 +401,27 @@ const EventsOfficeEventsView = () => {
   }, [events]);
 
   // Get unique professors from workshops and conferences
+  // Includes both creatorName and professors from the professors array
   const availableProfessors = React.useMemo(() => {
     const profs = new Set();
     events.forEach(event => {
-      if ((event.type === 'workshop' || event.type === 'conference') && event.creatorName) {
-        profs.add(event.creatorName);
+      if (event.type === 'workshop' || event.type === 'conference') {
+        // Add creator name if available
+        if (event.creatorName && event.creatorName.trim()) {
+          profs.add(event.creatorName.trim());
+        }
+        // Add professors from the professors array
+        if (event.professors) {
+          if (Array.isArray(event.professors)) {
+            event.professors.forEach(prof => {
+              if (prof && typeof prof === 'string' && prof.trim()) {
+                profs.add(prof.trim());
+              }
+            });
+          } else if (typeof event.professors === 'string' && event.professors.trim()) {
+            profs.add(event.professors.trim());
+          }
+        }
       }
     });
     return Array.from(profs).sort();
@@ -448,10 +464,26 @@ const EventsOfficeEventsView = () => {
     if (!typeMatch) return false;
     
     // Filter by professor name (for workshops and conferences)
+    // Checks both creatorName and professors array
     if (professorNameFilter.trim()) {
       const profFilter = professorNameFilter.trim().toLowerCase();
       const creatorName = (event.creatorName || event.professorName || '').toLowerCase();
-      if (!creatorName.includes(profFilter)) return false;
+      
+      // Check if creator name matches
+      let matches = creatorName.includes(profFilter);
+      
+      // If not matched, check professors array
+      if (!matches && event.professors) {
+        if (Array.isArray(event.professors)) {
+          matches = event.professors.some(prof => 
+            prof && typeof prof === 'string' && prof.toLowerCase().includes(profFilter)
+          );
+        } else if (typeof event.professors === 'string') {
+          matches = event.professors.toLowerCase().includes(profFilter);
+        }
+      }
+      
+      if (!matches) return false;
     }
     
     // Filter by location
@@ -2705,14 +2737,17 @@ const EventsOfficeEventsView = () => {
                                     </div>
                                   )}
 
-                                  {/* Professor (for workshops) */}
-                                  {event.type === 'workshop' && (event.creatorName || event.professors) && (
+                                  {/* Professor(s) participating (for workshops) */}
+                                  {event.type === 'workshop' && (event.professors || event.creatorName) && (
                                     <div>
                                       <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Professor
+                                        Professor(s) participating
                                       </h4>
                                       <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {event.creatorName || event.professors}
+                                        {event.professors 
+                                          ? (Array.isArray(event.professors) ? event.professors.join(', ') : event.professors)
+                                          : event.creatorName
+                                        }
                                       </p>
                                     </div>
                                   )}

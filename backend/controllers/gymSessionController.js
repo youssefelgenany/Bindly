@@ -451,15 +451,18 @@ exports.updateGymSession = async (req, res) => {
         const registrations = await GymRegistration.find({
           gymSession: id,
           status: 'registered'
-        }).populate('user', 'email firstName lastName');
+        }).populate('user', 'email firstName lastName userType');
 
         console.log(`📧 Sending edit notification emails to ${registrations.length} registered users...`);
 
         for (const registration of registrations) {
           if (registration.user && registration.user.email) {
+            // Works for all user types: Student, Staff, TA, Professor
             const userName = registration.user.firstName
               ? `${registration.user.firstName} ${registration.user.lastName || ''}`.trim()
               : registration.user.email;
+
+            console.log(`📧 Preparing to send edit email to ${registration.user.userType || 'user'}: ${registration.user.email}`);
 
             try {
               const emailResult = await sendGymEditEmail(
@@ -476,7 +479,7 @@ exports.updateGymSession = async (req, res) => {
               );
 
               if (emailResult.sent) {
-                console.log(`✅ Edit notification email sent to ${registration.user.email}`);
+                console.log(`✅ Edit notification email sent to ${registration.user.userType || 'user'} ${registration.user.email}`);
               } else {
                 console.error(`❌ Failed to send edit notification email to ${registration.user.email}:`,
                   emailResult.reason || emailResult.error);
@@ -507,15 +510,18 @@ exports.updateGymSession = async (req, res) => {
         const registrations = await GymRegistration.find({
           gymSession: id,
           status: 'registered'
-        }).populate('user', 'email firstName lastName');
+        }).populate('user', 'email firstName lastName userType');
 
         console.log(`📧 Sending cancellation emails to ${registrations.length} registered users...`);
 
         for (const registration of registrations) {
           if (registration.user && registration.user.email) {
+            // Works for all user types: Student, Staff, TA, Professor
             const userName = registration.user.firstName
               ? `${registration.user.firstName} ${registration.user.lastName || ''}`.trim()
               : registration.user.email;
+
+            console.log(`📧 Preparing to send cancellation email to ${registration.user.userType || 'user'}: ${registration.user.email}`);
 
             try {
               const emailResult = await sendGymCancellationEmail(
@@ -528,7 +534,7 @@ exports.updateGymSession = async (req, res) => {
               );
 
               if (emailResult.sent) {
-                console.log(`✅ Cancellation email sent to ${registration.user.email}`);
+                console.log(`✅ Cancellation email sent to ${registration.user.userType || 'user'} ${registration.user.email}`);
               } else {
                 console.error(`❌ Failed to send cancellation email to ${registration.user.email}:`,
                   emailResult.reason || emailResult.error);
@@ -590,58 +596,99 @@ exports.deleteGymSession = async (req, res) => {
       });
     }
 
-    // If session is active and has registrations, notify users before deleting
-    if (gymSession.status === 'active') {
-      try {
-        const registrations = await GymRegistration.find({
-          gymSession: id,
-          status: 'registered'
-        }).populate('user', 'email firstName lastName');
+    // Notify all registered users before deleting (same logic as cancellation)
+    console.log(`🗑️  Starting deletion process for gym session ${id}`);
+    console.log(`   Session type: ${gymSession.type}`);
+    console.log(`   Session date: ${gymSession.date}`);
+    console.log(`   Session time: ${gymSession.time}`);
+    console.log(`   Session location: ${gymSession.location}`);
+    
+    try {
+      const registrations = await GymRegistration.find({
+        gymSession: id,
+        status: 'registered'
+      }).populate('user', 'email firstName lastName userType');
 
-        if (registrations.length > 0) {
-          console.log(`📧 Sending cancellation emails to ${registrations.length} registered users before deletion...`);
+      console.log(`📋 Found ${registrations.length} registered users for this gym session`);
 
-          for (const registration of registrations) {
-            if (registration.user && registration.user.email) {
-              const userName = registration.user.firstName 
-                ? `${registration.user.firstName} ${registration.user.lastName || ''}`.trim() 
-                : registration.user.email;
+      if (registrations.length > 0) {
+        console.log(`📧 Sending cancellation emails to ${registrations.length} registered users before deletion...`);
 
-              try {
-                const emailResult = await sendGymCancellationEmail(
-                  registration.user.email,
-                  userName,
-                  gymSession.type,
-                  gymSession.date,
-                  gymSession.time,
-                  gymSession.location
-                );
+        let emailsSent = 0;
+        let emailsFailed = 0;
 
-                if (emailResult.sent) {
-                  console.log(`✅ Cancellation email sent to ${registration.user.email}`);
-                } else {
-                  console.error(`❌ Failed to send cancellation email to ${registration.user.email}:`, 
-                    emailResult.reason || emailResult.error);
-                }
-              } catch (emailError) {
-                console.error(`❌ Exception sending cancellation email to ${registration.user.email}:`, 
-                  emailError.message);
-                // Continue with other users even if one fails
+        for (const registration of registrations) {
+          console.log(`   Processing registration ${registration._id}...`);
+          
+          if (registration.user && registration.user.email) {
+            // Works for all user types: Student, Staff, TA, Professor
+            const userName = registration.user.firstName
+              ? `${registration.user.firstName} ${registration.user.lastName || ''}`.trim()
+              : registration.user.email;
+
+            console.log(`📧 Preparing to send deletion email to ${registration.user.userType || 'user'}: ${registration.user.email}`);
+
+            try {
+              // Ensure all required data is available
+              if (!gymSession.date || !gymSession.time) {
+                console.warn(`⚠️  Skipping email for ${registration.user.email}: Missing session date or time`);
+                console.warn(`   Date: ${gymSession.date}, Time: ${gymSession.time}`);
+                continue;
               }
+
+              const emailResult = await sendGymCancellationEmail(
+                registration.user.email,
+                userName,
+                gymSession.type || 'Gym Session',
+                gymSession.date,
+                gymSession.time || 'TBD',
+                gymSession.location || 'TBD'
+              );
+
+              if (emailResult.sent) {
+                emailsSent++;
+                console.log(`✅ Cancellation email sent successfully to ${registration.user.userType || 'user'} ${registration.user.email}`);
+              } else {
+                emailsFailed++;
+                console.error(`❌ Failed to send cancellation email to ${registration.user.email}:`, 
+                  emailResult.reason || emailResult.error);
+                if (emailResult.reason === 'SMTP not configured') {
+                  console.error(`   ⚠️  SMTP is not configured. Check your .env file for SMTP settings.`);
+                }
+              }
+            } catch (emailError) {
+              emailsFailed++;
+              console.error(`❌ Exception sending cancellation email to ${registration.user.email}:`, 
+                emailError.message);
+              console.error(`   Stack:`, emailError.stack);
+              // Continue with other users even if one fails
             }
+          } else {
+            console.warn(`⚠️  Registration ${registration._id} has no user or email associated`);
+            console.warn(`   User object:`, registration.user);
+            console.warn(`   User email:`, registration.user?.email);
           }
-
-          console.log('✅ Finished sending cancellation emails');
-
-          await GymRegistration.updateMany(
-            { gymSession: id, status: { $ne: 'cancelled' } },
-            { $set: { status: 'cancelled' } }
-          );
         }
-      } catch (error) {
-        console.error('❌ Error sending cancellation emails:', error);
-        // Don't fail the deletion if email sending fails
+
+        console.log(`✅ Finished sending cancellation emails for deleted session`);
+        console.log(`   Total emails sent: ${emailsSent}`);
+        console.log(`   Total emails failed: ${emailsFailed}`);
+
+        // Update all registrations to cancelled status
+        await GymRegistration.updateMany(
+          { gymSession: id, status: { $ne: 'cancelled' } },
+          { $set: { status: 'cancelled' } }
+        );
+        console.log(`✅ Updated all registrations to cancelled status`);
+      } else {
+        console.log('ℹ️  No registered users found for this gym session, skipping email notifications');
+        console.log(`   Query used: { gymSession: ${id}, status: 'registered' }`);
       }
+    } catch (error) {
+      console.error('❌ Error sending cancellation emails during deletion:', error);
+      console.error('   Error message:', error.message);
+      console.error('   Error stack:', error.stack);
+      // Don't fail the deletion if email sending fails
     }
 
     await GymSession.findByIdAndDelete(id);
@@ -726,16 +773,19 @@ exports.bulkUpdateGymSessions = async (req, res) => {
             const registrations = await GymRegistration.find({
               gymSession: session._id,
               status: 'registered'
-            }).populate('user', 'email firstName lastName');
+            }).populate('user', 'email firstName lastName userType');
 
             if (registrations.length > 0) {
               console.log(`📧 Sending cancellation emails for session ${session._id} to ${registrations.length} users...`);
 
               for (const registration of registrations) {
                 if (registration.user && registration.user.email) {
+                  // Works for all user types: Student, Staff, TA, Professor
                   const userName = registration.user.firstName
                     ? `${registration.user.firstName} ${registration.user.lastName || ''}`.trim()
                     : registration.user.email;
+
+                  console.log(`📧 Preparing to send bulk cancellation email to ${registration.user.userType || 'user'}: ${registration.user.email}`);
 
                   try {
                     const emailResult = await sendGymCancellationEmail(
@@ -748,7 +798,7 @@ exports.bulkUpdateGymSessions = async (req, res) => {
                     );
 
                     if (emailResult.sent) {
-                      console.log(`✅ Cancellation email sent to ${registration.user.email}`);
+                      console.log(`✅ Cancellation email sent to ${registration.user.userType || 'user'} ${registration.user.email}`);
                     }
                   } catch (emailError) {
                     console.error(`❌ Exception sending cancellation email:`, emailError.message);

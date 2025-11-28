@@ -17,7 +17,18 @@ const canStaffCancel = (registration) => {
   if (!registration) return false;
   if (!registration.paid) return false;
   if (!registration.eventDate) return false;
-  return new Date(registration.eventDate) > new Date();
+  
+  const eventDate = new Date(registration.eventDate);
+  const now = new Date();
+  
+  // Check if event has already started
+  if (eventDate <= now) return false;
+  
+  // Check if less than 2 weeks remain (14 days)
+  const twoWeeksInMs = 14 * 24 * 60 * 60 * 1000;
+  const timeUntilEvent = eventDate.getTime() - now.getTime();
+  
+  return timeUntilEvent >= twoWeeksInMs;
 };
 
 const StaffMyRegistrations = () => {
@@ -90,8 +101,8 @@ const StaffMyRegistrations = () => {
   }, [showLogoutDropdown, showNotificationsDropdown]);
 
   const loadMyRegistrations = useCallback(async () => {
-    if (!user?.email) {
-      setError('User email not available');
+    if (!user) {
+      setError('User not available');
       setLoading(false);
       return;
     }
@@ -100,24 +111,66 @@ const StaffMyRegistrations = () => {
     setError('');
 
     try {
-      const result = await studentRegistrationApi.getMyRegistrations(user.email);
+      const allRegistrations = [];
       
-      if (result.success) {
-        // Show all registrations (both upcoming and past events)
-        // Include approved and pending registrations regardless of payment status
-        // This ensures users can see both their registered (upcoming) and past events
-        const allRegistrations = result.data.registrations || [];
-        // Show approved and pending registrations (both paid and unpaid, upcoming and past)
-        // This includes all events the user has registered for, whether they've happened or not
-        const approvedRegistrations = allRegistrations.filter(reg => {
-          const status = reg.status?.toLowerCase();
-          return status === 'approved' || status === 'pending';
-        });
-        setRegistrations(approvedRegistrations);
-      } else {
-        setError(result.message || 'Failed to fetch registrations');
-        setRegistrations([]);
+      // Load regular registrations (Registration model)
+      try {
+        const result = await eventsApiService.getMyRegistrations();
+        if (result.success && result.data) {
+          const registrations = Array.isArray(result.data) ? result.data : [];
+          registrations
+            .filter(reg => reg.event && reg.status !== 'cancelled')
+            .forEach(reg => {
+              allRegistrations.push({
+                id: reg._id,
+                eventId: reg.event?._id ? String(reg.event._id) : null,
+                eventTitle: reg.event?.title || 'Event Deleted',
+                eventType: reg.event?.type || 'unknown',
+                eventDate: reg.event?.startDate || null,
+                eventEndDate: reg.event?.endDate || null,
+                eventLocation: reg.event?.location || 'N/A',
+                paid: reg.paid || false,
+                status: reg.status || 'approved',
+                registeredAt: reg.registeredAt || reg.createdAt
+              });
+            });
+        }
+      } catch (regError) {
+        console.error('Error loading regular registrations:', regError);
       }
+      
+      // Also check StudentRegistration by email (for workshops/trips registered through StudentRegistrationForm)
+      if (user.email) {
+        try {
+          const studentRegResult = await studentRegistrationApi.getMyRegistrations(user.email);
+          if (studentRegResult.success && studentRegResult.data?.registrations) {
+            studentRegResult.data.registrations
+              .filter(reg => reg.status !== 'cancelled')
+              .forEach(reg => {
+                // Only add if not already in allRegistrations (avoid duplicates)
+                const alreadyExists = allRegistrations.some(r => r.eventId === reg.eventId);
+                if (!alreadyExists) {
+                  allRegistrations.push({
+                    id: reg.id,
+                    eventId: reg.eventId,
+                    eventTitle: reg.eventTitle,
+                    eventType: reg.eventType,
+                    eventDate: reg.eventDate,
+                    eventEndDate: reg.eventEndDate,
+                    eventLocation: reg.eventLocation,
+                    paid: reg.paid || false,
+                    status: reg.status || 'approved',
+                    registeredAt: reg.registeredAt
+                  });
+                }
+              });
+          }
+        } catch (studentRegError) {
+          console.error('Error loading student registrations:', studentRegError);
+        }
+      }
+      
+      setRegistrations(allRegistrations);
     } catch (err) {
       console.error('Error loading registrations:', err);
       setError(err.message || 'An unexpected error occurred. Please try again.');
@@ -128,7 +181,7 @@ const StaffMyRegistrations = () => {
   }, [user]);
 
   useEffect(() => {
-    if (user && user.email) {
+    if (user) {
       loadMyRegistrations();
     }
     

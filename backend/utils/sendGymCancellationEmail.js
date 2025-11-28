@@ -28,10 +28,10 @@ async function sendGymCancellationEmail(email, name, sessionType, sessionDate, s
       <!-- Content Container -->
       <div style="background-color: #FFFFFF; margin: 20px; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
         <!-- Alert Box -->
-        <div style="background: linear-gradient(135deg, #457B9D 0%, #1D3557 100%); padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-          <h2 style="color: #FFFFFF; margin: 0 0 10px 0; font-size: 20px; font-weight: 600;">Gym Session Cancelled</h2>
-          <p style="color: #FFFFFF; margin: 8px 0; font-size: 14px; line-height: 1.6;">Hi ${name || 'there'},</p>
-          <p style="color: #FFFFFF; margin: 8px 0 0 0; font-size: 14px; line-height: 1.6;">We regret to inform you that a gym session you registered for has been cancelled.</p>
+        <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+          <h2 style="color: #1D3557; margin: 0 0 10px 0; font-size: 20px; font-weight: 600;">Gym Session Cancelled</h2>
+          <p style="color: #1D3557; margin: 8px 0; font-size: 14px; line-height: 1.6;">Hi ${name || 'there'},</p>
+          <p style="color: #1D3557; margin: 8px 0 0 0; font-size: 14px; line-height: 1.6;">We regret to inform you that a gym session you registered for has been cancelled.</p>
         </div>
 
         <!-- Session Details Table -->
@@ -57,9 +57,9 @@ async function sendGymCancellationEmail(email, name, sessionType, sessionDate, s
         </table>
 
         <!-- Cancellation Notice -->
-        <div style="background: linear-gradient(135deg, #457B9D 0%, #1D3557 100%); padding: 18px; border-radius: 8px; margin-bottom: 25px;">
-          <p style="margin: 0; color: #FFFFFF; font-size: 14px; line-height: 1.6;">
-            <strong style="font-size: 15px; color: #FFFFFF;">⚠️ Session Cancelled</strong><br>
+        <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 18px; border-radius: 8px; margin-bottom: 25px;">
+          <p style="margin: 0; color: #1D3557; font-size: 14px; line-height: 1.6;">
+            <strong style="font-size: 15px; color: #1D3557;">⚠️ Session Cancelled</strong><br>
             Your registration for this gym session has been automatically cancelled. We apologize for any inconvenience this may cause.
           </p>
         </div>

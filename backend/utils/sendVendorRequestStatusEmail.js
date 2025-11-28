@@ -58,12 +58,12 @@ async function sendVendorRequestStatusEmail(vendor, request, status) {
           <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
         </div>
         
-        <div style="background: #2a2a2a; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-          <h2 style="color: white; margin-top: 0; margin-bottom: 10px;">
+        <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+          <h2 style="color: #1D3557; margin-top: 0; margin-bottom: 10px;">
             ${status.toLowerCase() === 'accepted' ? '✅' : status.toLowerCase() === 'rejected' ? '❌' : '⏳'} Vendor Request ${status.charAt(0).toUpperCase() + status.slice(1)}
           </h2>
-          <p style="color: #ccc; margin: 0;">Hi ${vendor.firstName || vendor.companyName || vendor.name || 'there'},</p>
-          <p style="color: #ccc; margin: 10px 0;">
+          <p style="color: #1D3557; margin: 0;">Hi ${vendor.firstName || vendor.companyName || vendor.name || 'there'},</p>
+          <p style="color: #1D3557; margin: 10px 0;">
             Your request to participate in the <strong>${eventName}</strong> has been <span style="color: ${statusColor}; font-weight: bold;">${status.toLowerCase()}</span>.
           </p>
         </div>

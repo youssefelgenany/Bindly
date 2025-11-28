@@ -197,6 +197,20 @@ export const eventsApiService = {
       };
     }
   },
+  // 👤 Get logged-in user's event registrations (for Staff/TA/Professor/Student)
+  getMyRegistrations: async () => {
+    try {
+      const response = await eventsApi.get('/my/registrations');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.response?.data?.msg || 'Failed to fetch registrations',
+        error: error.response?.data || error.message,
+      };
+    }
+  },
+
   // 💬 Get comments for an event
   getComments: async (eventId) => {
     try {

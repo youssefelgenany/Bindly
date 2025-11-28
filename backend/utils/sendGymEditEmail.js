@@ -102,10 +102,10 @@ async function sendGymEditEmail(
       <!-- Content Container -->
       <div style="background-color: #FFFFFF; margin: 20px; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
         <!-- Alert Box -->
-        <div style="background: linear-gradient(135deg, #457B9D 0%, #1D3557 100%); padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-          <h2 style="color: #FFFFFF; margin: 0 0 10px 0; font-size: 20px; font-weight: 600;">⚠️ Gym Session Updated</h2>
-          <p style="color: #FFFFFF; margin: 8px 0; font-size: 14px; line-height: 1.6;">Hi ${name || 'there'},</p>
-          <p style="color: #FFFFFF; margin: 8px 0 0 0; font-size: 14px; line-height: 1.6;">We wanted to inform you that a gym session you registered for has been updated. Please review the changes below:</p>
+        <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+          <h2 style="color: #1D3557; margin: 0 0 10px 0; font-size: 20px; font-weight: 600;">⚠️ Gym Session Updated</h2>
+          <p style="color: #1D3557; margin: 8px 0; font-size: 14px; line-height: 1.6;">Hi ${name || 'there'},</p>
+          <p style="color: #1D3557; margin: 8px 0 0 0; font-size: 14px; line-height: 1.6;">We wanted to inform you that a gym session you registered for has been updated. Please review the changes below:</p>
         </div>
 
         <!-- Session Details Table -->
@@ -144,9 +144,9 @@ async function sendGymEditEmail(
         </table>
 
         <!-- Important Notice -->
-        <div style="background: linear-gradient(135deg, #457B9D 0%, #1D3557 100%); padding: 18px; border-radius: 8px; margin-bottom: 25px;">
-          <p style="margin: 0; color: #FFFFFF; font-size: 14px; line-height: 1.6;">
-            <strong style="font-size: 15px; color: #FFFFFF;">📅 Important:</strong><br>
+        <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 18px; border-radius: 8px; margin-bottom: 25px;">
+          <p style="margin: 0; color: #1D3557; font-size: 14px; line-height: 1.6;">
+            <strong style="font-size: 15px; color: #1D3557;">📅 Important:</strong><br>
             Please make note of the updated session details. If you have any questions or concerns, please contact the events office.
           </p>
         </div>
