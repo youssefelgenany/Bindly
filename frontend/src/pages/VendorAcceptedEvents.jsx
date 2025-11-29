@@ -198,8 +198,8 @@ const VendorAcceptedEvents = () => {
       workshop: '#607D8B',
       conference: '#795548',
       booth: '#3F51B5',
-      platformBooth: '#3F51B5',
-      standaloneBooth: '#3F51B5',
+      platformbooth: '#3F51B5',
+      standalonebooth: '#3F51B5',
       other: '#757575'
     };
     return colors[type?.toLowerCase()] || colors.other;
@@ -212,10 +212,37 @@ const VendorAcceptedEvents = () => {
       bazaar: '/assets/images/bazaar-background.jpg',
       trip: '/assets/images/trip-background.png',
       booth: '/assets/images/booth-background.jpg',
-      platformBooth: '/assets/images/booth-background.jpg',
-      standaloneBooth: '/assets/images/booth-background.jpg'
+      platformbooth: '/assets/images/booth-background.jpg',
+      standalonebooth: '/assets/images/booth-background.jpg'
     };
     return imageMap[type?.toLowerCase()] || null;
+  };
+
+  const getEventImageSrc = (event) => {
+    if (!event) return null;
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+    const candidates = [
+      event.image,
+      event.imageUrl,
+      event.imagePath,
+      event.banner,
+      event.coverImage,
+      event.logo,
+      event.logoUrl,
+      event.logoPath,
+      event.boothImage,
+      event.images && event.images[0],
+      event.media && event.media[0] && event.media[0].url,
+      event.eventImage,
+      event.picture
+    ].filter(Boolean);
+    if (candidates.length === 0) return null;
+    const raw = candidates.find(src => typeof src === 'string' && src.trim().length > 0) || null;
+    if (!raw) return null;
+    const cleaned = raw.trim().replace(/\\/g, '/');
+    if (cleaned.startsWith('http://') || cleaned.startsWith('https://') || cleaned.startsWith('data:')) return cleaned;
+    const normalized = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+    return `${API_BASE_URL}${normalized}`;
   };
 
   const getEventTypeFallbackText = (type) => {
@@ -237,8 +264,8 @@ const VendorAcceptedEvents = () => {
       workshop: 'Workshop',
       conference: 'Conference',
       booth: 'Booth',
-      platformBooth: 'Platform Booth',
-      standaloneBooth: 'Standalone Booth'
+      platformbooth: 'Platform Booth',
+      standalonebooth: 'Standalone Booth'
     };
     return typeMap[type?.toLowerCase()] || (type || 'Event');
   };
@@ -317,33 +344,37 @@ const VendorAcceptedEvents = () => {
             style={{ position: 'relative', cursor: 'pointer' }}
             onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
           >
-            {user?.profilePicturePath ? (
-              <img
-                src={`http://localhost:5000${user.profilePicturePath}`}
-                alt="User profile"
-                style={{
+            {(() => {
+              const avatarPath = user?.profilePicturePath || user?.vendorLogoPath;
+              const avatarSrc = avatarPath ? (avatarPath.startsWith('http') ? avatarPath : `http://localhost:5000${avatarPath}`) : null;
+              return avatarSrc ? (
+                <img
+                  src={avatarSrc}
+                  alt="User profile"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: '50%',
+                    objectFit: 'cover'
+                  }}
+                />
+              ) : (
+                <div style={{
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: '50%',
-                  objectFit: 'cover'
-                }}
-              />
-            ) : (
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                borderRadius: '50%',
-                backgroundColor: '#1D3557',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF',
-                fontSize: '0.875rem',
-                fontWeight: '600'
-              }}>
-                {(user?.companyName?.[0] || user?.firstName?.[0] || user?.name?.[0] || 'V').toUpperCase()}
-              </div>
-            )}
+                  backgroundColor: '#1D3557',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}>
+                  {(user?.companyName?.[0] || user?.firstName?.[0] || user?.name?.[0] || 'V').toUpperCase()}
+                </div>
+              );
+            })()}
             {showLogoutDropdown && (
               <div style={{
                 position: 'absolute',
@@ -646,44 +677,52 @@ const VendorAcceptedEvents = () => {
                           }}
                         >
                           {/* Event Type Image - Top Half */}
-                          {getEventTypeImage(eventType) && (
-                            <div style={{
-                              width: '100%',
-                              height: '180px',
-                              overflow: 'hidden',
-                              position: 'relative',
-                              backgroundColor: '#f3f4f6',
-                              flexShrink: 0
-                            }}>
-                              <img
-                                src={getEventTypeImage(eventType)}
-                                alt={getEventTypeLabel(eventType)}
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover',
-                                  objectPosition: 'center'
-                                }}
-                                onError={(e) => {
-                                  // Fallback if image doesn't exist
-                                  e.target.style.display = 'none';
-                                  e.target.parentElement.style.backgroundColor = getEventTypeColor(eventType);
-                                  e.target.parentElement.style.display = 'flex';
-                                  e.target.parentElement.style.alignItems = 'center';
-                                  e.target.parentElement.style.justifyContent = 'center';
-                                  if (!e.target.parentElement.querySelector('.fallback-text')) {
-                                    const fallback = document.createElement('div');
-                                    fallback.className = 'fallback-text';
-                                    fallback.textContent = getEventTypeFallbackText(eventType);
-                                    fallback.style.color = '#FFFFFF';
-                                    fallback.style.fontSize = '1.5rem';
-                                    fallback.style.fontWeight = '700';
-                                    e.target.parentElement.appendChild(fallback);
-                                  }
-                                }}
-                              />
-                            </div>
-                          )}
+                          {(() => {
+                            const eventImage = getEventImageSrc(event);
+                            const typeImage = getEventTypeImage(eventType);
+                            const showImage = eventImage || typeImage;
+                            if (!showImage) return null;
+                            const imgSrc = eventImage || typeImage;
+                            const imgAlt = eventImage ? (event.name || event.title || 'Event image') : getEventTypeLabel(eventType);
+                            return (
+                              <div style={{
+                                width: '100%',
+                                height: '180px',
+                                overflow: 'hidden',
+                                position: 'relative',
+                                backgroundColor: '#f3f4f6',
+                                flexShrink: 0
+                              }}>
+                                <img
+                                  src={imgSrc}
+                                  alt={imgAlt}
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    objectPosition: 'center'
+                                  }}
+                                  onError={(e) => {
+                                    // Fallback if image doesn't exist
+                                    e.target.style.display = 'none';
+                                    e.target.parentElement.style.backgroundColor = getEventTypeColor(eventType);
+                                    e.target.parentElement.style.display = 'flex';
+                                    e.target.parentElement.style.alignItems = 'center';
+                                    e.target.parentElement.style.justifyContent = 'center';
+                                    if (!e.target.parentElement.querySelector('.fallback-text')) {
+                                      const fallback = document.createElement('div');
+                                      fallback.className = 'fallback-text';
+                                      fallback.textContent = getEventTypeFallbackText(eventType);
+                                      fallback.style.color = '#FFFFFF';
+                                      fallback.style.fontSize = '1.5rem';
+                                      fallback.style.fontWeight = '700';
+                                      e.target.parentElement.appendChild(fallback);
+                                    }
+                                  }}
+                                />
+                              </div>
+                            );
+                          })()}
 
                           <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
