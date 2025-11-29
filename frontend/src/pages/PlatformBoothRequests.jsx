@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { vendorRequestApi } from '../api/vendorRequestApi';
+import { eventsApiService } from '../api/eventsApi';
 import EventsOfficeNotificationBell from './EventsOfficeNotificationBell';
 import axios from 'axios';
 
@@ -30,6 +31,7 @@ const PlatformBoothRequests = () => {
   const [selectedPoll, setSelectedPoll] = useState(null);
   const [pollResults, setPollResults] = useState(null);
   const [loadingResults, setLoadingResults] = useState(false);
+  const [sendingQRCodes, setSendingQRCodes] = useState({});
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -185,6 +187,49 @@ const PlatformBoothRequests = () => {
         {config.label}
       </span>
     );
+  };
+
+  // Handle sending QR codes for platform booth requests
+  const handleSendQRCodes = async (requestId, eventId) => {
+    console.log('🔍 handleSendQRCodes called:', { requestId, eventId, eventIdType: typeof eventId });
+    
+    if (!eventId) {
+      console.error('❌ No event ID provided');
+      showToast('Event not found for this platform booth request', 'error');
+      return;
+    }
+
+    // Ensure eventId is a string
+    const eventIdString = typeof eventId === 'object' && eventId?._id 
+      ? eventId._id.toString() 
+      : eventId?.toString() || eventId;
+    
+    console.log('🔍 Using event ID:', eventIdString);
+
+    try {
+      setSendingQRCodes(prev => ({ ...prev, [requestId]: true }));
+      const result = await eventsApiService.sendQRCodesToVendors(eventIdString);
+      
+      console.log('🔍 sendQRCodesToVendors result:', result);
+      
+      if (result.success) {
+        showToast(result.data?.message || 'QR codes sent successfully to vendor', 'success');
+        // Reload requests to get updated QR codes
+        await loadPlatformBoothRequests();
+      } else {
+        console.error('❌ Failed to send QR codes:', result.message || result.error);
+        showToast(result.message || 'Failed to send QR codes', 'error');
+      }
+    } catch (error) {
+      console.error('❌ Error sending QR codes:', error);
+      showToast('Failed to send QR codes: ' + (error.message || 'Unknown error'), 'error');
+    } finally {
+      setSendingQRCodes(prev => {
+        const newState = { ...prev };
+        delete newState[requestId];
+        return newState;
+      });
+    }
   };
 
   const filteredRequests = statusFilter === 'all'
@@ -1290,6 +1335,47 @@ const PlatformBoothRequests = () => {
                                         </div>
                                       ))}
                                     </div>
+                                  </div>
+                                )}
+                                {status === 'accepted' && request.booth && (
+                                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const eventId = request.booth?._id || request.booth?.id || request.booth;
+                                        handleSendQRCodes(requestId, eventId);
+                                      }}
+                                      disabled={!!sendingQRCodes[requestId]}
+                                      style={{
+                                        padding: '0.5rem 1rem',
+                                        borderRadius: '0.375rem',
+                                        border: 'none',
+                                        backgroundColor: sendingQRCodes[requestId] ? '#9ca3af' : '#3b82f6',
+                                        color: '#FFFFFF',
+                                        fontSize: '0.875rem',
+                                        fontWeight: '500',
+                                        cursor: sendingQRCodes[requestId] ? 'not-allowed' : 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        transition: 'background-color 0.2s'
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        if (!sendingQRCodes[requestId]) {
+                                          e.target.style.backgroundColor = '#2563eb';
+                                        }
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        if (!sendingQRCodes[requestId]) {
+                                          e.target.style.backgroundColor = '#3b82f6';
+                                        }
+                                      }}
+                                    >
+                                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                        qr_code_2
+                                      </span>
+                                      {sendingQRCodes[requestId] ? 'Sending...' : 'Send QR Codes'}
+                                    </button>
                                   </div>
                                 )}
                               </div>

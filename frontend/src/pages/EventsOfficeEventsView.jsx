@@ -92,11 +92,12 @@ const EventsOfficeEventsView = () => {
     navigate('/login');
   };
 
-  const loadEvents = useCallback(async () => {
+  const loadEvents = useCallback(async (retryCount = 0) => {
+    const MAX_RETRIES = 2;
     try {
       setError('');
       setLoading(true);
-      console.log('🔍 Loading events with params:', { searchQuery, filter });
+      console.log('🔍 Loading events with params:', { searchQuery, filter, retryCount });
       
       const result = await eventsApiService.getAllEventsAuthenticated({
         q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
@@ -254,23 +255,62 @@ const EventsOfficeEventsView = () => {
         const sortedEvents = [...upcomingEvents, ...pastEvents];
         console.log('🔍 Sorted events - Upcoming:', upcomingEvents.length, 'Past:', pastEvents.length);
         setEvents(sortedEvents);
+        // Clear error on successful load
+        setError('');
       } else {
+        // Check if it's a network/timeout error that should be retried
+        const isNetworkError = result.error?.code === 'ECONNABORTED' || 
+                               result.error?.code === 'ERR_NETWORK' ||
+                               result.message?.toLowerCase().includes('timeout') ||
+                               result.message?.toLowerCase().includes('network error') ||
+                               (result.error && typeof result.error === 'string' && result.error.toLowerCase().includes('timeout'));
+        
+        if (isNetworkError && retryCount < MAX_RETRIES) {
+          console.log(`🔍 Network error detected, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          return loadEvents(retryCount + 1);
+        }
+        
         console.error('🔍 API call failed:', result);
-        setEvents([]);
-        const msg = result.message || (typeof result.error === 'string' ? result.error : 'Failed to fetch events');
-        setError(msg);
+        // Only set error if we've exhausted retries or it's not a network error
+        if (retryCount >= MAX_RETRIES || !isNetworkError) {
+          setEvents([]);
+          const msg = result.message || (typeof result.error === 'string' ? result.error : 'Failed to fetch events');
+          setError(msg);
+        }
       }
     } catch (error) {
       console.error('🔍 Error loading events:', error);
-      setError(error?.message || 'Error loading events');
-      setEvents([]);
+      // Check if it's a network/timeout error
+      const isNetworkError = error.code === 'ECONNABORTED' || 
+                             error.code === 'ERR_NETWORK' ||
+                             error.message?.toLowerCase().includes('timeout') ||
+                             error.message?.toLowerCase().includes('network error');
+      
+      if (isNetworkError && retryCount < MAX_RETRIES) {
+        console.log(`🔍 Network error in catch, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+        // Wait before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        return loadEvents(retryCount + 1);
+      }
+      
+      // Only set error if we've exhausted retries or it's not a network error
+      if (retryCount >= MAX_RETRIES || !isNetworkError) {
+        setError(error?.message || 'Error loading events');
+        setEvents([]);
+      }
     } finally {
       setLoading(false);
     }
   }, [searchQuery, filter]);
 
   useEffect(() => {
-    loadEvents();
+    // Small delay to ensure component is fully mounted and ready
+    const timer = setTimeout(() => {
+      loadEvents();
+    }, 100);
+    return () => clearTimeout(timer);
   }, [filter, loadEvents]);
 
   // Reload archived events when modal opens
@@ -2106,64 +2146,6 @@ const EventsOfficeEventsView = () => {
                             textAlign: 'right'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                              {/* Workshop Accept/Reject buttons */}
-                              {event.type === 'workshop' && event.status === 'pending' && (
-                                <>
-                                  <button
-                                    onClick={() => handleEventStatusChange(event.id, 'approved')}
-                                    disabled={!!processingIds[event.id]}
-                                    style={{
-                                      padding: '0.5rem',
-                                      borderRadius: '0.5rem',
-                                      border: 'none',
-                                      backgroundColor: 'transparent',
-                                      color: canEdit ? '#137fec' : '#d1d5db',
-                                      cursor: canEdit ? 'pointer' : 'not-allowed',
-                                      opacity: canEdit ? 1 : 0.5
-                                    }}
-                                    title={canEdit ? 'Accept Workshop' : 'Workshop already accepted'}
-                                    onMouseEnter={(e) => {
-                                      if (canEdit) {
-                                        e.target.style.backgroundColor = '#f3f4f6';
-                                        e.target.style.color = '#137fec';
-                                      }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      if (canEdit) {
-                                        e.target.style.backgroundColor = 'transparent';
-                                        e.target.style.color = '#137fec';
-                                      }
-                                    }}
-                                  >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                      check_circle
-                                    </span>
-                                  </button>
-                                  <button
-                                    onClick={() => handleEventStatusChange(event.id, 'rejected')}
-                                    disabled={!!processingIds[event.id]}
-                                    style={{
-                                      padding: '0.5rem',
-                                      borderRadius: '0.5rem',
-                                      border: 'none',
-                                      backgroundColor: 'transparent',
-                                      color: '#ef4444',
-                                      cursor: 'pointer'
-                                    }}
-                                    title="Reject Workshop"
-                                    onMouseEnter={(e) => {
-                                      e.target.style.backgroundColor = '#fee2e2';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.target.style.backgroundColor = 'transparent';
-                                    }}
-                                  >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                      cancel
-                                    </span>
-                                  </button>
-                                </>
-                              )}
                               
                               {/* Edit Button */}
               <button
@@ -2530,8 +2512,8 @@ const EventsOfficeEventsView = () => {
                                   </div>
                                 )}
 
-                                {/* Vendors (for bazaars and booths) - Only show accepted vendors */}
-                                {(event.type === 'bazaar' || event.type === 'booth') && (() => {
+                                {/* Vendors (for bazaars, booths, and platform booths) - Only show accepted vendors */}
+                                {(event.type === 'bazaar' || event.type === 'booth' || event.type === 'platformBooth') && (() => {
                                   // Get only accepted vendors from vendor requests
                                   const acceptedVendors = vendorRequests[event.id] 
                                     ? vendorRequests[event.id].filter(r => r.status === 'accepted').map(r => r.vendor).filter(Boolean)
@@ -2670,8 +2652,8 @@ const EventsOfficeEventsView = () => {
                                   ) : null;
                                 })()}
 
-                                {/* Vendor Participation Requests (for bazaars and booths) - Only show pending and rejected */}
-                                {(event.type === 'bazaar' || event.type === 'booth') && (
+                                {/* Vendor Participation Requests (for bazaars, booths, and platform booths) - Only show pending and rejected */}
+                                {(event.type === 'bazaar' || event.type === 'booth' || event.type === 'platformBooth') && (
                                   <div>
                                     <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>
                                       Vendor Participation Requests

@@ -281,8 +281,9 @@ exports.getSalesReport = async (req, res) => {
 // 📅 Get all approved/upcoming events
 exports.getAllEvents = async (req, res) => {
   try {
-    const { q, name, type, status } = req.query;
+    const { q, name, type, status, minimal } = req.query;
     const search = (q || name || '').toString().trim();
+    const isMinimal = minimal === 'true' || minimal === true; // Skip vendor details for dashboard
 
     // Base match (type/status) - only allow valid event types
     const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
@@ -625,91 +626,183 @@ exports.getAllEvents = async (req, res) => {
     
     // For bazaars and booths, get vendor information
     // Also recalculate registeredCount from actual registrations for accuracy
+    // OPTIMIZATION: Batch all queries instead of doing them one by one
+    // If minimal=true, skip vendor details to speed up dashboard loading
     const Registration = require('../models/registrationModel');
+    const StudentRegistration = require('../models/studentRegistrationModel');
+    const VendorRequest = require('../models/vendorRequest');
     const mongoose = require('mongoose');
-    const eventsWithVendors = await Promise.all(events.map(async (e) => {
+    
+    // Batch fetch all counts at once
+    const eventIds = events.map(e => {
+      if (mongoose.Types.ObjectId.isValid(e._id)) {
+        return typeof e._id === 'string' ? new mongoose.Types.ObjectId(e._id) : e._id;
+      }
+      return e._id;
+    }).filter(id => id);
+    
+    // Get all vendor counts for bazaar/booth events in one query
+    const bazaarBoothEventIds = events
+      .filter(e => e.type === 'bazaar' || e.type === 'booth' || e.type === 'platformBooth')
+      .map(e => {
+        if (mongoose.Types.ObjectId.isValid(e._id)) {
+          return typeof e._id === 'string' ? new mongoose.Types.ObjectId(e._id) : e._id;
+        }
+        return e._id;
+      })
+      .filter(id => id);
+    
+    const vendorCountsMap = new Map();
+    if (bazaarBoothEventIds.length > 0 && !isMinimal) {
+      try {
+        const vendorCounts = await VendorRequest.aggregate([
+          {
+            $match: {
+              status: 'accepted',
+              $or: [
+                { bazaar: { $in: bazaarBoothEventIds } },
+                { booth: { $in: bazaarBoothEventIds } },
+                { standaloneBooth: { $in: bazaarBoothEventIds } }
+              ]
+            }
+          },
+          {
+            $group: {
+              _id: {
+                $cond: [
+                  { $ne: ['$bazaar', null] },
+                  '$bazaar',
+                  { $cond: [{ $ne: ['$booth', null] }, '$booth', '$standaloneBooth'] }
+                ]
+              },
+              count: { $sum: 1 }
+            }
+          }
+        ]);
+        
+        vendorCounts.forEach(vc => {
+          const eventIdStr = String(vc._id);
+          vendorCountsMap.set(eventIdStr, vc.count);
+        });
+      } catch (vendorCountError) {
+        console.error('Error fetching vendor counts:', vendorCountError);
+      }
+    }
+    
+    // Get all registration counts for non-bazaar/booth events in one query
+    const otherEventIds = events
+      .filter(e => e.type !== 'bazaar' && e.type !== 'booth' && e.type !== 'platformBooth')
+      .map(e => {
+        if (mongoose.Types.ObjectId.isValid(e._id)) {
+          return typeof e._id === 'string' ? new mongoose.Types.ObjectId(e._id) : e._id;
+        }
+        return e._id;
+      })
+      .filter(id => id);
+    
+    const registrationCountsMap = new Map();
+    const studentRegistrationCountsMap = new Map();
+    
+    if (otherEventIds.length > 0 && !isMinimal) {
+      try {
+        // Batch count registrations
+        const regCounts = await Registration.aggregate([
+          {
+            $match: {
+              event: { $in: otherEventIds },
+              status: { $ne: 'cancelled' }
+            }
+          },
+          {
+            $group: {
+              _id: '$event',
+              count: { $sum: 1 }
+            }
+          }
+        ]);
+        
+        regCounts.forEach(rc => {
+          const eventIdStr = String(rc._id);
+          registrationCountsMap.set(eventIdStr, rc.count);
+        });
+        
+        // Batch count student registrations
+        const studentRegCounts = await StudentRegistration.aggregate([
+          {
+            $match: {
+              event: { $in: otherEventIds },
+              status: { $ne: 'cancelled' }
+            }
+          },
+          {
+            $group: {
+              _id: '$event',
+              count: { $sum: 1 }
+            }
+          }
+        ]);
+        
+        studentRegCounts.forEach(src => {
+          const eventIdStr = String(src._id);
+          const currentCount = studentRegistrationCountsMap.get(eventIdStr) || 0;
+          studentRegistrationCountsMap.set(eventIdStr, currentCount + src.count);
+        });
+      } catch (regCountError) {
+        console.error('Error fetching registration counts:', regCountError);
+      }
+    }
+    
+    // Batch fetch all vendor requests for bazaar/booth events (only if not minimal)
+    const vendorRequestsMap = new Map();
+    if (bazaarBoothEventIds.length > 0 && !isMinimal) {
+      try {
+        const allVendorRequests = await VendorRequest.find({
+          status: 'accepted',
+          $or: [
+            { bazaar: { $in: bazaarBoothEventIds } },
+            { booth: { $in: bazaarBoothEventIds } },
+            { standaloneBooth: { $in: bazaarBoothEventIds } }
+          ]
+        })
+        .populate('vendor', 'firstName lastName companyName email')
+        .lean();
+        
+        allVendorRequests.forEach(vr => {
+          const eventId = vr.bazaar || vr.booth || vr.standaloneBooth;
+          if (eventId) {
+            const eventIdStr = String(eventId);
+            if (!vendorRequestsMap.has(eventIdStr)) {
+              vendorRequestsMap.set(eventIdStr, []);
+            }
+            vendorRequestsMap.get(eventIdStr).push(vr);
+          }
+        });
+      } catch (vendorReqError) {
+        console.error('Error fetching vendor requests:', vendorReqError);
+      }
+    }
+    
+    // Now process events with pre-fetched data
+    const eventsWithVendors = events.map((e) => {
       const creatorFullName = e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null;
+      const eventIdStr = String(e._id);
       
-      // For bazaars and booths, registeredCount = number of accepted vendor requests (participating vendors)
-      // For other events, registeredCount = number of event participants
+      // Get registeredCount from pre-fetched maps (or use existing if minimal)
       let finalCount = e.registeredCount || 0;
       
-      if (e.type === 'bazaar' || e.type === 'booth') {
-        // Count accepted vendor requests (participating vendors)
-        const VendorRequest = require('../models/vendorRequest');
-        let eventIdForQuery = e._id;
-        if (mongoose.Types.ObjectId.isValid(e._id)) {
-          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
-        } else if (typeof e._id === 'string' && mongoose.Types.ObjectId.isValid(e._id)) {
-          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
-        }
-        
-        const vendorCount = await VendorRequest.countDocuments({
-          $or: [
-            { bazaar: eventIdForQuery, status: 'accepted' },
-            { booth: eventIdForQuery, status: 'accepted' },
-            { standaloneBooth: eventIdForQuery, status: 'accepted' }
-          ]
-        });
-        
-        // Try string format if ObjectId didn't work
-        if (vendorCount === 0 && typeof e._id === 'string') {
-          const stringVendorCount = await VendorRequest.countDocuments({
-            $or: [
-              { bazaar: e._id, status: 'accepted' },
-              { booth: e._id, status: 'accepted' },
-              { standaloneBooth: e._id, status: 'accepted' }
-            ]
-          });
-          finalCount = stringVendorCount;
+      if (!isMinimal) {
+        if (e.type === 'bazaar' || e.type === 'booth' || e.type === 'platformBooth') {
+          finalCount = vendorCountsMap.get(eventIdStr) || 0;
         } else {
-          finalCount = vendorCount;
+          const regCount = registrationCountsMap.get(eventIdStr) || 0;
+          const studentRegCount = studentRegistrationCountsMap.get(eventIdStr) || 0;
+          finalCount = regCount + studentRegCount;
         }
-        
-        console.log(`🔍 Event ${String(e._id)} (${e.title || e.name}) - Bazaar/Booth: Found ${finalCount} accepted vendor(s)`);
-      } else {
-        // For other events, count actual event participants
-        let eventIdForQuery = e._id;
-        if (mongoose.Types.ObjectId.isValid(e._id)) {
-          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
-        } else if (typeof e._id === 'string' && mongoose.Types.ObjectId.isValid(e._id)) {
-          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
-        }
-        
-        // Count from Registration model
-        const regCount = await Registration.countDocuments({ 
-          event: eventIdForQuery,
-          status: { $ne: 'cancelled' }
-        });
-        
-        // Also check StudentRegistration (for workshops and trips)
-        const StudentRegistration = require('../models/studentRegistrationModel');
-        const studentRegCount = await StudentRegistration.countDocuments({ 
-          event: eventIdForQuery,
-          status: { $ne: 'cancelled' }
-        });
-        
-        finalCount = regCount + studentRegCount;
-        
-        // If still 0, try with string format
-        if (finalCount === 0 && typeof e._id === 'string') {
-          const stringRegCount = await Registration.countDocuments({ 
-            event: e._id,
-            status: { $ne: 'cancelled' }
-          });
-          const stringStudentCount = await StudentRegistration.countDocuments({ 
-            event: e._id,
-            status: { $ne: 'cancelled' }
-          });
-          finalCount = stringRegCount + stringStudentCount;
-        }
-        
-        console.log(`🔍 Event ${String(e._id)} (${e.title || e.name}): Registration=${regCount}, StudentRegistration=${studentRegCount}, Total=${finalCount}`);
       }
       
       const baseEvent = {
         ...e,
-        registeredCount: finalCount, // Use actual count from registrations
+        registeredCount: finalCount,
         creatorName: creatorFullName,
         professorName: creatorFullName,
         createdByName: creatorFullName,
@@ -718,25 +811,21 @@ exports.getAllEvents = async (req, res) => {
         creatorLastName: e.createdBy?.lastName || null,
       };
 
-      // Add vendor information for bazaars and booths
-      if (e.type === 'bazaar' || e.type === 'booth') {
+      // Add vendor information for bazaars and booths (only if not minimal)
+      if ((e.type === 'bazaar' || e.type === 'booth' || e.type === 'platformBooth') && !isMinimal) {
         try {
-          const VendorRequest = require('../models/vendorRequest');
-          const vendorRequests = await VendorRequest.find({
-            [e.type]: e._id,
-            status: 'accepted'
-          }).populate('vendor', 'firstName lastName companyName email').lean();
+          const vendorRequests = vendorRequestsMap.get(eventIdStr) || [];
 
           // For booth events, include full vendor request details
-          if (e.type === 'booth') {
+          if (e.type === 'booth' || e.type === 'platformBooth') {
             baseEvent.vendorRequests = vendorRequests.map(vr => ({
               _id: vr._id,
               vendor: {
-                _id: vr.vendor._id,
-                name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
-                companyName: vr.vendor.companyName,
-                contactName: `${vr.vendor.firstName} ${vr.vendor.lastName}`,
-                email: vr.vendor.email,
+                _id: vr.vendor?._id,
+                name: vr.vendor?.companyName || `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+                companyName: vr.vendor?.companyName,
+                contactName: `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+                email: vr.vendor?.email,
               },
               boothSize: vr.boothSize,
               durationWeeks: vr.durationWeeks,
@@ -752,46 +841,28 @@ exports.getAllEvents = async (req, res) => {
 
           // Keep the original vendors array for backward compatibility
           baseEvent.vendors = vendorRequests.map(vr => ({
-            _id: vr.vendor._id,
-            name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
-            companyName: vr.vendor.companyName,
-            contactName: `${vr.vendor.firstName} ${vr.vendor.lastName}`,
-            email: vr.vendor.email,
+            _id: vr.vendor?._id,
+            name: vr.vendor?.companyName || `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+            companyName: vr.vendor?.companyName,
+            contactName: `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+            email: vr.vendor?.email,
             boothSize: vr.boothSize,
             durationWeeks: vr.durationWeeks,
             boothLocation: vr.boothLocation,
             attendees: vr.attendees || []
           }));
-
-          // For bazaars, also get related booth events
-          if (e.type === 'bazaar') {
-            const boothEvents = await Event.find({
-              type: 'booth',
-              location: e.location,
-              startDate: { $gte: e.startDate },
-              endDate: { $lte: e.endDate },
-              status: 'approved'
-            }).lean();
-
-            baseEvent.booths = boothEvents.map(booth => ({
-              _id: booth._id,
-              title: booth.title,
-              description: booth.description,
-              startDate: booth.startDate,
-              endDate: booth.endDate,
-              location: booth.location,
-              capacity: booth.capacity,
-              price: booth.price
-            }));
-          }
         } catch (vendorError) {
-          console.error('Error fetching vendor info for event:', e._id, vendorError);
+          console.error('Error processing vendor info for event:', e._id, vendorError);
           baseEvent.vendors = [];
         }
+      } else if ((e.type === 'bazaar' || e.type === 'booth' || e.type === 'platformBooth') && isMinimal) {
+        // For minimal mode, just set empty arrays
+        baseEvent.vendors = [];
+        baseEvent.vendorRequests = [];
       }
 
       return baseEvent;
-    }));
+    });
 
     res.json(eventsWithVendors);
   } catch (err) {
@@ -2189,6 +2260,7 @@ exports.sendQRCodesToVendors = async (req, res) => {
     }
 
     // Find all accepted vendor requests for this event (use actual event ID)
+    // Platform booths store the event in the 'booth' field, so they're included in the booth query
     const vendorRequests = await VendorRequest.find({
       $or: [
         { bazaar: actualEventId, status: 'accepted' },
@@ -2196,8 +2268,24 @@ exports.sendQRCodesToVendors = async (req, res) => {
         { standaloneBooth: actualEventId, status: 'accepted' }
       ]
     }).populate('vendor', 'email firstName lastName companyName');
+    
+    console.log(`🔍 Found ${vendorRequests.length} vendor request(s) for event ${actualEventId}`);
+    vendorRequests.forEach((vr, idx) => {
+      console.log(`  Vendor Request ${idx + 1}:`, {
+        id: vr._id,
+        eventType: vr.eventType,
+        status: vr.status,
+        vendorEmail: vr.vendor?.email,
+        hasAttendees: !!(vr.attendees && vr.attendees.length > 0),
+        attendeesCount: vr.attendees?.length || 0
+      });
+    });
+    
+    // Use all vendor requests (platform booths are already included via the booth field)
+    const filteredVendorRequests = vendorRequests;
 
-    if (vendorRequests.length === 0) {
+    if (filteredVendorRequests.length === 0) {
+      console.error('❌ No accepted vendor requests found for event:', actualEventId);
       return res.status(400).json({ 
         success: false, 
         message: 'No accepted vendor requests found for this event' 
@@ -2208,13 +2296,20 @@ exports.sendQRCodesToVendors = async (req, res) => {
     const { generateQRCode } = require('../utils/generateQRCode');
     const vendorsWithQRCodes = [];
     
-    for (const vendorRequest of vendorRequests) {
+    for (const vendorRequest of filteredVendorRequests) {
       const vendor = vendorRequest.vendor;
-      if (!vendor || !vendor.email) continue;
+      if (!vendor || !vendor.email) {
+        console.warn(`⚠️ Skipping vendor request ${vendorRequest._id}: vendor or email missing`, {
+          hasVendor: !!vendor,
+          vendorEmail: vendor?.email
+        });
+        continue;
+      }
       
       try {
         // Generate QR code for this vendor
         const vendorName = vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim();
+        console.log(`🔍 Generating QR code for vendor: ${vendorName} (${vendor.email})`);
         const qrResult = await generateQRCode(
           vendorRequest._id.toString(),
           {
@@ -2248,10 +2343,58 @@ exports.sendQRCodesToVendors = async (req, res) => {
             console.error(`❌ QR code data URL format is invalid for vendor ${vendorName}. Expected 'data:image/...', got: ${qrResult.qrCodeDataUrl.substring(0, 50)}`);
           }
           
+          // For platform booths and bazaars, generate QR codes for attendees
+          let attendeeQRCodes = [];
+          if ((vendorRequest.eventType === 'platformBooth' || vendorRequest.eventType === 'bazaar') && vendorRequest.attendees && vendorRequest.attendees.length > 0) {
+            const eventTypeLabel = vendorRequest.eventType === 'platformBooth' ? 'platform booth' : 'bazaar';
+            console.log(`🔍 Generating QR codes for ${vendorRequest.attendees.length} ${eventTypeLabel} attendees`);
+            for (const attendee of vendorRequest.attendees) {
+              if (!attendee.name || !attendee.email) {
+                console.warn(`⚠️ Skipping attendee: missing name or email`, { name: attendee.name, email: attendee.email });
+                continue;
+              }
+              
+              try {
+                const attendeeType = vendorRequest.eventType === 'platformBooth' ? 'platform_booth_attendee' : 'bazaar_attendee';
+                const attendeeQRResult = await generateQRCode(
+                  `${vendorRequest._id}_${attendee.email}`,
+                  {
+                    attendeeName: attendee.name,
+                    attendeeEmail: attendee.email,
+                    vendorRequestId: vendorRequest._id.toString(),
+                    eventId: actualEventId.toString(),
+                    eventName: event.title || event.name,
+                    vendorName: vendorName,
+                    attendeeType: attendeeType
+                  }
+                );
+                
+                if (attendeeQRResult.success && attendeeQRResult.qrCodeDataUrl) {
+                  attendeeQRCodes.push({
+                    attendeeName: attendee.name,
+                    attendeeEmail: attendee.email,
+                    qrCode: attendeeQRResult.qrCodeDataUrl,
+                    qrCodeData: attendeeQRResult.qrDataString
+                  });
+                  console.log(`✅ Generated QR code for attendee: ${attendee.name} (${attendee.email})`);
+                } else {
+                  console.error(`❌ Failed to generate QR code for attendee ${attendee.email}:`, attendeeQRResult.error);
+                }
+              } catch (attendeeError) {
+                console.error(`❌ Error generating QR code for attendee ${attendee.email}:`, attendeeError);
+                console.error('Attendee error stack:', attendeeError.stack);
+              }
+            }
+            console.log(`✅ Generated ${attendeeQRCodes.length} attendee QR codes out of ${vendorRequest.attendees.length} attendees`);
+          }
+          
           // Store QR code in vendorRequest
           try {
             vendorRequest.qrCode = qrResult.qrCodeDataUrl;
             vendorRequest.qrCodeData = qrResult.qrDataString;
+            if (attendeeQRCodes.length > 0) {
+              vendorRequest.attendeeQRCodes = attendeeQRCodes;
+            }
             await vendorRequest.save();
             console.log(`✅ Saved QR code to vendorRequest ${vendorRequest._id}`);
             
@@ -2259,7 +2402,8 @@ exports.sendQRCodesToVendors = async (req, res) => {
               vendor: vendor,
               vendorRequest: vendorRequest,
               qrCode: qrResult.qrCodeDataUrl,
-              qrCodeData: qrResult.qrDataString
+              qrCodeData: qrResult.qrDataString,
+              attendeeQRCodes: attendeeQRCodes
             });
             console.log(`✅ Generated and stored QR code for vendor: ${vendorName} (${vendor.email})`);
           } catch (saveError) {
@@ -2275,7 +2419,8 @@ exports.sendQRCodesToVendors = async (req, res) => {
               vendor: vendor,
               vendorRequest: vendorRequest,
               qrCode: qrResult.qrCodeDataUrl,
-              qrCodeData: qrResult.qrDataString
+              qrCodeData: qrResult.qrDataString,
+              attendeeQRCodes: attendeeQRCodes
             });
             console.log(`⚠️ Continuing without saving QR code to database for vendor: ${vendorName}`);
           }
@@ -2356,7 +2501,7 @@ exports.sendQRCodesToVendors = async (req, res) => {
     const uniqueVendors = [];
     const results = [];
 
-    for (const vr of vendorRequests) {
+    for (const vr of filteredVendorRequests) {
       const v = vr.vendor;
       if (!v) continue;
       const emailKey = v.email ? String(v.email).toLowerCase().trim() : null;
@@ -2380,7 +2525,21 @@ exports.sendQRCodesToVendors = async (req, res) => {
             qrCodeData: vendorQRData.qrCodeData
           };
           
-          const result = await sendQRCodesToVendor(vendor, event, registrationsWithQR, vendorQRCode);
+          // For platform booths, include attendee QR codes
+          const attendeeQRCodes = vendorQRData.attendeeQRCodes || [];
+          
+          console.log(`📧 Sending QR codes to vendor ${vendor.email}...`);
+          console.log(`  - Has vendor QR: ${!!vendorQRCode.qrCode}`);
+          console.log(`  - Has attendee QR codes: ${attendeeQRCodes.length > 0} (${attendeeQRCodes.length} codes)`);
+          
+          // Vendors should NOT receive participant registrations - only their own QR code and their attendees' QR codes
+          const result = await sendQRCodesToVendor(vendor, event, [], vendorQRCode, attendeeQRCodes);
+          console.log(`📧 Email send result for ${vendor.email}:`, {
+            sent: result.sent,
+            stored: result.stored,
+            error: result.error || result.reason
+          });
+          
           results.push({
             vendorEmail: vendor.email,
             vendorName: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim(),
@@ -2391,6 +2550,11 @@ exports.sendQRCodesToVendors = async (req, res) => {
         } catch (error) {
           console.error(`❌ Error sending QR codes to vendor ${vendor.email}:`, error);
           console.error('Error stack:', error.stack);
+          console.error('Error details:', {
+            message: error.message,
+            name: error.name,
+            code: error.code
+          });
           results.push({
             vendorEmail: vendor.email,
             vendorName: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim(),
