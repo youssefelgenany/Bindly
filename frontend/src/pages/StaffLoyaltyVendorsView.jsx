@@ -1021,16 +1021,6 @@ const StaffLoyaltyVendorsView = () => {
                       e.currentTarget.style.transform = 'translateY(0) scale(1)';
                     }}
                   >
-                    {/* Vendor Header */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '1rem',
-                      marginBottom: '1rem'
-                    }}>
-                      {(() => {
-                        const logoSrc = getVendorLogoSrc(vendor);
-                        const baseCircleStyle = {
                     {/* Booth Photo */}
                     <div style={{
                       width: '100%',
@@ -1068,13 +1058,17 @@ const StaffLoyaltyVendorsView = () => {
                       />
                     </div>
 
-                    <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    {/* Vendor Logo/Icon */}
-                    {vendor.logoUrl ? (
-                      <img
-                        src={vendor.logoUrl}
-                        alt={vendor.vendorName}
-                        style={{
+                    <div style={{ padding: '1.75rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    {/* Vendor Header */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      marginBottom: '1rem'
+                    }}>
+                      {(() => {
+                        const logoSrc = getVendorLogoSrc(vendor);
+                        const baseCircleStyle = {
                           width: '4rem',
                           height: '4rem',
                           borderRadius: '9999px',
