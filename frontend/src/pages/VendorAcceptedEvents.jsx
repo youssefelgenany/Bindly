@@ -15,14 +15,8 @@ const VendorAcceptedEvents = () => {
   const [error, setError] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'upcoming', 'past'
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [paymentData, setPaymentData] = useState({
-    cardNumber: '',
-    cvv: '',
-    expirationDate: ''
-  });
-  const [paymentLoading, setPaymentLoading] = useState(false);
+  
   const [showIDUploadModal, setShowIDUploadModal] = useState(false);
   const [selectedEventForUpload, setSelectedEventForUpload] = useState(null);
 
@@ -123,15 +117,8 @@ const VendorAcceptedEvents = () => {
   };
 
   const handleOpenPaymentModal = (event) => {
-    setSelectedEvent(event);
-    setPaymentData({ cardNumber: '', cvv: '', expirationDate: '' });
-    setShowPaymentModal(true);
-  };
-
-  const handleClosePaymentModal = () => {
-    setShowPaymentModal(false);
-    setSelectedEvent(null);
-    setPaymentData({ cardNumber: '', cvv: '', expirationDate: '' });
+    // Navigate to a full-page payment layout (same UX as student trip payment)
+    navigate(`/vendor-requests/${event.requestId}/payment`, { state: { selectedEvent: event } });
   };
 
   const handleOpenIDUploadModal = (event) => {
@@ -149,41 +136,7 @@ const VendorAcceptedEvents = () => {
     loadAcceptedEvents();
   };
 
-  const handlePaymentSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedEvent || !selectedEvent.requestId) return;
-
-    try {
-      setPaymentLoading(true);
-      const token = localStorage.getItem('token');
-
-      // Request Stripe checkout session from backend
-      const res = await axios.post(
-        `http://localhost:5000/api/vendor-requests/${selectedEvent.requestId}/payment`,
-        { paymentMethod: 'card' },
-        {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (res.status === 200 && res.data.checkoutUrl) {
-        // Redirect to Stripe checkout
-        window.location.href = res.data.checkoutUrl;
-        handleClosePaymentModal();
-      } else {
-        alert(res.data?.message || 'Failed to initiate payment');
-      }
-    } catch (err) {
-      console.error('Error initiating payment:', err);
-      const msg = err.response?.data?.message || err.message || 'Error initiating payment';
-      alert(msg);
-    } finally {
-      setPaymentLoading(false);
-    }
-  };
+  
 
   const toggleRowExpansion = (eventId) => {
     const newExpanded = new Set(expandedRows);
@@ -929,21 +882,34 @@ const VendorAcceptedEvents = () => {
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleOpenIDUploadModal(event); }}
                                 style={{
-                                  padding: '0.5rem 0.75rem',
-                                  minWidth: 140,
-                                  borderRadius: '0.375rem',
-                                  backgroundColor: '#8b5cf6',
-                                  color: '#fff',
+                                  padding: '0.75rem 1rem',
+                                  borderRadius: '0.5rem',
+                                  backgroundColor: '#1e40af',
+                                  color: '#FFFFFF',
                                   border: 'none',
                                   cursor: 'pointer',
-                                  fontSize: '0.9rem',
-                                  fontWeight: 600
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  transition: 'all 0.2s',
+                                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.5rem'
                                 }}
-                                onMouseEnter={(e) => e.target.style.backgroundColor = '#7c3aed'}
-                                onMouseLeave={(e) => e.target.style.backgroundColor = '#8b5cf6'}
+                                onMouseEnter={(e) => {
+                                  e.target.style.backgroundColor = '#1e3a8a';
+                                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.backgroundColor = '#1e40af';
+                                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                                }}
                                 title="Upload individual IDs for attendees"
                               >
-                                📤 Upload IDs
+                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                  upload_file
+                                </span>
+                                Upload IDs
                               </button>
                             )}
 
@@ -952,16 +918,17 @@ const VendorAcceptedEvents = () => {
                               <button
                                 disabled
                                 style={{
-                                  padding: '0.5rem 0.75rem',
-                                  minWidth: 140,
-                                  borderRadius: '0.375rem',
+                                  padding: '0.75rem 1rem',
+                                  borderRadius: '0.5rem',
                                   backgroundColor: '#10b981',
-                                  color: '#fff',
+                                  color: '#FFFFFF',
                                   border: 'none',
                                   cursor: 'not-allowed',
-                                  fontSize: '0.9rem',
-                                  fontWeight: 600,
-                                  opacity: 0.7
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  opacity: 0.7,
+                                  transition: 'all 0.2s',
+                                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
                                 }}
                               >
                                 ✓ Paid
@@ -970,18 +937,25 @@ const VendorAcceptedEvents = () => {
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleOpenPaymentModal(event); }}
                                 style={{
-                                  padding: '0.5rem 0.75rem',
-                                  minWidth: 140,
-                                  borderRadius: '0.375rem',
+                                  padding: '0.75rem 1rem',
+                                  borderRadius: '0.5rem',
                                   backgroundColor: '#1e40af',
-                                  color: '#fff',
+                                  color: '#FFFFFF',
                                   border: 'none',
                                   cursor: 'pointer',
-                                  fontSize: '0.9rem',
-                                  fontWeight: 600
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  transition: 'all 0.2s',
+                                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
                                 }}
-                                onMouseEnter={(e) => e.target.style.backgroundColor = '#1e3a8a'}
-                                onMouseLeave={(e) => e.target.style.backgroundColor = '#1e40af'}
+                                onMouseEnter={(e) => {
+                                  e.target.style.backgroundColor = '#1e3a8a';
+                                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.backgroundColor = '#1e40af';
+                                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                                }}
                               >
                                 Payment
                               </button>
@@ -992,18 +966,25 @@ const VendorAcceptedEvents = () => {
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleCancel(event.requestId); }}
                                 style={{
-                                  padding: '0.5rem 0.75rem',
-                                  minWidth: 160,
-                                  borderRadius: '0.375rem',
+                                  padding: '0.75rem 1rem',
+                                  borderRadius: '0.5rem',
                                   backgroundColor: '#ef4444',
-                                  color: '#fff',
+                                  color: '#FFFFFF',
                                   border: 'none',
                                   cursor: 'pointer',
-                                  fontSize: '0.9rem',
-                                  fontWeight: 700
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  transition: 'all 0.2s',
+                                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
                                 }}
-                                onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
-                                onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
+                                onMouseEnter={(e) => {
+                                  e.target.style.backgroundColor = '#dc2626';
+                                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.backgroundColor = '#ef4444';
+                                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                                }}
                               >
                                 Cancel Request
                               </button>
@@ -1032,156 +1013,7 @@ const VendorAcceptedEvents = () => {
         )
       }
 
-      {/* Payment Modal */}
-      {
-        showPaymentModal && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000
-            }}
-            onClick={handleClosePaymentModal}
-          >
-            <div
-              style={{
-                backgroundColor: '#fff',
-                borderRadius: '0.75rem',
-                padding: '2rem',
-                maxWidth: '500px',
-                width: '90%',
-                position: 'relative',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Close Button */}
-              <button
-                onClick={handleClosePaymentModal}
-                style={{
-                  position: 'absolute',
-                  top: '1rem',
-                  right: '1rem',
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: '#6b7280',
-                  width: '2rem',
-                  height: '2rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '0.375rem'
-                }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-              >
-                ✕
-              </button>
-
-              <h2 style={{
-                color: '#1D3557',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                marginTop: 0,
-                marginBottom: '0.5rem'
-              }}>
-                Payment Details
-              </h2>
-
-              {selectedEvent && (
-                <p style={{
-                  color: '#6b7280',
-                  fontSize: '0.875rem',
-                  marginTop: 0,
-                  marginBottom: '1.5rem'
-                }}>
-                  Event: <strong>{selectedEvent.name}</strong>
-                </p>
-              )}
-
-              <form onSubmit={handlePaymentSubmit}>
-                {selectedEvent && (
-                  <div style={{
-                    backgroundColor: '#f3f4f6',
-                    padding: '1rem',
-                    borderRadius: '0.5rem',
-                    marginBottom: '1.5rem'
-                  }}>
-                    <div style={{ marginBottom: '0.75rem' }}>
-                      <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Amount to Pay:</span>
-                      <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#1D3557' }}>
-                        {selectedEvent.participationFee} EGP
-                      </div>
-                    </div>
-                    {selectedEvent.paymentDeadline && (
-                      <div>
-                        <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Payment Deadline:</span>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#dc2626' }}>
-                          {new Date(selectedEvent.paymentDeadline).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div style={{
-                  backgroundColor: '#fef3c7',
-                  border: '1px solid #fcd34d',
-                  borderRadius: '0.5rem',
-                  padding: '0.75rem',
-                  marginBottom: '1.5rem',
-                  fontSize: '0.875rem',
-                  color: '#92400e'
-                }}>
-                  ✓ Secure payment via Stripe. You will be redirected to complete your payment.
-                </div>
-
-
-
-                <button
-                  type="submit"
-                  disabled={paymentLoading}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    backgroundColor: paymentLoading ? '#9ca3af' : '#1e40af',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '1rem',
-                    fontWeight: '600',
-                    cursor: paymentLoading ? 'not-allowed' : 'pointer',
-                    marginTop: '0.5rem'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!paymentLoading) e.target.style.backgroundColor = '#1e3a8a';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!paymentLoading) e.target.style.backgroundColor = '#1e40af';
-                  }}
-                >
-                  {paymentLoading ? 'Processing...' : 'Pay Now'}
-                </button>
-              </form>
-            </div>
-          </div>
-        )
-      }
+      {/* Vendor payments now use the full-page flow at /vendor-requests/:requestId/payment */}
     </div >
   );
 };
