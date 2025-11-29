@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import axios from 'axios';
 import { notificationApiService } from '../api/notificationApi';
 import { vendorRequestApi } from '../api/vendorRequestApi';
 
@@ -130,34 +131,65 @@ const VendorNotificationBell = ({
       setError('');
       setLoading(true);
 
-      const [generalRes, vendorRes, vendorRequestsRes] = await Promise.all([
-        notificationApiService.getUserNotifications({ limit: 50 }),
-        notificationApiService.getNotificationsByType('vendor_request', { limit: 50 }),
-        vendorRequestApi.getPendingNotifications(25)
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('❌ No token found in localStorage');
+        setError('Authentication required');
+        setLoading(false);
+        return;
+      }
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const [notificationsRes, vendorNotificationsRes, pendingVendorRes] = await Promise.all([
+        axios.get('http://localhost:5000/api/notifications?limit=50', { headers }).catch(err => {
+          console.error('Error fetching notifications:', err);
+          return { data: { success: false, data: { notifications: [] } } };
+        }),
+        axios.get('http://localhost:5000/api/notifications/by-type/vendor_request?limit=50', { headers }).catch(err => {
+          console.error('Error fetching vendor notifications:', err);
+          return { data: { success: false, data: { notifications: [] } } };
+        }),
+        axios.get('http://localhost:5000/api/vendor-requests/pending/notifications?limit=25', { headers }).catch(err => {
+          console.error('Error fetching pending vendor notifications:', err);
+          return { data: { success: false, notifications: [] } };
+        })
       ]);
 
-      // Handle different response structures
+      // Handle notifications response
       let generalNotifications = [];
-      if (generalRes.success) {
-        if (Array.isArray(generalRes.data)) {
-          generalNotifications = generalRes.data;
-        } else if (generalRes.data?.data?.notifications) {
-          generalNotifications = generalRes.data.data.notifications;
-        } else if (generalRes.data?.notifications) {
-          generalNotifications = generalRes.data.notifications;
+      if (notificationsRes.data?.success) {
+        if (notificationsRes.data.data?.notifications) {
+          generalNotifications = notificationsRes.data.data.notifications;
+        } else if (Array.isArray(notificationsRes.data.data)) {
+          generalNotifications = notificationsRes.data.data;
+        } else if (Array.isArray(notificationsRes.data.notifications)) {
+          generalNotifications = notificationsRes.data.notifications;
         }
+      } else if (Array.isArray(notificationsRes.data)) {
+        generalNotifications = notificationsRes.data;
       }
 
+      // Handle vendor notifications response
       let vendorNotifications = [];
-      if (vendorRes.success) {
-        if (Array.isArray(vendorRes.data)) {
-          vendorNotifications = vendorRes.data;
-        } else if (vendorRes.data?.data?.notifications) {
-          vendorNotifications = vendorRes.data.data.notifications;
-        } else if (vendorRes.data?.notifications) {
-          vendorNotifications = vendorRes.data.notifications;
+      if (vendorNotificationsRes.data?.success) {
+        if (vendorNotificationsRes.data.data?.notifications) {
+          vendorNotifications = vendorNotificationsRes.data.data.notifications;
+        } else if (Array.isArray(vendorNotificationsRes.data.data)) {
+          vendorNotifications = vendorNotificationsRes.data.data;
+        } else if (Array.isArray(vendorNotificationsRes.data.notifications)) {
+          vendorNotifications = vendorNotificationsRes.data.notifications;
         }
+      } else if (Array.isArray(vendorNotificationsRes.data)) {
+        vendorNotifications = vendorNotificationsRes.data;
       }
+
+      console.log('📬 Raw API Responses:', {
+        generalRes: notificationsRes.data,
+        vendorRes: vendorNotificationsRes.data,
+        pendingRes: pendingVendorRes.data,
+        generalCount: generalNotifications.length,
+        vendorCount: vendorNotifications.length
+      });
 
       // Create a set of read notification request IDs to filter out pending vendor requests that are already read
       const readVendorRequestIds = new Set();
@@ -171,8 +203,8 @@ const VendorNotificationBell = ({
       const allReadVendorRequestIds = new Set([...readVendorRequestIds, ...markedAsReadVendorRequestsRef.current]);
 
       const vendorRequestItems =
-        vendorRequestsRes.success && Array.isArray(vendorRequestsRes.notifications)
-          ? vendorRequestsRes.notifications
+        pendingVendorRes.data?.success && Array.isArray(pendingVendorRes.data.notifications)
+          ? pendingVendorRes.data.notifications
               .filter((req) => {
                 // Only include if there's no corresponding read notification and hasn't been marked as read locally
                 const requestId = String(req.id || req._id);
@@ -224,14 +256,21 @@ const VendorNotificationBell = ({
         general: generalNotifications.length,
         vendor: vendorNotifications.length,
         pending: vendorRequestItems.length,
-        total: merged.length
+        total: merged.length,
+        generalNotifications: generalNotifications,
+        vendorNotifications: vendorNotifications,
+        vendorRequestItems: vendorRequestItems,
+        merged: merged,
+        notificationsRes: notificationsRes.data,
+        vendorNotificationsRes: vendorNotificationsRes.data,
+        pendingVendorRes: pendingVendorRes.data
       });
 
       setNotifications(merged);
       setUnreadCount(merged.filter((notif) => !notif.isRead).length);
 
-      if (!generalRes.success && !vendorRes.success) {
-        setError(generalRes.message || vendorRes.message || 'Failed to load notifications');
+      if (!notificationsRes.data?.success && !vendorNotificationsRes.data?.success) {
+        setError('Failed to load notifications');
       }
     } catch (err) {
       console.error('Failed to load notifications:', err);

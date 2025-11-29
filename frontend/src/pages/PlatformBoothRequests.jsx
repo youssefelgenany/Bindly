@@ -32,6 +32,7 @@ const PlatformBoothRequests = () => {
   const [pollResults, setPollResults] = useState(null);
   const [loadingResults, setLoadingResults] = useState(false);
   const [sendingQRCodes, setSendingQRCodes] = useState({});
+  const [closePollConfirm, setClosePollConfirm] = useState({ show: false, pollId: null });
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -381,10 +382,14 @@ const PlatformBoothRequests = () => {
     loadPollResults(poll._id);
   };
 
-  const handleClosePoll = async (pollId) => {
-    if (!window.confirm('Are you sure you want to close this poll? This action cannot be undone.')) {
-      return;
-    }
+  const handleClosePollClick = (pollId) => {
+    setClosePollConfirm({ show: true, pollId });
+  };
+
+  const handleClosePoll = async () => {
+    const pollId = closePollConfirm.pollId;
+    if (!pollId) return;
+
     try {
       const result = await vendorRequestApi.closePoll(pollId);
       if (result.success) {
@@ -400,6 +405,8 @@ const PlatformBoothRequests = () => {
     } catch (err) {
       console.error('Error closing poll:', err);
       showToast('Failed to close poll', 'error');
+    } finally {
+      setClosePollConfirm({ show: false, pollId: null });
     }
   };
 
@@ -1519,7 +1526,7 @@ const PlatformBoothRequests = () => {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Poll Title *
+                  Poll Title <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -1554,7 +1561,7 @@ const PlatformBoothRequests = () => {
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Poll Description *
+                  Poll Description <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <textarea
                   value={pollDescription}
@@ -2076,7 +2083,9 @@ const PlatformBoothRequests = () => {
                                     <div style={{ flex: 1 }}>
                                       {isWinner && (
                                         <span style={{
-                                          display: 'inline-block',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.375rem',
                                           padding: '0.25rem 0.75rem',
                                           borderRadius: '9999px',
                                           backgroundColor: '#10b981',
@@ -2085,7 +2094,10 @@ const PlatformBoothRequests = () => {
                                           fontWeight: '600',
                                           marginBottom: '0.5rem'
                                         }}>
-                                          🏆 Winner
+                                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                            emoji_events
+                                          </span>
+                                          Winner
                                         </span>
                                       )}
                                       <div style={{
@@ -2257,7 +2269,7 @@ const PlatformBoothRequests = () => {
                               </button>
                               {poll.status === 'active' && (
                                 <button
-                                  onClick={() => handleClosePoll(poll._id)}
+                                  onClick={() => handleClosePollClick(poll._id)}
                                   style={{
                                     padding: '0.5rem 1rem',
                                     borderRadius: '0.5rem',
@@ -2294,6 +2306,108 @@ const PlatformBoothRequests = () => {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Close Poll Confirmation Modal */}
+      {closePollConfirm.show && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10001,
+          padding: '2rem'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setClosePollConfirm({ show: false, pollId: null });
+          }
+        }}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            width: '100%',
+            maxWidth: '400px',
+            padding: '2rem'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <h4 style={{
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              color: '#111827',
+              margin: 0,
+              marginBottom: '1rem'
+            }}>
+              Close Poll
+            </h4>
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              margin: 0,
+              marginBottom: '1.5rem',
+              lineHeight: '1.5'
+            }}>
+              Are you sure you want to close this poll? This action cannot be undone.
+            </p>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.75rem'
+            }}>
+              <button
+                onClick={() => setClosePollConfirm({ show: false, pollId: null })}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f9fafb';
+                  e.target.style.borderColor = '#d1d5db';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#FFFFFF';
+                  e.target.style.borderColor = '#e5e7eb';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClosePoll}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#dc2626';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#ef4444';
+                }}
+              >
+                Close Poll
+              </button>
             </div>
           </div>
         </div>
