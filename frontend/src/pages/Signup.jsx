@@ -988,57 +988,59 @@ const Signup = () => {
                   </label>
                 </div>
 
-                {/* Vendor file uploads: logo and tax card (styled like other inputs, last entry) */}
+                {/* Vendor file uploads: logo and tax card (styled like student/events office, last entry) */}
                 {formData.userType === 'Vendor' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', marginBottom: '0.5rem' }}>
                     <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                       <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#1A202C', paddingBottom: '0.5rem' }}>Company Logo (PNG/JPEG/WebP)</p>
-                      <input
-                        type="file"
-                        name="vendorLogo"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        disabled={loading}
-                        style={{
-                          display: 'flex',
-                          width: '100%',
-                          borderRadius: '0.375rem',
-                          border: '1px solid #D1D5DB',
-                          backgroundColor: '#FFFFFF',
-                          padding: '0.75rem 1rem',
-                          fontSize: '1rem',
-                          color: '#1A202C'
-                        }}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          type="file"
+                          name="vendorLogo"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          disabled={loading}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            backgroundColor: '#f3f4f6'
+                          }}
+                        />
+                        <span style={{ color: '#6b7280', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>(select file)</span>
+                      </div>
                       {formData.vendorLogo && (
-                        <div style={{ fontSize: '0.875rem', color: '#374151', marginTop: '0.25rem' }}>
-                          Selected: {formData.vendorLogo.name}
+                        <div style={{ marginTop: '0.25rem', color: '#374151', fontSize: '0.75rem' }}>
+                          {formData.vendorLogo.name}
                         </div>
                       )}
                     </label>
 
                     <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                       <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#1A202C', paddingBottom: '0.5rem' }}>Tax Card (PDF or Image)</p>
-                      <input
-                        type="file"
-                        name="vendorTaxCard"
-                        accept="image/*,application/pdf"
-                        onChange={handleFileChange}
-                        disabled={loading}
-                        style={{
-                          display: 'flex',
-                          width: '100%',
-                          borderRadius: '0.375rem',
-                          border: '1px solid #D1D5DB',
-                          backgroundColor: '#FFFFFF',
-                          padding: '0.75rem 1rem',
-                          fontSize: '1rem',
-                          color: '#1A202C'
-                        }}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          type="file"
+                          name="vendorTaxCard"
+                          accept="image/*,application/pdf"
+                          onChange={handleFileChange}
+                          disabled={loading}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '0.5rem',
+                            fontSize: '0.875rem',
+                            backgroundColor: '#f3f4f6'
+                          }}
+                        />
+                        <span style={{ color: '#6b7280', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>(select file)</span>
+                      </div>
                       {formData.vendorTaxCard && (
-                        <div style={{ fontSize: '0.875rem', color: '#374151', marginTop: '0.25rem' }}>
-                          Selected: {formData.vendorTaxCard.name}
+                        <div style={{ marginTop: '0.25rem', color: '#374151', fontSize: '0.75rem' }}>
+                          {formData.vendorTaxCard.name}
                         </div>
                       )}
                     </label>

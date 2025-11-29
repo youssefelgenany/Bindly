@@ -34,8 +34,9 @@ const EventsOfficeDashboard = () => {
       const headers = { Authorization: `Bearer ${token}` };
 
       // Fetch all data in parallel
+      // Use minimal=true for events to skip vendor details and speed up dashboard loading
       const [eventsRes, vendorRequestsRes, notificationsRes, unreadCountRes, vendorNotificationsRes, pendingVendorRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/events', { headers }).catch(err => {
+        axios.get('http://localhost:5000/api/events?minimal=true', { headers }).catch(err => {
           console.error('Error fetching events:', err);
           return { data: [] };
         }),

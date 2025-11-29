@@ -1031,6 +1031,50 @@ const StaffLoyaltyVendorsView = () => {
                       {(() => {
                         const logoSrc = getVendorLogoSrc(vendor);
                         const baseCircleStyle = {
+                    {/* Booth Photo */}
+                    <div style={{
+                      width: '100%',
+                      height: '180px',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      backgroundColor: '#f3f4f6',
+                      flexShrink: 0
+                    }}>
+                      <img
+                        src="/assets/images/booth-background.jpg"
+                        alt={vendor.vendorName || 'Vendor'}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          objectPosition: 'center'
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.parentElement.style.backgroundColor = '#3F51B5';
+                          e.target.parentElement.style.display = 'flex';
+                          e.target.parentElement.style.alignItems = 'center';
+                          e.target.parentElement.style.justifyContent = 'center';
+                          if (!e.target.parentElement.querySelector('.fallback-text')) {
+                            const fallback = document.createElement('div');
+                            fallback.className = 'fallback-text';
+                            fallback.textContent = (vendor.vendorName || 'VENDOR').toUpperCase();
+                            fallback.style.color = '#FFFFFF';
+                            fallback.style.fontSize = '1.25rem';
+                            fallback.style.fontWeight = '700';
+                            e.target.parentElement.appendChild(fallback);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    {/* Vendor Logo/Icon */}
+                    {vendor.logoUrl ? (
+                      <img
+                        src={vendor.logoUrl}
+                        alt={vendor.vendorName}
+                        style={{
                           width: '4rem',
                           height: '4rem',
                           borderRadius: '9999px',
@@ -1182,6 +1226,7 @@ const StaffLoyaltyVendorsView = () => {
                       <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
                         arrow_forward
                       </span>
+                    </div>
                     </div>
                   </div>
                 ))}
