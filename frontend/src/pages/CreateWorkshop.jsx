@@ -692,7 +692,7 @@ const CreateWorkshop = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Workshop Name <span style={{ color: '#dc2626' }}>*</span>
+                    Workshop Name <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="text"
@@ -723,7 +723,7 @@ const CreateWorkshop = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Location <span style={{ color: '#dc2626' }}>*</span>
+                    Location <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <select
                     name="location"
@@ -758,7 +758,7 @@ const CreateWorkshop = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Start Date & Time <span style={{ color: '#dc2626' }}>*</span>
+                    Start Date & Time <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="datetime-local"
@@ -789,7 +789,7 @@ const CreateWorkshop = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    End Date & Time <span style={{ color: '#dc2626' }}>*</span>
+                    End Date & Time <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="datetime-local"
@@ -820,7 +820,7 @@ const CreateWorkshop = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Registration Deadline <span style={{ color: '#dc2626' }}>*</span>
+                    Registration Deadline <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="datetime-local"
@@ -851,7 +851,7 @@ const CreateWorkshop = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Short Description <span style={{ color: '#dc2626' }}>*</span> (max 200 characters)
+                    Short Description <span style={{ color: '#ef4444' }}>*</span> (max 200 characters)
                   </label>
                   <textarea
                     name="shortDescription"
@@ -893,7 +893,7 @@ const CreateWorkshop = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Full Agenda <span style={{ color: '#dc2626' }}>*</span>
+                    Full Agenda <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <textarea
                     name="fullAgenda"
@@ -926,7 +926,7 @@ const CreateWorkshop = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Faculty Responsible <span style={{ color: '#dc2626' }}>*</span>
+                    Faculty Responsible <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <select
                     name="facultyResponsible"
@@ -968,7 +968,7 @@ const CreateWorkshop = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Professor(s) Participating <span style={{ color: '#dc2626' }}>*</span>
+                    Professor(s) Participating <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="text"
@@ -1009,7 +1009,7 @@ const CreateWorkshop = () => {
                       color: '#374151',
                       marginBottom: '0.5rem'
                     }}>
-                      Required Budget <span style={{ color: '#dc2626' }}>*</span>
+                      Required Budget <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <input
                       type="number"
@@ -1040,7 +1040,7 @@ const CreateWorkshop = () => {
                       color: '#374151',
                       marginBottom: '0.5rem'
                     }}>
-                      Funding Source <span style={{ color: '#dc2626' }}>*</span>
+                      Funding Source <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <select
                       name="fundingSource"
@@ -1108,7 +1108,7 @@ const CreateWorkshop = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Capacity <span style={{ color: '#dc2626' }}>*</span>
+                    Capacity <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="number"
