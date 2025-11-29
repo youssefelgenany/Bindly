@@ -725,36 +725,32 @@ const StudentLoyaltyVendorsView = () => {
               setShowNotificationsDropdown(false);
             }}
           >
-            {(() => {
-              const avatarPath = user?.profilePicturePath || user?.vendorLogoPath;
-              const avatarSrc = avatarPath ? (avatarPath.startsWith('http') ? avatarPath : `http://localhost:5000${avatarPath}`) : null;
-              return avatarSrc ? (
-                <img
-                  src={avatarSrc}
-                  alt="User profile"
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: '50%',
-                    objectFit: 'cover'
-                  }}
-                />
-              ) : (
-                <div style={{
+            {user?.profilePicturePath ? (
+              <img
+                src={`http://localhost:5000${user.profilePicturePath}`}
+                alt="User profile"
+                style={{
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: '50%',
-                  backgroundColor: '#FFFFFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#1D3557',
-                  fontWeight: '600'
-                }}>
-                  {(user?.firstName?.[0] || user?.name?.[0] || 'S').toUpperCase()}
-                </div>
-              );
-            })()}
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                borderRadius: '50%',
+                backgroundColor: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#1D3557',
+                fontWeight: '600'
+              }}>
+                {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
+              </div>
+            )}
             {showLogoutDropdown && (
               <div style={{
                 position: 'absolute',
@@ -1028,15 +1024,12 @@ const StudentLoyaltyVendorsView = () => {
                     style={{
                       background: 'linear-gradient(135deg, #fbf7ef 0%, #ffffff 80%)',
                       borderRadius: '1.1rem',
-                      padding: 0,
+                      padding: '1.75rem',
                       boxShadow: '0 15px 25px -12px rgba(15, 23, 42, 0.25)',
                       cursor: 'pointer',
                       transition: 'all 0.25s ease',
                       border: '1px solid rgba(214, 188, 138, 0.4)',
-                      animation: 'fadeInUp 0.5s ease',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      overflow: 'hidden'
+                      animation: 'fadeInUp 0.5s ease'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.boxShadow = '0 25px 35px -15px rgba(15, 23, 42, 0.3)';
@@ -1047,44 +1040,6 @@ const StudentLoyaltyVendorsView = () => {
                       e.currentTarget.style.transform = 'translateY(0) scale(1)';
                     }}
                   >
-                    {/* Booth Photo */}
-                    <div style={{
-                      width: '100%',
-                      height: '180px',
-                      overflow: 'hidden',
-                      position: 'relative',
-                      backgroundColor: '#f3f4f6',
-                      flexShrink: 0
-                    }}>
-                      <img
-                        src="/assets/images/booth-background.jpg"
-                        alt={vendor.vendorName || 'Vendor'}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          objectPosition: 'center'
-                        }}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.parentElement.style.backgroundColor = '#3F51B5';
-                          e.target.parentElement.style.display = 'flex';
-                          e.target.parentElement.style.alignItems = 'center';
-                          e.target.parentElement.style.justifyContent = 'center';
-                          if (!e.target.parentElement.querySelector('.fallback-text')) {
-                            const fallback = document.createElement('div');
-                            fallback.className = 'fallback-text';
-                            fallback.textContent = (vendor.vendorName || 'VENDOR').toUpperCase();
-                            fallback.style.color = '#FFFFFF';
-                            fallback.style.fontSize = '1.25rem';
-                            fallback.style.fontWeight = '700';
-                            e.target.parentElement.appendChild(fallback);
-                          }
-                        }}
-                      />
-                    </div>
-
-                    <div style={{ padding: '1.75rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                     {/* Vendor Header */}
                     <div style={{
                       display: 'flex',
@@ -1246,7 +1201,6 @@ const StudentLoyaltyVendorsView = () => {
                       <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
                         arrow_forward
                       </span>
-                    </div>
                     </div>
                   </div>
                 ))}

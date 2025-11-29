@@ -119,15 +119,7 @@ const Signup = () => {
     }
   };
 
-  const handleFileChange = (e) => {
-    const { name, files } = e.target;
-    if (files && files[0]) {
-      setFormData(prev => ({
-        ...prev,
-        [name]: files[0]
-      }));
-    }
-  };
+  // Removed vendor file inputs: logo and tax card are no longer collected at signup
 
   const validateForm = () => {
     const newErrors = {};
@@ -242,15 +234,7 @@ const Signup = () => {
         submitData.append('companyName', formData.companyName);
       }
 
-      // If vendor, include uploaded files (logo and tax card) when present
-      if (actualUserType === 'Vendor') {
-        if (formData.vendorLogo) {
-          submitData.append('vendorLogo', formData.vendorLogo);
-        }
-        if (formData.vendorTaxCard) {
-          submitData.append('vendorTaxCard', formData.vendorTaxCard);
-        }
-      }
+      // Note: vendor logo and tax card are collected later in the vendor dashboard flow
 
       const result = await signup(submitData);
       
@@ -998,64 +982,7 @@ const Signup = () => {
                   </label>
                 </div>
 
-                {/* Vendor file uploads: logo and tax card (styled like student/events office, last entry) */}
-                {formData.userType === 'Vendor' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', marginBottom: '0.5rem' }}>
-                    <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                      <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#1A202C', paddingBottom: '0.5rem' }}>Company Logo (PNG/JPEG/WebP)</p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <input
-                          type="file"
-                          name="vendorLogo"
-                          accept="image/*"
-                          onChange={handleFileChange}
-                          disabled={loading}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '0.5rem',
-                            fontSize: '0.875rem',
-                            backgroundColor: '#f3f4f6'
-                          }}
-                        />
-                        <span style={{ color: '#6b7280', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>(select file)</span>
-                      </div>
-                      {formData.vendorLogo && (
-                        <div style={{ marginTop: '0.25rem', color: '#374151', fontSize: '0.75rem' }}>
-                          {formData.vendorLogo.name}
-                        </div>
-                      )}
-                    </label>
-
-                    <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                      <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#1A202C', paddingBottom: '0.5rem' }}>Tax Card (PDF or Image)</p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <input
-                          type="file"
-                          name="vendorTaxCard"
-                          accept="image/*,application/pdf"
-                          onChange={handleFileChange}
-                          disabled={loading}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '0.5rem',
-                            fontSize: '0.875rem',
-                            backgroundColor: '#f3f4f6'
-                          }}
-                        />
-                        <span style={{ color: '#6b7280', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>(select file)</span>
-                      </div>
-                      {formData.vendorTaxCard && (
-                        <div style={{ marginTop: '0.25rem', color: '#374151', fontSize: '0.75rem' }}>
-                          {formData.vendorTaxCard.name}
-                        </div>
-                      )}
-                    </label>
-                  </div>
-                )}
+                {/* Company logo and tax card removed from signup per request */}
 
                 {/* Sign Up Button */}
                 <button

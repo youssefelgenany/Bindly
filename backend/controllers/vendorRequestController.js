@@ -517,6 +517,15 @@ const updateVendorRequestStatus = async (req, res) => {
       return res.status(404).json({ message: "Vendor request not found" });
     }
 
+    console.log(`🔍 updateVendorRequestStatus - Request details:`, {
+      id: request._id,
+      eventType: request.eventType,
+      status: request.status,
+      newStatus: status,
+      hasBooth: !!request.booth,
+      boothId: request.booth
+    });
+
     // Update the request status
     request.status = status;
 
@@ -550,16 +559,30 @@ const updateVendorRequestStatus = async (req, res) => {
 
     await request.save();
 
+    // Reload the request to ensure we have the latest data, especially eventType
+    const reloadedRequest = await VendorRequest.findById(id).populate('vendor', 'companyName firstName lastName email');
+    if (!reloadedRequest) {
+      return res.status(404).json({ message: "Vendor request not found after save" });
+    }
+
+    console.log(`🔍 updateVendorRequestStatus - Reloaded request details:`, {
+      id: reloadedRequest._id,
+      eventType: reloadedRequest.eventType,
+      status: reloadedRequest.status,
+      hasBooth: !!reloadedRequest.booth,
+      boothId: reloadedRequest.booth
+    });
+
     // Send email notification to vendor (don't wait for it to complete)
-    if (request.vendor && request.vendor.email) {
-      sendVendorRequestStatusEmail(request.vendor, request, status)
+    if (reloadedRequest.vendor && reloadedRequest.vendor.email) {
+      sendVendorRequestStatusEmail(reloadedRequest.vendor, reloadedRequest, status)
         .then(result => {
           if (result.sent) {
-            console.log(`✅ Email notification sent to vendor: ${request.vendor.email}`);
+            console.log(`✅ Email notification sent to vendor: ${reloadedRequest.vendor.email}`);
           } else if (result.stored) {
-            console.log(`✅ Email notification stored in database for vendor: ${request.vendor.email}`);
+            console.log(`✅ Email notification stored in database for vendor: ${reloadedRequest.vendor.email}`);
           } else {
-            console.log(`⚠️ Email notification could not be sent/stored for vendor: ${request.vendor.email}`);
+            console.log(`⚠️ Email notification could not be sent/stored for vendor: ${reloadedRequest.vendor.email}`);
           }
         })
         .catch(error => {
@@ -571,41 +594,81 @@ const updateVendorRequestStatus = async (req, res) => {
     }
 
     // If accepting a platform booth request, create an event
-    if (status === 'accepted' && request.eventType === 'platformBooth') {
+    // Check eventType with case-insensitive comparison to handle any variations
+    const isPlatformBooth = reloadedRequest.eventType && 
+      (reloadedRequest.eventType.toLowerCase() === 'platformbooth' || 
+       reloadedRequest.eventType === 'platformBooth');
+    
+    if (status === 'accepted' && isPlatformBooth) {
+      console.log('🔍 Platform booth request accepted, checking if event needs to be created...');
+      
       // Check if an event was already created for this request
-      if (request.booth) {
-        console.log('⚠️ Event already exists for this platform booth request:', request.booth);
-      } else {
+      let existingEvent = null;
+      if (reloadedRequest.booth) {
         try {
+          existingEvent = await Event.findById(reloadedRequest.booth);
+          if (existingEvent) {
+            console.log('⚠️ Event already exists for this platform booth request:', reloadedRequest.booth);
+            console.log('⚠️ Existing event details:', {
+              id: existingEvent._id,
+              title: existingEvent.title,
+              type: existingEvent.type,
+              status: existingEvent.status
+            });
+          } else {
+            console.log('⚠️ Booth reference exists but event not found, will create new event');
+            reloadedRequest.booth = null; // Clear invalid reference
+            await reloadedRequest.save();
+          }
+        } catch (checkError) {
+          console.error('❌ Error checking existing event:', checkError);
+          reloadedRequest.booth = null; // Clear invalid reference
+          await reloadedRequest.save();
+        }
+      }
+      
+      // Create event if it doesn't exist
+      if (!existingEvent) {
+        try {
+          console.log('📅 Creating new event for platform booth request...');
+          
           // Calculate dates
-          const startDate = request.startDate || new Date();
-          const durationWeeks = request.durationWeeks || 1;
+          const startDate = reloadedRequest.startDate || new Date();
+          const durationWeeks = reloadedRequest.durationWeeks || 1;
           const endDate = new Date(startDate);
           endDate.setDate(endDate.getDate() + (durationWeeks * 7));
 
           // Format location name
-          const locationName = request.boothLocation
-            ? request.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+          const locationName = reloadedRequest.boothLocation
+            ? reloadedRequest.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
             : 'Platform';
 
           // Create event title
-          const vendorName = request.vendor?.companyName ||
-            `${request.vendor?.firstName || ''} ${request.vendor?.lastName || ''}`.trim() ||
+          const vendorName = reloadedRequest.vendor?.companyName ||
+            `${reloadedRequest.vendor?.firstName || ''} ${reloadedRequest.vendor?.lastName || ''}`.trim() ||
             'Vendor';
           const eventTitle = `Platform Booth - ${vendorName} - ${locationName}`;
+
+          console.log('📅 Event details:', {
+            title: eventTitle,
+            startDate: startDate,
+            endDate: endDate,
+            location: locationName,
+            durationWeeks: durationWeeks
+          });
 
           // Create the event
           const newEvent = new Event({
             title: eventTitle,
-            description: request.message || `Platform booth reservation by ${vendorName} at ${locationName}`,
-            type: 'booth',  // Use 'booth' instead of 'standaloneBooth' as Event model enum doesn't include 'standaloneBooth'
+            description: reloadedRequest.message || `Platform booth reservation by ${vendorName} at ${locationName}`,
+            type: 'platformBooth',  // Use 'platformBooth' to distinguish from regular booths
             startDate: startDate,
             endDate: endDate,
             location: locationName,
-            boothSize: request.boothSize || '2x2',
-            boothNumber: request.boothId ? (parseInt(request.boothId) || 1) : 1, // Use boothId if available, otherwise default to 1
+            boothSize: reloadedRequest.boothSize || '2x2',
+            boothNumber: reloadedRequest.boothId ? (parseInt(reloadedRequest.boothId) || 1) : 1, // Use boothId if available, otherwise default to 1
             boothStatus: 'taken', // Mark as taken since it's being reserved
-            currentOwner: request.vendor._id, // Set the vendor as the current owner
+            currentOwner: reloadedRequest.vendor._id, // Set the vendor as the current owner
             occupancyEndDate: endDate, // Set the occupancy end date
             status: 'approved',
             createdBy: req.user._id || req.user.id,
@@ -614,12 +677,27 @@ const updateVendorRequestStatus = async (req, res) => {
           });
 
           await newEvent.save();
-          console.log('✅ Created event for platform booth request:', newEvent._id);
+          console.log('✅ Created event for platform booth request:', {
+            eventId: newEvent._id,
+            title: newEvent.title,
+            type: newEvent.type,
+            status: newEvent.status
+          });
 
           // Link the event to the vendor request
-          request.booth = newEvent._id;
-          await request.save();
+          reloadedRequest.booth = newEvent._id;
+          await reloadedRequest.save();
           console.log('✅ Linked event to vendor request');
+
+          // Notify all users about the new event
+          try {
+            const { notifyNewEventCreated } = require('../services/notificationService');
+            await notifyNewEventCreated(newEvent);
+            console.log('✅ Notified all users about new platform booth event');
+          } catch (notifError) {
+            console.error('❌ Error notifying users about new event:', notifError);
+            // Don't fail the request if notification fails
+          }
         } catch (eventError) {
           console.error('❌ Error creating event for platform booth:', eventError);
           console.error('❌ Error details:', eventError.message);
@@ -627,12 +705,24 @@ const updateVendorRequestStatus = async (req, res) => {
           // Re-throw the error so the main catch block can handle it
           throw new Error(`Failed to create event for platform booth: ${eventError.message}`);
         }
+      } else {
+        console.log('⏭️ Skipping event creation - event already exists');
       }
+    } else {
+      console.log('⏭️ Not a platform booth request or not accepting:', {
+        eventType: reloadedRequest.eventType,
+        status: status,
+        isPlatformBooth: isPlatformBooth,
+        isAccepted: status === 'accepted'
+      });
     }
 
+    // Reload one more time to get the final state with the event linked
+    const finalRequest = await VendorRequest.findById(id).populate('vendor', 'companyName firstName lastName email');
+    
     res.status(200).json({
       message: `Vendor request ${status} successfully.`,
-      updatedRequest: request,
+      updatedRequest: finalRequest || reloadedRequest,
     });
   } catch (error) {
     console.error('❌ Error updating vendor request status:', error);
@@ -1984,6 +2074,13 @@ const handleStripePaymentSuccess = async (req, res) => {
 
     console.log('✅ Payment processing complete. Redirecting...');
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+
+    // If this was a vendor-request payment, redirect vendors straight to their dashboard
+    if (type === 'vendor-request' || (payment && payment.vendorRequest)) {
+      return res.redirect(`${clientUrl}/dashboard`);
+    }
+
+    // Default: redirect to generic payment success page
     res.redirect(`${clientUrl}/payment-success?session_id=${session_id}`);
 
   } catch (error) {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import PlatformBoothMapSelector from './PlatformBoothMapSelector';
+import FileChooser from './FileChooser';
 
 const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -464,24 +465,15 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
                     />
                   </div>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <input
-                        type="file"
-                        accept="image/*,application/pdf"
-                        onChange={(e) => handleFileChange(e, idx)}
-                        style={{
-                          width: '100%',
-                          padding: '0.5rem',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          backgroundColor: '#f3f4f6'
-                        }}
-                        required
-                        aria-label={`Attendee ${idx + 1} ID file`}
-                      />
-                      <span style={{ color: '#6b7280', fontSize: '0.8125rem' }}>(select ID file)</span>
-                    </div>
+                    <FileChooser
+                      id={`platform_attendee_${idx}`}
+                      accept="image/*,application/pdf"
+                      onChange={(e) => handleFileChange(e, idx)}
+                      disabled={loading}
+                      buttonLabel="Choose File"
+                      showName={true}
+                      ariaLabel={`Attendee ${idx + 1} ID file`}
+                    />
                     {formData.attendeeFiles && formData.attendeeFiles[idx] && (
                       <div style={{ marginTop: '0.25rem', color: '#374151', fontSize: '0.75rem' }}>
                         {formData.attendeeFiles[idx].name}

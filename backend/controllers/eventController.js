@@ -286,7 +286,7 @@ exports.getAllEvents = async (req, res) => {
     const isMinimal = minimal === 'true' || minimal === true; // Skip vendor details for dashboard
 
     // Base match (type/status) - only allow valid event types
-    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth', 'platformBooth'];
     const baseMatch = {
       type: { $in: validTypes }, // Only include valid event types
       $and: [

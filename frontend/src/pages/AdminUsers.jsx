@@ -170,6 +170,9 @@ const AdminUsers = () => {
     if (!formData.lastName.trim()) errors.lastName = 'Last name is required';
     if (!formData.email.trim()) errors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Email is invalid';
+    else if (!formData.email.toLowerCase().endsWith('@guc.edu.eg')) {
+      errors.email = 'Email must end with @guc.edu.eg';
+    }
     if (!formData.password.trim()) errors.password = 'Password is required';
     else if (formData.password.length < 6) errors.password = 'Password must be at least 6 characters';
     if (!formData.role) errors.role = 'Role is required';
@@ -2408,7 +2411,21 @@ const AdminUsers = () => {
                   type="email"
                   name="email"
                   value={formData.email}
-                  onChange={handleFormChange}
+                  onChange={(e) => {
+                    handleFormChange(e);
+                    // Real-time validation for @guc.edu.eg domain
+                    if (e.target.value && !e.target.value.toLowerCase().endsWith('@guc.edu.eg')) {
+                      if (!formErrors.email || formErrors.email !== 'Email must end with @guc.edu.eg') {
+                        setFormErrors(prev => ({ ...prev, email: 'Email must end with @guc.edu.eg' }));
+                      }
+                    } else if (formErrors.email === 'Email must end with @guc.edu.eg') {
+                      setFormErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.email;
+                        return newErrors;
+                      });
+                    }
+                  }}
                   style={{
                     width: '100%',
                     padding: '0.75rem 1rem',
@@ -2424,8 +2441,12 @@ const AdminUsers = () => {
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = formErrors.email ? '#ef4444' : '#e5e7eb';
+                    // Validate on blur
+                    if (e.target.value && !e.target.value.toLowerCase().endsWith('@guc.edu.eg')) {
+                      setFormErrors(prev => ({ ...prev, email: 'Email must end with @guc.edu.eg' }));
+                    }
                   }}
-                  placeholder="admin@guc.edu.eg"
+                  placeholder="username@guc.edu.eg"
                   disabled={isCreating}
                 />
                 {formErrors.email && (
