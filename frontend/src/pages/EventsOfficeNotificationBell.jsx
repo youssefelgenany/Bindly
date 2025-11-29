@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const EventsOfficeNotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+  // Use ref instead of state so it's immediately available (not async)
+  const markedAsReadVendorRequestsRef = useRef(new Set());
 
   // Close notification panel when clicking outside
   useEffect(() => {
@@ -26,8 +28,8 @@ const EventsOfficeNotificationBell = () => {
 
   useEffect(() => {
     fetchNotifications();
-    // Poll for notifications every 30 seconds
-    const interval = setInterval(fetchNotifications, 30000);
+    // Poll for notifications every 10 seconds for faster updates
+    const interval = setInterval(fetchNotifications, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -71,26 +73,44 @@ const EventsOfficeNotificationBell = () => {
           vendorNotificationsRes.data.notifications ||
           [];
       }
+      // Create a set of read notification request IDs to filter out pending vendor requests that are already read
+      const readVendorRequestIds = new Set();
+      [...notificationsData, ...vendorNotificationsData].forEach((notif) => {
+        if (notif.isRead && notif.type === 'vendor_request' && notif.metadata?.requestId) {
+          readVendorRequestIds.add(notif.metadata.requestId);
+        }
+      });
+
+      // Also check locally marked-as-read vendor requests (from ref for immediate access)
+      const allReadVendorRequestIds = new Set([...readVendorRequestIds, ...markedAsReadVendorRequestsRef.current]);
+
       const pendingVendorNotifications =
         pendingVendorRes.data?.success && Array.isArray(pendingVendorRes.data.notifications)
-          ? pendingVendorRes.data.notifications.map((req) => ({
-              _id: `vendor_req_${req.id || req._id}`,
-              type: 'vendor_request',
-              title: req.vendor?.companyName || 'Vendor Request',
-              message: `${req.vendor?.companyName || 'Vendor'} submitted a ${
-                req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
-              } request for "${req.event?.name || req.eventName || 'Event'}".`,
-              createdAt: req.submittedAt || req.createdAt || new Date().toISOString(),
-              metadata: {
-                vendorName:
-                  req.vendor?.companyName ||
-                  `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim() ||
-                  'Vendor',
-                eventName: req.event?.name || req.eventName || 'Event',
-                eventType: req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
-              },
-              isRead: false
-            }))
+          ? pendingVendorRes.data.notifications
+              .filter((req) => {
+                // Only include if there's no corresponding read notification and hasn't been marked as read locally
+                const requestId = String(req.id || req._id);
+                return !allReadVendorRequestIds.has(requestId);
+              })
+              .map((req) => ({
+                _id: `vendor_req_${req.id || req._id}`,
+                type: 'vendor_request',
+                title: req.vendor?.companyName || 'Vendor Request',
+                message: `${req.vendor?.companyName || 'Vendor'} submitted a ${
+                  req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
+                } request for "${req.event?.name || req.eventName || 'Event'}".`,
+                createdAt: req.submittedAt || req.createdAt || new Date().toISOString(),
+                metadata: {
+                  requestId: String(req.id || req._id), // Store the actual request ID for filtering
+                  vendorName:
+                    req.vendor?.companyName ||
+                    `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim() ||
+                    'Vendor',
+                  eventName: req.event?.name || req.eventName || 'Event',
+                  eventType: req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
+                },
+                isRead: false
+              }))
           : [];
 
       const mergedNotificationMap = new Map();
@@ -112,9 +132,15 @@ const EventsOfficeNotificationBell = () => {
 
       setNotifications(mergedNotifications);
 
-      // Handle unread count
-      const unreadCountValue = unreadCountRes.data?.success ? unreadCountRes.data.unreadCount : 0;
-      setUnreadCount(unreadCountValue);
+      // Calculate unread count from merged notifications (includes pending vendor notifications)
+      // This ensures the count is accurate even when new notifications arrive
+      const calculatedUnreadCount = mergedNotifications.filter(n => !n.isRead).length;
+      
+      // Use the calculated count if it's higher than the API count (in case API doesn't include pending vendor notifications)
+      const apiUnreadCount = unreadCountRes.data?.success ? unreadCountRes.data.unreadCount : 0;
+      const finalUnreadCount = Math.max(calculatedUnreadCount, apiUnreadCount);
+      
+      setUnreadCount(finalUnreadCount);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
@@ -139,6 +165,21 @@ const EventsOfficeNotificationBell = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
+      // Collect all pending vendor request IDs that need to be tracked as read
+      const pendingVendorRequestIds = notifications
+        .filter(n => n.type === 'vendor_request' && n._id?.startsWith('vendor_req_') && !n.isRead)
+        .map(n => n.metadata?.requestId)
+        .filter(id => id);
+
+      // Add them to the marked-as-read ref immediately (synchronous)
+      if (pendingVendorRequestIds.length > 0) {
+        pendingVendorRequestIds.forEach(id => markedAsReadVendorRequestsRef.current.add(id));
+      }
+
+      // Immediately update local state to show all as read (optimistic update)
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+
       // Mark all notifications as read via API
       await axios.put(
         'http://localhost:5000/api/notifications/mark-all-read',
@@ -146,11 +187,13 @@ const EventsOfficeNotificationBell = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Update local state
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      setUnreadCount(0);
+      // Don't refresh immediately - we've already updated the UI optimistically
+      // The next automatic poll (every 10 seconds) will sync with the server
+      // This prevents the notifications from flickering back to unread
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
+      // On error, refresh to get correct state from server
+      await fetchNotifications();
     }
   };
 
@@ -297,11 +340,21 @@ const EventsOfficeNotificationBell = () => {
                       if (!notif.isRead && notifId) {
                         try {
                           const token = localStorage.getItem('token');
-                          await axios.put(
-                            `http://localhost:5000/api/notifications/${notifId}/read`,
-                            {},
-                            { headers: { Authorization: `Bearer ${token}` } }
-                          );
+                          
+                          // If this is a pending vendor notification, track it as read (using ref for immediate access)
+                          if (notif.type === 'vendor_request' && notif._id?.startsWith('vendor_req_') && notif.metadata?.requestId) {
+                            markedAsReadVendorRequestsRef.current.add(notif.metadata.requestId);
+                          }
+                          
+                          // Only call API if it's a real notification (not a pending vendor notification)
+                          if (!notif._id?.startsWith('vendor_req_')) {
+                            await axios.put(
+                              `http://localhost:5000/api/notifications/${notifId}/read`,
+                              {},
+                              { headers: { Authorization: `Bearer ${token}` } }
+                            );
+                          }
+                          
                           setNotifications(prev => prev.map(n => 
                             (n._id === notifId || n.id === notifId) ? { ...n, isRead: true } : n
                           ));

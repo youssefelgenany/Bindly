@@ -47,7 +47,7 @@ const vendorRequestSchema = new mongoose.Schema({
     type: String,
     required: false,
     enum: [
-      'sports-area', 'parking', 'main-gate', 'platform', 'exam-halls'
+      'sports-area', 'parking', 'main-gate', 'main-entrance', 'platform', 'exam-halls'
     ]
   },
   // Platform booth specific fields
@@ -77,10 +77,17 @@ const vendorRequestSchema = new mongoose.Schema({
     type: String, // JSON string encoded in QR code
     required: false
   },
+  // Attendee QR codes for platform booths (array of objects with attendee info and QR code)
+  attendeeQRCodes: [{
+    attendeeName: { type: String },
+    attendeeEmail: { type: String },
+    qrCode: { type: String }, // Base64 encoded QR code image
+    qrCodeData: { type: String } // JSON string encoded in QR code
+  }],
   // Payment information
   participationFee: {
     type: Number,
-    default: null,
+    default: null, 
     min: 0
   },
   paymentStatus: {
