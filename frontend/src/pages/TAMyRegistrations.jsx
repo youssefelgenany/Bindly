@@ -645,6 +645,45 @@ const TAMyRegistrations = () => {
   };
 
   return (
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.8;
+            transform: scale(1.05);
+          }
+        }
+        .banner-animate {
+          animation: fadeInUp 0.6s ease-out;
+        }
+        .banner-content-animate {
+          animation: slideInLeft 1s ease-out 0.2s both;
+        }
+      `}</style>
     <div style={{
       display: 'flex',
       flexDirection: 'column',
@@ -657,14 +696,14 @@ const TAMyRegistrations = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF'
+        backgroundColor: '#1D3557'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -688,11 +727,11 @@ const TAMyRegistrations = () => {
             to="/dashboard"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -707,11 +746,11 @@ const TAMyRegistrations = () => {
             to="/ta/events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/ta/events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/ta/events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/ta/events') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/ta/events') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -726,11 +765,11 @@ const TAMyRegistrations = () => {
             to="/ta/my-registrations"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/ta/my-registrations') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/my-registrations') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/ta/my-registrations') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/ta/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/ta/my-registrations') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -745,11 +784,11 @@ const TAMyRegistrations = () => {
             to="/gym"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/gym') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -759,6 +798,25 @@ const TAMyRegistrations = () => {
               fitness_center
             </span>
             Gym Sessions
+          </Link>
+          <Link
+            to="/booth-polls"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              poll
+            </span>
+            Vendor Polls
           </Link>
         </nav>
 
@@ -780,7 +838,7 @@ const TAMyRegistrations = () => {
               color: 'inherit'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
@@ -788,7 +846,7 @@ const TAMyRegistrations = () => {
           >
             <span className="material-symbols-outlined" style={{
               fontSize: '1.5rem',
-              color: '#1D3557'
+              color: '#FFFFFF'
             }}>
               favorite
             </span>
@@ -817,7 +875,7 @@ const TAMyRegistrations = () => {
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = 'transparent';
@@ -825,7 +883,7 @@ const TAMyRegistrations = () => {
             >
               <span className="material-symbols-outlined" style={{
                 fontSize: '1.5rem',
-                color: '#1D3557'
+                color: '#FFFFFF'
               }}>
                 notifications
               </span>
@@ -1042,14 +1100,14 @@ const TAMyRegistrations = () => {
             <p style={{
               fontSize: '0.875rem',
               fontWeight: '600',
-              color: '#1D3557',
+              color: '#FFFFFF',
               margin: 0
             }}>
               {displayName}
             </p>
             <p style={{
               fontSize: '0.75rem',
-              color: '#6b7280',
+              color: 'rgba(255, 255, 255, 0.7)',
               margin: 0
             }}>
               TA
@@ -1081,14 +1139,14 @@ const TAMyRegistrations = () => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#1D3557',
+                backgroundColor: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
+                color: '#1D3557',
                 fontWeight: '600'
               }}>
-                {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
+                {(user?.firstName?.[0] || user?.name?.[0] || 'T').toUpperCase()}
               </div>
             )}
             {showLogoutDropdown && (
@@ -1187,15 +1245,27 @@ const TAMyRegistrations = () => {
             marginLeft: '4rem',
             marginRight: '4rem'
           }}>
-          {/* Page Title Box */}
-          <div style={{
-            position: 'relative',
-            height: '140px',
-            borderRadius: '0.75rem',
-            overflow: 'hidden',
-            marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-          }}>
+          {/* Page Title Box - Animated */}
+          <div 
+            className="banner-animate"
+            style={{
+              position: 'relative',
+              height: '140px',
+              borderRadius: '0.75rem',
+              overflow: 'hidden',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 12px -2px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+            }}
+          >
             {/* Background Image */}
             <div style={{
               position: 'absolute',
@@ -1204,7 +1274,8 @@ const TAMyRegistrations = () => {
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
-              filter: 'blur(2px)'
+              filter: 'blur(2px)',
+              animation: 'pulse 4s ease-in-out infinite'
             }}></div>
             {/* Blue Overlay */}
             <div style={{
@@ -1212,18 +1283,30 @@ const TAMyRegistrations = () => {
               inset: 0,
               backgroundColor: 'rgba(29, 53, 87, 0.75)'
             }}></div>
-            {/* Content */}
+            {/* Animated Pattern Overlay */}
             <div style={{
-              position: 'relative',
-              zIndex: 10,
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'flex-start',
-              padding: '2rem 2.5rem',
-              color: '#FFFFFF'
-            }}>
+              position: 'absolute',
+              inset: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+              zIndex: 1,
+              pointerEvents: 'none'
+            }}></div>
+            {/* Content */}
+            <div 
+              className="banner-content-animate"
+              style={{
+                position: 'relative',
+                zIndex: 10,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+                padding: '2rem 2.5rem',
+                color: '#FFFFFF'
+              }}
+            >
               <h3 style={{
                 color: '#FFFFFF',
                 fontSize: '1.75rem',
@@ -2707,76 +2790,6 @@ const TAMyRegistrations = () => {
                             </button>
                           ))}
                         </div>
-                        {rating > 0 && (
-                          <button
-                            type="button"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              if (rating > 0 && selectedEventForView?.eventId) {
-                                try {
-                                  const eventId = String(selectedEventForView.eventId);
-                                  console.log('🚀 Submitting rating:', { eventId, rating, selectedEventForView });
-                                  setError(''); // Clear previous errors
-                                  const result = await eventsApiService.submitRating(eventId, rating);
-                                  console.log('📊 Rating submission result:', result);
-                                  if (result.success) {
-                                    setRating(0);
-                                    setHoveredRating(0);
-                                    setError('');
-                                    // Reload ratings and comments
-                                    await loadRatingsAndComments(eventId);
-                                    // Update event ratings
-                                    const ratingResult = await eventsApiService.getRatingsAndComments(eventId);
-                                    if (ratingResult.success && ratingResult.data?.ratings) {
-                                      setEventRatings(prev => ({
-                                        ...prev,
-                                        [eventId]: {
-                                          average: ratingResult.data.ratings.average || 0,
-                                          count: ratingResult.data.ratings.count || 0
-                                        }
-                                      }));
-                                    }
-                                  } else {
-                                    const errorMsg = result.message || result.error?.message || result.error?.msg || 'Failed to submit rating';
-                                    console.error('❌ Rating submission failed:', errorMsg, result);
-                                    setError(errorMsg);
-                                  }
-                                } catch (err) {
-                                  console.error('❌ Error submitting rating:', err);
-                                  const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting rating';
-                                  setError(errorMsg);
-                                }
-                              } else {
-                                console.warn('⚠️ Cannot submit rating:', { rating, eventId: selectedEventForView?.eventId });
-                                setError('Please select a rating and ensure event is selected');
-                              }
-                            }}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: '#1e40af',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                              fontWeight: '600',
-                              transition: 'all 0.2s',
-                              zIndex: 10,
-                              position: 'relative'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.stopPropagation();
-                              e.target.style.backgroundColor = '#1e3a8a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.stopPropagation();
-                              e.target.style.backgroundColor = '#1e40af';
-                            }}
-                          >
-                            Submit Rating
-                          </button>
-                        )}
                       </div>
 
                       {/* Comment Section */}
@@ -2845,41 +2858,114 @@ const TAMyRegistrations = () => {
                             onClick={async (e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              if (commentText.trim() && selectedEventForView?.eventId) {
-                                try {
-                                  const eventId = String(selectedEventForView.eventId);
-                                  console.log('🚀 Submitting comment:', { eventId, commentLength: commentText.trim().length, selectedEventForView });
-                                  setError(''); // Clear previous errors
-                                  const result = await eventsApiService.submitComment(eventId, commentText.trim());
-                                  console.log('📊 Comment submission result:', result);
-                                  if (result.success) {
-                                    setCommentText('');
-                                    setError('');
-                                    // Reload ratings and comments
-                                    await loadRatingsAndComments(eventId);
-                                  } else {
-                                    const errorMsg = result.message || result.error?.message || result.error?.msg || 'Failed to submit comment';
-                                    console.error('❌ Comment submission failed:', errorMsg, result);
-                                    setError(errorMsg);
+                              
+                              if (!selectedEventForView?.eventId) {
+                                setModalError('No event selected.');
+                                return;
+                              }
+                              
+                              const hasRating = rating > 0 && rating <= 5;
+                              const hasComment = commentText.trim().length > 0;
+                              
+                              if (!hasRating && !hasComment) {
+                                setModalError('Please provide a rating, comment, or both.');
+                                return;
+                              }
+                              
+                              setModalError('');
+                              setModalSuccess('');
+                              
+                              const eventId = String(selectedEventForView.eventId);
+                              let ratingSuccess = true;
+                              let commentSuccess = true;
+                              let errorMessages = [];
+                              
+                              try {
+                                // Submit rating if provided
+                                if (hasRating) {
+                                  try {
+                                    console.log('🚀 Submitting rating:', { eventId, rating, selectedEventForView });
+                                    const ratingResult = await eventsApiService.submitRating(eventId, rating);
+                                    console.log('📊 Rating submission result:', ratingResult);
+                                    if (ratingResult.success) {
+                                      setRating(0);
+                                      setHoveredRating(0);
+                                    } else {
+                                      ratingSuccess = false;
+                                      const errorMsg = ratingResult.message || ratingResult.error?.message || ratingResult.error?.msg || 'Failed to submit rating';
+                                      errorMessages.push(errorMsg);
+                                    }
+                                  } catch (err) {
+                                    ratingSuccess = false;
+                                    console.error('❌ Error submitting rating:', err);
+                                    const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting rating';
+                                    errorMessages.push(errorMsg);
                                   }
-                                } catch (err) {
-                                  console.error('❌ Error submitting comment:', err);
-                                  const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting comment';
-                                  setError(errorMsg);
                                 }
-                              } else {
-                                console.warn('⚠️ Cannot submit comment:', { hasText: !!commentText.trim(), eventId: selectedEventForView?.eventId });
-                                setError('Please enter a comment and ensure event is selected');
+                                
+                                // Submit comment if provided
+                                if (hasComment) {
+                                  try {
+                                    console.log('🚀 Submitting comment:', { eventId, commentLength: commentText.trim().length, selectedEventForView });
+                                    const commentResult = await eventsApiService.submitComment(eventId, commentText.trim());
+                                    console.log('📊 Comment submission result:', commentResult);
+                                    if (commentResult.success) {
+                                      setCommentText('');
+                                    } else {
+                                      commentSuccess = false;
+                                      const errorMsg = commentResult.message || commentResult.error?.message || commentResult.error?.msg || 'Failed to submit comment';
+                                      errorMessages.push(errorMsg);
+                                    }
+                                  } catch (err) {
+                                    commentSuccess = false;
+                                    console.error('❌ Error submitting comment:', err);
+                                    const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting comment';
+                                    errorMessages.push(errorMsg);
+                                  }
+                                }
+                                
+                                // Show success or error messages
+                                if (ratingSuccess && commentSuccess) {
+                                  const successMessages = [];
+                                  if (hasRating) successMessages.push('Rating');
+                                  if (hasComment) successMessages.push('Comment');
+                                  setModalSuccess(`${successMessages.join(' and ')} submitted successfully.`);
+                                  setModalError('');
+                                } else {
+                                  setModalError(errorMessages.join(' '));
+                                  setModalSuccess('');
+                                }
+                                
+                                // Reload ratings and comments regardless of success/failure
+                                await loadRatingsAndComments(eventId);
+                                
+                                // Update event ratings if rating was submitted
+                                if (hasRating && ratingSuccess) {
+                                  const ratingResult = await eventsApiService.getRatingsAndComments(eventId);
+                                  if (ratingResult.success && ratingResult.data?.ratings) {
+                                    setEventRatings(prev => ({
+                                      ...prev,
+                                      [eventId]: {
+                                        average: ratingResult.data.ratings.average || 0,
+                                        count: ratingResult.data.ratings.count || 0
+                                      }
+                                    }));
+                                  }
+                                }
+                              } catch (err) {
+                                console.error('❌ Error in submit process:', err);
+                                setModalError(err.response?.data?.message || err.message || 'Error submitting feedback');
+                                setModalSuccess('');
                               }
                             }}
-                            disabled={!commentText.trim()}
+                            disabled={!(rating > 0 || commentText.trim())}
                             style={{
                               padding: '0.5rem 1rem',
                               borderRadius: '0.5rem',
-                              backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
+                              backgroundColor: !(rating > 0 || commentText.trim()) ? '#d1d5db' : '#1e40af',
                               color: '#FFFFFF',
                               border: 'none',
-                              cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
+                              cursor: !(rating > 0 || commentText.trim()) ? 'not-allowed' : 'pointer',
                               fontSize: '0.875rem',
                               fontWeight: '600',
                               transition: 'all 0.2s',
@@ -2888,18 +2974,18 @@ const TAMyRegistrations = () => {
                             }}
                             onMouseEnter={(e) => {
                               e.stopPropagation();
-                              if (commentText.trim()) {
+                              if (rating > 0 || commentText.trim()) {
                                 e.target.style.backgroundColor = '#1e3a8a';
                               }
                             }}
                             onMouseLeave={(e) => {
                               e.stopPropagation();
-                              if (commentText.trim()) {
+                              if (rating > 0 || commentText.trim()) {
                                 e.target.style.backgroundColor = '#1e40af';
                               }
                             }}
                           >
-                            Submit Comment
+                            Submit
                           </button>
                         </div>
                       </div>
@@ -3077,6 +3163,7 @@ const TAMyRegistrations = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 

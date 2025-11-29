@@ -18,9 +18,7 @@ const TAEventsView = () => {
   const [filter, setFilter] = useState('all');
   const [professorFilter, setProfessorFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date-asc'); // date-asc, date-desc, title-asc, title-desc
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [showProfessorDropdown, setShowProfessorDropdown] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [availableProfessors, setAvailableProfessors] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
@@ -73,14 +71,8 @@ const TAEventsView = () => {
       if (showLogoutDropdown && !event.target.closest('[data-profile-dropdown]')) {
         setShowLogoutDropdown(false);
       }
-      if (showFilterDropdown && !event.target.closest('[data-filter-dropdown]')) {
-        setShowFilterDropdown(false);
-      }
-      if (showSortDropdown && !event.target.closest('[data-sort-dropdown]')) {
-        setShowSortDropdown(false);
-      }
-      if (showProfessorDropdown && !event.target.closest('[data-professor-dropdown]')) {
-        setShowProfessorDropdown(false);
+      if (showFilterPanel && !event.target.closest('[data-filter-panel]')) {
+        // Don't close on overlay click - let the overlay handle it
       }
       if (showNotificationsDropdown && !event.target.closest('[data-notifications-dropdown]')) {
         setShowNotificationsDropdown(false);
@@ -88,7 +80,7 @@ const TAEventsView = () => {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLogoutDropdown, showFilterDropdown, showSortDropdown, showProfessorDropdown, showNotificationsDropdown]);
+  }, [showLogoutDropdown, showNotificationsDropdown, showFilterPanel]);
 
   const loadEvents = useCallback(async () => {
     try {
@@ -709,6 +701,45 @@ const TAEventsView = () => {
   };
 
   return (
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.8;
+            transform: scale(1.05);
+          }
+        }
+        .banner-animate {
+          animation: fadeInUp 0.6s ease-out;
+        }
+        .banner-content-animate {
+          animation: slideInLeft 1s ease-out 0.2s both;
+        }
+      `}</style>
     <div style={{
       display: 'flex',
       flexDirection: 'column',
@@ -721,14 +752,14 @@ const TAEventsView = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF'
+        backgroundColor: '#1D3557'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -752,11 +783,11 @@ const TAEventsView = () => {
             to="/dashboard"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -771,11 +802,11 @@ const TAEventsView = () => {
             to="/ta/events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/ta/events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/ta/events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/ta/events') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/ta/events') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -790,11 +821,11 @@ const TAEventsView = () => {
             to="/ta/my-registrations"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/ta/my-registrations') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/ta/my-registrations') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/ta/my-registrations') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/ta/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/ta/my-registrations') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -809,11 +840,11 @@ const TAEventsView = () => {
             to="/gym"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/gym') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -823,6 +854,25 @@ const TAEventsView = () => {
               fitness_center
             </span>
             Gym Sessions
+          </Link>
+          <Link
+            to="/booth-polls"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              poll
+            </span>
+            Vendor Polls
           </Link>
         </nav>
 
@@ -844,7 +894,7 @@ const TAEventsView = () => {
               color: 'inherit'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
@@ -852,7 +902,7 @@ const TAEventsView = () => {
           >
             <span className="material-symbols-outlined" style={{
               fontSize: '1.5rem',
-              color: '#1D3557'
+              color: '#FFFFFF'
             }}>
               favorite
             </span>
@@ -881,7 +931,7 @@ const TAEventsView = () => {
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = 'transparent';
@@ -889,7 +939,7 @@ const TAEventsView = () => {
             >
               <span className="material-symbols-outlined" style={{
                 fontSize: '1.5rem',
-                color: '#1D3557'
+                color: '#FFFFFF'
               }}>
                 notifications
               </span>
@@ -1108,14 +1158,14 @@ const TAEventsView = () => {
             <p style={{
               fontSize: '0.875rem',
               fontWeight: '600',
-              color: '#1D3557',
+              color: '#FFFFFF',
               margin: 0
             }}>
               {displayName}
             </p>
             <p style={{
               fontSize: '0.75rem',
-              color: '#6b7280',
+              color: 'rgba(255, 255, 255, 0.7)',
               margin: 0
             }}>
               TA
@@ -1147,14 +1197,14 @@ const TAEventsView = () => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#1D3557',
+                backgroundColor: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
+                color: '#1D3557',
                 fontWeight: '600'
               }}>
-                {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
+                {(user?.firstName?.[0] || user?.name?.[0] || 'T').toUpperCase()}
               </div>
             )}
             {showLogoutDropdown && (
@@ -1252,15 +1302,27 @@ const TAEventsView = () => {
             marginLeft: '4rem',
             marginRight: '4rem'
           }}>
-          {/* Page Title Banner */}
-          <div style={{
-            position: 'relative',
-            height: '140px',
-            borderRadius: '0.75rem',
-            overflow: 'hidden',
-            marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-          }}>
+          {/* Page Title Banner - Animated */}
+          <div 
+            className="banner-animate"
+            style={{
+              position: 'relative',
+              height: '140px',
+              borderRadius: '0.75rem',
+              overflow: 'hidden',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 12px -2px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+            }}
+          >
             {/* Background Image */}
             <div style={{
               position: 'absolute',
@@ -1269,7 +1331,8 @@ const TAEventsView = () => {
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
-              filter: 'blur(2px)'
+              filter: 'blur(2px)',
+              animation: 'pulse 4s ease-in-out infinite'
             }}></div>
             {/* Blue Overlay */}
             <div style={{
@@ -1277,16 +1340,27 @@ const TAEventsView = () => {
               inset: 0,
               backgroundColor: 'rgba(29, 53, 87, 0.75)'
             }}></div>
-            {/* Content */}
+            {/* Animated Pattern Overlay */}
             <div style={{
-              position: 'relative',
-              zIndex: 10,
-              height: '100%',
+              position: 'absolute',
+              inset: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+              zIndex: 1,
+              pointerEvents: 'none'
+            }}></div>
+            {/* Content */}
+            <div 
+              className="banner-content-animate"
+              style={{
+                position: 'relative',
+                zIndex: 10,
+                height: '100%',
                 display: 'flex',
-              flexDirection: 'column',
+                flexDirection: 'column',
                 justifyContent: 'center',
-              alignItems: 'flex-start',
-              padding: '2rem 2.5rem',
+                alignItems: 'flex-start',
+                padding: '2rem 2.5rem',
               color: '#FFFFFF'
             }}>
               <h3 style={{
@@ -1391,307 +1465,55 @@ const TAEventsView = () => {
               </button>
             </div>
             
-              {/* Filter and Sort Dropdowns - Right Side */}
+              {/* Filter & Sort Button - Right Side */}
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
-                {/* Filter Dropdown */}
-                <div style={{ position: 'relative' }} data-filter-dropdown>
-                  <button
-                    onClick={() => {
-                      setShowFilterDropdown(!showFilterDropdown);
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.875rem 1.25rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: '#1e40af',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      transition: 'all 0.2s',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#1e3a8a';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#1e40af';
-                    }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                      filter_list
-                    </span>
-                    Filter
-                  </button>
-                  {showFilterDropdown && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      marginTop: '0.5rem',
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '0.5rem',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                      border: '1px solid #e5e7eb',
-                      zIndex: 1000,
-                      minWidth: '180px',
-                      overflow: 'hidden'
+                <button
+                  onClick={() => setShowFilterPanel(true)}
+                  style={{
+                    padding: '0.875rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: (filter !== 'all' || professorFilter !== 'all' || sortBy !== 'date-asc') ? '#1e40af' : '#f9fafb',
+                    color: (filter !== 'all' || professorFilter !== 'all' || sortBy !== 'date-asc') ? '#FFFFFF' : '#6b7280',
+                    border: (filter !== 'all' || professorFilter !== 'all' || sortBy !== 'date-asc') ? 'none' : '1px solid #e5e7eb',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
+                    boxShadow: (filter !== 'all' || professorFilter !== 'all' || sortBy !== 'date-asc') ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!(professorFilter !== 'all' || filter !== 'all' || sortBy !== 'date-asc')) {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                      e.target.style.borderColor = '#d1d5db';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!(professorFilter !== 'all' || filter !== 'all' || sortBy !== 'date-asc')) {
+                      e.target.style.backgroundColor = '#f9fafb';
+                      e.target.style.borderColor = '#e5e7eb';
+                    }
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    filter_list
+                  </span>
+                  Filter & Sort
+                  {(filter !== 'all' || professorFilter !== 'all' || sortBy !== 'date-asc') && (
+                    <span style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                      borderRadius: '9999px',
+                      padding: '0.125rem 0.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600'
                     }}>
-                      {['all', 'bazaar', 'trip', 'workshop', 'conference', 'booth'].map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => {
-                            setFilter(type);
-                            setShowFilterDropdown(false);
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem 1rem',
-                            textAlign: 'left',
-                            backgroundColor: filter === type ? '#eff6ff' : 'transparent',
-                            color: filter === type ? '#1e40af' : '#374151',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: filter === type ? '600' : '500',
-                            textTransform: 'capitalize',
-                            transition: 'all 0.2s',
-                            borderBottom: '1px solid #f3f4f6'
-                          }}
-                          onMouseEnter={(e) => {
-                            if (filter !== type) {
-                              e.target.style.backgroundColor = '#f9fafb';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (filter !== type) {
-                              e.target.style.backgroundColor = 'transparent';
-                            }
-                          }}
-                        >
-                          {type === 'all' ? 'All Events' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Sort Dropdown */}
-                <div style={{ position: 'relative' }} data-sort-dropdown>
-                  <button
-                    onClick={() => {
-                      setShowSortDropdown(!showSortDropdown);
-                      setShowFilterDropdown(false);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.875rem 1.25rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: '#1e40af',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      transition: 'all 0.2s',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#1e3a8a';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#1e40af';
-                    }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                      sort
+                      {[filter !== 'all' ? 1 : 0, professorFilter !== 'all' ? 1 : 0, sortBy !== 'date-asc' ? 1 : 0].filter(f => f).length}
                     </span>
-                    Sort
-                  </button>
-                  {showSortDropdown && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      marginTop: '0.5rem',
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '0.5rem',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                      border: '1px solid #e5e7eb',
-                      zIndex: 1000,
-                      minWidth: '200px',
-                      overflow: 'hidden'
-                    }}>
-                      {[
-                        { value: 'date-asc', label: 'Date (Earliest First)' },
-                        { value: 'date-desc', label: 'Date (Latest First)' },
-                        { value: 'title-asc', label: 'Title (A-Z)' },
-                        { value: 'title-desc', label: 'Title (Z-A)' }
-                      ].map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => {
-                            setSortBy(option.value);
-                            setShowSortDropdown(false);
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem 1rem',
-                            textAlign: 'left',
-                            backgroundColor: sortBy === option.value ? '#eff6ff' : 'transparent',
-                            color: sortBy === option.value ? '#1e40af' : '#374151',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: sortBy === option.value ? '600' : '500',
-                            transition: 'all 0.2s',
-                            borderBottom: '1px solid #f3f4f6'
-                          }}
-                          onMouseEnter={(e) => {
-                            if (sortBy !== option.value) {
-                              e.target.style.backgroundColor = '#f9fafb';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (sortBy !== option.value) {
-                              e.target.style.backgroundColor = 'transparent';
-                            }
-                          }}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
                   )}
-                </div>
-
-                {/* Professor Filter Dropdown - Only show for workshop/conference */}
-                {(filter === 'workshop' || filter === 'conference') && (
-                  <div style={{ position: 'relative' }} data-professor-dropdown>
-                    <button
-                      onClick={() => {
-                        setShowProfessorDropdown(!showProfessorDropdown);
-                        setShowFilterDropdown(false);
-                        setShowSortDropdown(false);
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.875rem 1.25rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: '#1e40af',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        transition: 'all 0.2s',
-                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.backgroundColor = '#1e3a8a';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.backgroundColor = '#1e40af';
-                      }}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                        person
-                      </span>
-                      Professor
-                    </button>
-                    {showProfessorDropdown && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '100%',
-                        right: 0,
-                        marginTop: '0.5rem',
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: '0.5rem',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                        border: '1px solid #e5e7eb',
-                        zIndex: 1000,
-                        minWidth: '200px',
-                        maxHeight: '300px',
-                        overflowY: 'auto',
-                        overflow: 'hidden'
-                      }}>
-                        <button
-                          onClick={() => {
-                            setProfessorFilter('all');
-                            setShowProfessorDropdown(false);
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem 1rem',
-                            textAlign: 'left',
-                            backgroundColor: professorFilter === 'all' ? '#eff6ff' : 'transparent',
-                            color: professorFilter === 'all' ? '#1e40af' : '#374151',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: professorFilter === 'all' ? '600' : '500',
-                            transition: 'all 0.2s',
-                            borderBottom: '1px solid #f3f4f6'
-                          }}
-                          onMouseEnter={(e) => {
-                            if (professorFilter !== 'all') {
-                              e.target.style.backgroundColor = '#f9fafb';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (professorFilter !== 'all') {
-                              e.target.style.backgroundColor = 'transparent';
-                            }
-                          }}
-                        >
-                          All Professors
-                        </button>
-                        {availableProfessors.map((professor) => (
-                          <button
-                            key={professor}
-                            onClick={() => {
-                              setProfessorFilter(professor);
-                              setShowProfessorDropdown(false);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '0.75rem 1rem',
-                              textAlign: 'left',
-                              backgroundColor: professorFilter === professor ? '#eff6ff' : 'transparent',
-                              color: professorFilter === professor ? '#1e40af' : '#374151',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                              fontWeight: professorFilter === professor ? '600' : '500',
-                              transition: 'all 0.2s',
-                              borderBottom: '1px solid #f3f4f6'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (professorFilter !== professor) {
-                                e.target.style.backgroundColor = '#f9fafb';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (professorFilter !== professor) {
-                                e.target.style.backgroundColor = 'transparent';
-                              }
-                            }}
-                          >
-                            {professor}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                </button>
               </div>
             </div>
           </div>
@@ -3272,7 +3094,262 @@ const TAEventsView = () => {
           </div>
         </div>
       )}
+
+      {showFilterPanel && (
+        <>
+          {/* Overlay */}
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 999,
+              transition: 'opacity 0.3s'
+            }}
+            onClick={() => setShowFilterPanel(false)}
+          />
+          
+          {/* Side Panel */}
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: '300px',
+            backgroundColor: '#FFFFFF',
+            boxShadow: '-4px 0 6px -1px rgba(0, 0, 0, 0.1)',
+            zIndex: 1000,
+            transform: showFilterPanel ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.3s ease-in-out',
+            overflowY: 'auto'
+          }} data-filter-panel>
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1.25rem',
+              borderBottom: '1px solid #e5e7eb',
+              position: 'sticky',
+              top: 0,
+              backgroundColor: '#FFFFFF',
+              zIndex: 10
+            }}>
+              <h4 style={{
+                fontSize: '0.9375rem',
+                fontWeight: '600',
+                color: '#111827',
+                margin: 0,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                Filter & Sort
+              </h4>
+              <button
+                onClick={() => setShowFilterPanel(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6b7280',
+                  borderRadius: '0.375rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#111827';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                  close
+                </span>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Sort By Section */}
+              <div>
+                <h5 style={{
+                  fontSize: '0.8125rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  margin: 0,
+                  marginBottom: '0.75rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  Sort By
+                </h5>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+                  {[
+                    { value: 'date-asc', label: 'Date (Earliest First)' },
+                    { value: 'date-desc', label: 'Date (Latest First)' },
+                    { value: 'title-asc', label: 'Title (A-Z)' },
+                    { value: 'title-desc', label: 'Title (Z-A)' }
+                  ].map(option => (
+                    <label
+                      key={option.value}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.625rem',
+                        cursor: 'pointer',
+                        fontSize: '0.8125rem',
+                        color: '#374151'
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="sortBy"
+                        value={option.value}
+                        checked={sortBy === option.value}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        style={{
+                          width: '0.875rem',
+                          height: '0.875rem',
+                          cursor: 'pointer',
+                          accentColor: '#1e40af'
+                        }}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Event Type Section */}
+              <div>
+                <h5 style={{
+                  fontSize: '0.8125rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  margin: 0,
+                  marginBottom: '0.75rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  Event Type
+                </h5>
+                <select
+                  value={filter}
+                  onChange={(e) => {
+                    setFilter(e.target.value);
+                    if (e.target.value !== 'workshop' && e.target.value !== 'conference') {
+                      setProfessorFilter('all');
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.625rem 0.875rem',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.8125rem',
+                    outline: 'none',
+                    backgroundColor: '#FFFFFF',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = '#1e40af')}
+                  onBlur={(e) => (e.target.style.borderColor = '#e5e7eb')}
+                >
+                  <option value="all">All Events</option>
+                  <option value="bazaar">Bazaars</option>
+                  <option value="trip">Trips</option>
+                  <option value="workshop">Workshops</option>
+                  <option value="conference">Conferences</option>
+                  <option value="booth">Booths</option>
+                </select>
+              </div>
+
+              {/* Professor Filter - Only show for workshop/conference */}
+              {(filter === 'workshop' || filter === 'conference') && (
+                <div>
+                  <h5 style={{
+                    fontSize: '0.8125rem',
+                    fontWeight: '600',
+                    color: '#111827',
+                    margin: 0,
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    Professor
+                  </h5>
+                  <select
+                    value={professorFilter}
+                    onChange={(e) => setProfessorFilter(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.625rem 0.875rem',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.8125rem',
+                      outline: 'none',
+                      backgroundColor: '#FFFFFF',
+                      cursor: 'pointer',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#1e40af';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e5e7eb';
+                    }}
+                  >
+                    <option value="all">All Professors</option>
+                    {availableProfessors.map(prof => (
+                      <option key={prof} value={prof}>{prof}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Clear Filters Button */}
+              <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                <button
+                  onClick={() => {
+                    setFilter('all');
+                    setProfessorFilter('all');
+                    setSortBy('date-asc');
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.625rem 0.875rem',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.8125rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#e5e7eb';
+                    e.target.style.borderColor = '#d1d5db';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.borderColor = '#e5e7eb';
+                  }}
+                >
+                  Clear All Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
+    </>
   );
 };
 

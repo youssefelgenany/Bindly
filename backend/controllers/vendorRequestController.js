@@ -1605,15 +1605,37 @@ const voteInBoothPoll = async (req, res) => {
     }
 
     // Check if user already voted
-    const existingVote = poll.votes.find(vote => vote.user.toString() === req.user._id.toString());
-    if (existingVote) {
-      return res.status(400).json({
-        success: false,
-        message: 'You have already voted in this poll'
-      });
+    const existingVoteIndex = poll.votes.findIndex(vote => vote.user.toString() === req.user._id.toString());
+    
+    if (existingVoteIndex !== -1) {
+      // User already voted - check if clicking the same option (deselect) or different option (change vote)
+      const existingVote = poll.votes[existingVoteIndex];
+      
+      if (existingVote.optionIndex === optionIndex) {
+        // User clicked the same option - remove vote (deselect)
+        poll.votes.splice(existingVoteIndex, 1);
+        
+        await poll.save();
+
+        return res.json({
+          success: true,
+          message: 'Vote removed successfully'
+        });
+      } else {
+        // User clicked different option - update vote
+        poll.votes[existingVoteIndex].optionIndex = optionIndex;
+        poll.votes[existingVoteIndex].votedAt = new Date();
+        
+        await poll.save();
+
+        return res.json({
+          success: true,
+          message: 'Vote updated successfully'
+        });
+      }
     }
 
-    // Add vote
+    // Add new vote
     poll.votes.push({
       user: req.user._id,
       optionIndex

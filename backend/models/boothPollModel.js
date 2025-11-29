@@ -57,7 +57,7 @@ const boothPollSchema = new mongoose.Schema({
   }
 });
 
-// Prevent duplicate votes per user per poll
-boothPollSchema.index({ 'votes.user': 1, _id: 1 }, { unique: true });
+// Index for efficient vote lookups (not unique to allow vote changes)
+boothPollSchema.index({ 'votes.user': 1, _id: 1 });
 
 module.exports = mongoose.model('BoothPoll', boothPollSchema);

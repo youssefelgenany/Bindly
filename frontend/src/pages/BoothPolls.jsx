@@ -198,6 +198,11 @@ const BoothPolls = () => {
   }, [loadPolls]);
 
   const handleVote = async (pollId, optionIndex) => {
+    // Prevent multiple clicks while voting
+    if (voting[pollId]) {
+      return;
+    }
+    
     try {
       setVoting(prev => ({ ...prev, [pollId]: true }));
       
@@ -240,26 +245,117 @@ const BoothPolls = () => {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      minHeight: '100vh',
-      fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#f6f7f8'
-    }}>
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        @keyframes fadeInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        @keyframes fadeInRight {
+          from {
+            opacity: 0;
+            transform: translateX(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.8;
+            transform: scale(1.05);
+          }
+        }
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        @keyframes zoomIn {
+          0% {
+            transform: scale(1);
+          }
+          100% {
+            transform: scale(1.1);
+          }
+        }
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        .banner-animate {
+          animation: fadeInUp 0.6s ease-out;
+        }
+        .banner-content-animate {
+          animation: slideInLeft 1s ease-out 0.2s both;
+        }
+      `}</style>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+        fontFamily: 'Inter, sans-serif',
+        backgroundColor: '#f6f7f8'
+      }}>
       {/* Header/Navbar */}
       <header style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF'
+        backgroundColor: '#1D3557'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -285,11 +381,11 @@ const BoothPolls = () => {
               to={link.to}
               style={{
                 textDecoration: 'none',
-                color: isActiveRoute(link.to) ? '#2563eb' : '#6b7280',
+                color: isActiveRoute(link.to) ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                 fontSize: '0.875rem',
                 fontWeight: isActiveRoute(link.to) ? '600' : '500',
                 paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute(link.to) ? '2px solid #2563eb' : '2px solid transparent',
+                borderBottom: isActiveRoute(link.to) ? '2px solid #FFFFFF' : '2px solid transparent',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem'
@@ -304,6 +400,37 @@ const BoothPolls = () => {
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          {/* Heart Icon - Favorites */}
+          <Link
+            to={getFavoritesPath()}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textDecoration: 'none',
+              color: 'inherit',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ 
+              fontSize: '1.5rem',
+              color: '#FFFFFF'
+            }}>
+              favorite
+            </span>
+          </Link>
+          
           {/* Notifications Bell */}
           <div style={{ position: 'relative' }} data-notifications-dropdown>
             <button
@@ -327,7 +454,7 @@ const BoothPolls = () => {
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = 'transparent';
@@ -335,7 +462,7 @@ const BoothPolls = () => {
             >
               <span className="material-symbols-outlined" style={{
                 fontSize: '1.5rem',
-                color: '#1D3557'
+                color: '#FFFFFF'
               }}>
                 notifications
               </span>
@@ -516,86 +643,60 @@ const BoothPolls = () => {
               </div>
             )}
           </div>
-          
-          {/* Heart Icon - Favorites */}
-          <Link
-            to={getFavoritesPath()}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.5rem',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textDecoration: 'none',
-              color: '#1D3557',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
+
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#FFFFFF',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: 'rgba(255, 255, 255, 0.7)',
+              margin: 0
+            }}>
+              {userType.charAt(0).toUpperCase() + userType.slice(1)}
+            </p>
+          </div>
+
+          {/* Profile Icon */}
+          <div 
+            data-profile-dropdown
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => {
+              setShowLogoutDropdown(!showLogoutDropdown);
+              setShowNotificationsDropdown(false);
             }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
-              favorite
-            </span>
-          </Link>
-
-          {/* Profile Dropdown */}
-          <div style={{ position: 'relative' }} data-profile-dropdown>
-            <button
-              onClick={() => {
-                setShowLogoutDropdown(!showLogoutDropdown);
-                setShowNotificationsDropdown(false);
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              {user?.profilePicturePath ? (
-                <img
-                  src={`http://localhost:5000${user.profilePicturePath}`}
-                  alt="Profile"
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: '50%',
-                    objectFit: 'cover'
-                  }}
-                />
-              ) : (
-                <div style={{
+            {user?.profilePicturePath ? (
+              <img
+                src={`http://localhost:5000${user.profilePicturePath}`}
+                alt="User profile"
+                style={{
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: '50%',
-                  backgroundColor: '#1D3557',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#FFFFFF',
-                  fontWeight: '600',
-                  fontSize: '0.875rem'
-                }}>
-                  {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
-                </div>
-              )}
-              <span className="material-symbols-outlined" style={{
-                fontSize: '1.25rem',
-                color: '#6b7280'
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                borderRadius: '50%',
+                backgroundColor: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#1D3557',
+                fontWeight: '600'
               }}>
-                expand_more
-              </span>
-            </button>
+                {(user?.firstName?.[0] || user?.name?.[0] || 'P').toUpperCase()}
+              </div>
+            )}
             {showLogoutDropdown && (
               <div style={{
                 position: 'absolute',
@@ -605,56 +706,64 @@ const BoothPolls = () => {
                 backgroundColor: '#FFFFFF',
                 border: '1px solid #e2e8f0',
                 borderRadius: '0.5rem',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                zIndex: 1001,
-                minWidth: '200px',
-                overflow: 'hidden'
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                zIndex: 1000,
+                minWidth: '150px'
               }}>
-                <div style={{
-                  padding: '0.75rem 1rem',
-                  borderBottom: '1px solid #e2e8f0'
-                }}>
-                  <p style={{
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: '#1D3557',
-                    margin: 0,
-                    marginBottom: '0.25rem'
-                  }}>
-                    {displayName}
-                  </p>
-                  <p style={{
-                    fontSize: '0.75rem',
-                    color: '#6b7280',
-                    margin: 0
-                  }}>
-                    {user?.email || ''}
-                  </p>
-                </div>
+                {user?.userType === 'Professor' && (
+                  <Link
+                    to="/wallet"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#1D3557',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                    }}
+                    onClick={() => setShowLogoutDropdown(false)}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      account_balance_wallet
+                    </span>
+                    My Wallet
+                  </Link>
+                )}
                 <button
                   onClick={handleLogout}
                   style={{
                     width: '100%',
                     padding: '0.75rem 1rem',
-                    background: 'none',
-                    border: 'none',
                     textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
                     cursor: 'pointer',
                     fontSize: '0.875rem',
-                    color: '#ef4444',
+                    color: '#1D3557',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.5rem',
-                    transition: 'background-color 0.2s'
+                    gap: '0.5rem'
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#fef2f2';
+                    e.target.style.backgroundColor = '#f3f4f6';
                   }}
                   onMouseLeave={(e) => {
                     e.target.style.backgroundColor = 'transparent';
                   }}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
                     logout
                   </span>
                   Logout
@@ -674,51 +783,85 @@ const BoothPolls = () => {
         overflowY: 'auto',
         backgroundColor: '#f6f7f8'
       }}>
-        {/* Page Title */}
-        <div style={{
-          position: 'relative',
-          height: '160px',
-          borderRadius: '1rem',
-          overflow: 'hidden',
-          marginBottom: '2rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-        }}>
+        {/* Page Title Banner */}
+        <div 
+          className="banner-animate"
+          style={{
+            position: 'relative',
+            height: '140px',
+            borderRadius: '0.75rem',
+            overflow: 'hidden',
+            marginBottom: '1.5rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 8px 12px -2px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+          }}
+        >
+          {/* Background Image */}
           <div style={{
             position: 'absolute',
             inset: 0,
             backgroundImage: 'url(/assets/images/bazaar-background.jpg)',
             backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
             backgroundSize: 'cover',
-            filter: 'blur(2px)'
+            filter: 'blur(2px)',
+            transition: 'transform 0.5s ease, filter 0.5s ease'
           }}></div>
+          {/* Blue Overlay */}
           <div style={{
             position: 'absolute',
             inset: 0,
-            backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            backgroundColor: 'rgba(29, 53, 87, 0.75)',
+            transition: 'background-color 0.3s ease'
           }}></div>
+          {/* Animated Pattern Overlay */}
           <div style={{
-            position: 'relative',
-            zIndex: 10,
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-            padding: '2.5rem',
-            color: '#FFFFFF'
-          }}>
-            <h1 style={{
-              fontSize: '2rem',
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+            animation: 'pulse 4s ease-in-out infinite',
+            zIndex: 1,
+            pointerEvents: 'none'
+          }}></div>
+          {/* Content */}
+          <div 
+            className="banner-content-animate"
+            style={{
+              position: 'relative',
+              zIndex: 10,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '2rem 2.5rem',
+              color: '#FFFFFF'
+            }}
+          >
+            <h3 style={{
+              color: '#FFFFFF',
+              fontSize: '1.75rem',
               fontWeight: '700',
               margin: 0,
-              marginBottom: '0.5rem'
+              marginBottom: '0.5rem',
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
             }}>
               Vendor Polls
-            </h1>
+            </h3>
             <p style={{
               color: 'rgba(255, 255, 255, 0.9)',
-              fontSize: '1rem',
-              margin: 0
+              fontSize: '0.875rem',
+              fontWeight: '400',
+              margin: 0,
+              textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
             }}>
               Vote for vendors to set up booths in the platform
             </p>
@@ -731,34 +874,73 @@ const BoothPolls = () => {
             textAlign: 'center',
             padding: '4rem',
             backgroundColor: '#FFFFFF',
-            borderRadius: '0.75rem',
-            color: '#6b7280'
+            borderRadius: '1rem',
+            color: '#6b7280',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+            animation: 'fadeInUp 0.6s ease-out'
           }}>
-            Loading polls...
+            <div style={{
+              width: '3rem',
+              height: '3rem',
+              border: '4px solid #e5e7eb',
+              borderTop: '4px solid #1e40af',
+              borderRadius: '50%',
+              margin: '0 auto 1.5rem',
+              display: 'inline-block',
+              animation: 'spin 1s linear infinite'
+            }}></div>
+            <p style={{ margin: 0, fontSize: '1rem', fontWeight: '500' }}>Loading polls...</p>
           </div>
         ) : error ? (
           <div style={{
-            padding: '2rem',
-            backgroundColor: '#fee2e2',
-            borderRadius: '0.75rem',
+            padding: '2.5rem',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '1rem',
             color: '#991b1b',
-            textAlign: 'center'
+            textAlign: 'center',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+            border: '1px solid #fee2e2',
+            animation: 'fadeInUp 0.6s ease-out'
           }}>
-            {error}
+            <span className="material-symbols-outlined" style={{
+              fontSize: '3rem',
+              color: '#ef4444',
+              marginBottom: '1rem',
+              display: 'block'
+            }}>
+              error_outline
+            </span>
+            <p style={{ margin: 0, fontSize: '1rem', fontWeight: '500' }}>{error}</p>
           </div>
         ) : polls.length === 0 ? (
           <div style={{
             textAlign: 'center',
             padding: '4rem',
             backgroundColor: '#FFFFFF',
-            borderRadius: '0.75rem',
-            color: '#6b7280'
+            borderRadius: '1rem',
+            color: '#6b7280',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+            animation: 'fadeInUp 0.6s ease-out'
           }}>
-            No active polls available
+            <span className="material-symbols-outlined" style={{
+              fontSize: '4rem',
+              color: '#d1d5db',
+              marginBottom: '1.5rem',
+              display: 'block',
+              animation: 'pulse 2s ease-in-out infinite'
+            }}>
+              poll
+            </span>
+            <p style={{ margin: 0, fontSize: '1.125rem', fontWeight: '500' }}>No active polls available</p>
+            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem', color: '#9ca3af' }}>Check back later for new voting opportunities</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {polls.map((poll) => {
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+            gap: '1.5rem'
+          }}>
+            {polls.map((poll, pollIndex) => {
               const totalVotes = poll.totalVotes || 0;
               const hasVoted = poll.hasVoted || false;
               const userVoteIndex = poll.userVoteIndex;
@@ -769,51 +951,104 @@ const BoothPolls = () => {
                   style={{
                     backgroundColor: '#FFFFFF',
                     borderRadius: '0.75rem',
-                    padding: '2rem',
-                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    padding: 0,
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    border: '1px solid #e5e7eb',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    animation: `fadeInUp 0.6s ease-out ${pollIndex * 0.1}s both`
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                    e.currentTarget.style.borderColor = '#1e40af';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                    e.currentTarget.style.borderColor = '#e5e7eb';
                   }}
                 >
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <h3 style={{
-                      fontSize: '1.5rem',
-                      fontWeight: '700',
-                      color: '#111827',
-                      margin: 0,
-                      marginBottom: '0.5rem'
-                    }}>
-                      {poll.title}
-                    </h3>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      color: '#6b7280',
-                      margin: 0,
-                      marginBottom: '1rem'
-                    }}>
-                      {poll.description}
-                    </p>
+                  {/* Poll Header */}
+                  <div style={{
+                    padding: '1.25rem',
+                    borderBottom: '1px solid #e5e7eb',
+                    backgroundColor: '#f9fafb'
+                  }}>
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '1rem',
+                      justifyContent: 'space-between',
+                      marginBottom: '0.5rem'
+                    }}>
+                      <h3 style={{
+                        fontSize: '1.125rem',
+                        fontWeight: '700',
+                        color: '#111827',
+                        margin: 0,
+                        flex: 1
+                      }}>
+                        {poll.title}
+                      </h3>
+                      {hasVoted && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.375rem',
+                          padding: '0.25rem 0.625rem',
+                          borderRadius: '0.375rem',
+                          backgroundColor: '#dbeafe',
+                          color: '#1e40af',
+                          fontWeight: '600',
+                          fontSize: '0.75rem'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '0.875rem'
+                          }}>
+                            check_circle
+                          </span>
+                          <span>Voted</span>
+                        </div>
+                      )}
+                    </div>
+                    {poll.description && (
+                      <p style={{
+                        fontSize: '0.8125rem',
+                        color: '#6b7280',
+                        margin: 0,
+                        marginBottom: '0.5rem',
+                        lineHeight: '1.4'
+                      }}>
+                        {poll.description}
+                      </p>
+                    )}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
                       fontSize: '0.75rem',
                       color: '#6b7280'
                     }}>
-                      <span>Total Votes: {totalVotes}</span>
-                      {hasVoted && (
-                        <span style={{
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '9999px',
-                          backgroundColor: '#dbeafe',
-                          color: '#1e40af',
-                          fontWeight: '500'
-                        }}>
-                          ✓ You voted
-                        </span>
-                      )}
+                      <span className="material-symbols-outlined" style={{
+                        fontSize: '0.875rem',
+                        color: '#9ca3af'
+                      }}>
+                        how_to_vote
+                      </span>
+                      <span>{totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}</span>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Vendor Options */}
+                  <div style={{
+                    padding: '1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem'
+                  }}>
                     {poll.options.map((option, index) => {
                       const vendorRequest = option.vendorRequest;
                       const vendor = vendorRequest?.vendor || {};
@@ -821,101 +1056,170 @@ const BoothPolls = () => {
                       const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
                       const isUserVote = hasVoted && userVoteIndex === index;
                       const isVoting = voting[poll._id];
+                      const vendorName = vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Unknown Vendor';
 
                       return (
                         <div
                           key={index}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!isVoting) {
+                              handleVote(poll._id, index);
+                            }
+                          }}
                           style={{
-                            border: `2px solid ${isUserVote ? '#1e40af' : '#e5e7eb'}`,
+                            border: `1.5px solid ${isUserVote ? '#1e40af' : '#e5e7eb'}`,
                             borderRadius: '0.5rem',
-                            padding: '1.5rem',
-                            backgroundColor: isUserVote ? '#eff6ff' : '#f9fafb',
-                            transition: 'all 0.2s'
+                            padding: '0.875rem',
+                            backgroundColor: isUserVote ? '#eff6ff' : '#FFFFFF',
+                            transition: 'all 0.2s',
+                            position: 'relative',
+                            cursor: isVoting ? 'not-allowed' : 'pointer',
+                            opacity: isVoting ? 0.6 : 1
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isVoting) {
+                              e.currentTarget.style.borderColor = '#1e40af';
+                              e.currentTarget.style.backgroundColor = isUserVote ? '#dbeafe' : '#f9fafb';
+                              e.currentTarget.style.transform = 'translateX(2px)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isVoting) {
+                              e.currentTarget.style.borderColor = isUserVote ? '#1e40af' : '#e5e7eb';
+                              e.currentTarget.style.backgroundColor = isUserVote ? '#eff6ff' : '#FFFFFF';
+                              e.currentTarget.style.transform = 'translateX(0)';
+                            }
                           }}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{
-                                fontSize: '1rem',
-                                fontWeight: '600',
-                                color: '#111827',
-                                marginBottom: '0.5rem'
-                              }}>
-                                {vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Unknown Vendor'}
-                              </div>
-                              <div style={{
-                                fontSize: '0.875rem',
-                                color: '#6b7280',
-                                display: 'flex',
-                                gap: '1rem',
-                                flexWrap: 'wrap',
-                                marginBottom: '0.5rem'
-                              }}>
-                                <span>Booth Size: {vendorRequest?.boothSize || 'N/A'}</span>
-                                <span>Duration: {vendorRequest?.durationWeeks || 'N/A'} week{vendorRequest?.durationWeeks !== 1 ? 's' : ''}</span>
-                                <span>Location: {getLocationName(vendorRequest?.boothLocation)}</span>
-                              </div>
-                              {option.description && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem'
+                          }}>
+                            {/* Vendor Icon */}
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              backgroundColor: isUserVote ? '#dbeafe' : '#f3f4f6',
+                              borderRadius: '0.5rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              border: `1.5px solid ${isUserVote ? '#1e40af' : '#e5e7eb'}`
+                            }}>
+                              {vendor.companyName ? (
                                 <div style={{
                                   fontSize: '0.875rem',
-                                  color: '#6b7280',
-                                  fontStyle: 'italic'
+                                  fontWeight: '700',
+                                  color: isUserVote ? '#1e40af' : '#6b7280',
+                                  textTransform: 'uppercase'
                                 }}>
-                                  {option.description}
+                                  {vendor.companyName.substring(0, 2)}
                                 </div>
+                              ) : (
+                                <span className="material-symbols-outlined" style={{
+                                  fontSize: '1.25rem',
+                                  color: isUserVote ? '#1e40af' : '#9ca3af'
+                                }}>
+                                  storefront
+                                </span>
                               )}
                             </div>
-                            {!hasVoted && (
-                              <button
-                                onClick={() => handleVote(poll._id, index)}
-                                disabled={isVoting}
-                                style={{
-                                  padding: '0.75rem 1.5rem',
-                                  borderRadius: '0.5rem',
-                                  border: 'none',
-                                  backgroundColor: isVoting ? '#9ca3af' : '#1e40af',
-                                  color: '#FFFFFF',
-                                  fontSize: '0.875rem',
+                            
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '0.5rem',
+                                marginBottom: '0.375rem'
+                              }}>
+                                <h4 style={{
+                                  fontSize: '0.9375rem',
                                   fontWeight: '600',
-                                  cursor: isVoting ? 'not-allowed' : 'pointer',
-                                  transition: 'all 0.2s',
+                                  color: '#111827',
+                                  margin: 0,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap'
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!isVoting) {
-                                    e.target.style.backgroundColor = '#1e3a8a';
-                                  }
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!isVoting) {
-                                    e.target.style.backgroundColor = '#1e40af';
-                                  }
-                                }}
-                              >
-                                {isVoting ? 'Voting...' : 'Vote'}
-                              </button>
-                            )}
+                                }}>
+                                  {vendorName}
+                                </h4>
+                                {isUserVote && (
+                                  <span className="material-symbols-outlined" style={{
+                                    fontSize: '1.125rem',
+                                    color: '#1e40af',
+                                    flexShrink: 0,
+                                    fontWeight: '600'
+                                  }}>
+                                    check_circle
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '0.5rem'
+                              }}>
+                                <span style={{
+                                  fontSize: '0.6875rem',
+                                  color: '#6b7280',
+                                  padding: '0.125rem 0.5rem',
+                                  backgroundColor: '#f3f4f6',
+                                  borderRadius: '0.25rem'
+                                }}>
+                                  {vendorRequest?.boothSize || 'N/A'}
+                                </span>
+                                <span style={{
+                                  fontSize: '0.6875rem',
+                                  color: '#6b7280',
+                                  padding: '0.125rem 0.5rem',
+                                  backgroundColor: '#f3f4f6',
+                                  borderRadius: '0.25rem'
+                                }}>
+                                  {vendorRequest?.durationWeeks || 'N/A'}w
+                                </span>
+                                <span style={{
+                                  fontSize: '0.6875rem',
+                                  color: '#6b7280',
+                                  padding: '0.125rem 0.5rem',
+                                  backgroundColor: '#f3f4f6',
+                                  borderRadius: '0.25rem'
+                                }}>
+                                  {getLocationName(vendorRequest?.boothLocation)}
+                                </span>
+                              </div>
+                            </div>
                           </div>
 
-                          {/* Vote Count Bar */}
+                          {/* Compact Vote Count Bar */}
                           {hasVoted && (
-                            <div>
+                            <div style={{
+                              marginTop: '0.5rem',
+                              paddingTop: '0.5rem',
+                              borderTop: '1px solid #e5e7eb'
+                            }}>
                               <div style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                marginBottom: '0.5rem'
+                                marginBottom: '0.375rem'
                               }}>
                                 <span style={{
-                                  fontSize: '0.875rem',
+                                  fontSize: '0.75rem',
                                   fontWeight: '600',
                                   color: '#111827'
                                 }}>
-                                  {voteCount} vote{voteCount !== 1 ? 's' : ''}
+                                  {voteCount} {voteCount === 1 ? 'vote' : 'votes'}
                                 </span>
                                 <span style={{
-                                  fontSize: '0.875rem',
-                                  color: '#6b7280'
+                                  fontSize: '0.75rem',
+                                  fontWeight: '700',
+                                  color: isUserVote ? '#1e40af' : '#3b82f6'
                                 }}>
                                   {percentage.toFixed(1)}%
                                 </span>
@@ -931,7 +1235,8 @@ const BoothPolls = () => {
                                   width: `${percentage}%`,
                                   height: '100%',
                                   backgroundColor: isUserVote ? '#1e40af' : '#3b82f6',
-                                  transition: 'width 0.3s ease'
+                                  borderRadius: '9999px',
+                                  transition: 'width 0.5s ease'
                                 }}></div>
                               </div>
                             </div>
@@ -947,7 +1252,9 @@ const BoothPolls = () => {
         )}
       </div>
     </div>
+    </>
   );
 };
 
 export default BoothPolls;
+
