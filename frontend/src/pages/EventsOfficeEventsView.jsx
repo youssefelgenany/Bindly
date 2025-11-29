@@ -8,6 +8,7 @@ import BazaarForm from '../components/BazaarForm';
 import ConferenceForm from '../components/ConferenceForm';
 import TripForm from '../components/TripForm';
 import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
+import IDUploadModal from '../components/IDUploadModal';
 import EventsOfficeNotificationBell from './EventsOfficeNotificationBell';
 import axios from 'axios';
 
@@ -70,6 +71,8 @@ const EventsOfficeEventsView = () => {
   const [isWorkshopModalOpen, setIsWorkshopModalOpen] = useState(false);
   const [editingWorkshop, setEditingWorkshop] = useState(null);
   const [processingIds, setProcessingIds] = useState({});
+  const [showIDUploadModal, setShowIDUploadModal] = useState(false);
+  const [selectedRequestForUpload, setSelectedRequestForUpload] = useState(null); // { request, eventId, eventType }
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
   const [vendorRequests, setVendorRequests] = useState({}); // eventId -> array of requests
@@ -1028,6 +1031,29 @@ const EventsOfficeEventsView = () => {
       setLoadingVendorRequests(prev => ({ ...prev, [eventId]: false }));
     }
   }, []);
+
+  const handleOpenIDUploadModal = (request, eventId, eventType) => {
+    setSelectedRequestForUpload({ request, eventId, eventType });
+    setShowIDUploadModal(true);
+  };
+
+  const handleCloseIDUploadModal = () => {
+    setShowIDUploadModal(false);
+    setSelectedRequestForUpload(null);
+  };
+
+  const handleIDUploadSuccess = async () => {
+    try {
+      if (selectedRequestForUpload && selectedRequestForUpload.eventId) {
+        await loadVendorRequests(selectedRequestForUpload.eventId, selectedRequestForUpload.eventType);
+      }
+      setShowIDUploadModal(false);
+      setSelectedRequestForUpload(null);
+      setToast({ show: true, message: 'IDs uploaded successfully', type: 'success' });
+    } catch (err) {
+      console.error('Error reloading vendor requests after ID upload:', err);
+    }
+  };
 
   // Handle vendor request status update
   const handleVendorRequestStatus = async (requestId, status, eventId) => {

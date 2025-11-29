@@ -58,6 +58,7 @@ import AdminLoyaltyProgramVendors from './pages/AdminLoyaltyProgramVendors';
 import EventsOfficeLoyaltyProgramVendors from './pages/EventsOfficeLoyaltyProgramVendors';
 import VendorAcceptedEvents from './pages/VendorAcceptedEvents';
 import VendorMyRequests from './pages/VendorMyRequests';
+import VendorRequestPayment from './pages/VendorRequestPayment';
 import PlatformBoothRequests from './pages/PlatformBoothRequests';
 import VendorLoyaltyProgram from './pages/VendorLoyaltyProgram';
 import EventsOfficeCreatePoll from './pages/EventsOfficeCreatePoll';
@@ -599,6 +600,15 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <EventPayment />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/vendor-requests/:requestId/payment"
+          element={
+            <ProtectedRoute>
+              <VendorRequestPayment />
             </ProtectedRoute>
           }
         />
