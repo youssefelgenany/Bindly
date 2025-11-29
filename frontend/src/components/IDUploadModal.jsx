@@ -142,7 +142,12 @@ const IDUploadModal = ({ requestId, attendeesCount, onClose, onSuccess }) => {
                         fontSize: '0.875rem',
                         color: '#1e40af'
                     }}>
-                        <strong>ℹ️ Instructions:</strong>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                info
+                            </span>
+                            <strong>Instructions:</strong>
+                        </div>
                         <ul style={{
                             margin: '0.5rem 0 0 0',
                             paddingLeft: '1.25rem'
@@ -195,10 +200,13 @@ const IDUploadModal = ({ requestId, attendeesCount, onClose, onSuccess }) => {
                             display: 'block'
                         }}>
                             <div style={{
-                                fontSize: '2rem',
-                                marginBottom: '0.5rem'
+                                marginBottom: '0.5rem',
+                                display: 'flex',
+                                justifyContent: 'center'
                             }}>
-                                📁
+                                <span className="material-symbols-outlined" style={{ fontSize: '3rem', color: '#3b82f6' }}>
+                                    upload_file
+                                </span>
                             </div>
                             <div style={{
                                 fontSize: '0.875rem',
@@ -260,10 +268,11 @@ const IDUploadModal = ({ requestId, attendeesCount, onClose, onSuccess }) => {
                                             flex: 1,
                                             minWidth: 0
                                         }}>
-                                            <span style={{
-                                                fontSize: '1.25rem'
+                                            <span className="material-symbols-outlined" style={{
+                                                fontSize: '1.25rem',
+                                                color: file.type === 'application/pdf' ? '#ef4444' : '#3b82f6'
                                             }}>
-                                                {file.type === 'application/pdf' ? '📄' : '🖼️'}
+                                                {file.type === 'application/pdf' ? 'description' : 'image'}
                                             </span>
                                             <div style={{
                                                 flex: 1,
@@ -386,7 +395,10 @@ const IDUploadModal = ({ requestId, attendeesCount, onClose, onSuccess }) => {
                             </>
                         ) : (
                             <>
-                                ⬆️ Upload ({selectedFiles.length})
+                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                    upload_file
+                                </span>
+                                Upload ({selectedFiles.length})
                             </>
                         )}
                     </button>

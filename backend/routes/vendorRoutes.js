@@ -10,14 +10,15 @@ const {
   applyToLoyaltyProgram,
   getMyLoyaltyApplication,
   updateLoyaltyApplication,
-  cancelLoyaltyProgram
+  cancelLoyaltyProgram,
+  uploadVendorDocuments
 } = require('../controllers/vendorController.js');
 const {
   downloadVendorDocument,
   listVendorDocuments
 } = require('../controllers/vendorDocumentController.js');
 const { protect, permit } = require('../middleware/authMiddleware.js');
-const { uploadIndividualIdsArray } = require('../middleware/uploadMiddleware');
+const { uploadIndividualIdsArray, uploadVendorFiles } = require('../middleware/uploadMiddleware');
 
 const router = express.Router();
 
@@ -101,6 +102,15 @@ router.get('/my/upcoming', protect, permit('Vendor'), getMyAcceptedUpcoming); //
 
 // Vendor's pending/rejected upcoming requests
 router.get('/my/requests', protect, permit('Vendor'), getMyRequests); // ?status=pending|rejected & optional ?type=bazaar|booth
+
+// Upload/Update vendor documents (tax card and logo)
+router.post(
+  '/my/documents',
+  protect,
+  permit('Vendor'),
+  uploadVendorFiles,
+  uploadVendorDocuments
+);
 
 // Get all vendors (for admin/events office to get vendor IDs) - must be last to avoid route conflicts
 router.get(

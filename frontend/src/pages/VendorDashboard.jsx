@@ -3,13 +3,15 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { vendorApi } from '../api/vendorApi';
 import PlatformBoothsModal from '../components/PlatformBoothsModal';
+import VendorDocumentsModal from '../components/VendorDocumentsModal';
 
 const VendorDashboard = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   const [showPlatformBoothsModal, setShowPlatformBoothsModal] = useState(false);
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -389,19 +391,6 @@ const VendorDashboard = () => {
           >
             My Applications
           </Link>
-          <Link
-            to="/vendor/loyalty-program"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/loyalty-program') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/loyalty-program') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/loyalty-program') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            GUC Loyalty Program
-          </Link>
         </div>
       </nav>
 
@@ -625,6 +614,217 @@ const VendorDashboard = () => {
                           </div>
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Validity Status Card */}
+                  <div>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: '#1D3557',
+                      marginBottom: '1rem'
+                    }}>
+                      Account Validity
+                    </h3>
+                    <div style={{
+                      backgroundColor: '#FFFFFF',
+                      padding: '1.5rem',
+                      borderRadius: '0.5rem',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    }}>
+                      {user && (() => {
+                        const hasTaxCard = !!(user.vendorTaxCardPath || user.hasTaxCard);
+                        const hasLogo = !!(user.vendorLogoPath || user.hasLogo);
+                        const isValid = hasTaxCard && hasLogo;
+                        
+                        return (
+                          <>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <div style={{
+                                  backgroundColor: isValid ? '#dcfce7' : '#fee2e2',
+                                  padding: '0.75rem',
+                                  borderRadius: '50%'
+                                }}>
+                                  <span className="material-symbols-outlined" style={{ 
+                                    color: isValid ? '#065f46' : '#991b1b', 
+                                    fontSize: '1.5rem' 
+                                  }}>
+                                    {isValid ? 'check_circle' : 'error'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p style={{
+                                    color: 'rgba(29, 53, 87, 0.6)',
+                                    fontSize: '0.875rem',
+                                    margin: 0,
+                                    marginBottom: '0.25rem'
+                                  }}>
+                                    Status
+                                  </p>
+                                  <p style={{
+                                    color: isValid ? '#065f46' : '#991b1b',
+                                    fontSize: '1rem',
+                                    fontWeight: '600',
+                                    margin: 0
+                                  }}>
+                                    {isValid ? 'Valid' : 'Some documents are missing'}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.75rem',
+                              marginBottom: '1rem',
+                              padding: '0.75rem',
+                              backgroundColor: '#f9fafb',
+                              borderRadius: '0.375rem'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: '0.875rem', color: '#374151' }}>Tax Card</span>
+                                <span style={{
+                                  fontSize: '0.875rem',
+                                  color: hasTaxCard ? '#065f46' : '#991b1b',
+                                  fontWeight: '500'
+                                }}>
+                                  {hasTaxCard ? '✓ Uploaded' : '✗ Missing'}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: '0.875rem', color: '#374151' }}>Logo</span>
+                                <span style={{
+                                  fontSize: '0.875rem',
+                                  color: hasLogo ? '#065f46' : '#991b1b',
+                                  fontWeight: '500'
+                                }}>
+                                  {hasLogo ? '✓ Uploaded' : '✗ Missing'}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {!isValid && (
+                              <button
+                                onClick={() => setShowDocumentsModal(true)}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.75rem 1rem',
+                                  borderRadius: '0.5rem',
+                                  backgroundColor: '#1e40af',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.5rem',
+                                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.target.style.backgroundColor = '#1e3a8a';
+                                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.backgroundColor = '#1e40af';
+                                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                  upload_file
+                                </span>
+                                Upload Documents
+                              </button>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* GUC Loyalty Program Card */}
+                  <div style={{
+                    backgroundColor: '#FFFFFF',
+                    padding: '1.5rem',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    border: '2px solid #e5e7eb',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#1e40af';
+                    e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                  }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{
+                          backgroundColor: '#fef3c7',
+                          padding: '0.75rem',
+                          borderRadius: '50%'
+                        }}>
+                          <span className="material-symbols-outlined" style={{ color: '#92400e', fontSize: '1.5rem' }}>
+                            badge
+                          </span>
+                        </div>
+                        <div>
+                          <h4 style={{
+                            color: '#1D3557',
+                            fontSize: '1rem',
+                            fontWeight: '600',
+                            margin: '0 0 0.25rem 0'
+                          }}>
+                            GUC Loyalty Program
+                          </h4>
+                          <p style={{
+                            color: 'rgba(29, 53, 87, 0.6)',
+                            fontSize: '0.875rem',
+                            margin: 0
+                          }}>
+                            Offer discounts to the campus community
+                          </p>
+                        </div>
+                      </div>
+                      <Link
+                        to="/vendor/loyalty-program"
+                        style={{
+                          padding: '0.75rem 1rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: '#1e40af',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          textDecoration: 'none',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.backgroundColor = '#1e3a8a';
+                          e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.backgroundColor = '#1e40af';
+                          e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                          arrow_forward
+                        </span>
+                        Apply Now
+                      </Link>
                     </div>
                   </div>
 
@@ -957,6 +1157,28 @@ const VendorDashboard = () => {
           loadDashboardData();
         }}
       />
+
+      {/* Vendor Documents Modal */}
+      {showDocumentsModal && (
+        <VendorDocumentsModal
+          onClose={() => setShowDocumentsModal(false)}
+          onSuccess={(vendorData) => {
+            // Update user context with new document paths
+            if (vendorData) {
+              const updatedUser = { ...user };
+              if (vendorData.taxCardPath !== null && vendorData.taxCardPath !== undefined) {
+                updatedUser.vendorTaxCardPath = vendorData.taxCardPath;
+              }
+              if (vendorData.logoPath !== null && vendorData.logoPath !== undefined) {
+                updatedUser.vendorLogoPath = vendorData.logoPath;
+              }
+              updatedUser.hasTaxCard = vendorData.hasTaxCard !== undefined ? vendorData.hasTaxCard : !!vendorData.taxCardPath;
+              updatedUser.hasLogo = vendorData.hasLogo !== undefined ? vendorData.hasLogo : !!vendorData.logoPath;
+              updateUser(updatedUser);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -921,15 +921,57 @@ module.exports.applyToLoyaltyProgram = async (req, res) => {
       });
     }
 
-    // Check if vendor already has a loyalty program application
+    // Check if vendor already has an active loyalty program application
     const existingApplication = await VendorLoyaltyProgram.findOne({
-      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`
+      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`,
+      isActive: true
     });
 
     if (existingApplication) {
       return res.status(400).json({
         success: false,
         message: 'You already have an active loyalty program application. Update it instead.'
+      });
+    }
+
+    // If there's an inactive application, reactivate it instead of creating a new one
+    const inactiveApplication = await VendorLoyaltyProgram.findOne({
+      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`,
+      isActive: false
+    });
+
+    if (inactiveApplication) {
+      // Reactivate and update the existing application
+      inactiveApplication.discountRate = discountRate;
+      inactiveApplication.discountType = discountType || 'percentage';
+      inactiveApplication.promoCode = promoCode.toUpperCase();
+      inactiveApplication.termsAndConditions = termsAndConditions;
+      inactiveApplication.validFrom = validFrom ? new Date(validFrom) : new Date();
+      inactiveApplication.validUntil = validUntil ? new Date(validUntil) : null;
+      inactiveApplication.description = description || '';
+      inactiveApplication.category = category || '';
+      inactiveApplication.isActive = true;
+      inactiveApplication.logoUrl = buildAbsoluteLogoUrl(
+        vendor.vendorLogoPath || vendor.logoUrl || vendor.companyLogo
+      );
+      await inactiveApplication.save();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Loyalty program application reactivated successfully',
+        application: {
+          _id: inactiveApplication._id,
+          vendorName: inactiveApplication.vendorName,
+          discountRate: inactiveApplication.discountRate,
+          discountType: inactiveApplication.discountType,
+          promoCode: inactiveApplication.promoCode,
+          termsAndConditions: inactiveApplication.termsAndConditions,
+          validFrom: inactiveApplication.validFrom,
+          validUntil: inactiveApplication.validUntil,
+          isActive: inactiveApplication.isActive,
+          createdAt: inactiveApplication.createdAt,
+          updatedAt: inactiveApplication.updatedAt
+        }
       });
     }
 
@@ -992,7 +1034,7 @@ module.exports.getMyLoyaltyApplication = async (req, res) => {
       });
     }
 
-    // Find vendor's loyalty program application
+    // Find vendor's loyalty program application (active or inactive)
     const application = await VendorLoyaltyProgram.findOne({
       vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`
     });
@@ -1134,7 +1176,7 @@ module.exports.cancelLoyaltyProgram = async (req, res) => {
       });
     }
 
-    // Find vendor's loyalty program application
+    // Find vendor's loyalty program application (active or inactive)
     const application = await VendorLoyaltyProgram.findOne({
       vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`
     });

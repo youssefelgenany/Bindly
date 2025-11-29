@@ -893,11 +893,14 @@ const StaffLoyaltyVendorsView = () => {
                     style={{
                       backgroundColor: '#FFFFFF',
                       borderRadius: '0.75rem',
-                      padding: '1.5rem',
+                      padding: 0,
                       boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      border: '1px solid #e5e7eb'
+                      border: '1px solid #e5e7eb',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
@@ -908,6 +911,44 @@ const StaffLoyaltyVendorsView = () => {
                       e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
+                    {/* Booth Photo */}
+                    <div style={{
+                      width: '100%',
+                      height: '180px',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      backgroundColor: '#f3f4f6',
+                      flexShrink: 0
+                    }}>
+                      <img
+                        src="/assets/images/booth-background.jpg"
+                        alt={vendor.vendorName || 'Vendor'}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          objectPosition: 'center'
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.parentElement.style.backgroundColor = '#3F51B5';
+                          e.target.parentElement.style.display = 'flex';
+                          e.target.parentElement.style.alignItems = 'center';
+                          e.target.parentElement.style.justifyContent = 'center';
+                          if (!e.target.parentElement.querySelector('.fallback-text')) {
+                            const fallback = document.createElement('div');
+                            fallback.className = 'fallback-text';
+                            fallback.textContent = (vendor.vendorName || 'VENDOR').toUpperCase();
+                            fallback.style.color = '#FFFFFF';
+                            fallback.style.fontSize = '1.25rem';
+                            fallback.style.fontWeight = '700';
+                            e.target.parentElement.appendChild(fallback);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                     {/* Vendor Logo/Icon */}
                     {vendor.logoUrl ? (
                       <img
@@ -1040,6 +1081,7 @@ const StaffLoyaltyVendorsView = () => {
                       <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
                         arrow_forward
                       </span>
+                    </div>
                     </div>
                   </div>
                 ))}
