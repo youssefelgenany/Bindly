@@ -243,6 +243,24 @@ const VendorAcceptedEvents = () => {
     return typeMap[type?.toLowerCase()] || (type || 'Event');
   };
 
+  const getStatusColor = (status) => {
+    const colors = {
+      approved: '#059669',
+      accepted: '#059669',
+      pending: '#f59e0b',
+      rejected: '#dc2626'
+    };
+    return colors[String(status || '').toLowerCase()] || '#6b7280';
+  };
+
+  const getDisplayStatus = (status) => {
+    const normalized = String(status || '').toLowerCase();
+    if (normalized === 'approved' || normalized === 'accepted' || normalized === 'registered') return 'REGISTERED';
+    if (normalized === 'pending') return 'PENDING';
+    if (normalized === 'rejected') return 'REJECTED';
+    return status ? String(status).toUpperCase() : 'STATUS';
+  };
+
   const displayName = user?.companyName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Vendor';
 
   return (
@@ -698,16 +716,24 @@ const VendorAcceptedEvents = () => {
                                     {getDaysUntilEvent(startDate)}
                                   </div>
                                 )}
-                                <span style={{
-                                  padding: '0.25rem 0.75rem',
-                                  borderRadius: '9999px',
-                                  fontSize: '0.75rem',
-                                  fontWeight: '500',
-                                  backgroundColor: '#d1fae5',
-                                  color: '#065f46'
-                                }}>
-                                  {(event.paymentStatus === 'paid' || event.paidAt) ? 'Paid' : 'Accepted'}
-                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); /* optional action on status click */ }}
+                                  style={{
+                                    padding: '0.375rem 0.875rem',
+                                    borderRadius: '0.5rem',
+                                    border: 'none',
+                                    backgroundColor: getStatusColor(event.status || event.requestStatus || event.paymentStatus),
+                                    color: '#FFFFFF',
+                                    fontSize: '0.6875rem',
+                                    fontWeight: '700',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                    cursor: 'default'
+                                  }}
+                                >
+                                  {getDisplayStatus(event.status || event.requestStatus || (event.paymentStatus === 'paid' ? 'paid' : 'accepted'))}
+                                </button>
                                 {/* (Cancel button moved to card footer) */}
                               </div>
                             </div>
