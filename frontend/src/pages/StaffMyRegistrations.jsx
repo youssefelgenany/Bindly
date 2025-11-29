@@ -2148,10 +2148,8 @@ const StaffMyRegistrations = () => {
                 </div>
               )}
 
-              {/* Cancel Button - Only show for paid registrations that haven't started */}
-              {selectedRegistration.paid && 
-               selectedRegistration.eventDate && 
-               new Date(selectedRegistration.eventDate) > new Date() && (
+              {/* Cancel Button - Only show for paid registrations that can be cancelled (2+ weeks before event) */}
+              {canStaffCancel(selectedRegistration) && (
                 <div style={{
                   marginTop: '1.5rem',
                   paddingTop: '1.5rem',
@@ -2179,14 +2177,7 @@ const StaffMyRegistrations = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '0.5rem',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#b91c1c';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#dc2626';
+                      gap: '0.5rem'
                     }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>

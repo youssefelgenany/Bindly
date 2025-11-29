@@ -14,10 +14,8 @@ const CreateWorkshop = () => {
   const [formData, setFormData] = useState({
     workshopName: '',
     location: 'GUC Cairo',
-    startDate: '',
-    endDate: '',
-    startTime: '',
-    endTime: '',
+    startDateTime: '',
+    endDateTime: '',
     registrationDeadline: '',
     shortDescription: '',
     fullAgenda: '',
@@ -54,8 +52,8 @@ const CreateWorkshop = () => {
 
     // Validate required fields
     const requiredFields = [
-      'workshopName', 'location', 'startDate', 'endDate', 'startTime', 
-      'endTime', 'registrationDeadline', 'shortDescription', 'fullAgenda',
+      'workshopName', 'location', 'startDateTime', 'endDateTime', 
+      'registrationDeadline', 'shortDescription', 'fullAgenda',
       'facultyResponsible', 'professorsParticipating', 'requiredBudget',
       'fundingSource', 'capacity'
     ];
@@ -76,8 +74,8 @@ const CreateWorkshop = () => {
     }
 
     // Validate dates
-    const startDate = new Date(`${formData.startDate}T${formData.startTime}`);
-    const endDate = new Date(`${formData.endDate}T${formData.endTime}`);
+    const startDate = new Date(formData.startDateTime);
+    const endDate = new Date(formData.endDateTime);
     const registrationDeadline = new Date(formData.registrationDeadline);
 
     if (endDate <= startDate) {
@@ -119,13 +117,32 @@ const CreateWorkshop = () => {
       }
 
       // Prepare data for submission
+      // Extract date and time from datetime-local values for backward compatibility
+      const startDateTime = new Date(formData.startDateTime);
+      const endDateTime = new Date(formData.endDateTime);
+      
+      // Format time as HH:MM
+      const formatTime = (date) => {
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+      };
+      
+      // Format date as YYYY-MM-DD
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
       const submitData = {
         workshopName: formData.workshopName.trim(),
         location: formData.location,
-        startDate: new Date(`${formData.startDate}T${formData.startTime}`).toISOString(),
-        endDate: new Date(`${formData.endDate}T${formData.endTime}`).toISOString(),
-        startTime: formData.startTime,
-        endTime: formData.endTime,
+        startDate: startDateTime.toISOString(),
+        endDate: endDateTime.toISOString(),
+        startTime: formatTime(startDateTime),
+        endTime: formatTime(endDateTime),
         registrationDeadline: new Date(formData.registrationDeadline).toISOString(),
         shortDescription: formData.shortDescription.trim(),
         fullAgenda: formData.fullAgenda.trim(),
@@ -732,127 +749,66 @@ const CreateWorkshop = () => {
                   </select>
                 </div>
 
-                {/* Date and Time Row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{
-                      display: 'block',
+                {/* Start Date & Time */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Start Date & Time <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="startDateTime"
+                    value={formData.startDateTime}
+                    onChange={handleChange}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
                       fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Start Date <span style={{ color: '#dc2626' }}>*</span>
-                    </label>
-                    <input
-                      type="date"
-                      name="startDate"
-                      value={formData.startDate}
-                      onChange={handleChange}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        transition: 'border-color 0.2s',
-                        boxSizing: 'border-box'
-                      }}
-                      onFocus={(e) => e.target.style.borderColor = '#1e40af'}
-                      onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-                    />
-                  </div>
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Start Time <span style={{ color: '#dc2626' }}>*</span>
-                    </label>
-                    <input
-                      type="time"
-                      name="startTime"
-                      value={formData.startTime}
-                      onChange={handleChange}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        transition: 'border-color 0.2s',
-                        boxSizing: 'border-box'
-                      }}
-                      onFocus={(e) => e.target.style.borderColor = '#1e40af'}
-                      onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-                    />
-                  </div>
+                      transition: 'border-color 0.2s',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                    onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                  />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{
-                      display: 'block',
+                {/* End Date & Time */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    End Date & Time <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="endDateTime"
+                    value={formData.endDateTime}
+                    onChange={handleChange}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
                       fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      End Date <span style={{ color: '#dc2626' }}>*</span>
-                    </label>
-                    <input
-                      type="date"
-                      name="endDate"
-                      value={formData.endDate}
-                      onChange={handleChange}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        transition: 'border-color 0.2s',
-                        boxSizing: 'border-box'
-                      }}
-                      onFocus={(e) => e.target.style.borderColor = '#1e40af'}
-                      onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-                    />
-                  </div>
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      End Time <span style={{ color: '#dc2626' }}>*</span>
-                    </label>
-                    <input
-                      type="time"
-                      name="endTime"
-                      value={formData.endTime}
-                      onChange={handleChange}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        transition: 'border-color 0.2s',
-                        boxSizing: 'border-box'
-                      }}
-                      onFocus={(e) => e.target.style.borderColor = '#1e40af'}
-                      onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-                    />
-                  </div>
+                      transition: 'border-color 0.2s',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#1e40af'}
+                    onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                  />
                 </div>
 
                 {/* Registration Deadline */}
