@@ -74,6 +74,7 @@ const BoothPolls = () => {
         ...baseLinks,
         { to: '/professor/all-events', label: 'Discover Events', icon: 'explore' },
         { to: '/professor/events', label: 'My Events', icon: 'event' },
+        { to: '/professor/my-workshops', label: 'My Workshops', icon: 'school' },
         { to: '/gym', label: 'Gym Sessions', icon: 'fitness_center' },
         { to: '/booth-polls', label: 'Vendor Polls', icon: 'poll' }
       ];
@@ -937,7 +938,7 @@ const BoothPolls = () => {
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
             gap: '1.5rem'
           }}>
             {polls.map((poll, pollIndex) => {

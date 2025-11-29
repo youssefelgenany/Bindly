@@ -63,7 +63,6 @@ async function sendVerificationEmail(to, token, name) {
     token
   )}`;
 
-  const apiVerifyUrl = `${backendUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
   const loginRedirect =
     stripTrailingSlash(process.env.APP_LOGIN_URL) || `${frontendUrl}/login`;
 
@@ -71,7 +70,6 @@ async function sendVerificationEmail(to, token, name) {
     frontendUrl,
     backendUrl,
     verifyUrl,
-    apiVerifyUrl,
     loginRedirect,
   });
   
@@ -82,9 +80,7 @@ async function sendVerificationEmail(to, token, name) {
     "",
     "Welcome to Bindly! Please verify your email within the next 24 hours so you can access your account.",
     "",
-    `1) Primary link: ${verifyUrl}`,
-    "2) Fallback (direct API endpoint):",
-    `   ${apiVerifyUrl}`,
+    `Verification link: ${verifyUrl}`,
     "",
     `You'll be redirected to ${loginRedirect} once verification succeeds.`,
     "",
@@ -144,19 +140,10 @@ async function sendVerificationEmail(to, token, name) {
                     </td>
                   </tr>
                 </table>
-                <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#1D4ED8;">Primary verification link</p>
-                <p style="margin:0 0 18px;font-size:13px;color:#1D4ED8;word-break:break-all;">
+                <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#1D4ED8;">Verification link</p>
+                <p style="margin:0 0 24px;font-size:13px;color:#1D4ED8;word-break:break-all;">
                   <a href="${verifyUrl}" style="color:#1D4ED8;text-decoration:none;">${verifyUrl}</a>
                 </p>
-                <div style="background-color:#F8F5FF;border:1px solid #C4B5FD;border-radius:16px;padding:18px 20px;margin:6px 0 24px;">
-                  <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#4C1D95;">If the button doesn't work</p>
-                  <p style="margin:0;font-size:13px;color:#4C1D95;line-height:1.6;">
-                    Use our secure fallback endpoint:
-                  </p>
-                  <p style="margin:10px 0 0;font-size:13px;color:#4C1D95;word-break:break-all;">
-                    <a href="${apiVerifyUrl}" style="color:#4C1D95;text-decoration:underline;">${apiVerifyUrl}</a>
-                  </p>
-                </div>
                 <p style="margin:0 0 10px;font-size:13px;color:#6B7280;">
                   Need help? Reply to this email or contact your Bindly administrator and mention the address
                   <strong>${to}</strong>.

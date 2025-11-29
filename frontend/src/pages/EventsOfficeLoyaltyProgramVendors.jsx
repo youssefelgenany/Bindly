@@ -65,6 +65,7 @@ const EventsOfficeLoyaltyProgramVendors = () => {
   };
 
   const formatDiscount = (rate, type) => {
+    if (!rate && rate !== 0) return 'N/A';
     if (type === 'percentage') {
       return `${rate}%`;
     } else {
@@ -73,6 +74,23 @@ const EventsOfficeLoyaltyProgramVendors = () => {
   };
 
   const displayName = user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Events Office';
+
+  // Guard against rendering before user is loaded
+  if (!user) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        fontFamily: 'Inter, sans-serif'
+      }}>
+        <div style={{ textAlign: 'center', color: '#6b7280' }}>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -683,106 +701,109 @@ const EventsOfficeLoyaltyProgramVendors = () => {
                 </tr>
               </thead>
               <tbody>
-                {vendors.map((vendor, index) => (
-                  <tr key={vendor.id} style={{
-                    borderBottom: index < vendors.length - 1 ? '1px solid #e5e7eb' : 'none'
-                  }}>
-                    <td style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      color: '#111827'
+                {vendors.map((vendor, index) => {
+                  if (!vendor) return null;
+                  return (
+                    <tr key={vendor.id || vendor._id || index} style={{
+                      borderBottom: index < vendors.length - 1 ? '1px solid #e5e7eb' : 'none'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        {vendor.logoUrl && (
-                          <img
-                            src={vendor.logoUrl}
-                            alt={vendor.vendorName}
-                            style={{
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: '0.5rem',
-                              objectFit: 'cover'
-                            }}
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                            }}
-                          />
-                        )}
-                        <div>
-                          <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
-                            {vendor.vendorName}
-                          </div>
-                          {vendor.description && (
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                              {vendor.description.length > 50 ? `${vendor.description.substring(0, 50)}...` : vendor.description}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.875rem',
-                      color: '#6b7280'
-                    }}>
-                      {vendor.category || 'N/A'}
-                    </td>
-                    <td style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: '#059669',
-                      textAlign: 'center'
-                    }}>
-                      {formatDiscount(vendor.discountRate, vendor.discountType)}
-                    </td>
-                    <td style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: '700',
-                      color: '#78350f',
-                      fontFamily: 'monospace',
-                      letterSpacing: '0.05em',
-                      textAlign: 'center'
-                    }}>
-                      {vendor.promoCode}
-                    </td>
-                    <td style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.875rem',
-                      color: '#374151',
-                      maxWidth: '300px'
-                    }}>
-                      <div style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        lineHeight: '1.5'
+                      <td style={{
+                        padding: '1rem 1.5rem',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: '#111827'
                       }}>
-                        {vendor.termsAndConditions}
-                      </div>
-                    </td>
-                    <td style={{
-                      padding: '1rem 1.5rem',
-                      fontSize: '0.875rem',
-                      color: '#6b7280'
-                    }}>
-                      <div style={{ marginBottom: '0.25rem' }}>
-                        <span style={{ fontWeight: '500' }}>From: </span>
-                        {formatDate(vendor.validFrom)}
-                      </div>
-                      {vendor.validUntil && (
-                        <div>
-                          <span style={{ fontWeight: '500' }}>Until: </span>
-                          {formatDate(vendor.validUntil)}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          {vendor.logoUrl && (
+                            <img
+                              src={vendor.logoUrl}
+                              alt={vendor.vendorName || 'Vendor'}
+                              style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '0.5rem',
+                                objectFit: 'cover'
+                              }}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          )}
+                          <div>
+                            <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
+                              {vendor.vendorName || 'N/A'}
+                            </div>
+                            {vendor.description && (
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                                {vendor.description.length > 50 ? `${vendor.description.substring(0, 50)}...` : vendor.description}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td style={{
+                        padding: '1rem 1.5rem',
+                        fontSize: '0.875rem',
+                        color: '#6b7280'
+                      }}>
+                        {vendor.category || 'N/A'}
+                      </td>
+                      <td style={{
+                        padding: '1rem 1.5rem',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#059669',
+                        textAlign: 'center'
+                      }}>
+                        {formatDiscount(vendor.discountRate || 0, vendor.discountType || 'percentage')}
+                      </td>
+                      <td style={{
+                        padding: '1rem 1.5rem',
+                        fontSize: '0.875rem',
+                        fontWeight: '700',
+                        color: '#78350f',
+                        fontFamily: 'monospace',
+                        letterSpacing: '0.05em',
+                        textAlign: 'center'
+                      }}>
+                        {vendor.promoCode || 'N/A'}
+                      </td>
+                      <td style={{
+                        padding: '1rem 1.5rem',
+                        fontSize: '0.875rem',
+                        color: '#374151',
+                        maxWidth: '300px'
+                      }}>
+                        <div style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          lineHeight: '1.5'
+                        }}>
+                          {vendor.termsAndConditions || 'N/A'}
+                        </div>
+                      </td>
+                      <td style={{
+                        padding: '1rem 1.5rem',
+                        fontSize: '0.875rem',
+                        color: '#6b7280'
+                      }}>
+                        <div style={{ marginBottom: '0.25rem' }}>
+                          <span style={{ fontWeight: '500' }}>From: </span>
+                          {formatDate(vendor.validFrom)}
+                        </div>
+                        {vendor.validUntil && (
+                          <div>
+                            <span style={{ fontWeight: '500' }}>Until: </span>
+                            {formatDate(vendor.validUntil)}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

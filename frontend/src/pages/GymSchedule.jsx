@@ -60,7 +60,7 @@ const GymSchedule = () => {
     if (user?.userType === 'TA' || user?.userType === 'Staff') return '/staff/loyalty-vendors';
     if (user?.userType === 'Professor') return '/professor/loyalty-vendors';
     if (user?.userType === 'Student') return '/student/loyalty-vendors';
-    return '/event-office/loyalty-program-vendors';
+    return '/event-office/loyalty-partners';
   };
 
   const getDashboardRoute = () => {
@@ -234,6 +234,14 @@ const GymSchedule = () => {
   const startDay = useMemo(() => firstOfMonth.getDay(), [firstOfMonth]);
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  // Helper function to format date as YYYY-MM-DD in local time (not UTC)
+  const formatDateKeyLocal = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Group sessions by date (YYYY-MM-DD format)
   const sessionsByDate = useMemo(() => {
     const map = {};
@@ -248,7 +256,8 @@ const GymSchedule = () => {
         // Skip if date is invalid
         if (isNaN(d.getTime())) continue;
         
-        const key = d.toISOString().slice(0, 10); // YYYY-MM-DD format
+        // Use local time formatting to avoid timezone shifts
+        const key = formatDateKeyLocal(d);
         if (!map[key]) map[key] = [];
         map[key].push(s);
       } catch (error) {
@@ -261,7 +270,7 @@ const GymSchedule = () => {
 
   const formatDateKey = (y, m, day) => {
     const date = new Date(y, m, day);
-    return date.toISOString().slice(0, 10);
+    return formatDateKeyLocal(date);
   };
 
   // Get color for session type
@@ -619,37 +628,37 @@ const GymSchedule = () => {
               </Link>
 
               <Link
-                to="/event-office/loyalty-program-vendors"
+                to="/event-office/loyalty-partners"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  backgroundColor: isActiveRoute('/event-office/loyalty-program-vendors') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                  backgroundColor: isActiveRoute('/event-office/loyalty-partners') ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                   textDecoration: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActiveRoute('/event-office/loyalty-program-vendors')) {
+                  if (!isActiveRoute('/event-office/loyalty-partners')) {
                     e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActiveRoute('/event-office/loyalty-program-vendors')) {
+                  if (!isActiveRoute('/event-office/loyalty-partners')) {
                     e.target.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <span className="material-symbols-outlined" style={{ 
-                  color: isActiveRoute('/event-office/loyalty-program-vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
+                  color: isActiveRoute('/event-office/loyalty-partners') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)', 
                   fontSize: '1.25rem' 
                 }}>
                   card_giftcard
                 </span>
                 <p style={{
-                  color: isActiveRoute('/event-office/loyalty-program-vendors') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
+                  color: isActiveRoute('/event-office/loyalty-partners') ? '#FFFFFF' : 'rgba(241, 250, 238, 0.7)',
                   fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/event-office/loyalty-program-vendors') ? '700' : '500',
+                  fontWeight: isActiveRoute('/event-office/loyalty-partners') ? '700' : '500',
                   lineHeight: 'normal',
                   margin: 0
                 }}>
@@ -1161,6 +1170,25 @@ const GymSchedule = () => {
                       event
                     </span>
                     My Events
+                  </Link>
+                  <Link
+                    to="/professor/my-workshops"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #FFFFFF' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      school
+                    </span>
+                    My Workshops
                   </Link>
                   <Link
                     to="/gym"

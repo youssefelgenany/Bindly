@@ -29,19 +29,28 @@ const GymSessionForm = ({ onSubmit, loading = false, submitLabel = 'Create Gym S
       return;
     }
 
+    // Parse integer fields
+    const duration = parseInt(formData.duration, 10);
+    const maxParticipants = parseInt(formData.maxParticipants, 10);
+
     // Validate duration
-    if (formData.duration <= 0) {
+    if (isNaN(duration) || duration <= 0) {
       alert('Duration must be greater than 0');
       return;
     }
 
     // Validate max participants
-    if (formData.maxParticipants <= 0) {
+    if (isNaN(maxParticipants) || maxParticipants <= 0) {
       alert('Max participants must be greater than 0');
       return;
     }
 
-    onSubmit(formData);
+    // Submit with parsed integers
+    onSubmit({
+      ...formData,
+      duration,
+      maxParticipants
+    });
   };
 
   const sessionTypes = [

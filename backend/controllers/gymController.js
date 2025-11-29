@@ -86,14 +86,30 @@ exports.viewGymScheduleMonth = async (req, res) => {
     const start = new Date(year, month - 1, 1);
     const end = new Date(year, month, 1);
 
-    const sessions = await GymSession.find({
+    // Build filter object
+    const filter = {
       date: { $gte: start, $lt: end }
-    })
+    };
+
+    // Filter out cancelled sessions for non-Events Office users
+    // Events Office includes: Admin, event_office, Event Office, Events Office
+    const userType = req.user?.userType || req.user?.role || '';
+    const userTypeLower = userType.toLowerCase().replace(/[_\s]/g, '');
+    const isEventsOffice = userTypeLower === 'admin' || 
+                          userTypeLower === 'eventoffice' ||
+                          userTypeLower === 'eventsoffice';
+    
+    if (!isEventsOffice) {
+      // For non-Events Office users, exclude cancelled sessions
+      filter.status = { $ne: 'cancelled' };
+    }
+
+    const sessions = await GymSession.find(filter)
       .sort({ date: 1, time: 1 })
       .populate('createdBy', 'firstName lastName')
       .lean();
 
-    console.log('viewGymScheduleMonth - sessions fetched:', sessions.length);
+    console.log('viewGymScheduleMonth - sessions fetched:', sessions.length, 'for userType:', userType, 'isEventsOffice:', isEventsOffice);
     return res.json({ year, month, sessions });
   } catch (err) {
     console.error("viewGymScheduleMonth error:", err);
