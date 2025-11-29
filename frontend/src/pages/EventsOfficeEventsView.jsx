@@ -8,7 +8,6 @@ import BazaarForm from '../components/BazaarForm';
 import ConferenceForm from '../components/ConferenceForm';
 import TripForm from '../components/TripForm';
 import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
-import IDUploadModal from '../components/IDUploadModal';
 import EventsOfficeNotificationBell from './EventsOfficeNotificationBell';
 import axios from 'axios';
 
@@ -71,8 +70,6 @@ const EventsOfficeEventsView = () => {
   const [isWorkshopModalOpen, setIsWorkshopModalOpen] = useState(false);
   const [editingWorkshop, setEditingWorkshop] = useState(null);
   const [processingIds, setProcessingIds] = useState({});
-  const [showIDUploadModal, setShowIDUploadModal] = useState(false);
-  const [selectedRequestForUpload, setSelectedRequestForUpload] = useState(null); // { request, eventId, eventType }
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
   const [vendorRequests, setVendorRequests] = useState({}); // eventId -> array of requests
@@ -92,12 +89,11 @@ const EventsOfficeEventsView = () => {
     navigate('/login');
   };
 
-  const loadEvents = useCallback(async (retryCount = 0) => {
-    const MAX_RETRIES = 2;
+  const loadEvents = useCallback(async () => {
     try {
       setError('');
       setLoading(true);
-      console.log('🔍 Loading events with params:', { searchQuery, filter, retryCount });
+      console.log('🔍 Loading events with params:', { searchQuery, filter });
       
       const result = await eventsApiService.getAllEventsAuthenticated({
         q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
@@ -255,62 +251,23 @@ const EventsOfficeEventsView = () => {
         const sortedEvents = [...upcomingEvents, ...pastEvents];
         console.log('🔍 Sorted events - Upcoming:', upcomingEvents.length, 'Past:', pastEvents.length);
         setEvents(sortedEvents);
-        // Clear error on successful load
-        setError('');
       } else {
-        // Check if it's a network/timeout error that should be retried
-        const isNetworkError = result.error?.code === 'ECONNABORTED' || 
-                               result.error?.code === 'ERR_NETWORK' ||
-                               result.message?.toLowerCase().includes('timeout') ||
-                               result.message?.toLowerCase().includes('network error') ||
-                               (result.error && typeof result.error === 'string' && result.error.toLowerCase().includes('timeout'));
-        
-        if (isNetworkError && retryCount < MAX_RETRIES) {
-          console.log(`🔍 Network error detected, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
-          // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-          return loadEvents(retryCount + 1);
-        }
-        
         console.error('🔍 API call failed:', result);
-        // Only set error if we've exhausted retries or it's not a network error
-        if (retryCount >= MAX_RETRIES || !isNetworkError) {
-          setEvents([]);
-          const msg = result.message || (typeof result.error === 'string' ? result.error : 'Failed to fetch events');
-          setError(msg);
-        }
+        setEvents([]);
+        const msg = result.message || (typeof result.error === 'string' ? result.error : 'Failed to fetch events');
+        setError(msg);
       }
     } catch (error) {
       console.error('🔍 Error loading events:', error);
-      // Check if it's a network/timeout error
-      const isNetworkError = error.code === 'ECONNABORTED' || 
-                             error.code === 'ERR_NETWORK' ||
-                             error.message?.toLowerCase().includes('timeout') ||
-                             error.message?.toLowerCase().includes('network error');
-      
-      if (isNetworkError && retryCount < MAX_RETRIES) {
-        console.log(`🔍 Network error in catch, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
-        // Wait before retrying (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-        return loadEvents(retryCount + 1);
-      }
-      
-      // Only set error if we've exhausted retries or it's not a network error
-      if (retryCount >= MAX_RETRIES || !isNetworkError) {
-        setError(error?.message || 'Error loading events');
-        setEvents([]);
-      }
+      setError(error?.message || 'Error loading events');
+      setEvents([]);
     } finally {
       setLoading(false);
     }
   }, [searchQuery, filter]);
 
   useEffect(() => {
-    // Small delay to ensure component is fully mounted and ready
-    const timer = setTimeout(() => {
-      loadEvents();
-    }, 100);
-    return () => clearTimeout(timer);
+    loadEvents();
   }, [filter, loadEvents]);
 
   // Reload archived events when modal opens
@@ -1032,29 +989,6 @@ const EventsOfficeEventsView = () => {
     }
   }, []);
 
-  const handleOpenIDUploadModal = (request, eventId, eventType) => {
-    setSelectedRequestForUpload({ request, eventId, eventType });
-    setShowIDUploadModal(true);
-  };
-
-  const handleCloseIDUploadModal = () => {
-    setShowIDUploadModal(false);
-    setSelectedRequestForUpload(null);
-  };
-
-  const handleIDUploadSuccess = async () => {
-    try {
-      if (selectedRequestForUpload && selectedRequestForUpload.eventId) {
-        await loadVendorRequests(selectedRequestForUpload.eventId, selectedRequestForUpload.eventType);
-      }
-      setShowIDUploadModal(false);
-      setSelectedRequestForUpload(null);
-      setToast({ show: true, message: 'IDs uploaded successfully', type: 'success' });
-    } catch (err) {
-      console.error('Error reloading vendor requests after ID upload:', err);
-    }
-  };
-
   // Handle vendor request status update
   const handleVendorRequestStatus = async (requestId, status, eventId) => {
     try {
@@ -1536,11 +1470,11 @@ const EventsOfficeEventsView = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+          borderBottom: '1px solid #e2e8f0',
           padding: '1rem 2.5rem',
-          backgroundColor: '#1D3557'
+          backgroundColor: '#FFFFFF'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               style={{
@@ -1551,7 +1485,7 @@ const EventsOfficeEventsView = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF'
+                color: '#1D3557'
               }}
               aria-label="Toggle sidebar"
             >
@@ -1560,7 +1494,7 @@ const EventsOfficeEventsView = () => {
               </span>
             </button>
             <h2 style={{
-              color: '#FFFFFF',
+              color: '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -1577,14 +1511,14 @@ const EventsOfficeEventsView = () => {
               <p style={{
                 fontSize: '0.875rem',
                 fontWeight: '600',
-                color: '#FFFFFF',
+                color: '#1D3557',
                 margin: 0
               }}>
                 {displayName}
               </p>
               <p style={{
                 fontSize: '0.75rem',
-                color: 'rgba(255, 255, 255, 0.7)',
+                color: '#6b7280',
                 margin: 0
               }}>
                 Events Office
@@ -1606,11 +1540,11 @@ const EventsOfficeEventsView = () => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#FFFFFF',
+                backgroundColor: '#1D3557',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#1D3557',
+                color: '#FFFFFF',
                 fontWeight: '600'
               }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'E').toUpperCase()}
@@ -1629,32 +1563,13 @@ const EventsOfficeEventsView = () => {
           backgroundColor: '#f6f7f8'
         }}>
           {/* Page Title Banner */}
-          <style>{`
-            @keyframes fadeInUp {
-              from { opacity: 0; transform: translateY(20px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-            @keyframes float {
-              0%, 100% { transform: translateY(0px); }
-              50% { transform: translateY(-10px); }
-            }
-            @keyframes pulse {
-              0%, 100% { transform: scale(1); opacity: 1; }
-              50% { transform: scale(1.05); opacity: 0.9; }
-            }
-            @keyframes slideInRight {
-              from { opacity: 0; transform: translateX(30px); }
-              to { opacity: 1; transform: translateX(0); }
-            }
-          `}</style>
           <div style={{
             position: 'relative',
             height: '140px',
             borderRadius: '0.75rem',
             overflow: 'hidden',
             marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-            animation: 'fadeInUp 0.6s ease-out'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
           }}>
             {/* Background Image */}
             <div style={{
@@ -1664,37 +1579,13 @@ const EventsOfficeEventsView = () => {
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
-              filter: 'blur(2px)',
-              animation: 'pulse 4s ease-in-out infinite'
+              filter: 'blur(2px)'
             }}></div>
             {/* Blue Overlay */}
             <div style={{
               position: 'absolute',
               inset: 0,
               backgroundColor: 'rgba(29, 53, 87, 0.75)'
-            }}></div>
-            {/* Floating Decorative Elements */}
-            <div style={{
-              position: 'absolute',
-              top: '20px',
-              right: '50px',
-              width: '60px',
-              height: '60px',
-              borderRadius: '50%',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              animation: 'float 3s ease-in-out infinite',
-              zIndex: 5
-            }}></div>
-            <div style={{
-              position: 'absolute',
-              bottom: '30px',
-              right: '100px',
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              backgroundColor: 'rgba(255, 255, 255, 0.15)',
-              animation: 'float 2.5s ease-in-out infinite 0.5s',
-              zIndex: 5
             }}></div>
             {/* Content */}
             <div style={{
@@ -1714,8 +1605,7 @@ const EventsOfficeEventsView = () => {
                   fontSize: '1.75rem',
                   fontWeight: '700',
                   margin: 0,
-                  marginBottom: '0.5rem',
-                  animation: 'slideInRight 0.8s ease-out'
+                  marginBottom: '0.5rem'
                 }}>
                   All Upcoming Events
                 </h3>
@@ -2190,6 +2080,64 @@ const EventsOfficeEventsView = () => {
                             textAlign: 'right'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                              {/* Workshop Accept/Reject buttons */}
+                              {event.type === 'workshop' && event.status === 'pending' && (
+                                <>
+                                  <button
+                                    onClick={() => handleEventStatusChange(event.id, 'approved')}
+                                    disabled={!!processingIds[event.id]}
+                                    style={{
+                                      padding: '0.5rem',
+                                      borderRadius: '0.5rem',
+                                      border: 'none',
+                                      backgroundColor: 'transparent',
+                                      color: canEdit ? '#137fec' : '#d1d5db',
+                                      cursor: canEdit ? 'pointer' : 'not-allowed',
+                                      opacity: canEdit ? 1 : 0.5
+                                    }}
+                                    title={canEdit ? 'Accept Workshop' : 'Workshop already accepted'}
+                                    onMouseEnter={(e) => {
+                                      if (canEdit) {
+                                        e.target.style.backgroundColor = '#f3f4f6';
+                                        e.target.style.color = '#137fec';
+                                      }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (canEdit) {
+                                        e.target.style.backgroundColor = 'transparent';
+                                        e.target.style.color = '#137fec';
+                                      }
+                                    }}
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                      check_circle
+                                    </span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleEventStatusChange(event.id, 'rejected')}
+                                    disabled={!!processingIds[event.id]}
+                                    style={{
+                                      padding: '0.5rem',
+                                      borderRadius: '0.5rem',
+                                      border: 'none',
+                                      backgroundColor: 'transparent',
+                                      color: '#ef4444',
+                                      cursor: 'pointer'
+                                    }}
+                                    title="Reject Workshop"
+                                    onMouseEnter={(e) => {
+                                      e.target.style.backgroundColor = '#fee2e2';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.target.style.backgroundColor = 'transparent';
+                                    }}
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                      cancel
+                                    </span>
+                                  </button>
+                                </>
+                              )}
                               
                               {/* Edit Button */}
               <button
@@ -2556,8 +2504,8 @@ const EventsOfficeEventsView = () => {
                                   </div>
                                 )}
 
-                                {/* Vendors (for bazaars, booths, and platform booths) - Only show accepted vendors */}
-                                {(event.type === 'bazaar' || event.type === 'booth' || event.type === 'platformBooth') && (() => {
+                                {/* Vendors (for bazaars and booths) - Only show accepted vendors */}
+                                {(event.type === 'bazaar' || event.type === 'booth') && (() => {
                                   // Get only accepted vendors from vendor requests
                                   const acceptedVendors = vendorRequests[event.id] 
                                     ? vendorRequests[event.id].filter(r => r.status === 'accepted').map(r => r.vendor).filter(Boolean)
@@ -2696,8 +2644,8 @@ const EventsOfficeEventsView = () => {
                                   ) : null;
                                 })()}
 
-                                {/* Vendor Participation Requests (for bazaars, booths, and platform booths) - Only show pending and rejected */}
-                                {(event.type === 'bazaar' || event.type === 'booth' || event.type === 'platformBooth') && (
+                                {/* Vendor Participation Requests (for bazaars and booths) - Only show pending and rejected */}
+                                {(event.type === 'bazaar' || event.type === 'booth') && (
                                   <div>
                                     <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>
                                       Vendor Participation Requests
