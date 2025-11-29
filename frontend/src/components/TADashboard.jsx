@@ -775,17 +775,14 @@ const TADashboard = () => {
                                                     if (!notification.isRead) {
                                                         handleMarkAsRead(notification._id);
                                                     }
-                                                    if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
-                                                        navigate('/ta/events');
-                                                        setShowNotificationsDropdown(false);
-                                                    } else if (
-                                                        (notification.type === 'event_reminder' ||
+                                                    // All event-related notifications redirect to discover events
+                                                    if ((notification.type === 'event_announcement' || notification.type === 'new_event' || 
+                                                         notification.type === 'event_reminder' ||
                                                          notification.type === 'workshop_reminder' ||
                                                          notification.type === 'trip_reminder' ||
                                                          notification.type === 'gym_session_reminder') &&
-                                                        (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
-                                                    ) {
-                                                        navigate('/ta/my-registrations');
+                                                        (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)) {
+                                                        navigate('/ta/events');
                                                         setShowNotificationsDropdown(false);
                                                     } else if (
                                                         notification.type === 'new_loyalty_partner' ||
@@ -1608,162 +1605,6 @@ const TADashboard = () => {
                                     </div>
                                 </section>
                             )}
-
-                            {/* Quick Stats */}
-                            <div style={{ marginBottom: '1.5rem' }}>
-                                <h3 style={{
-                                    color: '#1D3557',
-                                    fontSize: '1.125rem',
-                                    fontWeight: '600',
-                                    marginBottom: '1rem',
-                                    marginTop: 0
-                                }}>
-                                    Quick Stats
-                                </h3>
-                                {loading ? (
-                                    <div style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                                        gap: '1rem'
-                                    }}>
-                                        <div style={{
-                                            backgroundColor: '#FFFFFF',
-                                            padding: '1.5rem',
-                                            borderRadius: '0.75rem',
-                                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                                        }}>
-                                            Loading...
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                                        gap: '1rem'
-                                    }}>
-                                        <div style={{
-                                            backgroundColor: '#FFFFFF',
-                                            padding: '1.5rem',
-                                            borderRadius: '0.75rem',
-                                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '1rem'
-                                        }}>
-                                            <div style={{
-                                                padding: '1rem',
-                                                backgroundColor: '#dbeafe',
-                                                borderRadius: '50%',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center'
-                                            }}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: '2rem', color: '#2563eb' }}>
-                                                    event_available
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <p style={{
-                                                    color: '#6b7280',
-                                                    fontSize: '0.875rem',
-                                                    margin: 0,
-                                                    marginBottom: '0.25rem'
-                                                }}>
-                                                    Enrolled Events
-                                                </p>
-                                                <p style={{
-                                                    color: '#111827',
-                                                    fontSize: '1.875rem',
-                                                    fontWeight: '700',
-                                                    margin: 0
-                                                }}>
-                                                    {stats.enrolledEvents}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div style={{
-                                            backgroundColor: '#FFFFFF',
-                                            padding: '1.5rem',
-                                            borderRadius: '0.75rem',
-                                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '1rem'
-                                        }}>
-                                            <div style={{
-                                                padding: '1rem',
-                                                backgroundColor: '#d1fae5',
-                                                borderRadius: '50%',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center'
-                                            }}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: '2rem', color: '#059669' }}>
-                                                    event_upcoming
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <p style={{
-                                                    color: '#6b7280',
-                                                    fontSize: '0.875rem',
-                                                    margin: 0,
-                                                    marginBottom: '0.25rem'
-                                                }}>
-                                                    Upcoming Events
-                                                </p>
-                                                <p style={{
-                                                    color: '#111827',
-                                                    fontSize: '1.875rem',
-                                                    fontWeight: '700',
-                                                    margin: 0
-                                                }}>
-                                                    {stats.upcomingEvents}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div style={{
-                                            backgroundColor: '#FFFFFF',
-                                            padding: '1.5rem',
-                                            borderRadius: '0.75rem',
-                                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '1rem'
-                                        }}>
-                                            <div style={{
-                                                padding: '1rem',
-                                                backgroundColor: '#fed7aa',
-                                                borderRadius: '50%',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center'
-                                            }}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: '2rem', color: '#ea580c' }}>
-                                                    pending_actions
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <p style={{
-                                                    color: '#6b7280',
-                                                    fontSize: '0.875rem',
-                                                    margin: 0,
-                                                    marginBottom: '0.25rem'
-                                                }}>
-                                                    Events Requiring Action
-                                                </p>
-                                                <p style={{
-                                                    color: '#111827',
-                                                    fontSize: '1.875rem',
-                                                    fontWeight: '700',
-                                                    margin: 0
-                                                }}>
-                                                    {stats.eventsRequiringAction}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
 
                             {/* Quick Actions */}
                             <div style={{ marginBottom: '1.5rem' }}>
