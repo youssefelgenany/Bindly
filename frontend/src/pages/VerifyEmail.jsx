@@ -5,10 +5,14 @@ import axios from 'axios';
 const VerifyEmail = () => {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
+  const [userType, setUserType] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); // 'success' or 'error'
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  
+  // Check if user is Staff/TA/Professor (pending admin verification)
+  const isPendingAdminVerification = ['Staff', 'TA', 'Professor'].includes(userType);
 
   // Get email from URL params or localStorage
   useEffect(() => {
@@ -44,18 +48,16 @@ const VerifyEmail = () => {
             }, 900);
             return;
           } else {
-            // Only show error if it's a real error, not a success case
-            // Don't show error for invalid links after successful verification
+            // For any error response, redirect silently without showing error box
             const errorMsg = res.data?.message || 'Verification failed.';
-            if (errorMsg.toLowerCase().includes('invalid') && !errorMsg.toLowerCase().includes('expired')) {
-              // Silently redirect for invalid links (likely already verified)
-              setTimeout(() => {
-                window.location.href = (process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000') + '/login';
-              }, 500);
-              return;
-            }
-            setMessage(errorMsg);
-            setMessageType('error');
+            // Don't show error box, just redirect silently
+            setMessage('');
+            setMessageType('');
+            setShowSuccessMessage(false);
+            setTimeout(() => {
+              window.location.href = (process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000') + '/login';
+            }, 500);
+            return;
           }
         } catch (err) {
           let errMsg = 'Verification request failed';
@@ -74,10 +76,16 @@ const VerifyEmail = () => {
             errMsg = err.message;
           }
           
-          // Check if it's an expired token error
+          // Check if it's an expired token error - redirect silently without showing error
           if (errMsg.toLowerCase().includes('expired')) {
-            setMessage('Verification link has expired. Please sign up again to receive a new verification email.');
-            setMessageType('error');
+            // Don't show error, just redirect silently
+            setMessage('');
+            setMessageType('');
+            setShowSuccessMessage(false);
+            setTimeout(() => {
+              window.location.href = (process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000') + '/login';
+            }, 500);
+            return;
           } else if (errMsg.toLowerCase().includes('already verified')) {
             // User is already verified, show success and redirect
             setMessage('Email already verified! Redirecting to login...');
@@ -97,9 +105,14 @@ const VerifyEmail = () => {
             }, 500);
             return;
           } else {
-            // Only show error for actual unexpected errors or expired tokens
-            setMessage(errMsg);
-            setMessageType('error');
+            // For any other errors, redirect silently without showing error box
+            setMessage('');
+            setMessageType('');
+            setShowSuccessMessage(false);
+            setTimeout(() => {
+              window.location.href = (process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000') + '/login';
+            }, 500);
+            return;
           }
         } finally {
           setLoading(false);
@@ -109,6 +122,8 @@ const VerifyEmail = () => {
       return; // don't continue with the rest of the effect
     }
     const emailFromStorage = localStorage.getItem('pendingVerificationEmail');
+    const userTypeFromUrl = searchParams.get('userType');
+    const userTypeFromStorage = localStorage.getItem('pendingVerificationUserType');
     
     if (emailFromUrl) {
       setEmail(emailFromUrl);
@@ -117,6 +132,13 @@ const VerifyEmail = () => {
       setShowSuccessMessage(true);
     } else if (emailFromStorage) {
       setEmail(emailFromStorage);
+    }
+    
+    if (userTypeFromUrl) {
+      setUserType(userTypeFromUrl);
+      localStorage.setItem('pendingVerificationUserType', userTypeFromUrl);
+    } else if (userTypeFromStorage) {
+      setUserType(userTypeFromStorage);
     }
   }, [searchParams]);
 
@@ -230,7 +252,7 @@ const VerifyEmail = () => {
               color: '#1D3557',
               margin: 0
             }}>
-              Check Your Email
+              {isPendingAdminVerification ? 'Account Pending Verification' : 'Check Your Email'}
             </h1>
 
             {/* Instructional Text */}
@@ -242,7 +264,9 @@ const VerifyEmail = () => {
               maxWidth: '24rem',
               padding: '0 0.5rem'
             }}>
-              We've sent a verification link to your email. Click the link to verify your account and you'll be redirected to the login page.
+              {isPendingAdminVerification 
+                ? 'Account pending verification. Check your email within the next 24 hours.'
+                : "We've sent a verification link to your email. Click the link to verify your account and you'll be redirected to the login page."}
             </p>
 
             {/* Information Alert Box */}
@@ -276,12 +300,14 @@ const VerifyEmail = () => {
                 margin: 0,
                 lineHeight: '1.4'
               }}>
-                You must verify your email before you can log in. Login will fail if you haven't clicked the verification link.
+                {isPendingAdminVerification 
+                  ? 'Your account is pending admin verification. Once verified, you will receive an email with a verification link. Check your email within the next 24 hours.'
+                  : "You must verify your email before you can log in. Login will fail if you haven't clicked the verification link."}
               </p>
             </div>
 
-            {/* Success Message - Shown when coming from signup */}
-            {showSuccessMessage && (
+            {/* Success Message - Shown when coming from signup (only for Students, not Staff/TA/Professor) */}
+            {showSuccessMessage && !isPendingAdminVerification && (
               <div style={{
                 width: '100%',
                 backgroundColor: '#D4EDDA',

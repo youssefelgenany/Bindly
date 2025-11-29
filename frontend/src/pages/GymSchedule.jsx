@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { gymApiService } from '../api/gymApi';
 import { gymSessionApi } from '../api/gymSessionApi';
 import { notificationApiService } from '../api/notificationApi';
+import EventsOfficeNotificationBell from './EventsOfficeNotificationBell';
 import GymSessionForm from '../components/GymSessionForm';
 import GymSessionRegistrationForm from '../components/GymSessionRegistrationForm';
 
@@ -1244,6 +1245,8 @@ const GymSchedule = () => {
             )}
             
             {/* Notifications Bell */}
+            {/* Notifications Bell - Only for non-Events Office users */}
+            {!isEventsOffice && (
               <div style={{ position: 'relative' }} data-notifications-dropdown>
                 <button
                   onClick={() => {
@@ -1486,6 +1489,7 @@ const GymSchedule = () => {
                   </div>
                 )}
               </div>
+            )}
             
             <div style={{ textAlign: 'right' }}>
               <p style={{

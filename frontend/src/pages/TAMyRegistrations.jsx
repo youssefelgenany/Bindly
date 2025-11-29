@@ -5,6 +5,32 @@ import { eventsApiService } from '../api/eventsApi';
 import { notificationApiService } from '../api/notificationApi';
 import { useAuth } from '../contexts/AuthContext';
 
+const getDisplayStatus = (status) => {
+  const normalized = status?.toLowerCase();
+  if (normalized === 'approved' || normalized === 'registered') return 'REGISTERED';
+  if (normalized === 'pending') return 'PENDING';
+  if (normalized === 'rejected') return 'REJECTED';
+  return status ? status.toUpperCase() : 'STATUS';
+};
+
+const canTACancel = (registration) => {
+  if (!registration) return false;
+  if (!registration.paid) return false;
+  if (!registration.eventDate) return false;
+  
+  const eventDate = new Date(registration.eventDate);
+  const now = new Date();
+  
+  // Check if event has already started
+  if (eventDate <= now) return false;
+  
+  // Check if less than 2 weeks remain (14 days)
+  const twoWeeksInMs = 14 * 24 * 60 * 60 * 1000;
+  const timeUntilEvent = eventDate.getTime() - now.getTime();
+  
+  return timeUntilEvent >= twoWeeksInMs;
+};
+
 const TAMyRegistrations = () => {
   const { user, logout, refreshUser } = useAuth();
   const location = useLocation();
@@ -173,14 +199,14 @@ const TAMyRegistrations = () => {
   };
 
   useEffect(() => {
-    if (user && user.email) {
+    if (user) {
       loadMyRegistrations();
     }
   }, [user]);
 
   const loadMyRegistrations = async () => {
-    if (!user?.email) {
-      setError('User email not available');
+    if (!user) {
+      setError('User not available');
       setLoading(false);
       return;
     }
@@ -189,34 +215,85 @@ const TAMyRegistrations = () => {
     setError('');
 
     try {
-      const result = await studentRegistrationApi.getMyRegistrations(user.email);
+      const allRegistrations = [];
       
-      if (result.success) {
-        const regs = result.data.registrations || [];
-        setRegistrations(regs);
-        
-        // Load ratings for all events
-        const ratingsMap = {};
-        await Promise.all(regs.map(async (reg) => {
-          if (reg.eventId) {
-            try {
-              const ratingResult = await eventsApiService.getRatingsAndComments(reg.eventId);
-              if (ratingResult.success && ratingResult.data?.ratings) {
-                ratingsMap[reg.eventId] = {
-                  average: ratingResult.data.ratings.average || 0,
-                  count: ratingResult.data.ratings.count || 0
-                };
-              }
-            } catch (err) {
-              console.error(`Error loading rating for event ${reg.eventId}:`, err);
-            }
-          }
-        }));
-        setEventRatings(ratingsMap);
-      } else {
-        setError(result.message || 'Failed to fetch registrations');
-        setRegistrations([]);
+      // Load regular registrations (Registration model)
+      try {
+        const result = await eventsApiService.getMyRegistrations();
+        if (result.success && result.data) {
+          const registrations = Array.isArray(result.data) ? result.data : [];
+          registrations
+            .filter(reg => reg.event && reg.status !== 'cancelled')
+            .forEach(reg => {
+              allRegistrations.push({
+                id: reg._id,
+                eventId: reg.event?._id ? String(reg.event._id) : null,
+                eventTitle: reg.event?.title || 'Event Deleted',
+                eventType: reg.event?.type || 'unknown',
+                eventDate: reg.event?.startDate || null,
+                eventEndDate: reg.event?.endDate || null,
+                eventLocation: reg.event?.location || 'N/A',
+                paid: reg.paid || false,
+                status: reg.status || 'approved',
+                registeredAt: reg.registeredAt || reg.createdAt
+              });
+            });
+        }
+      } catch (regError) {
+        console.error('Error loading regular registrations:', regError);
       }
+      
+      // Also check StudentRegistration by email (for workshops/trips registered through StudentRegistrationForm)
+      if (user.email) {
+        try {
+          const studentRegResult = await studentRegistrationApi.getMyRegistrations(user.email);
+          if (studentRegResult.success && studentRegResult.data?.registrations) {
+            studentRegResult.data.registrations
+              .filter(reg => reg.status !== 'cancelled')
+              .forEach(reg => {
+                // Only add if not already in allRegistrations (avoid duplicates)
+                const alreadyExists = allRegistrations.some(r => r.eventId === reg.eventId);
+                if (!alreadyExists) {
+                  allRegistrations.push({
+                    id: reg.id,
+                    eventId: reg.eventId,
+                    eventTitle: reg.eventTitle,
+                    eventType: reg.eventType,
+                    eventDate: reg.eventDate,
+                    eventEndDate: reg.eventEndDate,
+                    eventLocation: reg.eventLocation,
+                    paid: reg.paid || false,
+                    status: reg.status || 'approved',
+                    registeredAt: reg.registeredAt
+                  });
+                }
+              });
+          }
+        } catch (studentRegError) {
+          console.error('Error loading student registrations:', studentRegError);
+        }
+      }
+      
+      setRegistrations(allRegistrations);
+      
+      // Load ratings for all events
+      const ratingsMap = {};
+      await Promise.all(allRegistrations.map(async (reg) => {
+        if (reg.eventId) {
+          try {
+            const ratingResult = await eventsApiService.getRatingsAndComments(reg.eventId);
+            if (ratingResult.success && ratingResult.data?.ratings) {
+              ratingsMap[reg.eventId] = {
+                average: ratingResult.data.ratings.average || 0,
+                count: ratingResult.data.ratings.count || 0
+              };
+            }
+          } catch (err) {
+            console.error(`Error loading rating for event ${reg.eventId}:`, err);
+          }
+        }
+      }));
+      setEventRatings(ratingsMap);
     } catch (err) {
       console.error('Error loading registrations:', err);
       setError(err.message || 'An unexpected error occurred. Please try again.');
@@ -1416,19 +1493,45 @@ const TAMyRegistrations = () => {
                         }}>
                           {registration.eventType}
                         </div>
-                        <div style={{
-                          padding: '0.375rem 0.875rem',
-                          borderRadius: '0.5rem',
-                          backgroundColor: getStatusColor(registration.status),
-                          color: '#FFFFFF',
-                          fontSize: '0.6875rem',
-                          fontWeight: '700',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
-                          {registration.status}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!canTACancel(registration)) {
+                              setSelectedRegistration(registration);
+                              return;
+                            }
+                            setCancelRegistrationData({
+                              eventId: registration.eventId,
+                              eventTitle: registration.eventTitle,
+                              paid: registration.paid
+                            });
+                            setShowCancelModal(true);
+                          }}
+                          style={{
+                        padding: '0.375rem 0.875rem',
+                        borderRadius: '0.5rem',
+                            border: 'none',
+                            backgroundColor: getStatusColor(registration.status),
+                            color: '#FFFFFF',
+                            fontSize: '0.6875rem',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            cursor: canTACancel(registration) ? 'pointer' : 'default',
+                            boxShadow: canTACancel(registration) ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                          }}
+                          title={canTACancel(registration) ? 'Tap to cancel & refund to wallet' : ''}
+                        >
+                          {getDisplayStatus(registration.status)}
+                        </button>
                       </div>
+                      {canTACancel(registration) && (
+                        <div style={{ marginTop: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#dc2626', fontWeight: '600' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>info</span>
+                          Tap "Registered" to cancel & refund
+                        </div>
+                      )}
 
                       <h3 style={{
                         color: '#1D3557',
@@ -1842,7 +1945,7 @@ const TAMyRegistrations = () => {
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em'
                 }}>
-                  {selectedRegistration.status}
+                  {getDisplayStatus(selectedRegistration.status)}
                 </div>
               </div>
               
@@ -2065,10 +2168,8 @@ const TAMyRegistrations = () => {
           </div>
         )}
 
-              {/* Cancel Button - Only show for paid registrations that haven't started */}
-              {selectedRegistration.paid && 
-               selectedRegistration.eventDate && 
-               new Date(selectedRegistration.eventDate) > new Date() && (
+              {/* Cancel Button - Only show for paid registrations that can be cancelled (2+ weeks before event) */}
+              {canTACancel(selectedRegistration) && (
                 <div style={{
                   marginTop: '1.5rem',
                   paddingTop: '1.5rem',
@@ -2078,7 +2179,8 @@ const TAMyRegistrations = () => {
                     onClick={() => {
                       setCancelRegistrationData({
                         eventId: selectedRegistration.eventId,
-                        eventTitle: selectedRegistration.eventTitle
+                        eventTitle: selectedRegistration.eventTitle,
+                        paid: selectedRegistration.paid
                       });
                       setShowCancelModal(true);
                     }}
@@ -2150,7 +2252,8 @@ const TAMyRegistrations = () => {
               fontSize: '0.875rem',
               marginBottom: '1.5rem'
             }}>
-              Are you sure you want to cancel your registration for <strong>{cancelRegistrationData.eventTitle}</strong>? The refund will be added to your wallet.
+              Are you sure you want to cancel your registration for <strong>{cancelRegistrationData.eventTitle}</strong>?
+              {cancelRegistrationData.paid && ' The refund will be added to your wallet.'}
             </p>
             <div style={{
               display: 'flex',

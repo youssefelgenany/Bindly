@@ -320,6 +320,20 @@ exports.getStudentRegistrationsByEmail = async (req, res) => {
       });
     }
 
+    // Check if a user with this email exists - if not, return empty (user was deleted)
+    const User = require('../models/userModel');
+    const userExists = await User.findOne({ email: email.toLowerCase().trim() });
+    
+    // If no user exists with this email, return empty (user was deleted, registrations should be cleaned up)
+    if (!userExists) {
+      console.log('⚠️ No user found for email:', email, '- returning empty registrations (user may have been deleted)');
+      return res.json({
+        success: true,
+        registrations: [],
+        count: 0
+      });
+    }
+    
     const registrations = await StudentRegistration.find({ 
       studentEmail: email.toLowerCase().trim() 
     })

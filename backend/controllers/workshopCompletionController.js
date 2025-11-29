@@ -7,26 +7,40 @@ const { sendWorkshopCompletionEmail } = require('../utils/sendWorkshopCompletion
 // Send completion emails for workshops that ended (checks for workshops whose endDate is today or earlier)
 exports.sendWorkshopCompletionEmails = async (req, res) => {
   try {
-    // Get today's date (start of day)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // Get tomorrow's date (to use as upper bound)
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Get current date/time to check if workshop has actually ended
+    const now = new Date();
 
-    // Find workshops that ended today (or earlier) and haven't sent completion emails yet
-    // This catches workshops whose endDate is today or any previous day
+    // Find workshops that have ended (endDate is in the past) and haven't sent completion emails yet
+    console.log(`🔍 Checking for ended workshops at ${now.toISOString()}`);
+    
     const endedWorkshops = await Event.find({
       type: 'workshop',
       endDate: {
-        $lt: tomorrow  // End date is before tomorrow (i.e., today or earlier)
+        $lt: now  // End date is before current time (workshop has actually ended)
       },
       completionEmailSent: { $ne: true },
       status: 'approved'
     });
 
+    console.log(`📋 Found ${endedWorkshops.length} workshop(s) that ended and need completion emails`);
+
     if (endedWorkshops.length === 0) {
+      // Check if there are workshops that ended but might have other issues
+      const allEndedWorkshops = await Event.find({
+        type: 'workshop',
+        endDate: { $lt: now }
+      });
+      
+      if (allEndedWorkshops.length > 0) {
+        console.log(`ℹ️  Found ${allEndedWorkshops.length} ended workshop(s), but:`);
+        allEndedWorkshops.forEach(w => {
+          const reasons = [];
+          if (w.completionEmailSent) reasons.push('completionEmailSent=true');
+          if (w.status !== 'approved') reasons.push(`status=${w.status}`);
+          console.log(`   - "${w.title}" (ID: ${w._id}): ${reasons.join(', ') || 'no issues found'}`);
+        });
+      }
+      
       return res.json({
         success: true,
         message: 'No workshops ended that need completion emails',
@@ -42,6 +56,10 @@ exports.sendWorkshopCompletionEmails = async (req, res) => {
 
     for (const workshop of endedWorkshops) {
       console.log(`\n📚 Processing workshop: ${workshop.title}`);
+      console.log(`   Workshop ID: ${workshop._id}`);
+      console.log(`   End Date: ${workshop.endDate}`);
+      console.log(`   Status: ${workshop.status}`);
+      console.log(`   Completion Email Sent: ${workshop.completionEmailSent}`);
 
       // Get all registered users (both regular registrations and student registrations)
       const regularRegistrations = await Registration.find({
@@ -49,11 +67,15 @@ exports.sendWorkshopCompletionEmails = async (req, res) => {
         status: { $in: ['approved', 'registered'] }
       }).populate('user', 'email firstName lastName userType');
 
+      console.log(`   Found ${regularRegistrations.length} regular registrations`);
+
       const studentRegistrations = await StudentRegistration.find({
         event: workshop._id,
         eventType: 'workshop',
         status: { $in: ['approved', 'registered'] }
       });
+
+      console.log(`   Found ${studentRegistrations.length} student registrations`);
 
       // Combine all registrations
       const allRegistrations = [];

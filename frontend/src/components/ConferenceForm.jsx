@@ -99,12 +99,13 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {}, submitLab
       </div>
 
       <div style={formGroupStyle}>
-        <label style={labelStyle}>Short Description</label>
+        <label style={labelStyle}>Short Description <span style={{ color: '#ef4444' }}>*</span></label>
         <input
           type="text"
           name="description"
           value={formData.description}
           onChange={handleChange}
+          required
           placeholder="Brief description of the conference"
           style={inputStyle}
           onFocus={(e) => {

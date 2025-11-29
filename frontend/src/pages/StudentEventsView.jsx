@@ -255,34 +255,60 @@ const StudentEventsView = () => {
   }, [filter]);
 
   // Load user's registrations to check which events they're registered for
+  // Students can register through both Registration API (regular events) and StudentRegistration API (workshops/trips)
   useEffect(() => {
     const loadUserRegistrations = async () => {
-      if (!user?.email) return;
+      if (!user) return;
       
       try {
-        const result = await studentRegistrationApi.getMyRegistrations(user.email);
-        if (result.success && result.data.registrations) {
-          // Extract event IDs from PAID registrations only
-          const registeredIds = new Set();
-          result.data.registrations.forEach(reg => {
-            // Only include paid registrations
-            if (reg.paid !== true) return;
-            
-            // Check for eventId in the formatted response
-            if (reg.eventId) {
-              registeredIds.add(String(reg.eventId));
-            }
-            // Fallback: check if event object exists with _id
-            else if (reg.event && typeof reg.event === 'object' && reg.event._id) {
-              registeredIds.add(String(reg.event._id));
-            } 
-            // Fallback: check if event is a string ID
-            else if (reg.event && typeof reg.event === 'string') {
-              registeredIds.add(reg.event);
-            }
-          });
-          setRegisteredEventIds(registeredIds);
+        const registeredIds = new Set();
+        
+        // Load regular registrations (Registration model)
+        try {
+          const regResult = await eventsApiService.getMyRegistrations();
+          if (regResult.success && regResult.data) {
+            const registrations = Array.isArray(regResult.data) ? regResult.data : [];
+            registrations.forEach(reg => {
+              if (reg.event) {
+                if (typeof reg.event === 'object' && reg.event._id) {
+                  registeredIds.add(String(reg.event._id));
+                } else if (typeof reg.event === 'string') {
+                  registeredIds.add(reg.event);
+                } else if (reg.event.toString) {
+                  registeredIds.add(reg.event.toString());
+                }
+              }
+            });
+          }
+        } catch (regError) {
+          console.error('Error loading regular registrations:', regError);
         }
+        
+        // Load student registrations (StudentRegistration model) - only for workshops/trips
+        if (user.email) {
+          try {
+            const studentRegResult = await studentRegistrationApi.getMyRegistrations(user.email);
+            if (studentRegResult.success && studentRegResult.data?.registrations) {
+              studentRegResult.data.registrations.forEach(reg => {
+                // Only include paid registrations
+                if (reg.paid !== true) return;
+                
+                if (reg.eventId) {
+                  registeredIds.add(String(reg.eventId));
+                } else if (reg.event && typeof reg.event === 'object' && reg.event._id) {
+                  registeredIds.add(String(reg.event._id));
+                } else if (reg.event && typeof reg.event === 'string') {
+                  registeredIds.add(reg.event);
+                }
+              });
+            }
+          } catch (studentRegError) {
+            console.error('Error loading student registrations:', studentRegError);
+          }
+        }
+        
+        console.log('✅ Student registrations loaded:', Array.from(registeredIds));
+        setRegisteredEventIds(registeredIds);
       } catch (error) {
         console.error('Error loading user registrations:', error);
       }

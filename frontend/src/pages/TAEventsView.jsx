@@ -243,32 +243,34 @@ const TAEventsView = () => {
   }, [filter]);
 
   // Load user's registrations to check which events they're registered for
+  // TA users should use the regular Registration API, not StudentRegistration
   useEffect(() => {
     const loadUserRegistrations = async () => {
-      if (!user?.email) return;
+      if (!user) return;
       
       try {
-        const result = await studentRegistrationApi.getMyRegistrations(user.email);
-        if (result.success && result.data.registrations) {
-          // Extract event IDs from PAID registrations only
+        // Use the regular events API for TA registrations (not student registration API)
+        const result = await eventsApiService.getMyRegistrations();
+        if (result.success && result.data) {
+          // Backend returns an array of registrations directly
+          const registrations = Array.isArray(result.data) ? result.data : [];
           const registeredIds = new Set();
-          result.data.registrations.forEach(reg => {
-            // Only include paid registrations
-            if (reg.paid !== true) return;
-            
-            // Check for eventId in the formatted response
-            if (reg.eventId) {
-              registeredIds.add(String(reg.eventId));
-            }
-            // Fallback: check if event object exists with _id
-            else if (reg.event && typeof reg.event === 'object' && reg.event._id) {
-              registeredIds.add(String(reg.event._id));
-            } 
-            // Fallback: check if event is a string ID
-            else if (reg.event && typeof reg.event === 'string') {
-              registeredIds.add(reg.event);
+          registrations.forEach(reg => {
+            // Registration model has event field that can be populated or just an ID
+            if (reg.event) {
+              if (typeof reg.event === 'object' && reg.event._id) {
+                // Populated event object
+                registeredIds.add(String(reg.event._id));
+              } else if (typeof reg.event === 'string') {
+                // Event ID as string
+                registeredIds.add(reg.event);
+              } else if (reg.event.toString) {
+                // Event ID as ObjectId
+                registeredIds.add(reg.event.toString());
+              }
             }
           });
+          console.log('✅ TA registrations loaded:', Array.from(registeredIds));
           setRegisteredEventIds(registeredIds);
         }
       } catch (error) {
@@ -440,19 +442,22 @@ const TAEventsView = () => {
     loadEvents();
     // Reload registrations to update the registered events list
     const loadUserRegistrations = async () => {
-      if (!user?.email) return;
+      if (!user) return;
       try {
-        const result = await studentRegistrationApi.getMyRegistrations(user.email);
-        if (result.success && result.data.registrations) {
+        // Use the regular events API for TA registrations (not student registration API)
+        const result = await eventsApiService.getMyRegistrations();
+        if (result.success && result.data) {
+          const registrations = Array.isArray(result.data) ? result.data : [];
           const registeredIds = new Set();
-          result.data.registrations.forEach(reg => {
-            if (reg.paid !== true) return;
-            if (reg.eventId) {
-              registeredIds.add(String(reg.eventId));
-            } else if (reg.event && typeof reg.event === 'object' && reg.event._id) {
-              registeredIds.add(String(reg.event._id));
-            } else if (reg.event && typeof reg.event === 'string') {
-              registeredIds.add(reg.event);
+          registrations.forEach(reg => {
+            if (reg.event) {
+              if (typeof reg.event === 'object' && reg.event._id) {
+                registeredIds.add(String(reg.event._id));
+              } else if (typeof reg.event === 'string') {
+                registeredIds.add(reg.event);
+              } else if (reg.event.toString) {
+                registeredIds.add(reg.event.toString());
+              }
             }
           });
           setRegisteredEventIds(registeredIds);

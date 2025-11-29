@@ -11,7 +11,18 @@ const canCancelRegistration = (registration) => {
   if (!registration) return false;
   if (!registration.paid) return false;
   if (!registration.eventDate) return false;
-  return new Date(registration.eventDate) > new Date();
+  
+  const eventDate = new Date(registration.eventDate);
+  const now = new Date();
+  
+  // Check if event has already started
+  if (eventDate <= now) return false;
+  
+  // Check if less than 2 weeks remain (14 days)
+  const twoWeeksInMs = 14 * 24 * 60 * 60 * 1000;
+  const timeUntilEvent = eventDate.getTime() - now.getTime();
+  
+  return timeUntilEvent >= twoWeeksInMs;
 };
 
 const ProfessorMyRegistrations = () => {
@@ -191,76 +202,100 @@ const ProfessorMyRegistrations = () => {
     try {
       console.log('🔍 Loading professor registrations...');
       
-      // Professors register through StudentRegistrationForm which uses studentRegistrationApi
-      // So we need to check the student registration API, not the professor registration API
-      const result = await studentRegistrationApi.getMyRegistrations(user.email);
+      // Professor users should use the regular Registration API, not StudentRegistration
+      const result = await eventsApiService.getMyRegistrations();
       console.log('📦 Raw API result:', result);
       
-      if (result.success) {
-        // Student registration API returns { registrations: [...] }
-        let rawRegistrations = result.data?.registrations || [];
-        
-        console.log('📋 Raw registrations:', rawRegistrations);
-        console.log('📊 Number of registrations:', rawRegistrations.length);
-        
-        // The student registration API already formats the data correctly
-        // So we can use it directly, but we need to ensure all fields are present
-        const formattedRegistrations = rawRegistrations.map(reg => ({
-          id: reg.id,
-          eventId: reg.eventId,
-          eventTitle: reg.eventTitle,
-          eventType: reg.eventType,
-          eventDate: reg.eventDate,
-          eventEndDate: reg.eventEndDate,
-          eventLocation: reg.eventLocation,
-          eventDescription: reg.eventDescription || '',
-          capacity: reg.capacity || null,
-          registeredCount: reg.registeredCount || 0,
-          paid: reg.paid || false,
-          price: reg.price || reg.eventPrice || 0,
-          studentName: reg.studentName || (user?.firstName && user?.lastName 
-            ? `${user.firstName} ${user.lastName}` 
-            : user?.name || 'Professor'),
-          professorName: reg.studentName || (user?.firstName && user?.lastName 
-            ? `${user.firstName} ${user.lastName}` 
-            : user?.name || 'Professor'),
-          studentId: reg.studentId || user?.gucId || null,
-          studentEmail: reg.studentEmail || user?.email || '',
-          professorEmail: reg.studentEmail || user?.email || '',
-          status: reg.status || reg.registrationStatus || 'registered',
-          registeredAt: reg.registeredAt || new Date(),
-          emergencyContact: reg.emergencyContact || null,
-          dietaryRequirements: reg.dietaryRequirements || null,
-          medicalConditions: reg.medicalConditions || null
-        }));
-        
-        console.log('✨ Final formatted registrations:', formattedRegistrations);
-        console.log('📊 Final count:', formattedRegistrations.length);
-        setRegistrations(formattedRegistrations);
-        
-        // Load ratings for all events
-        const ratingsMap = {};
-        await Promise.all(formattedRegistrations.map(async (reg) => {
-          if (reg.eventId) {
-            try {
-              const ratingResult = await eventsApiService.getRatingsAndComments(reg.eventId);
-              if (ratingResult.success && ratingResult.data?.ratings) {
-                ratingsMap[reg.eventId] = {
-                  average: ratingResult.data.ratings.average || 0,
-                  count: ratingResult.data.ratings.count || 0
-                };
-              }
-            } catch (err) {
-              // Silently fail - ratings are optional
-            }
-          }
-        }));
-        setEventRatings(ratingsMap);
-      } else {
-        console.error('❌ API returned error:', result.message);
-        setError(result.message || 'Failed to fetch registrations');
-        setRegistrations([]);
+      const allRegistrations = [];
+      
+      // Load regular registrations (Registration model)
+      if (result.success && result.data) {
+        const registrations = Array.isArray(result.data) ? result.data : [];
+        registrations
+          .filter(reg => reg.event && reg.status !== 'cancelled')
+          .forEach(reg => {
+            allRegistrations.push({
+              id: reg._id,
+              eventId: reg.event?._id ? String(reg.event._id) : null,
+              eventTitle: reg.event?.title || 'Event Deleted',
+              eventType: reg.event?.type || 'unknown',
+              eventDate: reg.event?.startDate || null,
+              eventEndDate: reg.event?.endDate || null,
+              eventLocation: reg.event?.location || 'N/A',
+              eventDescription: reg.event?.description || '',
+              paid: reg.paid || false,
+              status: reg.status || 'approved',
+              registeredAt: reg.registeredAt || reg.createdAt,
+              professorName: user?.firstName && user?.lastName 
+                ? `${user.firstName} ${user.lastName}` 
+                : user?.name || 'Professor',
+              professorEmail: user?.email || ''
+            });
+          });
       }
+      
+      // Also check StudentRegistration by email (for workshops/trips registered through StudentRegistrationForm)
+      if (user.email) {
+        try {
+          const studentRegResult = await studentRegistrationApi.getMyRegistrations(user.email);
+          if (studentRegResult.success && studentRegResult.data?.registrations) {
+            studentRegResult.data.registrations
+              .filter(reg => reg.status !== 'cancelled')
+              .forEach(reg => {
+                // Only add if not already in allRegistrations (avoid duplicates)
+                const alreadyExists = allRegistrations.some(r => r.eventId === reg.eventId);
+                if (!alreadyExists) {
+                  allRegistrations.push({
+                    id: reg.id,
+                    eventId: reg.eventId,
+                    eventTitle: reg.eventTitle,
+                    eventType: reg.eventType,
+                    eventDate: reg.eventDate,
+                    eventEndDate: reg.eventEndDate,
+                    eventLocation: reg.eventLocation,
+                    eventDescription: reg.eventDescription || '',
+                    paid: reg.paid || false,
+                    status: reg.status || 'approved',
+                    registeredAt: reg.registeredAt,
+                    professorName: user?.firstName && user?.lastName 
+                      ? `${user.firstName} ${user.lastName}` 
+                      : user?.name || 'Professor',
+                    professorEmail: user?.email || ''
+                  });
+                }
+              });
+          }
+        } catch (studentRegError) {
+          console.error('Error loading student registrations:', studentRegError);
+        }
+      }
+      
+      const formattedRegistrations = allRegistrations;
+      
+      console.log('📋 Raw registrations:', formattedRegistrations);
+      console.log('📊 Number of registrations:', formattedRegistrations.length);
+      console.log('✨ Final formatted registrations:', formattedRegistrations);
+      console.log('📊 Final count:', formattedRegistrations.length);
+      setRegistrations(formattedRegistrations);
+      
+      // Load ratings for all events
+      const ratingsMap = {};
+      await Promise.all(formattedRegistrations.map(async (reg) => {
+        if (reg.eventId) {
+          try {
+            const ratingResult = await eventsApiService.getRatingsAndComments(reg.eventId);
+            if (ratingResult.success && ratingResult.data?.ratings) {
+              ratingsMap[reg.eventId] = {
+                average: ratingResult.data.ratings.average || 0,
+                count: ratingResult.data.ratings.count || 0
+              };
+            }
+          } catch (err) {
+            // Silently fail - ratings are optional
+          }
+        }
+      }));
+      setEventRatings(ratingsMap);
     } catch (err) {
       console.error('❌ Error loading registrations:', err);
       console.error('❌ Error details:', err.response?.data || err.message);

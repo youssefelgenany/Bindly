@@ -17,7 +17,18 @@ const canStudentCancel = (registration) => {
   if (!registration) return false;
   if (!registration.paid) return false;
   if (!registration.eventDate) return false;
-  return new Date(registration.eventDate) > new Date();
+  
+  const eventDate = new Date(registration.eventDate);
+  const now = new Date();
+  
+  // Check if event has already started
+  if (eventDate <= now) return false;
+  
+  // Check if less than 2 weeks remain (14 days)
+  const twoWeeksInMs = 14 * 24 * 60 * 60 * 1000;
+  const timeUntilEvent = eventDate.getTime() - now.getTime();
+  
+  return timeUntilEvent >= twoWeeksInMs;
 };
 
 const StudentMyRegistrations = () => {
