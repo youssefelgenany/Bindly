@@ -199,11 +199,15 @@ async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCo
           }
         }
         
+        // Parse attendee name (could be "FirstName LastName" or just a name)
+        const attendeeName = attendeeQR.attendeeName || 'N/A';
+        const attendeeEmail = attendeeQR.attendeeEmail || 'N/A';
+        
         return `
           <tr style="border-bottom: 1px solid #ddd;">
             <td style="padding: 12px; text-align: center;">${index + 1}</td>
-            <td style="padding: 12px;">${user.firstName || 'N/A'} ${user.lastName || ''}</td>
-            <td style="padding: 12px;">${user.email || 'N/A'}</td>
+            <td style="padding: 12px;">${attendeeName}</td>
+            <td style="padding: 12px;">${attendeeEmail}</td>
             <td style="padding: 12px; text-align: center;">
               ${qrCodeSrc ? `<img src="${qrCodeSrc}" alt="QR Code" style="width: 100px; height: 100px; border: 2px solid #1D3557; padding: 5px; display: block; margin: 0 auto; border-radius: 4px;" />` : '<span style="color: #6B7280; font-size: 14px;">QR Code unavailable</span>'}
             </td>
@@ -211,10 +215,10 @@ async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCo
         `;
       }).join('');
     } else {
-      participantQRCodesHTML = `
+      attendeeQRCodesHTML = `
         <tr>
           <td colspan="4" style="padding: 20px; text-align: center; color: #666; font-style: italic;">
-            No event participants have registered for this bazaar yet. QR codes for participants will be automatically generated and sent to you once they register to attend the event.
+            No attendee QR codes available at this time.
           </td>
         </tr>
       `;
@@ -257,18 +261,18 @@ async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCo
               <td style="padding: 8px; font-weight: bold;">Event Date:</td>
               <td style="padding: 8px;">${eventDate}</td>
             </tr>
-            ${hasParticipantRegistrations ? `
+            ${hasAttendeeQRCodes ? `
             <tr>
-              <td style="padding: 8px; font-weight: bold;">Total Visitors:</td>
-              <td style="padding: 8px; font-weight: bold; color: #27ae60;">${registrationsWithQR.length}</td>
+              <td style="padding: 8px; font-weight: bold;">Total Attendees:</td>
+              <td style="padding: 8px; font-weight: bold; color: #27ae60;">${attendeeQRCodes.length}</td>
             </tr>
             ` : ''}
           </table>
         </div>
 
-        ${hasParticipantRegistrations ? `
+        ${hasAttendeeQRCodes ? `
         <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
-          <h3 style="color: #333; margin-top: 0;">Registered Visitors</h3>
+          <h3 style="color: #333; margin-top: 0;">Attendee QR Codes</h3>
           <table style="width: 100%; border-collapse: collapse; background: white; border: 1px solid #e9ecef;">
             <thead>
               <tr style="background: #f8f9fa;">
@@ -279,7 +283,7 @@ async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCo
               </tr>
             </thead>
             <tbody>
-              ${participantQRCodesHTML}
+              ${attendeeQRCodesHTML}
             </tbody>
           </table>
         </div>
@@ -291,8 +295,8 @@ async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCo
               ? '<strong>Your Vendor QR Code:</strong> Use this QR code for vendor check-in and identification at the event. '
               : ''
             }
-            ${hasParticipantRegistrations 
-              ? '<strong>Visitor QR Codes:</strong> You can scan these QR codes at your event to verify visitor attendance. Each QR code contains the visitor\'s name, email, and registration ID.'
+            ${hasAttendeeQRCodes 
+              ? '<strong>Attendee QR Codes:</strong> You can scan these QR codes at your event to verify attendee attendance. Each QR code contains the attendee\'s name, email, and registration information.'
               : hasVendorQR 
                 ? 'Present this QR code when you arrive at the event for vendor check-in.'
                 : ''
@@ -338,10 +342,22 @@ async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCo
       ? process.env.SMTP_FROM.trim()
       : (process.env.SMTP_USER ? `Bindly <${process.env.SMTP_USER}>` : 'Bindly <no-reply@bindly.com>');
 
+    // Generate appropriate subject line based on what QR codes are being sent
+    let emailSubject = '';
+    if (hasVendorQR && hasAttendeeQRCodes) {
+      emailSubject = `QR Codes - ${eventName}`;
+    } else if (hasVendorQR) {
+      emailSubject = `Your Vendor QR Code - ${eventName}`;
+    } else if (hasAttendeeQRCodes) {
+      emailSubject = `Attendee QR Codes - ${eventName}`;
+    } else {
+      emailSubject = `QR Codes - ${eventName}`;
+    }
+
     const mailOptions = {
       from: defaultFrom,
       to: vendor.email,
-      subject: `Visitor QR Codes - ${eventName}`,
+      subject: emailSubject,
       html,
       attachments: emailAttachments.length > 0 ? emailAttachments : undefined
     };
