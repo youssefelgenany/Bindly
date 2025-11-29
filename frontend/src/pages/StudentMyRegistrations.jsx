@@ -608,8 +608,18 @@ const StudentMyRegistrations = () => {
             transform: translateX(0);
           }
         }
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.8;
+            transform: scale(1.05);
+          }
+        }
         .banner-animate {
-          animation: fadeInUp 0.8s ease-out;
+          animation: fadeInUp 0.6s ease-out;
         }
         .banner-content-animate {
           animation: slideInLeft 1s ease-out 0.2s both;
@@ -627,14 +637,14 @@ const StudentMyRegistrations = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF'
+        backgroundColor: '#1D3557'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -658,11 +668,11 @@ const StudentMyRegistrations = () => {
             to="/dashboard"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -677,11 +687,11 @@ const StudentMyRegistrations = () => {
             to="/student/events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/student/events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/student/events') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -696,11 +706,11 @@ const StudentMyRegistrations = () => {
             to="/student/my-registrations"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -715,11 +725,11 @@ const StudentMyRegistrations = () => {
             to="/student/courts"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/student/courts') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -734,11 +744,11 @@ const StudentMyRegistrations = () => {
             to="/gym"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/gym') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -749,9 +759,59 @@ const StudentMyRegistrations = () => {
             </span>
             Gym Sessions
           </Link>
+          <Link
+            to="/booth-polls"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              poll
+            </span>
+            Vendor Polls
+          </Link>
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          {/* Heart Icon - Favorites */}
+          <Link
+            to="/student/favorites"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              textDecoration: 'none',
+              color: 'inherit'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{
+              fontSize: '1.5rem',
+              color: '#FFFFFF'
+            }}>
+              favorite
+            </span>
+          </Link>
+
           {/* Notifications Bell */}
           <div style={{ position: 'relative' }} data-notifications-dropdown>
             <button
@@ -775,7 +835,7 @@ const StudentMyRegistrations = () => {
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = 'transparent';
@@ -783,7 +843,7 @@ const StudentMyRegistrations = () => {
             >
               <span className="material-symbols-outlined" style={{
                 fontSize: '1.5rem',
-                color: '#1D3557'
+                color: '#FFFFFF'
               }}>
                 notifications
               </span>
@@ -995,50 +1055,19 @@ const StudentMyRegistrations = () => {
               </div>
             )}
           </div>
-          
-          {/* Heart Icon - Favorites */}
-          <Link
-            to="/student/favorites"
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.5rem',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s',
-              textDecoration: 'none',
-              color: 'inherit'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{
-              fontSize: '1.5rem',
-              color: '#1D3557'
-            }}>
-              favorite
-            </span>
-          </Link>
 
           <div style={{ textAlign: 'right' }}>
             <p style={{
               fontSize: '0.875rem',
               fontWeight: '600',
-              color: '#1D3557',
+              color: '#FFFFFF',
               margin: 0
             }}>
               {displayName}
             </p>
             <p style={{
               fontSize: '0.75rem',
-              color: '#6b7280',
+              color: 'rgba(255, 255, 255, 0.7)',
               margin: 0
             }}>
               Student
@@ -1070,11 +1099,11 @@ const StudentMyRegistrations = () => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#1D3557',
+                backgroundColor: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
+                color: '#1D3557',
                 fontWeight: '600'
               }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
@@ -1214,6 +1243,15 @@ const StudentMyRegistrations = () => {
               inset: 0,
               backgroundColor: 'rgba(29, 53, 87, 0.75)',
               transition: 'background-color 0.3s ease'
+            }}></div>
+            {/* Animated Pattern Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+              zIndex: 1,
+              pointerEvents: 'none'
             }}></div>
             {/* Content */}
             <div 

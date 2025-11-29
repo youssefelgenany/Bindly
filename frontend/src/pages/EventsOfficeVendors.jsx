@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import EventsOfficeNotificationBell from './EventsOfficeNotificationBell';
 import axios from 'axios';
 
 const EventsOfficeVendors = () => {
@@ -604,6 +605,8 @@ const EventsOfficeVendors = () => {
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {/* Notification Bell */}
+            <EventsOfficeNotificationBell />
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',

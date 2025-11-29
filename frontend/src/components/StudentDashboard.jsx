@@ -207,13 +207,38 @@ const StudentDashboard = () => {
                 });
                 console.log('Upcoming events:', upcoming.length);
 
-                const previewCards = upcoming
-                    .slice()
-                    .sort((a, b) => {
-                        const dateA = new Date(a.eventDate || a.event?.startDate || 0);
-                        const dateB = new Date(b.eventDate || b.event?.startDate || 0);
-                        return dateA - dateB;
-                    })
+                // Sort by date
+                const sortedByDate = upcoming.slice().sort((a, b) => {
+                    const dateA = new Date(a.eventDate || a.event?.startDate || 0);
+                    const dateB = new Date(b.eventDate || b.event?.startDate || 0);
+                    return dateA - dateB;
+                });
+
+                // Select specific event types in order: Trip, Workshop, Bazaar, Conference/Booth (blurred)
+                const selectedEvents = [];
+                const priorityTypes = ['trip', 'workshop', 'bazaar', 'conference', 'booth'];
+                
+                // First pass: get one of each priority type in order
+                for (const type of priorityTypes) {
+                    if (selectedEvents.length >= 4) break;
+                    const found = sortedByDate.find(reg => {
+                        const eventType = (reg.event?.type || reg.eventType || 'Event').toLowerCase();
+                        return eventType === type && !selectedEvents.find(e => (e.id || e._id) === (reg.id || reg._id));
+                    });
+                    if (found) {
+                        selectedEvents.push(found);
+                    }
+                }
+                
+                // If we don't have 4 yet, fill with any remaining events
+                for (const reg of sortedByDate) {
+                    if (selectedEvents.length >= 4) break;
+                    if (!selectedEvents.find(e => (e.id || e._id) === (reg.id || reg._id))) {
+                        selectedEvents.push(reg);
+                    }
+                }
+
+                const previewCards = selectedEvents
                     .slice(0, 4)
                     .map((reg) => {
                         const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
@@ -541,6 +566,37 @@ const StudentDashboard = () => {
                 </nav>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+                    {/* Heart Icon - Favorites */}
+                    <Link
+                        to="/student/favorites"
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '0.5rem',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s',
+                            textDecoration: 'none',
+                            color: 'inherit'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                    >
+                        <span className="material-symbols-outlined" style={{
+                            fontSize: '1.5rem',
+                            color: '#FFFFFF'
+                        }}>
+                            favorite
+                        </span>
+                    </Link>
+
                     {/* Notifications Bell */}
                     <div style={{ position: 'relative' }} data-notifications-dropdown>
                         <button
@@ -785,37 +841,6 @@ const StudentDashboard = () => {
                             </div>
                         )}
                     </div>
-                    
-                    {/* Heart Icon - Favorites */}
-                    <Link
-                        to="/student/favorites"
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '0.5rem',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s',
-                            textDecoration: 'none',
-                            color: 'inherit'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                    >
-                        <span className="material-symbols-outlined" style={{
-                            fontSize: '1.5rem',
-                            color: '#FFFFFF'
-                        }}>
-                            favorite
-                        </span>
-                    </Link>
 
                     <div style={{ textAlign: 'right' }}>
                         <p style={{
@@ -1152,7 +1177,7 @@ const StudentDashboard = () => {
                                 <div style={{
                                     position: 'relative',
                                     flex: '0 0 auto',
-                                    width: '320px',
+                                    width: '400px',
                                     animation: 'fadeInUp 1s ease-out 0.3s both'
                                 }}>
                                     {/* Reward Icons Around Image */}
@@ -1250,37 +1275,6 @@ const StudentDashboard = () => {
                                             color: '#FFD700'
                                         }}>
                                             attach_money
-                                        </span>
-                                    </div>
-
-                                    {/* Limited Time Badge */}
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '20px',
-                                        left: '-40px',
-                                        width: '120px',
-                                        height: '120px',
-                                        border: '4px solid #FFD700',
-                                        borderRadius: '20px',
-                                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transform: 'rotate(-15deg)',
-                                        boxShadow: '0 6px 16px rgba(255, 215, 0, 0.3)',
-                                        animation: 'pulse 2.5s ease-in-out infinite',
-                                        zIndex: 6
-                                    }}>
-                                        <span style={{
-                                            fontSize: '0.7rem',
-                                            fontWeight: '700',
-                                            color: '#2c2c2c',
-                                            textAlign: 'center',
-                                            lineHeight: '1.2',
-                                            letterSpacing: '0.05em'
-                                        }}>
-                                            LIMITED<br/>TIME<br/>OFFER
                                         </span>
                                     </div>
 

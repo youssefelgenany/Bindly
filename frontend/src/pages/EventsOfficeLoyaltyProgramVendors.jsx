@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { vendorApi } from '../api/vendorApi';
+import EventsOfficeNotificationBell from './EventsOfficeNotificationBell';
 
 const EventsOfficeLoyaltyProgramVendors = () => {
   const { user, logout } = useAuth();
@@ -501,6 +502,8 @@ const EventsOfficeLoyaltyProgramVendors = () => {
           </h2>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {/* Notification Bell */}
+          <EventsOfficeNotificationBell />
           <div style={{ textAlign: 'right' }}>
             <p style={{
               fontSize: '0.875rem',

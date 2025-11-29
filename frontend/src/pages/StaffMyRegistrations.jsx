@@ -685,14 +685,14 @@ const StaffMyRegistrations = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF'
+        backgroundColor: '#1D3557'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -716,11 +716,11 @@ const StaffMyRegistrations = () => {
             to="/dashboard"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -735,11 +735,11 @@ const StaffMyRegistrations = () => {
             to="/staff/events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/staff/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/staff/events') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -754,11 +754,11 @@ const StaffMyRegistrations = () => {
             to="/staff/my-registrations"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/staff/my-registrations') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -773,11 +773,11 @@ const StaffMyRegistrations = () => {
             to="/gym"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/gym') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -787,6 +787,25 @@ const StaffMyRegistrations = () => {
               fitness_center
             </span>
             Gym Sessions
+          </Link>
+          <Link
+            to="/booth-polls"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              poll
+            </span>
+            Vendor Polls
           </Link>
         </nav>
 
@@ -808,7 +827,7 @@ const StaffMyRegistrations = () => {
               color: 'inherit'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
@@ -816,7 +835,7 @@ const StaffMyRegistrations = () => {
           >
             <span className="material-symbols-outlined" style={{
               fontSize: '1.5rem',
-              color: '#1D3557'
+              color: '#FFFFFF'
             }}>
               favorite
             </span>
@@ -845,7 +864,7 @@ const StaffMyRegistrations = () => {
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = 'transparent';
@@ -853,7 +872,7 @@ const StaffMyRegistrations = () => {
             >
               <span className="material-symbols-outlined" style={{
                 fontSize: '1.5rem',
-                color: '#1D3557'
+                color: '#FFFFFF'
               }}>
                 notifications
               </span>
@@ -1077,14 +1096,14 @@ const StaffMyRegistrations = () => {
             <p style={{
               fontSize: '0.875rem',
               fontWeight: '600',
-              color: '#1D3557',
+              color: '#FFFFFF',
               margin: 0
             }}>
               {displayName}
             </p>
             <p style={{
               fontSize: '0.75rem',
-              color: '#6b7280',
+              color: 'rgba(255, 255, 255, 0.7)',
               margin: 0
             }}>
               Staff
@@ -1093,7 +1112,10 @@ const StaffMyRegistrations = () => {
           <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            onClick={() => {
+              setShowLogoutDropdown(!showLogoutDropdown);
+              setShowNotificationsDropdown(false);
+            }}
           >
             {user?.profilePicturePath ? (
               <img
@@ -1111,17 +1133,16 @@ const StaffMyRegistrations = () => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#1D3557',
+                backgroundColor: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                  color: '#FFFFFF',
-                  fontSize: '0.875rem',
+                color: '#1D3557',
                 fontWeight: '600'
-                }}>
+              }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'S').toUpperCase()}
-          </div>
-        )}
+              </div>
+            )}
             {showLogoutDropdown && (
               <div style={{
                 position: 'absolute',
@@ -1198,83 +1219,6 @@ const StaffMyRegistrations = () => {
           </div>
         </div>
       </header>
-
-      {/* Navigation */}
-      <nav style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '1rem 2rem',
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #e2e8f0'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <Link
-            to="/dashboard"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/staff/events"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-                  Discover Events
-              </Link>
-              <Link
-                to="/staff/my-registrations"
-                style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-                  My Events
-              </Link>
-              <Link
-            to="/staff/favorites"
-                style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/staff/favorites') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/staff/favorites') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/staff/favorites') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Favorites
-              </Link>
-          <Link
-            to="/gym-schedule"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/gym-schedule') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            View Gym Sessions
-          </Link>
-        </div>
-      </nav>
 
       {/* Main Content */}
       <main style={{
