@@ -312,6 +312,12 @@ const login = async (req, res) => {
         gucId: user.gucId || null,
         department: user.department || null,
         profilePicturePath: user.profilePicturePath || null,
+        // Include vendor-specific document paths so frontend gets them on login
+        vendorLogoPath: user.vendorLogoPath || null,
+        vendorTaxCardPath: user.vendorTaxCardPath || null,
+        // Convenience flags used by frontend to show status
+        hasLogo: (user.hasLogo !== undefined) ? user.hasLogo : (!!user.vendorLogoPath),
+        hasTaxCard: (user.hasTaxCard !== undefined) ? user.hasTaxCard : (!!user.vendorTaxCardPath),
         companyName: user.companyName || null,
         isVerified: user.isVerified !== undefined ? user.isVerified : false,
         status: user.status || 'blocked',
