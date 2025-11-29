@@ -9,31 +9,76 @@ const VendorRequestPayment = () => {
   const location = useLocation();
   const { user } = useAuth();
   const [request, setRequest] = useState(location.state?.selectedEvent || null);
+  const [paymentInfo, setPaymentInfo] = useState(null);
   const [loading, setLoading] = useState(!location.state?.selectedEvent);
   const [error, setError] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
 
   useEffect(() => {
-    if (request) return;
     const load = async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:5000/api/vendor-requests/${requestId}`, {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            'Content-Type': 'application/json'
+
+        // If we already have a request from navigation state, use it but try to fetch payment info
+        if (request) {
+          // If participationFee is missing or zero, fetch vendor-specific payment details endpoint
+          if (!request.participationFee || request.participationFee <= 0) {
+            try {
+              const payRes = await fetch(`http://localhost:5000/api/vendor-requests/${requestId}/payment`, {
+                headers: {
+                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                  'Content-Type': 'application/json'
+                }
+              });
+              if (payRes.ok) {
+                const payData = await payRes.json();
+                setPaymentInfo(payData.payment || payData);
+                // merge amount into request for display
+                setRequest(prev => ({ ...(prev || {}), participationFee: payData.payment?.amount || payData.amount || prev.participationFee }));
+              }
+            } catch (e) {
+              console.warn('Could not fetch payment details from vendor payment endpoint', e);
+            }
           }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setRequest(data.request || data);
-        } else {
-          setError('Failed to load request details');
+          setLoading(false);
+          return;
         }
-      } catch (err) {
-        console.error('Error loading vendor request:', err);
-        setError('Error loading request');
+
+        // No request in state: call vendor payment endpoint which returns amount (vendor-only)
+        try {
+          const payRes = await fetch(`http://localhost:5000/api/vendor-requests/${requestId}/payment`, {
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              'Content-Type': 'application/json'
+            }
+          });
+          if (payRes.ok) {
+            const payData = await payRes.json();
+            setPaymentInfo(payData.payment || payData);
+            // populate a minimal request object for UI
+            setRequest({ _id: requestId, eventName: payData.payment?.eventName || '', participationFee: payData.payment?.amount || 0, paymentStatus: payData.payment?.paymentStatus });
+          } else {
+            // fallback: try to fetch the general vendor request (may require admin rights)
+            const res = await fetch(`http://localhost:5000/api/vendor-requests/${requestId}`, {
+              headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                'Content-Type': 'application/json'
+              }
+            });
+            if (res.ok) {
+              const data = await res.json();
+              setRequest(data.request || data);
+            } else {
+              setError('Failed to load request details');
+            }
+          }
+        } catch (err) {
+          console.error('Error loading vendor request/payment:', err);
+          setError('Error loading request');
+        } finally {
+          setLoading(false);
+        }
       } finally {
         setLoading(false);
       }
@@ -53,10 +98,19 @@ const VendorRequestPayment = () => {
       );
 
       if (res.status === 200 && res.data.checkoutUrl) {
+        // Stripe flow: redirect to checkout
         window.location.href = res.data.checkoutUrl;
-      } else {
-        setError(res.data?.message || 'Failed to initiate payment');
+        return;
       }
+
+      // If backend simulated payment (Stripe not configured) it returns success payload
+      if (res.status === 200 && res.data && (res.data.success || res.data.payment)) {
+        // Navigate vendor to dashboard after successful simulated payment
+        navigate('/dashboard');
+        return;
+      }
+
+      setError(res.data?.message || 'Failed to initiate payment');
     } catch (err) {
       console.error('Error initiating vendor payment:', err);
       setError(err.response?.data?.message || err.message || 'Error initiating payment');
@@ -184,8 +238,8 @@ const VendorRequestPayment = () => {
               alignItems: 'center'
             }}>
               <span style={{ fontSize: '1rem', fontWeight: '600', color: '#1D3557' }}>Total Amount:</span>
-              <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1D3557' }}>
-                {request.participationFee || request.amount || 0} EGP
+                <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1D3557' }}>
+                {(paymentInfo?.amount) || request.participationFee || request.amount || 0} EGP
               </span>
             </div>
           </div>
@@ -284,7 +338,7 @@ const VendorRequestPayment = () => {
               opacity: paymentLoading ? 0.5 : 1
             }}
           >
-            {paymentLoading ? 'Processing...' : `Pay ${request.participationFee || request.amount || 0} EGP`}
+            {paymentLoading ? 'Processing...' : `Pay ${(paymentInfo?.amount) || request.participationFee || request.amount || 0} EGP`}
           </button>
         </div>
       </div>
