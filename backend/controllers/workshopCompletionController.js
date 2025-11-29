@@ -61,26 +61,60 @@ exports.sendWorkshopCompletionEmails = async (req, res) => {
       console.log(`   Status: ${workshop.status}`);
       console.log(`   Completion Email Sent: ${workshop.completionEmailSent}`);
 
-      // Get all registered users (both regular registrations and student registrations)
-      const regularRegistrations = await Registration.find({
-        event: workshop._id,
-        status: { $in: ['approved', 'registered'] }
-      }).populate('user', 'email firstName lastName userType');
-
-      console.log(`   Found ${regularRegistrations.length} regular registrations`);
-
+      // Get all registered users
+      // Note: Staff/TA/Professor also register via StudentRegistrationForm, so they're in StudentRegistration model
       const studentRegistrations = await StudentRegistration.find({
         event: workshop._id,
         eventType: 'workshop',
         status: { $in: ['approved', 'registered'] }
       });
 
-      console.log(`   Found ${studentRegistrations.length} student registrations`);
+      console.log(`   Found ${studentRegistrations.length} registrations (StudentRegistration model)`);
+
+      // Also check Registration model for any registrations (backwards compatibility)
+      const regularRegistrations = await Registration.find({
+        event: workshop._id,
+        status: { $in: ['approved', 'registered'] }
+      }).populate('user', 'email firstName lastName userType');
+
+      console.log(`   Found ${regularRegistrations.length} registrations (Registration model)`);
 
       // Combine all registrations
       const allRegistrations = [];
 
-      // Add regular registrations (staff, TA, professors)
+      // Batch lookup users by email for student registrations
+      const studentEmails = studentRegistrations
+        .map(reg => reg.studentEmail?.toLowerCase())
+        .filter(email => email);
+      
+      const users = await User.find({ 
+        email: { $in: studentEmails } 
+      }).select('email userType');
+      
+      // Create a map of email -> userType for quick lookup
+      const userTypeMap = new Map();
+      users.forEach(user => {
+        userTypeMap.set(user.email.toLowerCase(), user.userType);
+      });
+
+      // Add student registrations (includes Students, Staff, TA, Professors who registered via StudentRegistrationForm)
+      for (const reg of studentRegistrations) {
+        if (reg.studentEmail) {
+          // Look up userType from the map
+          const userType = userTypeMap.get(reg.studentEmail.toLowerCase()) || 'Student'; // Default to Student if user not found
+          
+          // Only send to students, staff, TA, professors
+          if (['Student', 'Staff', 'TA', 'Professor'].includes(userType)) {
+            allRegistrations.push({
+              email: reg.studentEmail,
+              name: reg.studentName || reg.studentEmail,
+              userType: userType
+            });
+          }
+        }
+      }
+
+      // Add regular registrations (for backwards compatibility - if any exist)
       for (const reg of regularRegistrations) {
         if (reg.user && reg.user.email) {
           const userType = reg.user.userType || reg.role;
@@ -94,17 +128,6 @@ exports.sendWorkshopCompletionEmails = async (req, res) => {
               userType: userType
             });
           }
-        }
-      }
-
-      // Add student registrations
-      for (const reg of studentRegistrations) {
-        if (reg.studentEmail) {
-          allRegistrations.push({
-            email: reg.studentEmail,
-            name: reg.studentName || reg.studentEmail,
-            userType: 'Student'
-          });
         }
       }
 
