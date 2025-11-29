@@ -766,10 +766,12 @@ const AdminDashboard = () => {
                   gridColumn: 'span 8',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '1.5rem'
+                  gap: '1.5rem',
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}>
                   {/* Quick Stats */}
-                  <div>
+                  <div style={{ width: '100%', boxSizing: 'border-box' }}>
                     <h3 style={{
                       fontSize: '1.125rem',
                       fontWeight: '600',
@@ -780,39 +782,56 @@ const AdminDashboard = () => {
                     </h3>
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(4, 1fr)',
-                      gap: '1.5rem'
+                      gridTemplateColumns: '1fr 1fr 1fr 1.25fr',
+                      gap: '0.75rem',
+                      width: '100%',
+                      boxSizing: 'border-box'
                     }}>
                       {/* Total Users Card */}
                       <div style={{
                         backgroundColor: '#FFFFFF',
                         padding: '1.5rem',
                         borderRadius: '0.5rem',
-                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        minHeight: '100px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                           <div style={{
                             backgroundColor: '#dbeafe',
                             padding: '0.75rem',
-                            borderRadius: '50%'
+                            borderRadius: '50%',
+                            flexShrink: 0
                           }}>
                             <span className="material-symbols-outlined" style={{ color: '#1D3557', fontSize: '1.5rem' }}>
                               people
                             </span>
                           </div>
-                          <div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             <p style={{
                               color: 'rgba(29, 53, 87, 0.6)',
                               fontSize: '0.875rem',
-                              margin: 0
+                              fontWeight: '500',
+                              margin: 0,
+                              marginBottom: '0.25rem',
+                              lineHeight: '1.25',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
                             }}>
-                              Total Users
+                              Users
                             </p>
                             <p style={{
                               color: '#1D3557',
                               fontSize: '1.5rem',
                               fontWeight: '700',
-                              margin: 0
+                              margin: 0,
+                              lineHeight: '1.2'
                             }}>
                               {stats.totalUsers}
                             </p>
@@ -825,31 +844,46 @@ const AdminDashboard = () => {
                         backgroundColor: '#FFFFFF',
                         padding: '1.5rem',
                         borderRadius: '0.5rem',
-                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        minHeight: '100px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                           <div style={{
                             backgroundColor: '#d1fae5',
                             padding: '0.75rem',
-                            borderRadius: '50%'
+                            borderRadius: '50%',
+                            flexShrink: 0
                           }}>
                             <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: '1.5rem' }}>
                               storefront
                             </span>
                           </div>
-                          <div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             <p style={{
                               color: 'rgba(29, 53, 87, 0.6)',
                               fontSize: '0.875rem',
-                              margin: 0
+                              fontWeight: '500',
+                              margin: 0,
+                              marginBottom: '0.25rem',
+                              lineHeight: '1.25',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
                             }}>
-                              Total Vendors
+                              Vendors
                             </p>
                             <p style={{
                               color: '#1D3557',
                               fontSize: '1.5rem',
                               fontWeight: '700',
-                              margin: 0
+                              margin: 0,
+                              lineHeight: '1.2'
                             }}>
                               {stats.totalVendors}
                             </p>
@@ -862,31 +896,46 @@ const AdminDashboard = () => {
                         backgroundColor: '#FFFFFF',
                         padding: '1.5rem',
                         borderRadius: '0.5rem',
-                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        minHeight: '100px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                           <div style={{
                             backgroundColor: '#fef3c7',
                             padding: '0.75rem',
-                            borderRadius: '50%'
+                            borderRadius: '50%',
+                            flexShrink: 0
                           }}>
                             <span className="material-symbols-outlined" style={{ color: '#f59e0b', fontSize: '1.5rem' }}>
                               event
                             </span>
                           </div>
-                          <div>
+                          <div style={{ flex: 1, minWidth: 0  }}>
                             <p style={{
                               color: 'rgba(29, 53, 87, 0.6)',
                               fontSize: '0.875rem',
-                              margin: 0
+                              fontWeight: '500',
+                              margin: 0,
+                              marginBottom: '0.25rem',
+                              lineHeight: '1.25',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
                             }}>
-                              Total Events
+                              Events
                             </p>
                             <p style={{
                               color: '#1D3557',
                               fontSize: '1.5rem',
                               fontWeight: '700',
-                              margin: 0
+                              margin: 0,
+                              lineHeight: '1.2'
                             }}>
                               {stats.totalEvents}
                             </p>
@@ -899,23 +948,37 @@ const AdminDashboard = () => {
                         backgroundColor: '#FFFFFF',
                         padding: '1.5rem',
                         borderRadius: '0.5rem',
-                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        minHeight: '100px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                           <div style={{
                             backgroundColor: '#fee2e2',
                             padding: '0.75rem',
-                            borderRadius: '50%'
+                            borderRadius: '50%',
+                            flexShrink: 0
                           }}>
                             <span className="material-symbols-outlined" style={{ color: '#dc2626', fontSize: '1.5rem' }}>
                               pending_actions
                             </span>
                           </div>
-                          <div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             <p style={{
                               color: 'rgba(29, 53, 87, 0.6)',
                               fontSize: '0.875rem',
-                              margin: 0
+                              fontWeight: '500',
+                              margin: 0,
+                              marginBottom: '0.25rem',
+                              lineHeight: '1.25',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
                             }}>
                               Pending Approvals
                             </p>
@@ -923,7 +986,8 @@ const AdminDashboard = () => {
                               color: '#1D3557',
                               fontSize: '1.5rem',
                               fontWeight: '700',
-                              margin: 0
+                              margin: 0,
+                              lineHeight: '1.2'
                             }}>
                               {stats.pendingApprovals}
                             </p>
@@ -934,7 +998,13 @@ const AdminDashboard = () => {
                   </div>
 
                   {/* Recent Activity */}
-                  <div>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    height: '100%', 
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}>
                     <h3 style={{
                       fontSize: '1.125rem',
                       fontWeight: '600',
@@ -948,8 +1018,12 @@ const AdminDashboard = () => {
                       padding: '1.5rem',
                       borderRadius: '0.5rem',
                       boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                      maxHeight: '400px',
-                      overflowY: 'auto'
+                      flex: 1,
+                      overflowY: 'auto',
+                      minHeight: '600px',
+                      width: '100%',
+                      maxWidth: '100%',
+                      boxSizing: 'border-box'
                     }}>
                       <ul style={{
                         listStyle: 'none',
@@ -1018,9 +1092,10 @@ const AdminDashboard = () => {
                   gridColumn: 'span 4',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '1.5rem'
+                  gap: '1.5rem',
+                  height: '100%'
                 }}>
-                  <div>
+                  <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                     <h3 style={{
                       fontSize: '1.125rem',
                       fontWeight: '600',
@@ -1034,6 +1109,7 @@ const AdminDashboard = () => {
                       padding: '1.5rem',
                       borderRadius: '0.5rem',
                       boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                      flex: 1,
                       minHeight: '600px'
                     }}>
                       {upcomingDeadlines.length > 0 ? (

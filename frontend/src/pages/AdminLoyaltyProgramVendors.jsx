@@ -517,10 +517,10 @@ const AdminLoyaltyProgramVendors = () => {
             <div style={{
               position: 'absolute',
               inset: 0,
-              backgroundImage: 'url(/assets/images/LoyaltyProgram.png)',
+            backgroundImage: 'url(/assets/images/LoyaltyProgram.png)',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
-              backgroundSize: 'cover',
+            backgroundSize: 'cover',
               filter: 'blur(2px)',
               animation: 'pulse 4s ease-in-out infinite'
             }}></div>
