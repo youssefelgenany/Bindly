@@ -18,6 +18,7 @@ const MyWallet = () => {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const isProfessor = user?.userType === 'Professor';
   const isStaff = user?.userType === 'Staff';
+  const isTA = user?.userType === 'TA';
 
   useEffect(() => {
     loadWalletData();
@@ -168,7 +169,7 @@ const MyWallet = () => {
   };
 
   const loadNotifications = useCallback(async () => {
-    if (!isProfessor) return;
+    if (!isProfessor && !isTA) return;
     try {
       setLoadingNotifications(true);
       const [notificationsResult, countResult] = await Promise.all([
@@ -195,13 +196,13 @@ const MyWallet = () => {
   }, [isProfessor]);
 
   useEffect(() => {
-    if (!isProfessor) return;
+    if (!isProfessor && !isTA) return;
     loadNotifications();
     const interval = setInterval(() => {
       loadNotifications();
     }, 30000);
     return () => clearInterval(interval);
-  }, [loadNotifications, isProfessor]);
+  }, [loadNotifications, isProfessor, isTA]);
 
   const handleMarkAsRead = async (notificationId) => {
     try {
@@ -263,7 +264,7 @@ const MyWallet = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#f6f7f8' }}>
       {/* Header */}
-      {isProfessor || isStaff ? (
+      {isProfessor || isStaff || isTA ? (
         <header style={{
           display: 'flex',
           alignItems: 'center',
@@ -354,6 +355,25 @@ const MyWallet = () => {
                   My Events
                 </Link>
                 <Link
+                  to="/professor/my-workshops"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    school
+                  </span>
+                  My Workshops
+                </Link>
+                <Link
                   to="/gym"
                   style={{
                     textDecoration: 'none',
@@ -392,7 +412,7 @@ const MyWallet = () => {
                   Vendor Polls
                 </Link>
               </>
-            ) : (
+            ) : isStaff ? (
               <>
                 <Link
                   to="/dashboard"
@@ -490,7 +510,105 @@ const MyWallet = () => {
                   Vendor Polls
                 </Link>
               </>
-            )}
+            ) : isTA ? (
+              <>
+                <Link
+                  to="/dashboard"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    dashboard
+                  </span>
+                  Dashboard
+                </Link>
+                <Link
+                  to="/ta/events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/ta/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/ta/events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/ta/events') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    explore
+                  </span>
+                  Discover Events
+                </Link>
+                <Link
+                  to="/ta/my-registrations"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/ta/my-registrations') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/ta/my-registrations') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/ta/my-registrations') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    event
+                  </span>
+                  My Events
+                </Link>
+                <Link
+                  to="/gym"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/gym') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    fitness_center
+                  </span>
+                  Gym Sessions
+                </Link>
+                <Link
+                  to="/booth-polls"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    poll
+                  </span>
+                  Vendor Polls
+                </Link>
+              </>
+            ) : null}
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
@@ -621,7 +739,13 @@ const MyWallet = () => {
                               handleMarkAsRead(notification._id);
                             }
                             if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
-                              navigate('/professor/all-events');
+                              if (isProfessor) {
+                                navigate('/professor/all-events');
+                              } else if (isTA) {
+                                navigate('/ta/events');
+                              } else {
+                                navigate('/staff/events');
+                              }
                               setShowNotificationsDropdown(false);
                             } else if (
                               (notification.type === 'event_reminder' ||
@@ -633,14 +757,26 @@ const MyWallet = () => {
                                 notification.metadata?.tripId ||
                                 notification.metadata?.gymSessionId)
                             ) {
-                              navigate('/professor/events');
+                              if (isProfessor) {
+                                navigate('/professor/events');
+                              } else if (isTA) {
+                                navigate('/ta/my-registrations');
+                              } else {
+                                navigate('/staff/my-registrations');
+                              }
                               setShowNotificationsDropdown(false);
                             } else if (
                               notification.type === 'new_loyalty_partner' ||
                               notification.type === 'loyalty_partner_added' ||
                               (notification.type === 'system' && notification.metadata?.vendorId)
                             ) {
-                              navigate('/professor/loyalty-vendors');
+                              if (isProfessor) {
+                                navigate('/professor/loyalty-vendors');
+                              } else if (isTA) {
+                                navigate('/ta/loyalty-vendors');
+                              } else {
+                                navigate('/staff/loyalty-vendors');
+                              }
                               setShowNotificationsDropdown(false);
                             }
                           }}
@@ -744,7 +880,7 @@ const MyWallet = () => {
 
             {/* Heart Icon - Favorites */}
             <Link
-              to={isProfessor ? "/professor/favorites" : "/staff/favorites"}
+              to={isProfessor ? "/professor/favorites" : isStaff ? "/staff/favorites" : "/ta/favorites"}
               style={{
                 background: 'none',
                 border: 'none',
@@ -787,7 +923,7 @@ const MyWallet = () => {
                 color: 'rgba(255, 255, 255, 0.7)',
                 margin: 0
               }}>
-                {isProfessor ? 'Professor' : 'Staff'}
+                {isProfessor ? 'Professor' : isStaff ? 'Staff' : 'TA'}
               </p>
             </div>
             <div 
@@ -821,7 +957,7 @@ const MyWallet = () => {
                   color: '#1D3557',
                   fontWeight: '600'
                 }}>
-                  {(user?.firstName?.[0] || user?.name?.[0] || (isProfessor ? 'P' : 'S')).toUpperCase()}
+                  {(user?.firstName?.[0] || user?.name?.[0] || (isProfessor ? 'P' : isStaff ? 'S' : 'T')).toUpperCase()}
                 </div>
               )}
               {showLogoutDropdown && (
@@ -837,7 +973,7 @@ const MyWallet = () => {
                   zIndex: 1000,
                   minWidth: '150px'
                 }}>
-                  {(user?.userType === 'Professor' || user?.userType === 'Staff') && (
+                  {(user?.userType === 'Professor' || user?.userType === 'Staff' || user?.userType === 'TA') && (
                     <Link
                       to="/wallet"
                       style={{

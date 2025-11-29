@@ -1194,56 +1194,6 @@ const StaffFavorites = () => {
                             {event.location}
                           </div>
                         </div>
-                        <div style={{
-                          marginTop: 'auto',
-                          paddingTop: '0.75rem',
-                          borderTop: '1px solid #e5e7eb',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'flex-start',
-                          gap: '0.5rem'
-                        }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewRatingsComments(event);
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.375rem',
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: '0.25rem',
-                              borderRadius: '0.375rem',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f3f4f6';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                            title="View ratings and comments"
-                          >
-                            <span className="material-symbols-outlined" style={{
-                              fontSize: '1rem',
-                              color: '#fbbf24'
-                            }}>
-                              star
-                            </span>
-                            <span style={{
-                              fontSize: '0.8125rem',
-                              fontWeight: '600',
-                              color: '#374151'
-                            }}>
-                              {eventRatings[event.id]?.average > 0
-                                ? eventRatings[event.id].average.toFixed(1)
-                                : '—'}
-                            </span>
-                          </button>
-                        </div>
                       </div>
                     </div>
                   ))}

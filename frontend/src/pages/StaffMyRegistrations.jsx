@@ -1609,88 +1609,6 @@ const StaffMyRegistrations = () => {
                         )}
                       </div>
                       
-                      {/* Rating and Comment Icons - Only for Past Events */}
-                      {hasEventPassed(registration.eventDate, registration.eventEndDate) && (
-                      <div style={{
-                        display: 'flex',
-                          gap: '0.5rem',
-                          marginTop: '0.5rem',
-                          marginBottom: '0.5rem'
-                        }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              handleViewRatingsComments(registration, { focus: 'rating' });
-                            }}
-                            style={{
-                              padding: '0.5rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: 'transparent',
-                              border: '1px solid #e5e7eb',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'all 0.2s',
-                              zIndex: 10,
-                              position: 'relative'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = '#f3f4f6';
-                              e.target.style.borderColor = '#d1d5db';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = 'transparent';
-                              e.target.style.borderColor = '#e5e7eb';
-                            }}
-                            title="Rate this event"
-                          >
-                        <span className="material-symbols-outlined" style={{
-                              fontSize: '1.25rem',
-                              color: '#1e40af'
-                        }}>
-                              star
-                        </span>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              handleViewRatingsComments(registration, { focus: 'comment' });
-                            }}
-                            style={{
-                              padding: '0.5rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: 'transparent',
-                              border: '1px solid #e5e7eb',
-                              cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'all 0.2s',
-                              zIndex: 10,
-                              position: 'relative'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = '#f3f4f6';
-                              e.target.style.borderColor = '#d1d5db';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = 'transparent';
-                              e.target.style.borderColor = '#e5e7eb';
-                            }}
-                            title="Comment on this event"
-                          >
-                          <span className="material-symbols-outlined" style={{
-                              fontSize: '1.25rem',
-                              color: '#1e40af'
-                          }}>
-                              comment
-                          </span>
-                          </button>
-        </div>
-      )}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -3020,36 +2938,9 @@ const StaffMyRegistrations = () => {
                             </button>
                           ))}
                         </div>
-                        {rating > 0 && (
-                          <button
-                            type="button"
-                            onClick={handleSubmitRating}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: '#1e40af',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                              fontWeight: '600',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.stopPropagation();
-                              e.target.style.backgroundColor = '#1e3a8a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.stopPropagation();
-                              e.target.style.backgroundColor = '#1e40af';
-                            }}
-                          >
-                            Submit Rating
-                          </button>
-                        )}
                       </div>
 
-                      <div ref={commentSectionRef}>
+                      <div ref={commentSectionRef} style={{ marginBottom: '1.5rem' }}>
                         <label style={{
                           display: 'block',
                           fontSize: '0.875rem',
@@ -3087,41 +2978,139 @@ const StaffMyRegistrations = () => {
                           }}
                         />
                         <div style={{
-                          fontSize: '0.75rem',
-                          color: '#6b7280',
-                          textAlign: 'right',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
                           marginBottom: '0.75rem'
+                        }}>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280'
                         }}>
                           {commentText.length}/1000 characters
                         </div>
                         <button
                           type="button"
-                          onClick={handleSubmitComment}
-                          disabled={!commentText.trim()}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              
+                              if (!selectedEventForView?.eventId) {
+                                setModalError('No event selected.');
+                                return;
+                              }
+                              
+                              const hasRating = rating > 0 && rating <= 5;
+                              const hasComment = commentText.trim().length > 0;
+                              
+                              if (!hasRating && !hasComment) {
+                                setModalError('Please provide a rating, comment, or both.');
+                                return;
+                              }
+                              
+                              setModalError('');
+                              setModalSuccess('');
+                              
+                              const eventId = String(selectedEventForView.eventId);
+                              let ratingSuccess = true;
+                              let commentSuccess = true;
+                              let errorMessages = [];
+                              
+                              try {
+                                // Submit rating if provided
+                                if (hasRating) {
+                                  try {
+                                    const ratingResult = await eventsApiService.submitRating(eventId, rating);
+                                    if (ratingResult.success) {
+                                      setRating(0);
+                                      setHoveredRating(0);
+                                    } else {
+                                      ratingSuccess = false;
+                                      const errorMsg = ratingResult.message || ratingResult.error?.message || ratingResult.error?.msg || 'Failed to submit rating';
+                                      errorMessages.push(errorMsg);
+                                    }
+                                  } catch (err) {
+                                    ratingSuccess = false;
+                                    console.error('Error submitting rating:', err);
+                                    const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting rating';
+                                    errorMessages.push(errorMsg);
+                                  }
+                                }
+                                
+                                // Submit comment if provided
+                                if (hasComment) {
+                                  try {
+                                    const commentResult = await eventsApiService.submitComment(eventId, commentText.trim());
+                                    if (commentResult.success) {
+                                      setCommentText('');
+                                    } else {
+                                      commentSuccess = false;
+                                      const errorMsg = commentResult.message || commentResult.error?.message || commentResult.error?.msg || 'Failed to submit comment';
+                                      errorMessages.push(errorMsg);
+                                    }
+                                  } catch (err) {
+                                    commentSuccess = false;
+                                    console.error('Error submitting comment:', err);
+                                    const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting comment';
+                                    errorMessages.push(errorMsg);
+                                  }
+                                }
+                                
+                                // Show success or error messages
+                                if (ratingSuccess && commentSuccess) {
+                                  const successMessages = [];
+                                  if (hasRating) successMessages.push('Rating');
+                                  if (hasComment) successMessages.push('Comment');
+                                  setModalSuccess(`${successMessages.join(' and ')} submitted successfully.`);
+                                  setModalError('');
+                                } else {
+                                  setModalError(errorMessages.join(' '));
+                                  setModalSuccess('');
+                                }
+                                
+                                // Reload ratings and comments regardless of success/failure
+                                await loadRatingsAndComments(eventId);
+                                
+                                // Update event ratings if rating was submitted
+                                if (hasRating && ratingSuccess) {
+                                  await refreshEventRatingStats(eventId);
+                                }
+                              } catch (err) {
+                                console.error('Error in submit process:', err);
+                                setModalError(err.response?.data?.message || err.message || 'Error submitting feedback');
+                                setModalSuccess('');
+                              }
+                            }}
+                            disabled={!(rating > 0 || commentText.trim())}
                           style={{
                             padding: '0.5rem 1rem',
                             borderRadius: '0.5rem',
-                            backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
+                              backgroundColor: !(rating > 0 || commentText.trim()) ? '#d1d5db' : '#1e40af',
                             color: '#FFFFFF',
                             border: 'none',
-                            cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
+                              cursor: !(rating > 0 || commentText.trim()) ? 'not-allowed' : 'pointer',
                             fontSize: '0.875rem',
                             fontWeight: '600',
-                            transition: 'all 0.2s'
+                              transition: 'all 0.2s',
+                              zIndex: 10,
+                              position: 'relative'
                           }}
                           onMouseEnter={(e) => {
-                            if (commentText.trim()) {
+                              e.stopPropagation();
+                              if (rating > 0 || commentText.trim()) {
                               e.target.style.backgroundColor = '#1e3a8a';
                             }
                           }}
                           onMouseLeave={(e) => {
-                            if (commentText.trim()) {
+                              e.stopPropagation();
+                              if (rating > 0 || commentText.trim()) {
                               e.target.style.backgroundColor = '#1e40af';
                             }
                           }}
                         >
-                          Submit Comment
+                            Submit
                         </button>
+                        </div>
                       </div>
                     </div>
                   )}

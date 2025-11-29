@@ -433,20 +433,46 @@ const AdminUsers = () => {
       });
       
       if (response.ok) {
+        // Get content type from response headers
+        const contentType = response.headers.get('content-type') || '';
         const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
+        
+        // Determine file extension from content type
+        let extension = '';
+        if (contentType.includes('pdf')) {
+          extension = 'pdf';
+        } else if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+          extension = 'jpg';
+        } else if (contentType.includes('png')) {
+          extension = 'png';
+        } else if (contentType.includes('gif')) {
+          extension = 'gif';
+        } else if (contentType.includes('webp')) {
+          extension = 'webp';
+        } else {
+          // Fallback based on document type
+          extension = documentType === 'logo' ? 'png' : 'pdf';
+        }
+        
+        // Create a new blob with the correct MIME type
+        const typedBlob = new Blob([blob], { type: contentType || blob.type });
+        const blobUrl = window.URL.createObjectURL(typedBlob);
         const link = document.createElement('a');
         link.href = blobUrl;
         
         const vendor = users.find(v => (v._id || v.id) === vendorId);
         const companyName = vendor?.companyName || 'vendor';
         const safeName = companyName.replace(/[^a-z0-9]/gi, '_');
-        link.download = `${safeName}_${documentType}.${documentType === 'logo' ? 'png' : 'pdf'}`;
+        link.download = `${safeName}_${documentType}.${extension}`;
         
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
+        
+        // Clean up after a short delay to ensure download starts
+        setTimeout(() => {
+          window.URL.revokeObjectURL(blobUrl);
+        }, 100);
       } else {
         alert('Failed to download document');
       }

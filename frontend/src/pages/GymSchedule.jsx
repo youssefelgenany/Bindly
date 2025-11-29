@@ -1172,6 +1172,25 @@ const GymSchedule = () => {
                     My Events
                   </Link>
                   <Link
+                    to="/professor/my-workshops"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #FFFFFF' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      school
+                    </span>
+                    My Workshops
+                  </Link>
+                  <Link
                     to="/gym"
                     style={{
                       textDecoration: 'none',

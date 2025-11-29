@@ -380,6 +380,25 @@ const ProfessorLoyaltyVendorsView = () => {
             My Events
           </Link>
           <Link
+            to="/professor/my-workshops"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              school
+            </span>
+            My Workshops
+          </Link>
+          <Link
             to="/gym"
             style={{
               textDecoration: 'none',
@@ -420,6 +439,37 @@ const ProfessorLoyaltyVendorsView = () => {
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          {/* Heart Icon - Favorites */}
+          <Link
+            to="/professor/favorites"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              textDecoration: 'none',
+              color: 'inherit'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{
+              fontSize: '1.5rem',
+              color: '#FFFFFF'
+            }}>
+              favorite
+            </span>
+          </Link>
+
           {/* Notifications Bell */}
           <div style={{ position: 'relative' }} data-notifications-dropdown>
             <button
@@ -647,37 +697,6 @@ const ProfessorLoyaltyVendorsView = () => {
               </div>
             )}
           </div>
-          
-          {/* Heart Icon - Favorites */}
-          <Link
-            to="/professor/favorites"
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.5rem',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s',
-              textDecoration: 'none',
-              color: 'inherit'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{
-              fontSize: '1.5rem',
-              color: '#FFFFFF'
-            }}>
-              favorite
-            </span>
-          </Link>
 
           <div style={{ textAlign: 'right' }}>
             <p style={{
@@ -1002,12 +1021,15 @@ const ProfessorLoyaltyVendorsView = () => {
                     style={{
                       background: 'linear-gradient(135deg, #fbf7ef 0%, #ffffff 80%)',
                       borderRadius: '1.1rem',
-                      padding: '1.75rem',
+                      padding: 0,
                       boxShadow: '0 15px 25px -12px rgba(15, 23, 42, 0.25)',
                       cursor: 'pointer',
                       transition: 'all 0.25s ease',
                       border: '1px solid rgba(214, 188, 138, 0.4)',
-                      animation: 'fadeInUp 0.5s ease'
+                      animation: 'fadeInUp 0.5s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.boxShadow = '0 25px 35px -15px rgba(15, 23, 42, 0.3)';
@@ -1018,6 +1040,44 @@ const ProfessorLoyaltyVendorsView = () => {
                       e.currentTarget.style.transform = 'translateY(0) scale(1)';
                     }}
                   >
+                    {/* Booth Photo */}
+                    <div style={{
+                      width: '100%',
+                      height: '180px',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      backgroundColor: '#f3f4f6',
+                      flexShrink: 0
+                    }}>
+                      <img
+                        src="/assets/images/booth-background.jpg"
+                        alt={vendor.vendorName || 'Vendor'}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          objectPosition: 'center'
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.parentElement.style.backgroundColor = '#3F51B5';
+                          e.target.parentElement.style.display = 'flex';
+                          e.target.parentElement.style.alignItems = 'center';
+                          e.target.parentElement.style.justifyContent = 'center';
+                          if (!e.target.parentElement.querySelector('.fallback-text')) {
+                            const fallback = document.createElement('div');
+                            fallback.className = 'fallback-text';
+                            fallback.textContent = (vendor.vendorName || 'VENDOR').toUpperCase();
+                            fallback.style.color = '#FFFFFF';
+                            fallback.style.fontSize = '1.25rem';
+                            fallback.style.fontWeight = '700';
+                            e.target.parentElement.appendChild(fallback);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ padding: '1.75rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                     {/* Vendor Header */}
                     <div style={{
                       display: 'flex',
@@ -1179,6 +1239,7 @@ const ProfessorLoyaltyVendorsView = () => {
                       <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
                         arrow_forward
                       </span>
+                    </div>
                     </div>
                   </div>
                 ))}

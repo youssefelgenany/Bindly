@@ -136,6 +136,21 @@ export const vendorApi = {
     cancelMyLoyaltyApplication: async () => {
         const res = await api.delete('/loyalty-program/my-application');
         return res.data;
+    },
+    // Update my loyalty application
+    updateLoyaltyApplication: async (payload) => {
+        const res = await api.patch('/loyalty-program/my-application', payload);
+        return res.data;
+    },
+    
+    // Upload vendor documents (tax card and logo)
+    uploadDocuments: async (formData) => {
+        const res = await api.post('/my/documents', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        return res.data;
     }
 };
 
