@@ -65,7 +65,7 @@ const GymSessionForm = ({ onSubmit, loading = false, submitLabel = 'Create Gym S
   return (
     <form className="gym-session-form" onSubmit={handleSubmit}>
       <div className="form-group">
-        <label className="form-label">Date *</label>
+        <label className="form-label">Date <span style={{ color: '#ef4444' }}>*</span></label>
         <input
           type="date"
           name="date"
@@ -77,7 +77,7 @@ const GymSessionForm = ({ onSubmit, loading = false, submitLabel = 'Create Gym S
       </div>
 
       <div className="form-group">
-        <label className="form-label">Time *</label>
+        <label className="form-label">Time <span style={{ color: '#ef4444' }}>*</span></label>
         <input
           type="time"
           name="time"
@@ -89,7 +89,7 @@ const GymSessionForm = ({ onSubmit, loading = false, submitLabel = 'Create Gym S
       </div>
 
       <div className="form-group">
-        <label className="form-label">Duration (minutes) *</label>
+        <label className="form-label">Duration (minutes) <span style={{ color: '#ef4444' }}>*</span></label>
         <input
           type="number"
           name="duration"
@@ -103,7 +103,7 @@ const GymSessionForm = ({ onSubmit, loading = false, submitLabel = 'Create Gym S
       </div>
 
       <div className="form-group">
-        <label className="form-label">Session Type *</label>
+        <label className="form-label">Session Type <span style={{ color: '#ef4444' }}>*</span></label>
         <select
           name="type"
           className="form-input"
@@ -121,7 +121,7 @@ const GymSessionForm = ({ onSubmit, loading = false, submitLabel = 'Create Gym S
       </div>
 
       <div className="form-group">
-        <label className="form-label">Max Number of Participants *</label>
+        <label className="form-label">Max Number of Participants <span style={{ color: '#ef4444' }}>*</span></label>
         <input
           type="number"
           name="maxParticipants"

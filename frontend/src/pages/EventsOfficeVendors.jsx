@@ -620,15 +620,18 @@ const EventsOfficeVendors = () => {
                 menu
               </span>
             </button>
-            <h2 style={{
-              color: '#FFFFFF',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              lineHeight: '1.25',
-              margin: 0
-            }}>
-              Bindly
-            </h2>
+            <Link to="/event-office" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h2 style={{
+                color: '#FFFFFF',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                lineHeight: '1.25',
+                margin: 0,
+                cursor: 'pointer'
+              }}>
+                Bindly
+              </h2>
+            </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             {/* Notification Bell */}
