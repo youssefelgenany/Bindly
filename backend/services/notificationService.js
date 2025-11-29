@@ -441,6 +441,11 @@ exports.notifyVendorRequest = async (vendorRequest, vendor, event) => {
       ]
     });
 
+    console.log(`📢 notifyVendorRequest: Found ${potentialRecipients.length} potential recipients`);
+    potentialRecipients.forEach(user => {
+      console.log(`  - ${user.userType || user.role}: ${user.email || user.name} (ID: ${user._id})`);
+    });
+
     if (!potentialRecipients.length) {
       console.warn('notifyVendorRequest: no recipients found for vendor request notifications');
       return;
@@ -455,12 +460,15 @@ exports.notifyVendorRequest = async (vendorRequest, vendor, event) => {
     });
     const recipients = Array.from(recipientMap.values());
     
+    console.log(`📢 notifyVendorRequest: After deduplication, ${recipients.length} unique recipients`);
+    
     const vendorName = vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || vendor.email;
     const eventName = event?.title || event?.name || vendorRequest?.eventName || 'Event';
     const eventType = (vendorRequest.eventType || event?.type || 'bazaar').toLowerCase();
     const formattedEventType = eventType.includes('booth') ? 'Platform Booth' : 'Bazaar';
     const message = `${vendorName} submitted a ${formattedEventType} vendor request for "${eventName}".`;
     
+    let notificationCount = 0;
     for (const recipient of recipients) {
       // Check if notification already exists
       const existingNotification = await Notification.findOne({
@@ -487,8 +495,13 @@ exports.notifyVendorRequest = async (vendorRequest, vendor, event) => {
             createdAt: new Date()
           }
         });
+        notificationCount++;
+        console.log(`✅ Created vendor_request notification for ${recipient.userType || recipient.role}: ${recipient.email || recipient.name}`);
+      } else {
+        console.log(`⏭️  Skipped duplicate notification for ${recipient.userType || recipient.role}: ${recipient.email || recipient.name}`);
       }
     }
+    console.log(`📢 notifyVendorRequest: Created ${notificationCount} notifications for vendor request ${vendorRequest._id}`);
   } catch (error) {
     console.error('Error notifying vendor request:', error);
   }
