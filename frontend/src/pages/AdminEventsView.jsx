@@ -276,11 +276,27 @@ const AdminEventsView = () => {
   }, [events]);
 
   // Get unique professors from workshops and conferences
+  // Includes both creatorName and professors from the professors array
   const availableProfessors = React.useMemo(() => {
     const profs = new Set();
     events.forEach(event => {
-      if ((event.type === 'workshop' || event.type === 'conference') && event.creatorName) {
-        profs.add(event.creatorName);
+      if (event.type === 'workshop' || event.type === 'conference') {
+        // Add creator name if available
+        if (event.creatorName && event.creatorName.trim()) {
+          profs.add(event.creatorName.trim());
+        }
+        // Add professors from the professors array
+        if (event.professors) {
+          if (Array.isArray(event.professors)) {
+            event.professors.forEach(prof => {
+              if (prof && typeof prof === 'string' && prof.trim()) {
+                profs.add(prof.trim());
+              }
+            });
+          } else if (typeof event.professors === 'string' && event.professors.trim()) {
+            profs.add(event.professors.trim());
+          }
+        }
       }
     });
     return Array.from(profs).sort();
@@ -323,10 +339,26 @@ const AdminEventsView = () => {
     if (!typeMatch) return false;
     
     // Filter by professor name (for workshops and conferences)
+    // Checks both creatorName and professors array
     if (professorNameFilter.trim()) {
       const profFilter = professorNameFilter.trim().toLowerCase();
       const creatorName = (event.creatorName || event.professorName || '').toLowerCase();
-      if (!creatorName.includes(profFilter)) return false;
+      
+      // Check if creator name matches
+      let matches = creatorName.includes(profFilter);
+      
+      // If not matched, check professors array
+      if (!matches && event.professors) {
+        if (Array.isArray(event.professors)) {
+          matches = event.professors.some(prof => 
+            prof && typeof prof === 'string' && prof.toLowerCase().includes(profFilter)
+          );
+        } else if (typeof event.professors === 'string') {
+          matches = event.professors.toLowerCase().includes(profFilter);
+        }
+      }
+      
+      if (!matches) return false;
     }
     
     // Filter by location
@@ -1893,14 +1925,17 @@ const AdminEventsView = () => {
                                     </div>
                                   )}
 
-                                  {/* Professor (for workshops) */}
-                                  {event.type === 'workshop' && (event.creatorName || event.professors) && (
+                                  {/* Professor(s) participating (for workshops) */}
+                                  {event.type === 'workshop' && (event.professors || event.creatorName) && (
                                     <div>
                                       <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Professor
+                                        Professor(s) participating
                                       </h4>
                                       <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {event.creatorName || event.professors}
+                                        {event.professors 
+                                          ? (Array.isArray(event.professors) ? event.professors.join(', ') : event.professors)
+                                          : event.creatorName
+                                        }
                                       </p>
                                     </div>
                                   )}
@@ -2670,70 +2705,6 @@ const AdminEventsView = () => {
             }}>
               This action cannot be undone.
             </p>
-
-            <div style={{ marginBottom: '1.5rem' }}>
-              <p style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#1F2937',
-                marginBottom: '0.75rem'
-              }}>
-                Reason for removing this comment
-              </p>
-              <label style={{
-                display: 'flex',
-                gap: '0.5rem',
-                alignItems: 'flex-start',
-                padding: '0.75rem',
-                borderRadius: '0.5rem',
-                border: commentDeleteReason === 'inappropriate' ? '1px solid #1D3557' : '1px solid #E5E7EB',
-                marginBottom: '0.75rem',
-                cursor: 'pointer',
-                backgroundColor: commentDeleteReason === 'inappropriate' ? '#F8FAFC' : '#FFFFFF'
-              }}>
-                <input
-                  type="radio"
-                  name="comment-delete-reason"
-                  value="inappropriate"
-                  checked={commentDeleteReason === 'inappropriate'}
-                  onChange={() => setCommentDeleteReason('inappropriate')}
-                  style={{ marginTop: '0.25rem' }}
-                />
-                <span style={{ fontSize: '0.875rem', color: '#374151' }}>
-                  Inappropriate / violates community guidelines
-                  <br />
-                  <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
-                    Sends a warning email to the attendee (Student, Staff, TA, Professor)
-                  </span>
-                </span>
-              </label>
-              <label style={{
-                display: 'flex',
-                gap: '0.5rem',
-                alignItems: 'flex-start',
-                padding: '0.75rem',
-                borderRadius: '0.5rem',
-                border: commentDeleteReason === 'general' ? '1px solid #1D3557' : '1px solid #E5E7EB',
-                cursor: 'pointer',
-                backgroundColor: commentDeleteReason === 'general' ? '#F8FAFC' : '#FFFFFF'
-              }}>
-                <input
-                  type="radio"
-                  name="comment-delete-reason"
-                  value="general"
-                  checked={commentDeleteReason === 'general'}
-                  onChange={() => setCommentDeleteReason('general')}
-                  style={{ marginTop: '0.25rem' }}
-                />
-                <span style={{ fontSize: '0.875rem', color: '#374151' }}>
-                  General cleanup (spam, duplicates, admin request)
-                  <br />
-                  <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
-                    Removes the comment without emailing the participant
-                  </span>
-                </span>
-              </label>
-            </div>
 
             {/* Buttons */}
             <div style={{
