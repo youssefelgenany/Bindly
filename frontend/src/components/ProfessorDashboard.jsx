@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { professorApiService } from '../api/professorApi';
 import { notificationApiService } from '../api/notificationApi';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
+import { eventsApiService } from '../api/eventsApi';
 
 const ProfessorDashboard = () => {
     const { user, logout } = useAuth();
@@ -163,79 +164,98 @@ const ProfessorDashboard = () => {
                 console.error('Failed to fetch notifications:', notificationsResult.message);
             }
 
-            // Fetch professor registrations for upcoming events preview
-            if (user?.email) {
-                try {
-                    const registrationsRes = await studentRegistrationApi.getMyRegistrations(user.email);
+            // Fetch events from discover events for upcoming events preview
+            try {
+                const eventsResult = await professorApiService.getAllEvents({});
+                
+                if (eventsResult.success) {
+                    const eventsList = Array.isArray(eventsResult.data) ? eventsResult.data : (eventsResult.data?.events || []);
                     
-                    let registrations = [];
-                    if (registrationsRes.success) {
-                        registrations = registrationsRes.data?.registrations || 
-                                       registrationsRes.data?.data?.registrations ||
-                                       (Array.isArray(registrationsRes.data) ? registrationsRes.data : []) ||
-                                       [];
-                    }
-
                     const now = new Date();
-                    const upcoming = registrations.filter(reg => {
-                        const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
-                        if (!eventDate) return false;
-                        const date = new Date(eventDate);
+                    // Filter for upcoming events (future dates)
+                    const upcoming = eventsList.filter(ev => {
+                        if (!ev.startDate) return false;
+                        const date = new Date(ev.startDate);
                         return !isNaN(date.getTime()) && date > now;
                     });
 
-                    // Prioritize different event types
+                    // Sort by date
                     const sortedByDate = upcoming.slice().sort((a, b) => {
-                        const dateA = new Date(a.eventDate || a.event?.startDate || 0);
-                        const dateB = new Date(b.eventDate || b.event?.startDate || 0);
+                        const dateA = new Date(a.startDate || 0);
+                        const dateB = new Date(b.startDate || 0);
                         return dateA - dateB;
                     });
 
-                    // Select events with different types, prioritizing variety
+                    // Select specific event types in order: Trip, Workshop, Bazaar, Conference/Booth (blurred)
                     const selectedEvents = [];
-                    const usedTypes = new Set();
+                    const priorityTypes = ['trip', 'workshop', 'bazaar', 'conference', 'booth'];
                     
-                    // First pass: try to get one of each type
-                    for (const reg of sortedByDate) {
-                        if (selectedEvents.length >= 3) break;
-                        const eventType = (reg.event?.type || reg.eventType || 'Event').toLowerCase();
-                        if (!usedTypes.has(eventType)) {
-                            selectedEvents.push(reg);
-                            usedTypes.add(eventType);
+                    // First pass: get one of each priority type in order
+                    for (const type of priorityTypes) {
+                        if (selectedEvents.length >= 4) break;
+                        const found = sortedByDate.find(ev => {
+                            const eventType = (ev.type || '').toLowerCase();
+                            return eventType === type && !selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id));
+                        });
+                        if (found) {
+                            selectedEvents.push(found);
                         }
                     }
                     
-                    // Second pass: fill remaining slots with any events
-                    for (const reg of sortedByDate) {
+                    // If we don't have 4 yet, fill with any remaining events
+                    for (const ev of sortedByDate) {
                         if (selectedEvents.length >= 4) break;
-                        if (!selectedEvents.find(e => (e.id || e._id) === (reg.id || reg._id))) {
-                            selectedEvents.push(reg);
+                        if (!selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id))) {
+                            selectedEvents.push(ev);
                         }
                     }
 
+                    // Load ratings for selected events
+                    const ratingsMap = {};
+                    await Promise.all(selectedEvents.slice(0, 4).map(async (ev) => {
+                        if (ev._id || ev.id) {
+                            try {
+                                const ratingResult = await eventsApiService.getRatingsAndComments(ev._id || ev.id);
+                                if (ratingResult.success && ratingResult.data?.ratings) {
+                                    ratingsMap[ev._id || ev.id] = {
+                                        average: ratingResult.data.ratings.average || 0,
+                                        count: ratingResult.data.ratings.count || 0
+                                    };
+                                }
+                            } catch (err) {
+                                // Silently fail - ratings are optional
+                            }
+                        }
+                    }));
+
                     const previewCards = selectedEvents
                         .slice(0, 4)
-                        .map((reg) => {
-                            const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
-                            const { rating, ratingCount } = getRatingSummary(reg);
+                        .map((ev) => {
+                            const eventId = ev._id || ev.id;
+                            const ratingData = ratingsMap[eventId] || { average: null, count: 0 };
+                            const banner = ev.bannerFile || ev.banner;
+                            const image = banner 
+                                ? (banner.startsWith('http') ? banner : `http://localhost:5000${banner}`)
+                                : eventTypeImages[(ev.type || '').toLowerCase()] || eventTypeImages.other;
+                            
                             return {
-                                id: reg.id || reg._id,
-                                title: reg.eventTitle || reg.event?.title || 'Upcoming Event',
-                                subtitle: reg.event?.location || reg.event?.faculty || reg.event?.type || 'On Campus',
-                                dateLabel: formatEventDateLabel(eventDate),
-                                image: getEventPreviewImage(reg),
-                                rating,
-                                ratingCount,
-                                priceLabel: getPriceLabel(reg.event?.price || reg.event?.cost || reg.price),
-                                typeLabel: reg.event?.type || reg.eventType || 'Event'
+                                id: eventId,
+                                title: ev.title || 'Upcoming Event',
+                                subtitle: ev.location || ev.faculty || ev.type || 'On Campus',
+                                dateLabel: formatEventDateLabel(ev.startDate),
+                                image: image,
+                                rating: ratingData.average,
+                                ratingCount: ratingData.count,
+                                priceLabel: getPriceLabel(ev.price),
+                                typeLabel: ev.type || 'Event'
                             };
                         });
                     setUpcomingEventsPreview(previewCards);
-                } catch (regError) {
-                    console.error('Error fetching registrations for upcoming events:', regError);
+                } else {
                     setUpcomingEventsPreview([]);
                 }
-            } else {
+            } catch (eventsError) {
+                console.error('Error fetching events for upcoming events preview:', eventsError);
                 setUpcomingEventsPreview([]);
             }
         } catch (error) {
@@ -269,12 +289,14 @@ const ProfessorDashboard = () => {
         other: '/assets/images/events-banner.jpeg'
     };
 
-    const getEventPreviewImage = (registration) => {
-        const banner = registration.event?.bannerFile || registration.event?.banner;
+    const getEventPreviewImage = (eventOrRegistration) => {
+        // Handle both event objects and registration objects
+        const banner = eventOrRegistration.bannerFile || eventOrRegistration.banner || 
+                      eventOrRegistration.event?.bannerFile || eventOrRegistration.event?.banner;
         if (banner) {
             return banner.startsWith('http') ? banner : `http://localhost:5000${banner}`;
         }
-        const type = (registration.event?.type || registration.eventType || '').toLowerCase();
+        const type = (eventOrRegistration.type || eventOrRegistration.event?.type || eventOrRegistration.eventType || '').toLowerCase();
         return eventTypeImages[type] || eventTypeImages.other;
     };
 
@@ -295,17 +317,25 @@ const ProfessorDashboard = () => {
         return price;
     };
 
-    const getRatingSummary = (registration) => {
-        const rating = registration.event?.averageRating ??
-            registration.event?.rating?.average ??
-            registration.event?.average ??
-            registration.event?.rating ??
+    const getRatingSummary = (eventOrRegistration) => {
+        // Handle both event objects and registration objects
+        const rating = eventOrRegistration.averageRating ??
+            eventOrRegistration.rating?.average ??
+            eventOrRegistration.average ??
+            eventOrRegistration.rating ??
+            eventOrRegistration.event?.averageRating ??
+            eventOrRegistration.event?.rating?.average ??
+            eventOrRegistration.event?.average ??
+            eventOrRegistration.event?.rating ??
             null;
-        const ratingCount = registration.event?.ratingCount ??
-            registration.event?.rating?.count ??
-            registration.event?.ratingsCount ??
-            registration.event?.registeredCount ??
-            registration.registeredCount ??
+        const ratingCount = eventOrRegistration.ratingCount ??
+            eventOrRegistration.rating?.count ??
+            eventOrRegistration.ratingsCount ??
+            eventOrRegistration.registeredCount ??
+            eventOrRegistration.event?.ratingCount ??
+            eventOrRegistration.event?.rating?.count ??
+            eventOrRegistration.event?.ratingsCount ??
+            eventOrRegistration.event?.registeredCount ??
             0;
         return {
             rating: rating && rating > 0 ? Math.min(Math.max(rating, 0), 5) : null,
@@ -432,6 +462,25 @@ const ProfessorDashboard = () => {
                             event
                         </span>
                         My Events
+                    </Link>
+                    <Link
+                        to="/professor/my-workshops"
+                        style={{
+                            textDecoration: 'none',
+                            color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                            fontSize: '0.875rem',
+                            fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+                            paddingBottom: '0.5rem',
+                            borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #FFFFFF' : '2px solid transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                            school
+                        </span>
+                        My Workshops
                     </Link>
                     <Link
                         to="/gym"
@@ -1352,7 +1401,7 @@ const ProfessorDashboard = () => {
                                                 gap: '0.85rem'
                                             }}>
                                                 {upcomingEventsPreview.map((event, index) => {
-                                                    const shouldBlurCard = upcomingEventsPreview.length > 1 && index === upcomingEventsPreview.length - 1;
+                                                    const shouldBlurCard = upcomingEventsPreview.length === 4 && index === 3;
                                                     return (
                                                         <div
                                                             key={event.id || index}

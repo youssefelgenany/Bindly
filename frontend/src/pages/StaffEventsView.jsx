@@ -17,9 +17,12 @@ const StaffEventsView = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [professorFilter, setProfessorFilter] = useState('all');
+  const [locationFilter, setLocationFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('');
   const [sortBy, setSortBy] = useState('date-asc');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [availableProfessors, setAvailableProfessors] = useState([]);
+  const [availableLocations, setAvailableLocations] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
   const [registrationEvent, setRegistrationEvent] = useState(null);
@@ -204,10 +207,23 @@ const StaffEventsView = () => {
           }
         });
         setAvailableProfessors(Array.from(professorsSet).sort());
-
+        
+        // Extract unique locations from all events
+        const locationsSet = new Set();
+        mapped.forEach(ev => {
+          if (ev.location && ev.location.trim()) {
+            locationsSet.add(ev.location.trim());
+          }
+        });
+        const locationsList = Array.from(locationsSet).sort();
+        setAvailableLocations(locationsList);
+        
+        // Apply filters
         let filteredEvents = mapped;
+        
+        // Apply professor filter if workshop/conference is selected
         if ((filter === 'workshop' || filter === 'conference') && professorFilter !== 'all') {
-          filteredEvents = mapped.filter(ev => {
+          filteredEvents = filteredEvents.filter(ev => {
             if (ev.type !== 'workshop' && ev.type !== 'conference') return false;
             const eventProfessors = [];
             if (ev.professors) {
@@ -223,6 +239,28 @@ const StaffEventsView = () => {
             return eventProfessors.some(p => p === professorFilter);
           });
         }
+        
+        // Apply location filter
+        if (locationFilter !== 'all') {
+          filteredEvents = filteredEvents.filter(ev => {
+            return ev.location && ev.location.trim().toLowerCase() === locationFilter.toLowerCase();
+          });
+        }
+        
+        // Apply date filter
+        if (dateFilter.trim()) {
+          const filterDate = new Date(dateFilter);
+          if (!isNaN(filterDate.getTime())) {
+            filteredEvents = filteredEvents.filter(ev => {
+              if (!ev.startDate) return false;
+              const eventDate = new Date(ev.startDate);
+              // Compare dates (ignore time)
+              const filterDateOnly = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate());
+              const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+              return eventDateOnly.getTime() === filterDateOnly.getTime();
+            });
+          }
+        }
 
         const sortedEvents = sortEvents(filteredEvents);
         setEvents(sortedEvents);
@@ -237,11 +275,11 @@ const StaffEventsView = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, filter, professorFilter, sortBy, fetchEventRatings]);
+  }, [searchQuery, filter, professorFilter, locationFilter, dateFilter, sortBy, fetchEventRatings]);
 
   useEffect(() => {
     loadEvents();
-  }, [filter, professorFilter, sortBy, loadEvents]);
+  }, [filter, professorFilter, locationFilter, dateFilter, sortBy, loadEvents]);
 
   useEffect(() => {
     if (filter !== 'workshop' && filter !== 'conference') {
@@ -1441,27 +1479,27 @@ const StaffEventsView = () => {
                   style={{
                     padding: '0.875rem 1.5rem',
                     borderRadius: '0.5rem',
-                    backgroundColor: (filter !== 'all' || professorFilter !== 'all' || sortBy !== 'date-asc') ? '#1e40af' : '#f9fafb',
-                    color: (filter !== 'all' || professorFilter !== 'all' || sortBy !== 'date-asc') ? '#FFFFFF' : '#6b7280',
-                    border: (filter !== 'all' || professorFilter !== 'all' || sortBy !== 'date-asc') ? 'none' : '1px solid #e5e7eb',
+                    backgroundColor: (filter !== 'all' || professorFilter !== 'all' || locationFilter !== 'all' || dateFilter || sortBy !== 'date-asc') ? '#1e40af' : '#f9fafb',
+                    color: (filter !== 'all' || professorFilter !== 'all' || locationFilter !== 'all' || dateFilter || sortBy !== 'date-asc') ? '#FFFFFF' : '#6b7280',
+                    border: (filter !== 'all' || professorFilter !== 'all' || locationFilter !== 'all' || dateFilter || sortBy !== 'date-asc') ? 'none' : '1px solid #e5e7eb',
                     cursor: 'pointer',
                     fontSize: '0.875rem',
                     fontWeight: '600',
                     transition: 'all 0.2s',
                     whiteSpace: 'nowrap',
-                    boxShadow: (filter !== 'all' || professorFilter !== 'all' || sortBy !== 'date-asc') ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                    boxShadow: (filter !== 'all' || professorFilter !== 'all' || locationFilter !== 'all' || dateFilter || sortBy !== 'date-asc') ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem'
                   }}
                   onMouseEnter={(e) => {
-                    if (!(professorFilter !== 'all' || filter !== 'all' || sortBy !== 'date-asc')) {
+                    if (!(professorFilter !== 'all' || filter !== 'all' || locationFilter !== 'all' || dateFilter || sortBy !== 'date-asc')) {
                       e.target.style.backgroundColor = '#f3f4f6';
                       e.target.style.borderColor = '#d1d5db';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!(professorFilter !== 'all' || filter !== 'all' || sortBy !== 'date-asc')) {
+                    if (!(professorFilter !== 'all' || filter !== 'all' || locationFilter !== 'all' || dateFilter || sortBy !== 'date-asc')) {
                       e.target.style.backgroundColor = '#f9fafb';
                       e.target.style.borderColor = '#e5e7eb';
                     }
@@ -1471,7 +1509,7 @@ const StaffEventsView = () => {
                     filter_list
                   </span>
                   Filter & Sort
-                  {(filter !== 'all' || professorFilter !== 'all' || sortBy !== 'date-asc') && (
+                  {(filter !== 'all' || professorFilter !== 'all' || locationFilter !== 'all' || dateFilter || sortBy !== 'date-asc') && (
                     <span style={{
                       backgroundColor: 'rgba(255, 255, 255, 0.3)',
                       borderRadius: '9999px',
@@ -1479,7 +1517,7 @@ const StaffEventsView = () => {
                       fontSize: '0.75rem',
                       fontWeight: '600'
                     }}>
-                      {[filter !== 'all' ? 1 : 0, professorFilter !== 'all' ? 1 : 0, sortBy !== 'date-asc' ? 1 : 0].filter(f => f).length}
+                      {[filter !== 'all' ? 1 : 0, professorFilter !== 'all' ? 1 : 0, locationFilter !== 'all' ? 1 : 0, dateFilter ? 1 : 0, sortBy !== 'date-asc' ? 1 : 0].filter(f => f).length}
                     </span>
                   )}
                 </button>
@@ -3160,12 +3198,94 @@ const StaffEventsView = () => {
                 </div>
               )}
 
+              {/* Location Filter */}
+              <div>
+                <h5 style={{
+                  fontSize: '0.8125rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  margin: 0,
+                  marginBottom: '0.75rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  Location
+                </h5>
+                <select
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.625rem 0.875rem',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.8125rem',
+                    outline: 'none',
+                    backgroundColor: '#FFFFFF',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1e40af';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                  }}
+                >
+                  <option value="all">All Locations</option>
+                  {availableLocations.map(location => (
+                    <option key={location} value={location}>{location}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date Filter */}
+              <div>
+                <h5 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  margin: 0,
+                  marginBottom: '1rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  Date
+                </h5>
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e5e7eb',
+                    backgroundColor: '#FFFFFF',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1e40af';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
               {/* Clear Filters Button */}
               <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
                 <button
                   onClick={() => {
                     setFilter('all');
                     setProfessorFilter('all');
+                    setLocationFilter('all');
+                    setDateFilter('');
                     setSortBy('date-asc');
                   }}
                   style={{

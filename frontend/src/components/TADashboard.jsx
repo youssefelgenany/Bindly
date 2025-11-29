@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
 import { notificationApiService } from '../api/notificationApi';
+import { eventsApiService } from '../api/eventsApi';
 
 const TADashboard = () => {
     const { user, logout } = useAuth();
@@ -46,55 +47,126 @@ const TADashboard = () => {
         try {
             setLoading(true);
             
-            // Fetch TA registrations (using student registration API as TA can register for events)
-            if (user?.email) {
-                const registrationsRes = await studentRegistrationApi.getMyRegistrations(user.email);
+            // Fetch events from discover events for upcoming events preview
+            try {
+                const eventsResult = await eventsApiService.getAllEventsAuthenticated({});
                 
-                // Handle different response formats
-                let registrations = [];
-                if (registrationsRes.success) {
-                    registrations = registrationsRes.data?.registrations || 
-                                   registrationsRes.data?.data?.registrations ||
-                                   (Array.isArray(registrationsRes.data) ? registrationsRes.data : []) ||
-                                   [];
-                } else {
-                    console.error('Failed to fetch registrations:', registrationsRes.message);
-                }
-
-                const now = new Date();
-                
-                // Filter upcoming events - check both eventDate and event.startDate
-                const upcoming = registrations.filter(reg => {
-                    const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
-                    if (!eventDate) return false;
-                    const date = new Date(eventDate);
-                    return !isNaN(date.getTime()) && date > now;
-                });
-
-                const previewCards = upcoming
-                    .slice()
-                    .sort((a, b) => {
-                        const dateA = new Date(a.eventDate || a.event?.startDate || 0);
-                        const dateB = new Date(b.eventDate || b.event?.startDate || 0);
-                        return dateA - dateB;
-                    })
-                    .slice(0, 4)
-                    .map((reg) => {
-                        const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
-                        const { rating, ratingCount } = getRatingSummary(reg);
-                        return {
-                            id: reg.id || reg._id,
-                            title: reg.eventTitle || reg.event?.title || 'Upcoming Event',
-                            subtitle: reg.event?.location || reg.event?.faculty || reg.event?.type || 'On Campus',
-                            dateLabel: formatEventDateLabel(eventDate),
-                            image: getEventPreviewImage(reg),
-                            rating,
-                            ratingCount,
-                            priceLabel: getPriceLabel(reg.event?.price || reg.event?.cost || reg.price),
-                            typeLabel: reg.event?.type || reg.eventType || 'Event'
-                        };
+                if (eventsResult.success) {
+                    const eventsList = Array.isArray(eventsResult.data) ? eventsResult.data : (eventsResult.data?.events || []);
+                    
+                    const now = new Date();
+                    // Filter for upcoming events (future dates)
+                    const upcoming = eventsList.filter(ev => {
+                        if (!ev.startDate) return false;
+                        const date = new Date(ev.startDate);
+                        return !isNaN(date.getTime()) && date > now;
                     });
-                setUpcomingEventsPreview(previewCards);
+
+                    // Sort by date
+                    const sortedByDate = upcoming.slice().sort((a, b) => {
+                        const dateA = new Date(a.startDate || 0);
+                        const dateB = new Date(b.startDate || 0);
+                        return dateA - dateB;
+                    });
+
+                    // Select specific event types in order: Trip, Workshop, Bazaar, Conference/Booth (blurred)
+                    const selectedEvents = [];
+                    const priorityTypes = ['trip', 'workshop', 'bazaar', 'conference', 'booth'];
+                    
+                    // First pass: get one of each priority type in order
+                    for (const type of priorityTypes) {
+                        if (selectedEvents.length >= 4) break;
+                        const found = sortedByDate.find(ev => {
+                            const eventType = (ev.type || '').toLowerCase();
+                            return eventType === type && !selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id));
+                        });
+                        if (found) {
+                            selectedEvents.push(found);
+                        }
+                    }
+                    
+                    // If we don't have 4 yet, fill with any remaining events
+                    for (const ev of sortedByDate) {
+                        if (selectedEvents.length >= 4) break;
+                        if (!selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id))) {
+                            selectedEvents.push(ev);
+                        }
+                    }
+
+                    // Load ratings for selected events
+                    const ratingsMap = {};
+                    await Promise.all(selectedEvents.slice(0, 4).map(async (ev) => {
+                        if (ev._id || ev.id) {
+                            try {
+                                const ratingResult = await eventsApiService.getRatingsAndComments(ev._id || ev.id);
+                                if (ratingResult.success && ratingResult.data?.ratings) {
+                                    ratingsMap[ev._id || ev.id] = {
+                                        average: ratingResult.data.ratings.average || 0,
+                                        count: ratingResult.data.ratings.count || 0
+                                    };
+                                }
+                            } catch (err) {
+                                // Silently fail - ratings are optional
+                            }
+                        }
+                    }));
+
+                    const previewCards = selectedEvents
+                        .slice(0, 4)
+                        .map((ev) => {
+                            const eventId = ev._id || ev.id;
+                            const ratingData = ratingsMap[eventId] || { average: null, count: 0 };
+                            const banner = ev.bannerFile || ev.banner;
+                            const image = banner 
+                                ? (banner.startsWith('http') ? banner : `http://localhost:5000${banner}`)
+                                : eventTypeImages[(ev.type || '').toLowerCase()] || eventTypeImages.other;
+                            
+                            return {
+                                id: eventId,
+                                title: ev.title || 'Upcoming Event',
+                                subtitle: ev.location || ev.faculty || ev.type || 'On Campus',
+                                dateLabel: formatEventDateLabel(ev.startDate),
+                                image: image,
+                                rating: ratingData.average,
+                                ratingCount: ratingData.count,
+                                priceLabel: getPriceLabel(ev.price),
+                                typeLabel: ev.type || 'Event'
+                            };
+                        });
+                    setUpcomingEventsPreview(previewCards);
+                } else {
+                    setUpcomingEventsPreview([]);
+                }
+            } catch (eventsError) {
+                console.error('Error fetching events for upcoming events preview:', eventsError);
+                setUpcomingEventsPreview([]);
+            }
+
+            // Still fetch registrations for stats
+            if (user?.email) {
+                try {
+                    const registrationsRes = await studentRegistrationApi.getMyRegistrations(user.email);
+                    
+                    // Handle different response formats
+                    let registrations = [];
+                    if (registrationsRes.success) {
+                        registrations = registrationsRes.data?.registrations || 
+                                       registrationsRes.data?.data?.registrations ||
+                                       (Array.isArray(registrationsRes.data) ? registrationsRes.data : []) ||
+                                       [];
+                    } else {
+                        console.error('Failed to fetch registrations:', registrationsRes.message);
+                    }
+
+                    const now = new Date();
+                    
+                    // Filter upcoming events - check both eventDate and event.startDate
+                    const upcoming = registrations.filter(reg => {
+                        const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
+                        if (!eventDate) return false;
+                        const date = new Date(eventDate);
+                        return !isNaN(date.getTime()) && date > now;
+                    });
 
                 // Calculate stats
                 const enrolledCount = registrations.length;
@@ -181,6 +253,17 @@ const TADashboard = () => {
                     .slice(0, 3);
 
                 setUpcomingDeadlines(deadlines);
+                } catch (registrationError) {
+                    console.error('Error fetching registrations:', registrationError);
+                    // Set empty stats on error
+                    setStats({
+                        enrolledEvents: 0,
+                        upcomingEvents: 0,
+                        eventsRequiringAction: 0
+                    });
+                    setRecentActivity([]);
+                    setUpcomingDeadlines([]);
+                }
             } else {
                 // Reset stats if no user email
                 setStats({
@@ -1384,7 +1467,7 @@ const TADashboard = () => {
                                         gap: '0.85rem'
                                     }}>
                                         {upcomingEventsPreview.map((event, index) => {
-                                            const shouldBlurCard = upcomingEventsPreview.length > 1 && index === upcomingEventsPreview.length - 1;
+                                            const shouldBlurCard = upcomingEventsPreview.length === 4 && index === 3;
                                             return (
                                                 <div
                                                     key={event.id || index}
@@ -1698,39 +1781,6 @@ const TADashboard = () => {
                                     gap: '1rem',
                                     flexWrap: 'wrap'
                                 }}>
-                                    <button
-                                        onClick={() => navigate('/ta/favorites')}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.75rem',
-                                            padding: '0.75rem 1.5rem',
-                                            backgroundColor: '#1D3557',
-                                            color: '#FFFFFF',
-                                            border: 'none',
-                                            borderRadius: '0.5rem',
-                                            fontSize: '0.875rem',
-                                            fontWeight: '500',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s',
-                                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.target.style.backgroundColor = '#152a47';
-                                            e.target.style.transform = 'translateY(-1px)';
-                                            e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.target.style.backgroundColor = '#1D3557';
-                                            e.target.style.transform = 'translateY(0)';
-                                            e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                                        }}
-                                    >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                            favorite
-                                        </span>
-                                        My Favorites
-                                    </button>
                                     <button
                                         onClick={() => navigate('/ta/loyalty-vendors')}
                                         style={{

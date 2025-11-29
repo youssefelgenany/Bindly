@@ -684,6 +684,35 @@ const MyWorkshops = () => {
   };
 
   return (
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        .banner-animate {
+          animation: fadeInUp 0.8s ease-out;
+        }
+        .banner-content-animate {
+          animation: slideInLeft 1s ease-out 0.2s both;
+        }
+      `}</style>
     <div style={{
       display: 'flex',
       flexDirection: 'column',
@@ -696,14 +725,14 @@ const MyWorkshops = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF'
+          backgroundColor: '#1D3557'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -714,7 +743,163 @@ const MyWorkshops = () => {
             </h2>
           </Link>
           </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+                
+          {/* Centered Navigation Menu */}
+          <nav style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flex: 1,
+            gap: '1.25rem'
+          }}>
+            <Link
+              to="/dashboard"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                dashboard
+              </span>
+              Dashboard
+            </Link>
+            <Link
+              to="/professor/all-events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #FFFFFF' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                explore
+              </span>
+              Discover Events
+            </Link>
+            <Link
+              to="/professor/events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/events') ? '2px solid #FFFFFF' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                event
+              </span>
+              My Events
+            </Link>
+            <Link
+              to="/professor/my-workshops"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #FFFFFF' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                school
+              </span>
+              My Workshops
+            </Link>
+            <Link
+              to="/gym"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/gym') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                fitness_center
+              </span>
+              Gym Sessions
+            </Link>
+            <Link
+              to="/booth-polls"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                poll
+              </span>
+              Vendor Polls
+            </Link>
+          </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          {/* Heart Icon - Favorites */}
+          <Link
+            to="/professor/favorites"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              textDecoration: 'none',
+              color: 'inherit'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{
+              fontSize: '1.5rem',
+              color: '#FFFFFF'
+            }}>
+              favorite
+            </span>
+          </Link>
+
           {/* Notifications Bell */}
           <div style={{ position: 'relative' }} data-notifications-dropdown>
             <button
@@ -738,7 +923,7 @@ const MyWorkshops = () => {
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = 'transparent';
@@ -746,7 +931,7 @@ const MyWorkshops = () => {
             >
               <span className="material-symbols-outlined" style={{
                 fontSize: '1.5rem',
-                color: '#1D3557'
+                color: '#FFFFFF'
               }}>
                 notifications
               </span>
@@ -963,14 +1148,14 @@ const MyWorkshops = () => {
               <p style={{
                 fontSize: '0.875rem',
                 fontWeight: '600',
-                color: '#1D3557',
+                color: '#FFFFFF',
                 margin: 0
               }}>
                 {displayName}
               </p>
               <p style={{
                 fontSize: '0.75rem',
-                color: '#6b7280',
+                color: 'rgba(255, 255, 255, 0.7)',
                 margin: 0
               }}>
                 Professor
@@ -1082,96 +1267,6 @@ const MyWorkshops = () => {
           </div>
         </header>
 
-      {/* Horizontal Menu Bar */}
-      <nav style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '1rem 2rem',
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #e2e8f0'
-      }}>
-        {/* Navigation Links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <Link
-            to="/dashboard"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/professor/all-events"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Discover Events
-          </Link>
-          <Link
-            to="/professor/events"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Events
-          </Link>
-          <Link
-            to="/professor/my-workshops"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/professor/my-workshops') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Workshops
-          </Link>
-          <Link
-            to="/professor/favorites"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/professor/favorites') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/professor/favorites') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/favorites') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Favorites
-          </Link>
-          <Link
-            to="/gym-schedule"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/gym-schedule') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            View Gym Sessions
-          </Link>
-        </div>
-      </nav>
 
       {/* Main Content */}
       <main style={{
@@ -1207,14 +1302,26 @@ const MyWorkshops = () => {
             borderRight: showCreateForm ? '1px solid #e2e8f0' : 'none'
         }}>
           {/* Banner Header */}
-          <div style={{
-            position: 'relative',
-            height: '140px',
-            borderRadius: '0.75rem',
-            overflow: 'hidden',
-            marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-          }}>
+          <div 
+            className="banner-animate"
+            style={{
+              position: 'relative',
+              height: '140px',
+              borderRadius: '0.75rem',
+              overflow: 'hidden',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 12px -2px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+            }}
+          >
             {/* Background Image */}
             <div style={{
               position: 'absolute',
@@ -1232,17 +1339,20 @@ const MyWorkshops = () => {
               backgroundColor: 'rgba(29, 53, 87, 0.75)'
             }}></div>
             {/* Content */}
-            <div style={{
-              position: 'relative',
-              zIndex: 10,
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'flex-start',
-              padding: '2rem 2.5rem',
-              color: '#FFFFFF'
-            }}>
+            <div 
+              className="banner-content-animate"
+              style={{
+                position: 'relative',
+                zIndex: 10,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+                padding: '2rem 2.5rem',
+                color: '#FFFFFF'
+              }}
+            >
               <h3 style={{
                 color: '#FFFFFF',
                 fontSize: '1.75rem',
@@ -3209,6 +3319,7 @@ const MyWorkshops = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 

@@ -380,6 +380,25 @@ const ProfessorLoyaltyVendorsView = () => {
             My Events
           </Link>
           <Link
+            to="/professor/my-workshops"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/professor/my-workshops') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/professor/my-workshops') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/professor/my-workshops') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              school
+            </span>
+            My Workshops
+          </Link>
+          <Link
             to="/gym"
             style={{
               textDecoration: 'none',
@@ -420,6 +439,37 @@ const ProfessorLoyaltyVendorsView = () => {
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          {/* Heart Icon - Favorites */}
+          <Link
+            to="/professor/favorites"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              textDecoration: 'none',
+              color: 'inherit'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{
+              fontSize: '1.5rem',
+              color: '#FFFFFF'
+            }}>
+              favorite
+            </span>
+          </Link>
+
           {/* Notifications Bell */}
           <div style={{ position: 'relative' }} data-notifications-dropdown>
             <button
@@ -647,37 +697,6 @@ const ProfessorLoyaltyVendorsView = () => {
               </div>
             )}
           </div>
-          
-          {/* Heart Icon - Favorites */}
-          <Link
-            to="/professor/favorites"
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.5rem',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s',
-              textDecoration: 'none',
-              color: 'inherit'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{
-              fontSize: '1.5rem',
-              color: '#FFFFFF'
-            }}>
-              favorite
-            </span>
-          </Link>
 
           <div style={{ textAlign: 'right' }}>
             <p style={{
