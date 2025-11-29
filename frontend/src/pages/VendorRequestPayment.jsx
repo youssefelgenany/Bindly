@@ -88,6 +88,13 @@ const VendorRequestPayment = () => {
 
   const handlePayment = async () => {
     if (!request) return;
+    // Prevent payment if deadline passed
+    const now = new Date();
+    const deadline = paymentInfo?.paymentDeadline ? new Date(paymentInfo.paymentDeadline) : (request.paymentDeadline ? new Date(request.paymentDeadline) : null);
+    if (deadline && now > deadline) {
+      setError('Payment window has expired. Please contact the Events Office.');
+      return;
+    }
     try {
       setPaymentLoading(true);
       const token = localStorage.getItem('token');
@@ -105,8 +112,8 @@ const VendorRequestPayment = () => {
 
       // If backend simulated payment (Stripe not configured) it returns success payload
       if (res.status === 200 && res.data && (res.data.success || res.data.payment)) {
-        // Navigate vendor to dashboard after successful simulated payment
-        navigate('/dashboard');
+        // Navigate vendor to vendor dashboard after successful simulated payment
+        navigate('/vendor');
         return;
       }
 
@@ -322,24 +329,53 @@ const VendorRequestPayment = () => {
           >
             Cancel
           </button>
-          <button
-            onClick={handlePayment}
-            disabled={paymentLoading}
-            style={{
-              flex: 1,
-              padding: '0.75rem 1.5rem',
-              borderRadius: '0.5rem',
-              backgroundColor: paymentLoading ? '#9ca3af' : '#1e40af',
-              color: '#FFFFFF',
-              border: 'none',
-              cursor: paymentLoading ? 'not-allowed' : 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              opacity: paymentLoading ? 0.5 : 1
-            }}
-          >
-            {paymentLoading ? 'Processing...' : `Pay ${(paymentInfo?.amount) || request.participationFee || request.amount || 0} EGP`}
-          </button>
+          {(() => {
+            const now = new Date();
+            const deadline = paymentInfo?.paymentDeadline ? new Date(paymentInfo.paymentDeadline) : (request.paymentDeadline ? new Date(request.paymentDeadline) : null);
+            const isExpired = deadline && now > deadline;
+            if (isExpired) {
+              return (
+                <button
+                  disabled
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: '#9ca3af',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    cursor: 'not-allowed',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    opacity: 0.9
+                  }}
+                >
+                  Expired
+                </button>
+              );
+            }
+
+            return (
+              <button
+                onClick={handlePayment}
+                disabled={paymentLoading}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: paymentLoading ? '#9ca3af' : '#1e40af',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: paymentLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  opacity: paymentLoading ? 0.5 : 1
+                }}
+              >
+                {paymentLoading ? 'Processing...' : `Pay ${(paymentInfo?.amount) || request.participationFee || request.amount || 0} EGP`}
+              </button>
+            );
+          })()}
         </div>
       </div>
     </div>
