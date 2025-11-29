@@ -618,17 +618,14 @@ const TAFavorites = () => {
                           if (!notification.isRead) {
                             handleMarkAsRead(notification._id);
                           }
-                          if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                          // All event-related notifications redirect to discover events
+                          if ((notification.type === 'event_announcement' || notification.type === 'new_event' || 
+                               notification.type === 'event_reminder' || 
+                               notification.type === 'workshop_reminder' || 
+                               notification.type === 'trip_reminder' ||
+                               notification.type === 'gym_session_reminder') && 
+                              (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)) {
                             navigate('/ta/events');
-                            setShowNotificationsDropdown(false);
-                          } else if (
-                            (notification.type === 'event_reminder' ||
-                             notification.type === 'workshop_reminder' ||
-                             notification.type === 'trip_reminder' ||
-                             notification.type === 'gym_session_reminder') &&
-                            (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
-                          ) {
-                            navigate('/ta/my-registrations');
                             setShowNotificationsDropdown(false);
                           } else if (
                             notification.type === 'new_loyalty_partner' ||
