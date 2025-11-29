@@ -480,7 +480,7 @@ const EventsOfficeLoyaltyProgramVendors = () => {
         position: 'fixed',
         top: 0,
         left: sidebarOpen ? '16rem' : '0',
-        right: 0,
+        width: sidebarOpen ? 'calc(100% - 16rem)' : '100%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -488,7 +488,7 @@ const EventsOfficeLoyaltyProgramVendors = () => {
         padding: '1rem 2.5rem',
         backgroundColor: '#1D3557',
         zIndex: 100,
-        transition: 'left 0.3s ease'
+        transition: 'left 0.3s ease, width 0.3s ease'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF' }}>
           <button
@@ -509,15 +509,18 @@ const EventsOfficeLoyaltyProgramVendors = () => {
               menu
             </span>
           </button>
-          <h2 style={{
-            color: '#FFFFFF',
-            fontSize: '1.5rem',
-            fontWeight: '700',
-            lineHeight: '1.25',
-            margin: 0
-          }}>
-            Bindly
-          </h2>
+          <Link to="/event-office" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <h2 style={{
+              color: '#FFFFFF',
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              lineHeight: '1.25',
+              margin: 0,
+              cursor: 'pointer'
+            }}>
+              Bindly
+            </h2>
+          </Link>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {/* Notification Bell */}
@@ -570,15 +573,13 @@ const EventsOfficeLoyaltyProgramVendors = () => {
 
       {/* Content */}
       <div style={{
-        marginLeft: sidebarOpen ? '16rem' : '0',
-        marginTop: '73px',
         flex: 1,
         padding: '2rem',
         paddingLeft: '6rem',
         paddingRight: '6rem',
         overflowY: 'auto',
         backgroundColor: '#f6f7f8',
-        transition: 'margin-left 0.3s ease'
+        marginTop: '73px'
       }}>
         {/* Page Title Banner */}
         <div style={{
