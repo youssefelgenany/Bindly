@@ -789,13 +789,13 @@ const GymSchedule = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid #e2e8f0',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '#1D3557' : '#FFFFFF',
         zIndex: useFixedHeader ? 100 : 'auto',
         transition: useFixedHeader ? 'left 0.3s ease' : 'none'
       }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '#FFFFFF' : '#1D3557', flex: '0 0 auto' }}>
             {user?.userType !== 'Student' && user?.userType !== 'TA' && user?.userType !== 'Staff' && user?.userType !== 'Professor' && (
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -818,7 +818,7 @@ const GymSchedule = () => {
             )}
             <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '#FFFFFF' : '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -843,11 +843,15 @@ const GymSchedule = () => {
                 to="/dashboard"
                 style={{
                   textDecoration: 'none',
-                  color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+                  color: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor')
+                    ? (isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)')
+                    : (isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280'),
                   fontSize: '0.875rem',
                   fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
                   paddingBottom: '0.5rem',
-                  borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+                  borderBottom: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor')
+                    ? (isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent')
+                    : (isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent'),
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
@@ -864,11 +868,11 @@ const GymSchedule = () => {
                     to="/student/events"
                     style={{
                       textDecoration: 'none',
-                      color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
+                      color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                       fontSize: '0.875rem',
                       fontWeight: isActiveRoute('/student/events') ? '600' : '500',
                       paddingBottom: '0.5rem',
-                      borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent',
+                      borderBottom: isActiveRoute('/student/events') ? '2px solid #FFFFFF' : '2px solid transparent',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
@@ -883,11 +887,11 @@ const GymSchedule = () => {
                     to="/student/my-registrations"
                     style={{
                       textDecoration: 'none',
-                      color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
+                      color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                       fontSize: '0.875rem',
                       fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
                       paddingBottom: '0.5rem',
-                      borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+                      borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #FFFFFF' : '2px solid transparent',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
@@ -902,11 +906,11 @@ const GymSchedule = () => {
                     to="/student/courts"
                     style={{
                       textDecoration: 'none',
-                      color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+                      color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                       fontSize: '0.875rem',
                       fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
                       paddingBottom: '0.5rem',
-                      borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent',
+                      borderBottom: isActiveRoute('/student/courts') ? '2px solid #FFFFFF' : '2px solid transparent',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
@@ -917,6 +921,44 @@ const GymSchedule = () => {
                     </span>
                     Campus Courts
                   </Link>
+                  <Link
+                    to="/gym"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/gym') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      fitness_center
+                    </span>
+                    Gym Sessions
+                  </Link>
+                  <Link
+                    to="/booth-polls"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      poll
+                    </span>
+                    Vendor Polls
+                  </Link>
                 </>
               )}
               {user?.userType === 'TA' && (
@@ -925,11 +967,11 @@ const GymSchedule = () => {
                     to="/ta/events"
                     style={{
                       textDecoration: 'none',
-                      color: isActiveRoute('/ta/events') ? '#2563eb' : '#6b7280',
+                      color: isActiveRoute('/ta/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                       fontSize: '0.875rem',
                       fontWeight: isActiveRoute('/ta/events') ? '600' : '500',
                       paddingBottom: '0.5rem',
-                      borderBottom: isActiveRoute('/ta/events') ? '2px solid #2563eb' : '2px solid transparent',
+                      borderBottom: isActiveRoute('/ta/events') ? '2px solid #FFFFFF' : '2px solid transparent',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
@@ -944,11 +986,11 @@ const GymSchedule = () => {
                     to="/ta/my-registrations"
                     style={{
                       textDecoration: 'none',
-                      color: isActiveRoute('/ta/my-registrations') ? '#2563eb' : '#6b7280',
+                      color: isActiveRoute('/ta/my-registrations') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                       fontSize: '0.875rem',
                       fontWeight: isActiveRoute('/ta/my-registrations') ? '600' : '500',
                       paddingBottom: '0.5rem',
-                      borderBottom: isActiveRoute('/ta/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+                      borderBottom: isActiveRoute('/ta/my-registrations') ? '2px solid #FFFFFF' : '2px solid transparent',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
@@ -959,6 +1001,44 @@ const GymSchedule = () => {
                     </span>
                     My Events
                   </Link>
+                  <Link
+                    to="/gym"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '2px solid #FFFFFF' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      fitness_center
+                    </span>
+                    Gym Sessions
+                  </Link>
+                  <Link
+                    to="/booth-polls"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      poll
+                    </span>
+                    Vendor Polls
+                  </Link>
                 </>
               )}
               {user?.userType === 'Staff' && (
@@ -967,11 +1047,11 @@ const GymSchedule = () => {
                     to="/staff/events"
                     style={{
                       textDecoration: 'none',
-                      color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+                      color: isActiveRoute('/staff/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                       fontSize: '0.875rem',
                       fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
                       paddingBottom: '0.5rem',
-                      borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent',
+                      borderBottom: isActiveRoute('/staff/events') ? '2px solid #FFFFFF' : '2px solid transparent',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
@@ -986,11 +1066,11 @@ const GymSchedule = () => {
                     to="/staff/my-registrations"
                     style={{
                       textDecoration: 'none',
-                      color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+                      color: isActiveRoute('/staff/my-registrations') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                       fontSize: '0.875rem',
                       fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
                       paddingBottom: '0.5rem',
-                      borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+                      borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #FFFFFF' : '2px solid transparent',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
@@ -1001,6 +1081,44 @@ const GymSchedule = () => {
                     </span>
                     My Events
                   </Link>
+                  <Link
+                    to="/gym"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '2px solid #FFFFFF' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      fitness_center
+                    </span>
+                    Gym Sessions
+                  </Link>
+                  <Link
+                    to="/booth-polls"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      poll
+                    </span>
+                    Vendor Polls
+                  </Link>
                 </>
               )}
               {user?.userType === 'Professor' && (
@@ -1009,11 +1127,11 @@ const GymSchedule = () => {
                     to="/professor/all-events"
                     style={{
                       textDecoration: 'none',
-                      color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+                      color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                       fontSize: '0.875rem',
                       fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
                       paddingBottom: '0.5rem',
-                      borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent',
+                      borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #FFFFFF' : '2px solid transparent',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
@@ -1028,11 +1146,11 @@ const GymSchedule = () => {
                     to="/professor/events"
                     style={{
                       textDecoration: 'none',
-                      color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+                      color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                       fontSize: '0.875rem',
                       fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
                       paddingBottom: '0.5rem',
-                      borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent',
+                      borderBottom: isActiveRoute('/professor/events') ? '2px solid #FFFFFF' : '2px solid transparent',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
@@ -1043,31 +1161,88 @@ const GymSchedule = () => {
                     </span>
                     My Events
                   </Link>
+                  <Link
+                    to="/gym"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '2px solid #FFFFFF' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      fitness_center
+                    </span>
+                    Gym Sessions
+                  </Link>
+                  <Link
+                    to="/booth-polls"
+                    style={{
+                      textDecoration: 'none',
+                      color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '0.875rem',
+                      fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+                      paddingBottom: '0.5rem',
+                      borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      poll
+                    </span>
+                    Vendor Polls
+                  </Link>
                 </>
               )}
-              <Link
-                to="/gym"
-                style={{
-                  textDecoration: 'none',
-                  color: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '#2563eb' : '#6b7280',
-                  fontSize: '0.875rem',
-                  fontWeight: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '600' : '500',
-                  paddingBottom: '0.5rem',
-                  borderBottom: isActiveRoute('/gym') || isActiveRoute('/gym-schedule') ? '2px solid #2563eb' : '2px solid transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                  fitness_center
-                </span>
-                Gym Sessions
-              </Link>
             </nav>
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+            {/* Heart Icon - Favorites (For Students, TA, Staff, and Professor) */}
+            {(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') && (
+              <Link
+                to={
+                  user?.userType === 'Student' ? '/student/favorites' :
+                  user?.userType === 'TA' ? '/ta/favorites' :
+                  user?.userType === 'Staff' ? '/staff/favorites' :
+                  '/professor/favorites'
+                }
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s',
+                  textDecoration: 'none',
+                  color: 'inherit'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'rgba(255, 255, 255, 0.1)' : '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{
+                  fontSize: '1.5rem',
+                  color: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '#FFFFFF' : '#1D3557'
+                }}>
+                  favorite
+                </span>
+              </Link>
+            )}
+            
             {/* Notifications Bell */}
               <div style={{ position: 'relative' }} data-notifications-dropdown>
                 <button
@@ -1091,7 +1266,7 @@ const GymSchedule = () => {
                     transition: 'all 0.2s'
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.backgroundColor = (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'rgba(255, 255, 255, 0.1)' : '#f3f4f6';
                   }}
                   onMouseLeave={(e) => {
                     e.target.style.backgroundColor = 'transparent';
@@ -1099,7 +1274,7 @@ const GymSchedule = () => {
                 >
                   <span className="material-symbols-outlined" style={{
                     fontSize: '1.5rem',
-                    color: '#1D3557'
+                    color: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '#FFFFFF' : '#1D3557'
                   }}>
                     notifications
                   </span>
@@ -1312,56 +1487,18 @@ const GymSchedule = () => {
                 )}
               </div>
             
-            {/* Heart Icon - Favorites (For Students, TA, Staff, and Professor) */}
-            {(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') && (
-              <Link
-                to={
-                  user?.userType === 'Student' ? '/student/favorites' :
-                  user?.userType === 'TA' ? '/ta/favorites' :
-                  user?.userType === 'Staff' ? '/staff/favorites' :
-                  '/professor/favorites'
-                }
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '0.5rem',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s',
-                  textDecoration: 'none',
-                  color: 'inherit'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f3f4f6';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <span className="material-symbols-outlined" style={{
-                  fontSize: '1.5rem',
-                  color: '#1D3557'
-                }}>
-                  favorite
-                </span>
-              </Link>
-            )}
-            
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
                 fontWeight: '600',
-                color: '#1D3557',
+                color: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '#FFFFFF' : '#1D3557',
                 margin: 0
               }}>
                 {displayName}
               </p>
               <p style={{
                 fontSize: '0.75rem',
-                color: '#6b7280',
+                color: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'rgba(255, 255, 255, 0.7)' : '#6b7280',
                 margin: 0
               }}>
                 {isEventsOffice ? 'Events Office' : getUserRole()}
@@ -1388,11 +1525,11 @@ const GymSchedule = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: '50%',
-                  backgroundColor: '#1D3557',
+                  backgroundColor: '#FFFFFF',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#FFFFFF',
+                  color: '#1D3557',
                   fontSize: '0.875rem',
                   fontWeight: '600'
                 }}>
@@ -1497,14 +1634,26 @@ const GymSchedule = () => {
           backgroundColor: '#f6f7f8'
         }}>
           {/* Page Title Banner */}
-          <div style={{
-            position: 'relative',
-            height: '140px',
-            borderRadius: '0.75rem',
-            overflow: 'hidden',
-            marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-          }}>
+          <div 
+            className={(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'banner-animate' : ''}
+            style={{
+              position: 'relative',
+              height: '140px',
+              borderRadius: '0.75rem',
+              overflow: 'hidden',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              transition: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'transform 0.3s ease, box-shadow 0.3s ease' : 'none'
+            }}
+            onMouseEnter={(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? (e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 12px -2px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            } : undefined}
+            onMouseLeave={(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? (e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+            } : undefined}
+          >
             {/* Background Image */}
             <div style={{
               position: 'absolute',
@@ -1513,7 +1662,8 @@ const GymSchedule = () => {
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
-              filter: 'blur(2px)'
+              filter: 'blur(2px)',
+              animation: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'pulse 4s ease-in-out infinite' : 'none'
             }}></div>
             {/* Blue Overlay */}
             <div style={{
@@ -1521,18 +1671,32 @@ const GymSchedule = () => {
               inset: 0,
               backgroundColor: 'rgba(29, 53, 87, 0.75)'
             }}></div>
+            {/* Animated Pattern Overlay - For Students, TA, Staff, and Professor */}
+            {(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') && (
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+                animation: 'pulse 4s ease-in-out infinite',
+                zIndex: 1,
+                pointerEvents: 'none'
+              }}></div>
+            )}
             {/* Content */}
-            <div style={{
-              position: 'relative',
-              zIndex: 10,
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '2rem 2.5rem',
-              color: '#FFFFFF'
-            }}>
+            <div 
+              className={(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'banner-content-animate' : ''}
+              style={{
+                position: 'relative',
+                zIndex: 10,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '2rem 2.5rem',
+                color: '#FFFFFF'
+              }}
+            >
               <div>
                 <h3 style={{
                   color: '#FFFFFF',
@@ -2576,6 +2740,42 @@ const GymSchedule = () => {
       </div>
 
       <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.8;
+            transform: scale(1.05);
+          }
+        }
+        .banner-animate {
+          animation: fadeInUp 0.6s ease-out;
+        }
+        .banner-content-animate {
+          animation: slideInLeft 1s ease-out 0.2s both;
+        }
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }

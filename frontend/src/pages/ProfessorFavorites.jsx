@@ -171,14 +171,14 @@ const ProfessorFavorites = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF'
+        backgroundColor: '#1D3557'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               margin: 0
@@ -200,11 +200,11 @@ const ProfessorFavorites = () => {
             to="/dashboard"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -219,11 +219,11 @@ const ProfessorFavorites = () => {
             to="/professor/all-events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -238,11 +238,11 @@ const ProfessorFavorites = () => {
             to="/professor/events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/professor/events') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -257,11 +257,11 @@ const ProfessorFavorites = () => {
             to="/gym"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/gym') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -272,18 +272,28 @@ const ProfessorFavorites = () => {
             </span>
             Gym Sessions
           </Link>
+          <Link
+            to="/booth-polls"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              poll
+            </span>
+            Vendor Polls
+          </Link>
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1D3557', margin: 0 }}>
-              {displayName}
-            </p>
-            <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>
-              Professor
-            </p>
-          </div>
-          
           {/* Heart Icon - Favorites */}
           <Link
             to="/professor/favorites"
@@ -301,7 +311,7 @@ const ProfessorFavorites = () => {
               color: 'inherit'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
@@ -309,16 +319,36 @@ const ProfessorFavorites = () => {
           >
             <span className="material-symbols-outlined" style={{
               fontSize: '1.5rem',
-              color: '#1D3557'
+              color: '#FFFFFF'
             }}>
               favorite
             </span>
           </Link>
 
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#FFFFFF',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: 'rgba(255, 255, 255, 0.7)',
+              margin: 0
+            }}>
+              Professor
+            </p>
+          </div>
+
           <div
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            onClick={() => {
+              setShowLogoutDropdown(!showLogoutDropdown);
+            }}
           >
             {user?.profilePicturePath ? (
               <img
@@ -331,11 +361,11 @@ const ProfessorFavorites = () => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#1D3557',
+                backgroundColor: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
+                color: '#1D3557',
                 fontWeight: '600'
               }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'P').toUpperCase()}

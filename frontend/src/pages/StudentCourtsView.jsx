@@ -389,14 +389,14 @@ const StudentCourtsView = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF'
+        backgroundColor: '#1D3557'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -420,11 +420,11 @@ const StudentCourtsView = () => {
             to="/dashboard"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -439,11 +439,11 @@ const StudentCourtsView = () => {
             to="/student/events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/student/events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/student/events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/events') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/student/events') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -458,11 +458,11 @@ const StudentCourtsView = () => {
             to="/student/my-registrations"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/student/my-registrations') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -477,11 +477,11 @@ const StudentCourtsView = () => {
             to="/student/courts"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/student/courts') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/student/courts') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/student/courts') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -496,11 +496,11 @@ const StudentCourtsView = () => {
             to="/gym"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/gym') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -511,9 +511,59 @@ const StudentCourtsView = () => {
             </span>
             Gym Sessions
           </Link>
+          <Link
+            to="/booth-polls"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              poll
+            </span>
+            Vendor Polls
+          </Link>
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          {/* Heart Icon - Favorites */}
+          <Link
+            to="/student/favorites"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              textDecoration: 'none',
+              color: 'inherit'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{
+              fontSize: '1.5rem',
+              color: '#FFFFFF'
+            }}>
+              favorite
+            </span>
+          </Link>
+
           {/* Notifications Bell */}
           <div style={{ position: 'relative' }} data-notifications-dropdown>
             <button
@@ -537,7 +587,7 @@ const StudentCourtsView = () => {
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = 'transparent';
@@ -545,7 +595,7 @@ const StudentCourtsView = () => {
             >
               <span className="material-symbols-outlined" style={{
                 fontSize: '1.5rem',
-                color: '#1D3557'
+                color: '#FFFFFF'
               }}>
                 notifications
               </span>
@@ -758,50 +808,19 @@ const StudentCourtsView = () => {
               </div>
             )}
           </div>
-          
-          {/* Heart Icon - Favorites */}
-          <Link
-            to="/student/favorites"
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.5rem',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s',
-              textDecoration: 'none',
-              color: 'inherit'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{
-              fontSize: '1.5rem',
-              color: '#1D3557'
-            }}>
-              favorite
-            </span>
-          </Link>
 
           <div style={{ textAlign: 'right' }}>
             <p style={{
               fontSize: '0.875rem',
               fontWeight: '600',
-              color: '#1D3557',
+              color: '#FFFFFF',
               margin: 0
             }}>
               {displayName}
             </p>
             <p style={{
               fontSize: '0.75rem',
-              color: '#6b7280',
+              color: 'rgba(255, 255, 255, 0.7)',
               margin: 0
             }}>
               Student
@@ -833,11 +852,11 @@ const StudentCourtsView = () => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#1D3557',
+                backgroundColor: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
+                color: '#1D3557',
                 fontWeight: '600'
               }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
@@ -940,14 +959,26 @@ const StudentCourtsView = () => {
             marginRight: '4rem'
           }}>
           {/* Page Title Box */}
-          <div style={{
-            position: 'relative',
-            height: '140px',
-            borderRadius: '0.75rem',
-            overflow: 'hidden',
-            marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-          }}>
+          <div 
+            className="banner-animate"
+            style={{
+              position: 'relative',
+              height: '140px',
+              borderRadius: '0.75rem',
+              overflow: 'hidden',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 12px -2px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+            }}
+          >
             {/* Background Image */}
             <div style={{
               position: 'absolute',
@@ -956,26 +987,40 @@ const StudentCourtsView = () => {
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
-              filter: 'blur(2px)'
+              filter: 'blur(2px)',
+              transition: 'transform 0.5s ease, filter 0.5s ease'
             }}></div>
             {/* Blue Overlay */}
             <div style={{
               position: 'absolute',
               inset: 0,
-              backgroundColor: 'rgba(10, 20, 40, 0.85)'
+              backgroundColor: 'rgba(10, 20, 40, 0.85)',
+              transition: 'background-color 0.3s ease'
+            }}></div>
+            {/* Animated Pattern Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+              animation: 'pulse 4s ease-in-out infinite',
+              zIndex: 1,
+              pointerEvents: 'none'
             }}></div>
             {/* Content */}
-            <div style={{
-              position: 'relative',
-              zIndex: 10,
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'flex-start',
-              padding: '2rem 2.5rem',
-              color: '#FFFFFF'
-            }}>
+            <div 
+              className="banner-content-animate"
+              style={{
+                position: 'relative',
+                zIndex: 10,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+                padding: '2rem 2.5rem',
+                color: '#FFFFFF'
+              }}
+            >
               <h3 style={{
                 color: '#FFFFFF',
                 fontSize: '1.75rem',

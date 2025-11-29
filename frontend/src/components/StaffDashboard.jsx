@@ -16,6 +16,7 @@ const StaffDashboard = () => {
     });
     const [recentActivity, setRecentActivity] = useState([]);
     const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
+    const [upcomingEventsPreview, setUpcomingEventsPreview] = useState([]);
     const [loading, setLoading] = useState(true);
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -117,6 +118,59 @@ const StaffDashboard = () => {
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
+    const eventTypeImages = {
+        conference: '/assets/images/conference-background.jpg',
+        workshop: '/assets/images/workshop-background.jpg',
+        bazaar: '/assets/images/bazaar-background.jpg',
+        trip: '/assets/images/trip-background.png',
+        booth: '/assets/images/booth-background.jpg',
+        other: '/assets/images/events-banner.jpeg'
+    };
+
+    const getEventPreviewImage = (registration) => {
+        const banner = registration.event?.bannerFile || registration.event?.banner;
+        if (banner) {
+            return banner.startsWith('http') ? banner : `http://localhost:5000${banner}`;
+        }
+        const type = (registration.event?.type || registration.eventType || '').toLowerCase();
+        return eventTypeImages[type] || eventTypeImages.other;
+    };
+
+    const formatEventDateLabel = (dateString) => {
+        if (!dateString) return 'Date to be announced';
+        const date = new Date(dateString);
+        if (Number.isNaN(date.getTime())) return 'Date to be announced';
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+
+    const getPriceLabel = (price) => {
+        if (price === 0 || price === '0' || price === 'Free') return 'Free';
+        if (!price) return 'Included';
+        const numeric = parseFloat(price);
+        if (!Number.isNaN(numeric) && numeric > 0) {
+            return `from $${numeric}`;
+        }
+        return price;
+    };
+
+    const getRatingSummary = (registration) => {
+        const rating = registration.event?.averageRating ??
+            registration.event?.rating?.average ??
+            registration.event?.average ??
+            registration.event?.rating ??
+            null;
+        const ratingCount = registration.event?.ratingCount ??
+            registration.event?.rating?.count ??
+            registration.event?.ratingsCount ??
+            registration.event?.registeredCount ??
+            registration.registeredCount ??
+            0;
+        return {
+            rating: rating && rating > 0 ? Math.min(Math.max(rating, 0), 5) : null,
+            ratingCount
+        };
+    };
+
     const loadDashboardData = async () => {
         try {
             setLoading(true);
@@ -145,6 +199,54 @@ const StaffDashboard = () => {
                     const date = new Date(eventDate);
                     return !isNaN(date.getTime()) && date > now;
                 });
+
+                // Prioritize different event types
+                const sortedByDate = upcoming.slice().sort((a, b) => {
+                    const dateA = new Date(a.eventDate || a.event?.startDate || 0);
+                    const dateB = new Date(b.eventDate || b.event?.startDate || 0);
+                    return dateA - dateB;
+                });
+
+                // Select events with different types, prioritizing variety
+                const selectedEvents = [];
+                const usedTypes = new Set();
+                
+                // First pass: try to get one of each type
+                for (const reg of sortedByDate) {
+                    if (selectedEvents.length >= 3) break;
+                    const eventType = (reg.event?.type || reg.eventType || 'Event').toLowerCase();
+                    if (!usedTypes.has(eventType)) {
+                        selectedEvents.push(reg);
+                        usedTypes.add(eventType);
+                    }
+                }
+                
+                // Second pass: fill remaining slots with any events
+                for (const reg of sortedByDate) {
+                    if (selectedEvents.length >= 4) break;
+                    if (!selectedEvents.find(e => (e.id || e._id) === (reg.id || reg._id))) {
+                        selectedEvents.push(reg);
+                    }
+                }
+
+                const previewCards = selectedEvents
+                    .slice(0, 4)
+                    .map((reg) => {
+                        const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
+                        const { rating, ratingCount } = getRatingSummary(reg);
+                        return {
+                            id: reg.id || reg._id,
+                            title: reg.eventTitle || reg.event?.title || 'Upcoming Event',
+                            subtitle: reg.event?.location || reg.event?.faculty || reg.event?.type || 'On Campus',
+                            dateLabel: formatEventDateLabel(eventDate),
+                            image: getEventPreviewImage(reg),
+                            rating,
+                            ratingCount,
+                            priceLabel: getPriceLabel(reg.event?.price || reg.event?.cost || reg.price),
+                            typeLabel: reg.event?.type || reg.eventType || 'Event'
+                        };
+                    });
+                setUpcomingEventsPreview(previewCards);
 
                 // Calculate stats
                 const enrolledCount = registrations.length;
@@ -240,6 +342,7 @@ const StaffDashboard = () => {
                 });
                 setRecentActivity([]);
                 setUpcomingDeadlines([]);
+                setUpcomingEventsPreview([]);
             }
         } catch (error) {
             console.error('Error loading dashboard data:', error);
@@ -251,6 +354,7 @@ const StaffDashboard = () => {
             });
             setRecentActivity([]);
             setUpcomingDeadlines([]);
+            setUpcomingEventsPreview([]);
         } finally {
             setLoading(false);
         }
@@ -304,14 +408,14 @@ const StaffDashboard = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                borderBottom: '1px solid #e2e8f0',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
                 padding: '1rem 2.5rem',
-                backgroundColor: '#FFFFFF'
+                backgroundColor: '#1D3557'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
                     <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
                         <h2 style={{
-                            color: '#1D3557',
+                            color: '#FFFFFF',
                             fontSize: '1.5rem',
                             fontWeight: '700',
                             lineHeight: '1.25',
@@ -335,11 +439,11 @@ const StaffDashboard = () => {
                         to="/dashboard"
                         style={{
                             textDecoration: 'none',
-                            color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+                            color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                             fontSize: '0.875rem',
                             fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
                             paddingBottom: '0.5rem',
-                            borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+                            borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem'
@@ -354,11 +458,11 @@ const StaffDashboard = () => {
                         to="/staff/events"
                         style={{
                             textDecoration: 'none',
-                            color: isActiveRoute('/staff/events') ? '#2563eb' : '#6b7280',
+                            color: isActiveRoute('/staff/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                             fontSize: '0.875rem',
                             fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
                             paddingBottom: '0.5rem',
-                            borderBottom: isActiveRoute('/staff/events') ? '2px solid #2563eb' : '2px solid transparent',
+                            borderBottom: isActiveRoute('/staff/events') ? '2px solid #FFFFFF' : '2px solid transparent',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem'
@@ -373,11 +477,11 @@ const StaffDashboard = () => {
                         to="/staff/my-registrations"
                         style={{
                             textDecoration: 'none',
-                            color: isActiveRoute('/staff/my-registrations') ? '#2563eb' : '#6b7280',
+                            color: isActiveRoute('/staff/my-registrations') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                             fontSize: '0.875rem',
                             fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
                             paddingBottom: '0.5rem',
-                            borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #2563eb' : '2px solid transparent',
+                            borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #FFFFFF' : '2px solid transparent',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem'
@@ -392,11 +496,11 @@ const StaffDashboard = () => {
                         to="/gym"
                         style={{
                             textDecoration: 'none',
-                            color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+                            color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                             fontSize: '0.875rem',
                             fontWeight: isActiveRoute('/gym') ? '600' : '500',
                             paddingBottom: '0.5rem',
-                            borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+                            borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem'
@@ -411,11 +515,11 @@ const StaffDashboard = () => {
                         to="/booth-polls"
                         style={{
                             textDecoration: 'none',
-                            color: isActiveRoute('/booth-polls') ? '#2563eb' : '#6b7280',
+                            color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
                             fontSize: '0.875rem',
                             fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
                             paddingBottom: '0.5rem',
-                            borderBottom: isActiveRoute('/booth-polls') ? '2px solid #2563eb' : '2px solid transparent',
+                            borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem'
@@ -446,7 +550,7 @@ const StaffDashboard = () => {
                             color: 'inherit'
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#f3f4f6';
+                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                         }}
                         onMouseLeave={(e) => {
                             e.currentTarget.style.backgroundColor = 'transparent';
@@ -454,12 +558,13 @@ const StaffDashboard = () => {
                     >
                         <span className="material-symbols-outlined" style={{
                             fontSize: '1.5rem',
-                            color: '#1D3557'
+                            color: '#FFFFFF'
                         }}>
                             favorite
                         </span>
                     </Link>
 
+                    {/* Notifications Bell */}
                     <div style={{ position: 'relative' }} data-notifications-dropdown>
                         <button
                             onClick={() => {
@@ -482,15 +587,15 @@ const StaffDashboard = () => {
                                 transition: 'all 0.2s'
                             }}
                             onMouseEnter={(e) => {
-                                (e.target instanceof HTMLElement ? e.target : e.currentTarget).style.backgroundColor = '#f3f4f6';
+                                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                             }}
                             onMouseLeave={(e) => {
-                                (e.target instanceof HTMLElement ? e.target : e.currentTarget).style.backgroundColor = 'transparent';
+                                e.target.style.backgroundColor = 'transparent';
                             }}
                         >
                             <span className="material-symbols-outlined" style={{
                                 fontSize: '1.5rem',
-                                color: '#1D3557'
+                                color: '#FFFFFF'
                             }}>
                                 notifications
                             </span>
@@ -560,10 +665,10 @@ const StaffDashboard = () => {
                                                 padding: '0.25rem 0.5rem'
                                             }}
                                             onMouseEnter={(e) => {
-                                                e.currentTarget.style.textDecoration = 'underline';
+                                                e.target.style.textDecoration = 'underline';
                                             }}
                                             onMouseLeave={(e) => {
-                                                e.currentTarget.style.textDecoration = 'none';
+                                                e.target.style.textDecoration = 'none';
                                             }}
                                         >
                                             Mark all as read
@@ -601,107 +706,99 @@ const StaffDashboard = () => {
                                                         handleMarkAsRead(notification._id);
                                                     }
                                                     if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
-                                                        navigate('/staff/events');
+                                                        navigate(`/staff/events`);
                                                         setShowNotificationsDropdown(false);
                                                     } else if (
-                                                        (notification.type === 'event_reminder' ||
-                                                         notification.type === 'workshop_reminder' ||
+                                                        (notification.type === 'event_reminder' || 
+                                                         notification.type === 'workshop_reminder' || 
                                                          notification.type === 'trip_reminder' ||
-                                                         notification.type === 'gym_session_reminder') &&
+                                                         notification.type === 'gym_session_reminder') && 
                                                         (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)
                                                     ) {
-                                                        navigate('/staff/my-registrations');
+                                                        navigate(`/staff/my-registrations`);
                                                         setShowNotificationsDropdown(false);
                                                     } else if (
-                                                        notification.type === 'new_loyalty_partner' ||
+                                                        notification.type === 'new_loyalty_partner' || 
                                                         notification.type === 'loyalty_partner_added' ||
                                                         (notification.type === 'system' && notification.metadata?.vendorId)
                                                     ) {
-                                                        navigate('/staff/loyalty-vendors');
+                                                        navigate(`/staff/loyalty-vendors`);
                                                         setShowNotificationsDropdown(false);
                                                     }
                                                 }}
                                                 style={{
-                                                    padding: '0.75rem 1rem',
-                                                    borderBottom: '1px solid #f1f5f9',
-                                                    backgroundColor: notification.isRead
-                                                        ? '#FFFFFF'
-                                                        : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                                                            ? '#fff7ed'
-                                                            : '#f8fafc',
+                                                    padding: '1rem',
+                                                    borderBottom: '1px solid #f3f4f6',
                                                     cursor: 'pointer',
-                                                    transition: 'all 0.2s',
-                                                    display: 'flex',
-                                                    gap: '0.75rem'
+                                                    backgroundColor: notification.isRead 
+                                                        ? '#FFFFFF' 
+                                                        : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
+                                                          ? '#fef2f2'
+                                                          : '#eff6ff',
+                                                    borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
+                                                        ? '3px solid #ef4444'
+                                                        : 'none',
+                                                    transition: 'background-color 0.2s'
                                                 }}
                                                 onMouseEnter={(e) => {
-                                                    e.currentTarget.style.backgroundColor = notification.isRead
-                                                        ? '#f8fafc'
+                                                    e.currentTarget.style.backgroundColor = notification.isRead 
+                                                        ? '#f9fafb' 
                                                         : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                                                            ? '#ffedd5'
-                                                            : '#edf2ff';
+                                                          ? '#fee2e2'
+                                                          : '#dbeafe';
                                                 }}
                                                 onMouseLeave={(e) => {
-                                                    e.currentTarget.style.backgroundColor = notification.isRead
-                                                        ? '#FFFFFF'
+                                                    e.currentTarget.style.backgroundColor = notification.isRead 
+                                                        ? '#FFFFFF' 
                                                         : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                                                            ? '#fff7ed'
-                                                            : '#f8fafc';
+                                                          ? '#fef2f2'
+                                                          : '#eff6ff';
                                                 }}
                                             >
                                                 <div style={{
-                                                    width: '2.5rem',
-                                                    height: '2.5rem',
-                                                    borderRadius: '0.75rem',
-                                                    backgroundColor: notification.priority === 'high' ? '#fef3c7' : '#e0e7ff',
                                                     display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    flexShrink: 0
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'flex-start',
+                                                    gap: '0.5rem'
                                                 }}>
-                                                    <span className="material-symbols-outlined" style={{
-                                                        fontSize: '1.25rem',
-                                                        color: notification.priority === 'high' ? '#b45309' : '#4338ca'
-                                                    }}>
-                                                        {notification.type === 'event_announcement' || notification.type === 'new_event' ? 'campaign'
-                                                            : notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder' ? 'event'
-                                                            : 'notifications'}
-                                                    </span>
-                                                </div>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{
-                                                        fontWeight: notification.isRead ? '400' : '600',
-                                                        color: '#1D3557',
-                                                        fontSize: '0.875rem',
-                                                        marginBottom: '0.25rem'
-                                                    }}>
-                                                        {notification.title || notification.message}
-                                                    </div>
-                                                    {notification.message && notification.message !== notification.title && (
-                                                        <div style={{
-                                                            fontSize: '0.8125rem',
-                                                            color: '#475569',
+                                                    <div style={{ flex: 1 }}>
+                                                        <p style={{
+                                                            fontSize: '0.875rem',
+                                                            fontWeight: notification.isRead ? '400' : '600',
+                                                            color: '#1D3557',
+                                                            margin: 0,
                                                             marginBottom: '0.25rem'
                                                         }}>
-                                                            {notification.message}
-                                                        </div>
-                                                    )}
-                                                    <div style={{
-                                                        fontSize: '0.75rem',
-                                                        color: '#94a3b8'
-                                                    }}>
-                                                        {formatNotificationDate(notification.createdAt)}
+                                                            {notification.title || notification.message}
+                                                        </p>
+                                                        {notification.message && notification.message !== notification.title && (
+                                                            <p style={{
+                                                                fontSize: '0.75rem',
+                                                                color: '#6b7280',
+                                                                margin: 0
+                                                            }}>
+                                                                {notification.message}
+                                                            </p>
+                                                        )}
+                                                        <p style={{
+                                                            fontSize: '0.625rem',
+                                                            color: '#9ca3af',
+                                                            margin: '0.5rem 0 0 0'
+                                                        }}>
+                                                            {formatNotificationDate(notification.createdAt)}
+                                                        </p>
                                                     </div>
+                                                    {!notification.isRead && (
+                                                        <div style={{
+                                                            width: '0.5rem',
+                                                            height: '0.5rem',
+                                                            borderRadius: '50%',
+                                                            backgroundColor: '#1e40af',
+                                                            flexShrink: 0,
+                                                            marginTop: '0.25rem'
+                                                        }} />
+                                                    )}
                                                 </div>
-                                                {!notification.isRead && (
-                                                    <span style={{
-                                                        width: '0.5rem',
-                                                        height: '0.5rem',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: '#2563eb',
-                                                        alignSelf: 'center'
-                                                    }} />
-                                                )}
                                             </div>
                                         ))
                                     )}
@@ -709,27 +806,32 @@ const StaffDashboard = () => {
                             </div>
                         )}
                     </div>
+
                     <div style={{ textAlign: 'right' }}>
                         <p style={{
                             fontSize: '0.875rem',
                             fontWeight: '600',
-                            color: '#1D3557',
+                            color: '#FFFFFF',
                             margin: 0
                         }}>
                             {displayName}
                         </p>
                         <p style={{
                             fontSize: '0.75rem',
-                            color: '#6b7280',
+                            color: 'rgba(255, 255, 255, 0.7)',
                             margin: 0
                         }}>
                             Staff
                         </p>
                     </div>
+
                     <div 
                         data-profile-dropdown
                         style={{ position: 'relative', cursor: 'pointer' }}
-                        onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+                        onClick={() => {
+                            setShowLogoutDropdown(!showLogoutDropdown);
+                            setShowNotificationsDropdown(false);
+                        }}
                     >
                         {user?.profilePicturePath ? (
                             <img
@@ -747,12 +849,11 @@ const StaffDashboard = () => {
                                 width: '2.5rem',
                                 height: '2.5rem',
                                 borderRadius: '50%',
-                                backgroundColor: '#1D3557',
+                                backgroundColor: '#FFFFFF',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                color: '#FFFFFF',
-                                fontSize: '0.875rem',
+                                color: '#1D3557',
                                 fontWeight: '600'
                             }}>
                                 {(user?.firstName?.[0] || user?.name?.[0] || 'S').toUpperCase()}
@@ -852,15 +953,56 @@ const StaffDashboard = () => {
                         marginLeft: '4rem',
                         marginRight: '4rem'
                     }}>
-                    {/* Page Title Banner */}
+                    {/* Page Title Banner - Animated */}
                     <div style={{
                         position: 'relative',
                         height: '140px',
                         borderRadius: '0.75rem',
                         overflow: 'hidden',
                         marginBottom: '1.5rem',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-                    }}>
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        animation: 'fadeInUp 0.6s ease-out',
+                        transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 8px 12px -2px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+                    }}
+                    >
+                        <style>{`
+                            @keyframes fadeInUp {
+                                from {
+                                    opacity: 0;
+                                    transform: translateY(20px);
+                                }
+                                to {
+                                    opacity: 1;
+                                    transform: translateY(0);
+                                }
+                            }
+                            @keyframes float {
+                                0%, 100% { transform: translateY(0px); }
+                                50% { transform: translateY(-10px); }
+                            }
+                            @keyframes pulse {
+                                0%, 100% { transform: scale(1); opacity: 1; }
+                                50% { transform: scale(1.05); opacity: 0.9; }
+                            }
+                            @keyframes slideInLeft {
+                                from {
+                                    opacity: 0;
+                                    transform: translateX(-30px);
+                                }
+                                to {
+                                    opacity: 1;
+                                    transform: translateX(0);
+                                }
+                            }
+                        `}</style>
                         {/* Background Image */}
                         <div style={{
                             position: 'absolute',
@@ -869,13 +1011,37 @@ const StaffDashboard = () => {
                             backgroundPosition: 'center',
                             backgroundRepeat: 'no-repeat',
                             backgroundSize: 'cover',
-                            filter: 'blur(2px)'
+                            filter: 'blur(2px)',
+                            animation: 'pulse 4s ease-in-out infinite'
                         }}></div>
                         {/* Blue Overlay */}
                         <div style={{
                             position: 'absolute',
                             inset: 0,
                             backgroundColor: 'rgba(29, 53, 87, 0.75)'
+                        }}></div>
+                        {/* Floating Decorative Elements */}
+                        <div style={{
+                            position: 'absolute',
+                            top: '20px',
+                            right: '50px',
+                            width: '60px',
+                            height: '60px',
+                            borderRadius: '50%',
+                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            animation: 'float 3s ease-in-out infinite',
+                            zIndex: 5
+                        }}></div>
+                        <div style={{
+                            position: 'absolute',
+                            bottom: '30px',
+                            right: '100px',
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '50%',
+                            backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                            animation: 'float 2.5s ease-in-out infinite 0.5s',
+                            zIndex: 5
                         }}></div>
                         {/* Content */}
                         <div style={{
@@ -887,7 +1053,8 @@ const StaffDashboard = () => {
                             justifyContent: 'center',
                             alignItems: 'flex-start',
                             padding: '2rem 2.5rem',
-                            color: '#FFFFFF'
+                            color: '#FFFFFF',
+                            animation: 'slideInLeft 0.8s ease-out 0.2s both'
                         }}>
                             <h3 style={{
                                 color: '#FFFFFF',
@@ -908,6 +1075,458 @@ const StaffDashboard = () => {
                             </p>
                         </div>
                     </div>
+
+                    {/* Animated WIR/GUC Ad - Tripadvisor Style Layout */}
+                    <div 
+                        style={{
+                            marginBottom: '1.5rem',
+                            position: 'relative',
+                            width: '100%',
+                            background: 'linear-gradient(to bottom, #fafafa, #f0f0f0)',
+                            borderRadius: '1.25rem',
+                            padding: '2.5rem',
+                            boxShadow: '0 8px 24px -8px rgba(0, 0, 0, 0.15)',
+                            animation: 'fadeInUp 0.8s ease-out',
+                            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                            animationDelay: '0.2s',
+                            animationFillMode: 'both',
+                            overflow: 'hidden'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-5px)';
+                            e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(0, 0, 0, 0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 8px 24px -8px rgba(0, 0, 0, 0.15)';
+                        }}
+                    >
+                        {/* Subtle Background Pattern Animation */}
+                        <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+                            animation: 'pulse 4s ease-in-out infinite',
+                            zIndex: 1,
+                            pointerEvents: 'none'
+                        }}></div>
+
+                        <div style={{
+                            position: 'relative',
+                            zIndex: 2,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3rem',
+                            flexWrap: 'wrap'
+                        }}>
+                            {/* Left Side - Image with Reward Icons */}
+                            <div style={{
+                                position: 'relative',
+                                flex: '0 0 auto',
+                                width: '400px',
+                                animation: 'fadeInUp 1s ease-out 0.3s both'
+                            }}>
+                                {/* Reward Icons Around Image */}
+                                {/* Trophy Icon - Top Left (Gold) */}
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '-15px',
+                                    left: '-20px',
+                                    width: '60px',
+                                    height: '60px',
+                                    backgroundColor: '#FFFFFF',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 4px 12px rgba(255, 215, 0, 0.3)',
+                                    animation: 'float 3s ease-in-out infinite',
+                                    zIndex: 5,
+                                    border: '3px solid #FFD700'
+                                }}>
+                                    <span className="material-symbols-outlined" style={{
+                                        fontSize: '2rem',
+                                        color: '#FFD700'
+                                    }}>
+                                        emoji_events
+                                    </span>
+                                </div>
+                                {/* Wallet Icon - Top Right (Red) */}
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '-10px',
+                                    right: '-25px',
+                                    width: '55px',
+                                    height: '55px',
+                                    backgroundColor: '#FFFFFF',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 4px 12px rgba(220, 20, 60, 0.3)',
+                                    animation: 'float 3s ease-in-out infinite 0.3s',
+                                    zIndex: 5,
+                                    border: '3px solid #DC143C'
+                                }}>
+                                    <span className="material-symbols-outlined" style={{
+                                        fontSize: '1.75rem',
+                                        color: '#DC143C'
+                                    }}>
+                                        account_balance_wallet
+                                    </span>
+                                </div>
+                                {/* Percentage Icon - Bottom Left (Black) */}
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '-10px',
+                                    left: '-20px',
+                                    width: '55px',
+                                    height: '55px',
+                                    backgroundColor: '#FFFFFF',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                                    animation: 'float 3s ease-in-out infinite 0.6s',
+                                    zIndex: 5,
+                                    border: '3px solid #2c2c2c'
+                                }}>
+                                    <span className="material-symbols-outlined" style={{
+                                        fontSize: '1.75rem',
+                                        color: '#2c2c2c'
+                                    }}>
+                                        percent
+                                    </span>
+                                </div>
+                                {/* Money Icon - Bottom Right (Gold) */}
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '-15px',
+                                    right: '-25px',
+                                    width: '60px',
+                                    height: '60px',
+                                    backgroundColor: '#FFFFFF',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 4px 12px rgba(255, 215, 0, 0.3)',
+                                    animation: 'float 3s ease-in-out infinite 0.9s',
+                                    zIndex: 5,
+                                    border: '3px solid #FFD700'
+                                }}>
+                                    <span className="material-symbols-outlined" style={{
+                                        fontSize: '2rem',
+                                        color: '#FFD700'
+                                    }}>
+                                        attach_money
+                                    </span>
+                                </div>
+
+                                {/* Ad Image Container */}
+                                <div style={{
+                                    position: 'relative',
+                                    borderRadius: '1rem',
+                                    overflow: 'hidden',
+                                    boxShadow: '0 8px 20px rgba(0, 0, 0, 0.2)',
+                                    backgroundColor: '#FFFFFF',
+                                    padding: '0.5rem',
+                                    animation: 'float 4s ease-in-out infinite'
+                                }}>
+                                    <img 
+                                        src="/assets/images/ad.png" 
+                                        alt="GUC WIR Loyalty Program"
+                                        style={{
+                                            width: '100%',
+                                            height: 'auto',
+                                            display: 'block',
+                                            objectFit: 'contain',
+                                            borderRadius: '0.75rem',
+                                            transition: 'transform 0.5s ease'
+                                        }}
+                                        onError={(e) => {
+                                            console.error('Failed to load ad image');
+                                            e.target.style.display = 'none';
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.target.style.transform = 'scale(1.05)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.target.style.transform = 'scale(1)';
+                                        }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Right Side - Text Content */}
+                            <div style={{
+                                flex: '1',
+                                minWidth: '300px',
+                                color: '#2c2c2c',
+                                animation: 'fadeInUp 1s ease-out 0.5s both'
+                            }}>
+                                {/* Logo/Brand */}
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    marginBottom: '1.5rem'
+                                }}>
+                                    <div style={{
+                                        width: '50px',
+                                        height: '50px',
+                                        backgroundColor: '#FFFFFF',
+                                        borderRadius: '12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                                        border: '2px solid #FFD700'
+                                    }}>
+                                        <span className="material-symbols-outlined" style={{
+                                            fontSize: '2rem',
+                                            color: '#FFD700'
+                                        }}>
+                                            local_offer
+                                        </span>
+                                    </div>
+                                    <h3 style={{
+                                        fontSize: '1.5rem',
+                                        fontWeight: '700',
+                                        color: '#2c2c2c',
+                                        margin: 0
+                                    }}>
+                                        GUC Rewards
+                                    </h3>
+                                </div>
+
+                                {/* Main Headline */}
+                                <h2 style={{
+                                    fontSize: '2.5rem',
+                                    fontWeight: '800',
+                                    color: '#2c2c2c',
+                                    margin: 0,
+                                    marginBottom: '1rem',
+                                    lineHeight: '1.2',
+                                    animation: 'slideInRight 0.8s ease-out 0.7s both'
+                                }}>
+                                    Get Up to 50% Off<br/>Loyalty Partners
+                                </h2>
+
+                                {/* Description */}
+                                <p style={{
+                                    fontSize: '1.1rem',
+                                    color: '#2c2c2c',
+                                    margin: 0,
+                                    marginBottom: '2rem',
+                                    lineHeight: '1.6',
+                                    fontWeight: '500',
+                                    opacity: 0.9
+                                }}>
+                                    Savings, this way. Join GUC Loyalty Program to unlock exclusive discounts on food, shopping, entertainment, and more.
+                                </p>
+
+                                {/* CTA Button */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate('/staff/loyalty-vendors');
+                                    }}
+                                    style={{
+                                        padding: '1rem 2.5rem',
+                                        background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+                                        color: '#2c2c2c',
+                                        border: 'none',
+                                        borderRadius: '9999px',
+                                        fontSize: '1rem',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.3s ease',
+                                        boxShadow: '0 4px 12px rgba(255, 215, 0, 0.4)',
+                                        animation: 'fadeInUp 1s ease-out 0.9s both'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.background = 'linear-gradient(135deg, #FFA500 0%, #FFD700 100%)';
+                                        e.target.style.transform = 'translateY(-2px) scale(1.05)';
+                                        e.target.style.boxShadow = '0 6px 16px rgba(255, 215, 0, 0.5)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.background = 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)';
+                                        e.target.style.transform = 'translateY(0) scale(1)';
+                                        e.target.style.boxShadow = '0 4px 12px rgba(255, 215, 0, 0.4)';
+                                    }}
+                                >
+                                    Learn More
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Upcoming Events Preview */}
+                    {upcomingEventsPreview.length > 0 && (
+                        <section style={{ marginBottom: '1.5rem' }}>
+                            <div style={{ marginBottom: '0.75rem' }}>
+                                <h3 style={{
+                                    color: '#1D3557',
+                                    fontSize: '1.125rem',
+                                    fontWeight: '600',
+                                    margin: 0
+                                }}>
+                                    Upcoming Events
+                                </h3>
+                            </div>
+
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+                                gap: '0.85rem'
+                            }}>
+                                {upcomingEventsPreview.map((event, index) => {
+                                    const shouldBlurCard = upcomingEventsPreview.length > 1 && index === upcomingEventsPreview.length - 1;
+                                    return (
+                                        <div
+                                            key={event.id || index}
+                                            onClick={() => {
+                                                if (shouldBlurCard) {
+                                                    navigate('/staff/events');
+                                                }
+                                            }}
+                                            style={{
+                                                backgroundColor: '#FFFFFF',
+                                                borderRadius: '1rem',
+                                                overflow: 'hidden',
+                                                border: '1px solid #e5e7eb',
+                                                boxShadow: '0 12px 20px -6px rgba(15, 23, 42, 0.15)',
+                                                position: 'relative',
+                                                cursor: shouldBlurCard ? 'pointer' : 'default',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                minHeight: '260px',
+                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both`
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                                                e.currentTarget.style.boxShadow = '0 25px 40px -10px rgba(15,23,42,0.25)';
+                                                e.currentTarget.style.borderColor = '#1e40af';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                                e.currentTarget.style.boxShadow = '0 12px 20px -6px rgba(15, 23, 42, 0.15)';
+                                                e.currentTarget.style.borderColor = '#e5e7eb';
+                                            }}
+                                        >
+                                            <div style={{
+                                                height: '200px',
+                                                overflow: 'hidden',
+                                                position: 'relative'
+                                            }}>
+                                                <img
+                                                    src={event.image}
+                                                    alt={event.title}
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'cover',
+                                                        objectPosition: 'center'
+                                                    }}
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        e.target.parentElement.style.backgroundColor = '#f1f5f9';
+                                                    }}
+                                                />
+                                                <button
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '0.75rem',
+                                                        right: '0.75rem',
+                                                        backgroundColor: 'rgba(255,255,255,0.9)',
+                                                        borderRadius: '50%',
+                                                        border: 'none',
+                                                        width: '2.25rem',
+                                                        height: '2.25rem',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        cursor: 'pointer',
+                                                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                                                    }}
+                                                >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: '#1D3557' }}>
+                                                        favorite
+                                                    </span>
+                                                </button>
+                                            </div>
+
+                                            <div style={{ padding: '0.7rem 0.8rem 0.9rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
+                                                <p style={{
+                                                    color: '#1D3557',
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: '600',
+                                                    margin: 0
+                                                }}>
+                                                    {event.title}
+                                                </p>
+                                                {event.rating ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                                        <span style={{ fontWeight: '600', color: '#065f46', fontSize: '0.75rem' }}>
+                                                            {event.rating.toFixed(1)}
+                                                        </span>
+                                                        <div style={{ display: 'flex', gap: '0.05rem' }}>
+                                                            {[1, 2, 3, 4, 5].map((star) => (
+                                                                <span
+                                                                    key={star}
+                                                                    className="material-symbols-outlined"
+                                                                    style={{
+                                                                        fontSize: '0.8rem',
+                                                                        color: star <= Math.round(event.rating) ? '#22c55e' : '#d1d5db'
+                                                                    }}
+                                                                >
+                                                                    grade
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                        <span style={{ color: '#6b7280', fontSize: '0.65rem' }}>
+                                                            ({event.ratingCount || '—'})
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <p style={{ color: '#9ca3af', fontSize: '0.65rem', margin: 0 }}>
+                                                        Not rated yet
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {shouldBlurCard && (
+                                                <div
+                                                    style={{
+                                                        position: 'absolute',
+                                                        inset: 0,
+                                                        backgroundColor: 'rgba(248,250,252,0.7)',
+                                                        backdropFilter: 'blur(2px)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        textAlign: 'center',
+                                                        padding: '0.5rem',
+                                                        color: '#1D3557',
+                                                        fontWeight: '600',
+                                                        fontSize: '0.9rem'
+                                                    }}
+                                                >
+                                                    Discover more events
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    )}
 
                     {/* Quick Stats */}
                     <div style={{ marginBottom: '2rem' }}>

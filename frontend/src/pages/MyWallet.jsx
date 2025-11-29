@@ -17,6 +17,7 @@ const MyWallet = () => {
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const isProfessor = user?.userType === 'Professor';
+  const isStaff = user?.userType === 'Staff';
 
   useEffect(() => {
     loadWalletData();
@@ -262,19 +263,19 @@ const MyWallet = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#f6f7f8' }}>
       {/* Header */}
-      {isProfessor ? (
+      {isProfessor || isStaff ? (
         <header style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF'
+          backgroundColor: '#1D3557'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
             <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
               <h2 style={{
-                color: '#1D3557',
+                color: '#FFFFFF',
                 fontSize: '1.5rem',
                 fontWeight: '700',
                 lineHeight: '1.25',
@@ -293,112 +294,207 @@ const MyWallet = () => {
             flex: 1,
             gap: '1.25rem'
           }}>
-            <Link
-              to="/dashboard"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                dashboard
-              </span>
-              Dashboard
-            </Link>
-            <Link
-              to="/professor/all-events"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                explore
-              </span>
-              Discover Events
-            </Link>
-            <Link
-              to="/professor/events"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                event
-              </span>
-              My Events
-            </Link>
-            <Link
-              to="/gym"
-              style={{
-                textDecoration: 'none',
-                color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: isActiveRoute('/gym') ? '600' : '500',
-                paddingBottom: '0.5rem',
-                borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                fitness_center
-              </span>
-              Gym Sessions
-            </Link>
+            {isProfessor ? (
+              <>
+                <Link
+                  to="/dashboard"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    dashboard
+                  </span>
+                  Dashboard
+                </Link>
+                <Link
+                  to="/professor/all-events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    explore
+                  </span>
+                  Discover Events
+                </Link>
+                <Link
+                  to="/professor/events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/professor/events') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    event
+                  </span>
+                  My Events
+                </Link>
+                <Link
+                  to="/gym"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/gym') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    fitness_center
+                  </span>
+                  Gym Sessions
+                </Link>
+                <Link
+                  to="/booth-polls"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    poll
+                  </span>
+                  Vendor Polls
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/dashboard"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    dashboard
+                  </span>
+                  Dashboard
+                </Link>
+                <Link
+                  to="/staff/events"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/events') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/events') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    explore
+                  </span>
+                  Discover Events
+                </Link>
+                <Link
+                  to="/staff/my-registrations"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/staff/my-registrations') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/staff/my-registrations') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/staff/my-registrations') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    event
+                  </span>
+                  My Events
+                </Link>
+                <Link
+                  to="/gym"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/gym') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    fitness_center
+                  </span>
+                  Gym Sessions
+                </Link>
+                <Link
+                  to="/booth-polls"
+                  style={{
+                    textDecoration: 'none',
+                    color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '0.875rem',
+                    fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+                    paddingBottom: '0.5rem',
+                    borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    poll
+                  </span>
+                  Vendor Polls
+                </Link>
+              </>
+            )}
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
-            <Link
-              to="/professor/favorites"
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.2s',
-                textDecoration: 'none',
-                color: 'inherit'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f3f4f6';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem', color: '#1D3557' }}>
-                favorite
-              </span>
-            </Link>
-
+            {/* Notifications Bell */}
             <div style={{ position: 'relative' }} data-notifications-dropdown>
               <button
                 onClick={() => {
@@ -421,13 +517,16 @@ const MyWallet = () => {
                   transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                 }}
                 onMouseLeave={(e) => {
                   e.target.style.backgroundColor = 'transparent';
                 }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem', color: '#1D3557' }}>
+                <span className="material-symbols-outlined" style={{
+                  fontSize: '1.5rem',
+                  color: '#FFFFFF'
+                }}>
                   notifications
                 </span>
                 {unreadCount > 0 && (
@@ -457,20 +556,18 @@ const MyWallet = () => {
                   top: '100%',
                   right: 0,
                   marginTop: '0.5rem',
+                  width: '22rem',
                   backgroundColor: '#FFFFFF',
-                  border: '1px solid #e2e8f0',
                   borderRadius: '0.5rem',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                  zIndex: 1001,
-                  width: '360px',
-                  maxHeight: '500px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden'
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                  border: '1px solid #e5e7eb',
+                  zIndex: 1000,
+                  maxHeight: '32rem',
+                  overflowY: 'auto'
                 }}>
                   <div style={{
                     padding: '1rem',
-                    borderBottom: '1px solid #e2e8f0',
+                    borderBottom: '1px solid #e5e7eb',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center'
@@ -489,44 +586,34 @@ const MyWallet = () => {
                         style={{
                           background: 'none',
                           border: 'none',
-                          color: '#1e40af',
-                          cursor: 'pointer',
+                          color: '#2563eb',
                           fontSize: '0.75rem',
-                          fontWeight: '500',
-                          padding: '0.25rem 0.5rem'
+                          cursor: 'pointer',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '0.25rem'
                         }}
                         onMouseEnter={(e) => {
-                          e.target.style.textDecoration = 'underline';
+                          e.target.style.backgroundColor = '#eff6ff';
                         }}
                         onMouseLeave={(e) => {
-                          e.target.style.textDecoration = 'none';
+                          e.target.style.backgroundColor = 'transparent';
                         }}
                       >
                         Mark all as read
                       </button>
                     )}
                   </div>
-                  <div style={{ overflowY: 'auto', maxHeight: '400px' }}>
-                    {loadingNotifications ? (
-                      <div style={{
-                        padding: '2rem',
-                        textAlign: 'center',
-                        color: '#6b7280',
-                        fontSize: '0.875rem'
-                      }}>
-                        Loading...
-                      </div>
-                    ) : notifications.length === 0 ? (
-                      <div style={{
-                        padding: '2rem',
-                        textAlign: 'center',
-                        color: '#6b7280',
-                        fontSize: '0.875rem'
-                      }}>
-                        No notifications
-                      </div>
-                    ) : (
-                      notifications.map((notification) => (
+                  {loadingNotifications ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                      Loading...
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                      No notifications
+                    </div>
+                  ) : (
+                    <div>
+                      {notifications.map((notification) => (
                         <div
                           key={notification._id}
                           onClick={() => {
@@ -648,34 +735,68 @@ const MyWallet = () => {
                             )}
                           </div>
                         </div>
-                      ))
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
+
+            {/* Heart Icon - Favorites */}
+            <Link
+              to={isProfessor ? "/professor/favorites" : "/staff/favorites"}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s',
+                textDecoration: 'none',
+                color: 'inherit'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span className="material-symbols-outlined" style={{
+                fontSize: '1.5rem',
+                color: '#FFFFFF'
+              }}>
+                favorite
+              </span>
+            </Link>
 
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
                 fontWeight: '600',
-                color: '#1D3557',
+                color: '#FFFFFF',
                 margin: 0
               }}>
                 {displayName}
               </p>
               <p style={{
                 fontSize: '0.75rem',
-                color: '#6b7280',
+                color: 'rgba(255, 255, 255, 0.7)',
                 margin: 0
               }}>
-                Professor
+                {isProfessor ? 'Professor' : 'Staff'}
               </p>
             </div>
             <div 
               data-profile-dropdown
               style={{ position: 'relative', cursor: 'pointer' }}
-              onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+              onClick={() => {
+                setShowLogoutDropdown(!showLogoutDropdown);
+                setShowNotificationsDropdown(false);
+              }}
             >
               {user?.profilePicturePath ? (
                 <img
@@ -693,14 +814,14 @@ const MyWallet = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: '50%',
-                  backgroundColor: '#1D3557',
+                  backgroundColor: '#FFFFFF',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#FFFFFF',
+                  color: '#1D3557',
                   fontWeight: '600'
                 }}>
-                  {(user?.firstName?.[0] || user?.name?.[0] || 'P').toUpperCase()}
+                  {(user?.firstName?.[0] || user?.name?.[0] || (isProfessor ? 'P' : 'S')).toUpperCase()}
                 </div>
               )}
               {showLogoutDropdown && (
@@ -716,35 +837,37 @@ const MyWallet = () => {
                   zIndex: 1000,
                   minWidth: '150px'
                 }}>
-                  <Link
-                    to="/wallet"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      textAlign: 'left',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      color: '#1D3557',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      textDecoration: 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#f3f4f6';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'transparent';
-                    }}
-                    onClick={() => setShowLogoutDropdown(false)}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                      account_balance_wallet
-                    </span>
-                    My Wallet
-                  </Link>
+                  {(user?.userType === 'Professor' || user?.userType === 'Staff') && (
+                    <Link
+                      to="/wallet"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        textAlign: 'left',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#1D3557',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        textDecoration: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#f3f4f6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'transparent';
+                      }}
+                      onClick={() => setShowLogoutDropdown(false)}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                        account_balance_wallet
+                      </span>
+                      My Wallet
+                    </Link>
+                  )}
                   <button
                     onClick={handleLogout}
                     style={{

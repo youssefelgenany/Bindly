@@ -642,14 +642,14 @@ const getDisplayStatus = (status) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF'
+        backgroundColor: '#1D3557'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557', flex: '0 0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -673,11 +673,11 @@ const getDisplayStatus = (status) => {
             to="/dashboard"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/dashboard') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/dashboard') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -692,11 +692,11 @@ const getDisplayStatus = (status) => {
             to="/professor/all-events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/professor/all-events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/professor/all-events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/professor/all-events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/professor/all-events') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -711,11 +711,11 @@ const getDisplayStatus = (status) => {
             to="/professor/events"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/professor/events') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/professor/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/professor/events') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/professor/events') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/professor/events') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -730,11 +730,11 @@ const getDisplayStatus = (status) => {
             to="/gym"
             style={{
               textDecoration: 'none',
-              color: isActiveRoute('/gym') ? '#2563eb' : '#6b7280',
+              color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
               fontWeight: isActiveRoute('/gym') ? '600' : '500',
               paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/gym') ? '2px solid #2563eb' : '2px solid transparent',
+              borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -744,6 +744,25 @@ const getDisplayStatus = (status) => {
               fitness_center
             </span>
             Gym Sessions
+          </Link>
+          <Link
+            to="/booth-polls"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              poll
+            </span>
+            Vendor Polls
           </Link>
         </nav>
 
@@ -765,7 +784,7 @@ const getDisplayStatus = (status) => {
               color: 'inherit'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
@@ -773,7 +792,7 @@ const getDisplayStatus = (status) => {
           >
             <span className="material-symbols-outlined" style={{
               fontSize: '1.5rem',
-              color: '#1D3557'
+              color: '#FFFFFF'
             }}>
               favorite
             </span>
@@ -802,7 +821,7 @@ const getDisplayStatus = (status) => {
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = 'transparent';
@@ -810,7 +829,7 @@ const getDisplayStatus = (status) => {
             >
               <span className="material-symbols-outlined" style={{
                 fontSize: '1.5rem',
-                color: '#1D3557'
+                color: '#FFFFFF'
               }}>
                 notifications
               </span>
@@ -1027,14 +1046,14 @@ const getDisplayStatus = (status) => {
             <p style={{
               fontSize: '0.875rem',
               fontWeight: '600',
-              color: '#1D3557',
+              color: '#FFFFFF',
               margin: 0
             }}>
               {displayName}
             </p>
             <p style={{
               fontSize: '0.75rem',
-              color: '#6b7280',
+              color: 'rgba(255, 255, 255, 0.7)',
               margin: 0
             }}>
               Professor
@@ -1043,7 +1062,10 @@ const getDisplayStatus = (status) => {
           <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            onClick={() => {
+              setShowLogoutDropdown(!showLogoutDropdown);
+              setShowNotificationsDropdown(false);
+            }}
           >
             {user?.profilePicturePath ? (
               <img
@@ -1061,11 +1083,11 @@ const getDisplayStatus = (status) => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#1D3557',
+                backgroundColor: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
+                color: '#1D3557',
                 fontWeight: '600'
               }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'P').toUpperCase()}
@@ -1882,33 +1904,6 @@ const getDisplayStatus = (status) => {
                             </button>
                           ))}
                         </div>
-                        {rating > 0 && (
-                          <button
-                            type="button"
-                            onClick={handleSubmitRating}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.5rem',
-                              backgroundColor: '#1e40af',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                              fontWeight: '600',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.stopPropagation();
-                              e.target.style.backgroundColor = '#1e3a8a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.stopPropagation();
-                              e.target.style.backgroundColor = '#1e40af';
-                            }}
-                          >
-                            Submit Rating
-                          </button>
-                        )}
                       </div>
 
                       <div ref={commentSectionRef}>
@@ -1958,33 +1953,128 @@ const getDisplayStatus = (status) => {
                         </div>
                         <button
                           type="button"
-                          onClick={handleSubmitComment}
-                          disabled={!commentText.trim()}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            
+                            if (!selectedEventForView?.eventId) {
+                              setModalError('No event selected.');
+                              return;
+                            }
+                            
+                            const hasRating = rating > 0 && rating <= 5;
+                            const hasComment = commentText.trim().length > 0;
+                            
+                            if (!hasRating && !hasComment) {
+                              setModalError('Please provide a rating, comment, or both.');
+                              return;
+                            }
+                            
+                            setModalError('');
+                            setModalSuccess('');
+                            
+                            const eventId = String(selectedEventForView.eventId);
+                            let ratingSuccess = true;
+                            let commentSuccess = true;
+                            let errorMessages = [];
+                            
+                            try {
+                              // Submit rating if provided
+                              if (hasRating) {
+                                try {
+                                  console.log('🚀 Submitting rating:', { eventId, rating, selectedEventForView });
+                                  const ratingResult = await eventsApiService.submitRating(eventId, rating);
+                                  console.log('📊 Rating submission result:', ratingResult);
+                                  if (ratingResult.success) {
+                                    setRating(0);
+                                    setHoveredRating(0);
+                                  } else {
+                                    ratingSuccess = false;
+                                    const errorMsg = ratingResult.message || ratingResult.error?.message || ratingResult.error?.msg || 'Failed to submit rating';
+                                    errorMessages.push(errorMsg);
+                                  }
+                                } catch (err) {
+                                  ratingSuccess = false;
+                                  console.error('❌ Error submitting rating:', err);
+                                  const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting rating';
+                                  errorMessages.push(errorMsg);
+                                }
+                              }
+                              
+                              // Submit comment if provided
+                              if (hasComment) {
+                                try {
+                                  console.log('🚀 Submitting comment:', { eventId, commentLength: commentText.trim().length, selectedEventForView });
+                                  const commentResult = await eventsApiService.submitComment(eventId, commentText.trim());
+                                  console.log('📊 Comment submission result:', commentResult);
+                                  if (commentResult.success) {
+                                    setCommentText('');
+                                  } else {
+                                    commentSuccess = false;
+                                    const errorMsg = commentResult.message || commentResult.error?.message || commentResult.error?.msg || 'Failed to submit comment';
+                                    errorMessages.push(errorMsg);
+                                  }
+                                } catch (err) {
+                                  commentSuccess = false;
+                                  console.error('❌ Error submitting comment:', err);
+                                  const errorMsg = err.response?.data?.message || err.response?.data?.msg || err.message || 'Error submitting comment';
+                                  errorMessages.push(errorMsg);
+                                }
+                              }
+                              
+                              // Show success or error messages
+                              if (ratingSuccess && commentSuccess) {
+                                const successMessages = [];
+                                if (hasRating) successMessages.push('Rating');
+                                if (hasComment) successMessages.push('Comment');
+                                setModalSuccess(`${successMessages.join(' and ')} submitted successfully.`);
+                                setModalError('');
+                              } else {
+                                setModalError(errorMessages.join(' '));
+                                setModalSuccess('');
+                              }
+                              
+                              // Reload ratings and comments regardless of success/failure
+                              await loadRatingsAndComments(eventId);
+                              
+                              // Update event ratings if rating was submitted
+                              if (hasRating && ratingSuccess) {
+                                await refreshEventRatingStats(eventId);
+                              }
+                            } catch (err) {
+                              console.error('❌ Error in submit process:', err);
+                              setModalError(err.response?.data?.message || err.message || 'Error submitting feedback');
+                              setModalSuccess('');
+                            }
+                          }}
+                          disabled={!(rating > 0 || commentText.trim())}
                           style={{
                             padding: '0.5rem 1rem',
                             borderRadius: '0.5rem',
-                            backgroundColor: !commentText.trim() ? '#d1d5db' : '#1e40af',
+                            backgroundColor: !(rating > 0 || commentText.trim()) ? '#d1d5db' : '#1e40af',
                             color: '#FFFFFF',
                             border: 'none',
-                            cursor: !commentText.trim() ? 'not-allowed' : 'pointer',
+                            cursor: !(rating > 0 || commentText.trim()) ? 'not-allowed' : 'pointer',
                             fontSize: '0.875rem',
                             fontWeight: '600',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            zIndex: 10,
+                            position: 'relative'
                           }}
                           onMouseEnter={(e) => {
-                            if (commentText.trim()) {
-                              e.stopPropagation();
+                            e.stopPropagation();
+                            if (rating > 0 || commentText.trim()) {
                               e.target.style.backgroundColor = '#1e3a8a';
                             }
                           }}
                           onMouseLeave={(e) => {
-                            if (commentText.trim()) {
-                              e.stopPropagation();
+                            e.stopPropagation();
+                            if (rating > 0 || commentText.trim()) {
                               e.target.style.backgroundColor = '#1e40af';
                             }
                           }}
                         >
-                          Submit Comment
+                          Submit
                         </button>
                       </div>
                     </div>
