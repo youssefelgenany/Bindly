@@ -2380,46 +2380,6 @@ const getDisplayStatus = (status) => {
                   {getDisplayStatus(selectedRegistration.status)}
                 </div>
               </div>
-              {canCancelSelectedRegistration && (
-                <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-start' }}>
-                  <button
-                    onClick={() => {
-                      setCancelRegistrationData({
-                        eventId: selectedRegistration.eventId || selectedRegistration.id,
-                        eventTitle: selectedRegistration.eventTitle,
-                        paid: selectedRegistration.paid
-                      });
-                      setShowCancelModal(true);
-                    }}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.65rem 1.25rem',
-                      borderRadius: '0.5rem',
-                      border: 'none',
-                      backgroundColor: '#dc2626',
-                      color: '#FFFFFF',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                      transition: 'background-color 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#b91c1c';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#dc2626';
-                    }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                      refund
-                    </span>
-                    Cancel & Refund
-                  </button>
-                </div>
-              )}
               
               <div style={{
                 display: 'grid',
@@ -2642,6 +2602,45 @@ const getDisplayStatus = (status) => {
                 </div>
               )}
 
+              {/* Cancel Button - Only show for paid registrations that can be cancelled (2+ weeks before event) */}
+              {canCancelSelectedRegistration && (
+                <div style={{
+                  marginTop: '1.5rem',
+                  paddingTop: '1.5rem',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  <button
+                    onClick={() => {
+                      setCancelRegistrationData({
+                        eventId: selectedRegistration.eventId || selectedRegistration.id,
+                        eventTitle: selectedRegistration.eventTitle,
+                        paid: selectedRegistration.paid
+                      });
+                      setShowCancelModal(true);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#dc2626',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      cancel
+                    </span>
+                    Cancel Registration & Get Refund
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

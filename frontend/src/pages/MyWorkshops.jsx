@@ -21,10 +21,8 @@ const MyWorkshops = () => {
   const [createFormData, setCreateFormData] = useState({
     workshopName: '',
     location: 'GUC Cairo',
-    startDate: '',
-    endDate: '',
-    startTime: '',
-    endTime: '',
+    startDateTime: '',
+    endDateTime: '',
     registrationDeadline: '',
     shortDescription: '',
     fullAgenda: '',
@@ -311,11 +309,31 @@ const MyWorkshops = () => {
   };
 
   const handleEditClick = (workshop) => {
-    // Format dates for the form
-    const startDate = workshop.startDate ? new Date(workshop.startDate).toISOString().split('T')[0] : '';
-    const endDate = workshop.endDate ? new Date(workshop.endDate).toISOString().split('T')[0] : '';
+    // Format datetime-local values (YYYY-MM-DDTHH:mm)
+    const formatDateTimeLocal = (dateString, timeString) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      
+      let hours = '00';
+      let minutes = '00';
+      if (timeString) {
+        const timeParts = timeString.split(':');
+        hours = timeParts[0] || '00';
+        minutes = timeParts[1] || '00';
+      } else {
+        hours = String(date.getHours()).padStart(2, '0');
+        minutes = String(date.getMinutes()).padStart(2, '0');
+      }
+      
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
     
-    // Format registration deadline as datetime-local (YYYY-MM-DDTHH:mm)
+    // Format registration deadline as datetime-local
     let registrationDeadline = '';
     if (workshop.registrationDeadline) {
       const deadlineDate = new Date(workshop.registrationDeadline);
@@ -326,19 +344,13 @@ const MyWorkshops = () => {
       const minutes = String(deadlineDate.getMinutes()).padStart(2, '0');
       registrationDeadline = `${year}-${month}-${day}T${hours}:${minutes}`;
     }
-    
-    // Format times
-    const startTime = workshop.startTime || '';
-    const endTime = workshop.endTime || '';
 
     setEditFormData({
       id: workshop._id,
       workshopName: workshop.workshopName || '',
       location: workshop.location || 'GUC Cairo',
-      startDate: startDate,
-      endDate: endDate,
-      startTime: startTime,
-      endTime: endTime,
+      startDateTime: formatDateTimeLocal(workshop.startDate, workshop.startTime),
+      endDateTime: formatDateTimeLocal(workshop.endDate, workshop.endTime),
       registrationDeadline: registrationDeadline,
       shortDescription: workshop.shortDescription || '',
       fullAgenda: workshop.fullAgenda || '',
@@ -370,8 +382,8 @@ const MyWorkshops = () => {
 
     try {
       // Validate required fields
-      if (!editFormData.workshopName || !editFormData.startDate || !editFormData.endDate || 
-          !editFormData.startTime || !editFormData.endTime || !editFormData.registrationDeadline ||
+      if (!editFormData.workshopName || !editFormData.startDateTime || !editFormData.endDateTime || 
+          !editFormData.registrationDeadline ||
           !editFormData.shortDescription || !editFormData.fullAgenda || !editFormData.facultyResponsible ||
           !editFormData.professorsParticipating || !editFormData.requiredBudget || !editFormData.fundingSource ||
           !editFormData.capacity) {
@@ -393,8 +405,8 @@ const MyWorkshops = () => {
       }
 
       // Validate dates
-      const startDateTime = new Date(`${editFormData.startDate}T${editFormData.startTime}`);
-      const endDateTime = new Date(`${editFormData.endDate}T${editFormData.endTime}`);
+      const startDateTime = new Date(editFormData.startDateTime);
+      const endDateTime = new Date(editFormData.endDateTime);
       const registrationDeadlineDate = new Date(editFormData.registrationDeadline);
 
       if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime()) || isNaN(registrationDeadlineDate.getTime())) {
@@ -439,13 +451,20 @@ const MyWorkshops = () => {
       }
 
       // Prepare data for submission
+      // Format time as HH:MM
+      const formatTime = (date) => {
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+      };
+
       const submitData = {
         workshopName: editFormData.workshopName.trim(),
         location: editFormData.location,
         startDate: startDateTime.toISOString(),
         endDate: endDateTime.toISOString(),
-        startTime: editFormData.startTime,
-        endTime: editFormData.endTime,
+        startTime: formatTime(startDateTime),
+        endTime: formatTime(endDateTime),
         registrationDeadline: registrationDeadlineDate.toISOString(),
         shortDescription: editFormData.shortDescription.trim(),
         fullAgenda: editFormData.fullAgenda.trim(),
@@ -499,8 +518,8 @@ const MyWorkshops = () => {
 
     // Validate required fields
     const requiredFields = [
-      'workshopName', 'location', 'startDate', 'endDate', 'startTime', 
-      'endTime', 'registrationDeadline', 'shortDescription', 'fullAgenda',
+      'workshopName', 'location', 'startDateTime', 'endDateTime', 
+      'registrationDeadline', 'shortDescription', 'fullAgenda',
       'facultyResponsible', 'professorsParticipating', 'requiredBudget',
       'fundingSource', 'capacity'
     ];
@@ -521,8 +540,8 @@ const MyWorkshops = () => {
     }
 
     // Validate dates
-    const startDate = new Date(`${createFormData.startDate}T${createFormData.startTime}`);
-    const endDate = new Date(`${createFormData.endDate}T${createFormData.endTime}`);
+    const startDate = new Date(createFormData.startDateTime);
+    const endDate = new Date(createFormData.endDateTime);
     const registrationDeadline = new Date(createFormData.registrationDeadline);
 
     if (endDate <= startDate) {
@@ -564,13 +583,24 @@ const MyWorkshops = () => {
       }
 
       // Prepare data for submission
+      // Extract date and time from datetime-local values for backward compatibility
+      const startDateTime = new Date(createFormData.startDateTime);
+      const endDateTime = new Date(createFormData.endDateTime);
+      
+      // Format time as HH:MM
+      const formatTime = (date) => {
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+      };
+
       const submitData = {
         workshopName: createFormData.workshopName.trim(),
         location: createFormData.location,
-        startDate: new Date(`${createFormData.startDate}T${createFormData.startTime}`).toISOString(),
-        endDate: new Date(`${createFormData.endDate}T${createFormData.endTime}`).toISOString(),
-        startTime: createFormData.startTime,
-        endTime: createFormData.endTime,
+        startDate: startDateTime.toISOString(),
+        endDate: endDateTime.toISOString(),
+        startTime: formatTime(startDateTime),
+        endTime: formatTime(endDateTime),
         registrationDeadline: new Date(createFormData.registrationDeadline).toISOString(),
         shortDescription: createFormData.shortDescription.trim(),
         fullAgenda: createFormData.fullAgenda.trim(),
@@ -1929,116 +1959,61 @@ const MyWorkshops = () => {
                     </select>
                                 </div>
 
-                  {/* Date and Time Row */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div>
-                      <label style={{
-                        display: 'block',
+                  {/* Start Date & Time */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Start Date & Time <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      name="startDateTime"
+                      value={createFormData.startDateTime}
+                      onChange={handleCreateChange}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
                         fontSize: '0.875rem',
-                        fontWeight: '600',
-                        color: '#374151',
-                        marginBottom: '0.5rem'
-                      }}>
-                        Start Date <span style={{ color: '#dc2626' }}>*</span>
-                      </label>
-                      <input
-                        type="date"
-                        name="startDate"
-                        value={createFormData.startDate}
-                        onChange={handleCreateChange}
-                        required
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                                    </div>
-                    <div>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        color: '#374151',
-                        marginBottom: '0.5rem'
-                      }}>
-                        Start Time <span style={{ color: '#dc2626' }}>*</span>
-                      </label>
-                      <input
-                        type="time"
-                        name="startTime"
-                        value={createFormData.startTime}
-                        onChange={handleCreateChange}
-                        required
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                                    </div>
-                                    </div>
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div>
-                      <label style={{
-                        display: 'block',
+                  {/* End Date & Time */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      End Date & Time <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      name="endDateTime"
+                      value={createFormData.endDateTime}
+                      onChange={handleCreateChange}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
                         fontSize: '0.875rem',
-                        fontWeight: '600',
-                        color: '#374151',
-                        marginBottom: '0.5rem'
-                      }}>
-                        End Date <span style={{ color: '#dc2626' }}>*</span>
-                      </label>
-                      <input
-                        type="date"
-                        name="endDate"
-                        value={createFormData.endDate}
-                        onChange={handleCreateChange}
-                        required
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                                    </div>
-                    <div>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        color: '#374151',
-                        marginBottom: '0.5rem'
-                      }}>
-                        End Time <span style={{ color: '#dc2626' }}>*</span>
-                      </label>
-                      <input
-                        type="time"
-                        name="endTime"
-                        value={createFormData.endTime}
-                        onChange={handleCreateChange}
-                        required
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.875rem',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                                      </div>
-                                  </div>
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
 
                   {/* Registration Deadline */}
                   <div>
@@ -2502,115 +2477,60 @@ const MyWorkshops = () => {
                   </select>
                 </div>
 
-                {/* Date and Time Row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{
-                      display: 'block',
+                {/* Start Date & Time */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Start Date & Time <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="startDateTime"
+                    value={editFormData.startDateTime || ''}
+                    onChange={handleEditChange}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
                       fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Start Date <span style={{ color: '#dc2626' }}>*</span>
-                    </label>
-                    <input
-                      type="date"
-                      name="startDate"
-                      value={editFormData.startDate || ''}
-                      onChange={handleEditChange}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Start Time <span style={{ color: '#dc2626' }}>*</span>
-                    </label>
-                    <input
-                      type="time"
-                      name="startTime"
-                      value={editFormData.startTime || ''}
-                      onChange={handleEditChange}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
+                      boxSizing: 'border-box'
+                    }}
+                  />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{
-                      display: 'block',
+                {/* End Date & Time */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    End Date & Time <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="endDateTime"
+                    value={editFormData.endDateTime || ''}
+                    onChange={handleEditChange}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
                       fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      End Date <span style={{ color: '#dc2626' }}>*</span>
-                    </label>
-                    <input
-                      type="date"
-                      name="endDate"
-                      value={editFormData.endDate || ''}
-                      onChange={handleEditChange}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      End Time <span style={{ color: '#dc2626' }}>*</span>
-                    </label>
-                    <input
-                      type="time"
-                      name="endTime"
-                      value={editFormData.endTime || ''}
-                      onChange={handleEditChange}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
+                      boxSizing: 'border-box'
+                    }}
+                  />
                 </div>
 
                 {/* Registration Deadline */}
