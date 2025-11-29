@@ -706,32 +706,36 @@ const TALoyaltyVendorsView = () => {
               setShowNotificationsDropdown(false);
             }}
           >
-            {user?.profilePicturePath ? (
-              <img
-                src={`http://localhost:5000${user.profilePicturePath}`}
-                alt="User profile"
-                style={{
+            {(() => {
+              const avatarPath = user?.profilePicturePath || user?.vendorLogoPath;
+              const avatarSrc = avatarPath ? (avatarPath.startsWith('http') ? avatarPath : `http://localhost:5000${avatarPath}`) : null;
+              return avatarSrc ? (
+                <img
+                  src={avatarSrc}
+                  alt="User profile"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: '50%',
+                    objectFit: 'cover'
+                  }}
+                />
+              ) : (
+                <div style={{
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: '50%',
-                  objectFit: 'cover'
-                }}
-              />
-            ) : (
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                borderRadius: '50%',
-                backgroundColor: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1D3557',
-                fontWeight: '600'
-              }}>
-                {(user?.firstName?.[0] || user?.name?.[0] || 'T').toUpperCase()}
-              </div>
-            )}
+                  backgroundColor: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#1D3557',
+                  fontWeight: '600'
+                }}>
+                  {(user?.firstName?.[0] || user?.name?.[0] || 'T').toUpperCase()}
+                </div>
+              );
+            })()}
             {showLogoutDropdown && (
               <div style={{
                 position: 'absolute',

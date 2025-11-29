@@ -145,11 +145,8 @@ export const vendorApi = {
     
     // Upload vendor documents (tax card and logo)
     uploadDocuments: async (formData) => {
-        const res = await api.post('/my/documents', formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data'
-            }
-        });
+        // Let axios set the Content-Type (including boundary) for multipart/form-data
+        const res = await api.post('/my/documents', formData);
         return res.data;
     }
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { notificationApiService } from '../api/notificationApi';
 import { vendorRequestApi } from '../api/vendorRequestApi';
 
@@ -91,7 +91,7 @@ const getNotificationDisplay = (notification) => {
 
 const VendorNotificationBell = ({
   label = 'Notifications',
-  bellColor = '#1D3557',
+  bellColor = '#FFFFFF',
   pollIntervalMs = 30000,
   style = {}
 }) => {
@@ -100,6 +100,30 @@ const VendorNotificationBell = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
+  
+  // Use ref instead of state so it's immediately available (not async)
+  // Load from localStorage on mount to persist across page refreshes
+  const getInitialMarkedVendorRequests = () => {
+    try {
+      const stored = localStorage.getItem('markedAsReadVendorRequests');
+      if (stored) {
+        return new Set(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Error loading marked vendor requests from localStorage:', error);
+    }
+    return new Set();
+  };
+  const markedAsReadVendorRequestsRef = useRef(getInitialMarkedVendorRequests());
+
+  // Helper function to save marked vendor requests to localStorage
+  const saveMarkedVendorRequests = (set) => {
+    try {
+      localStorage.setItem('markedAsReadVendorRequests', JSON.stringify(Array.from(set)));
+    } catch (error) {
+      console.error('Error saving marked vendor requests to localStorage:', error);
+    }
+  };
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -112,37 +136,70 @@ const VendorNotificationBell = ({
         vendorRequestApi.getPendingNotifications(25)
       ]);
 
-      const generalNotifications =
-        generalRes.success && generalRes.data?.data?.notifications
-          ? generalRes.data.data.notifications
-          : [];
-      const vendorNotifications =
-        vendorRes.success && vendorRes.data?.data?.notifications
-          ? vendorRes.data.data.notifications
-          : [];
+      // Handle different response structures
+      let generalNotifications = [];
+      if (generalRes.success) {
+        if (Array.isArray(generalRes.data)) {
+          generalNotifications = generalRes.data;
+        } else if (generalRes.data?.data?.notifications) {
+          generalNotifications = generalRes.data.data.notifications;
+        } else if (generalRes.data?.notifications) {
+          generalNotifications = generalRes.data.notifications;
+        }
+      }
+
+      let vendorNotifications = [];
+      if (vendorRes.success) {
+        if (Array.isArray(vendorRes.data)) {
+          vendorNotifications = vendorRes.data;
+        } else if (vendorRes.data?.data?.notifications) {
+          vendorNotifications = vendorRes.data.data.notifications;
+        } else if (vendorRes.data?.notifications) {
+          vendorNotifications = vendorRes.data.notifications;
+        }
+      }
+
+      // Create a set of read notification request IDs to filter out pending vendor requests that are already read
+      const readVendorRequestIds = new Set();
+      [...generalNotifications, ...vendorNotifications].forEach((notif) => {
+        if (notif.isRead && notif.type === 'vendor_request' && notif.metadata?.requestId) {
+          readVendorRequestIds.add(notif.metadata.requestId);
+        }
+      });
+
+      // Also check locally marked-as-read vendor requests (from ref for immediate access)
+      const allReadVendorRequestIds = new Set([...readVendorRequestIds, ...markedAsReadVendorRequestsRef.current]);
 
       const vendorRequestItems =
         vendorRequestsRes.success && Array.isArray(vendorRequestsRes.notifications)
-          ? vendorRequestsRes.notifications.map((req) => ({
-              _id: `vendor_req_${req.id || req._id}`,
-              type: 'vendor_request',
-              title: req.vendor?.companyName || 'Vendor Request',
-              message: `${req.vendor?.companyName || 'Vendor'} submitted a ${
-                req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
-              } request for "${req.event?.name || req.eventName || 'Event'}".`,
-              createdAt: req.submittedAt || req.createdAt || new Date().toISOString(),
-              metadata: {
-                vendorName:
-                  req.vendor?.companyName ||
-                  `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim() ||
-                  'Vendor',
-                eventName: req.event?.name || req.eventName || 'Event',
-                eventType: req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
-              },
-              isRead: false
-            }))
+          ? vendorRequestsRes.notifications
+              .filter((req) => {
+                // Only include if there's no corresponding read notification and hasn't been marked as read locally
+                const requestId = String(req.id || req._id);
+                return !allReadVendorRequestIds.has(requestId);
+              })
+              .map((req) => ({
+                _id: `vendor_req_${req.id || req._id}`,
+                type: 'vendor_request',
+                title: req.vendor?.companyName || 'Vendor Request',
+                message: `${req.vendor?.companyName || 'Vendor'} submitted a ${
+                  req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
+                } request for "${req.event?.name || req.eventName || 'Event'}".`,
+                createdAt: req.submittedAt || req.createdAt || new Date().toISOString(),
+                metadata: {
+                  requestId: String(req.id || req._id), // Store the actual request ID for filtering
+                  vendorName:
+                    req.vendor?.companyName ||
+                    `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim() ||
+                    'Vendor',
+                  eventName: req.event?.name || req.eventName || 'Event',
+                  eventType: req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
+                },
+                isRead: false
+              }))
           : [];
 
+      // Merge all notifications - include ALL general and vendor notifications
       const mergedMap = new Map();
       generalNotifications.forEach((notif) => {
         const id = notif?._id || notif?.id;
@@ -153,6 +210,7 @@ const VendorNotificationBell = ({
         if (id) mergedMap.set(id, notif);
       });
 
+      // Add pending vendor requests that haven't been marked as read
       vendorRequestItems.forEach((notif) => {
         const id = notif?._id || notif?.id;
         if (id && !mergedMap.has(id)) mergedMap.set(id, notif);
@@ -161,6 +219,13 @@ const VendorNotificationBell = ({
       const merged = Array.from(mergedMap.values()).sort(
         (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0)
       );
+
+      console.log('🔔 Admin Notifications loaded:', {
+        general: generalNotifications.length,
+        vendor: vendorNotifications.length,
+        pending: vendorRequestItems.length,
+        total: merged.length
+      });
 
       setNotifications(merged);
       setUnreadCount(merged.filter((notif) => !notif.isRead).length);
@@ -183,9 +248,28 @@ const VendorNotificationBell = ({
       if (!notificationId) return;
       const notification = notifications.find((n) => n._id === notificationId || n.id === notificationId);
       if (!notification || notification.isRead) return;
+      
+      // If this is a pending vendor notification, track it as read (using ref for immediate access)
+      if (notification.type === 'vendor_request' && notification._id?.startsWith('vendor_req_') && notification.metadata?.requestId) {
+        markedAsReadVendorRequestsRef.current.add(notification.metadata.requestId);
+        // Persist to localStorage so it survives page refresh
+        saveMarkedVendorRequests(markedAsReadVendorRequestsRef.current);
+      }
+      
       try {
-        const response = await notificationApiService.markAsRead(notificationId);
-        if (response.success) {
+        // Only call API if it's a real notification (not a pending vendor notification)
+        if (!notification._id?.startsWith('vendor_req_')) {
+          const response = await notificationApiService.markAsRead(notificationId);
+          if (response.success) {
+            setNotifications((prev) =>
+              prev.map((notif) =>
+                (notif._id || notif.id) === notificationId ? { ...notif, isRead: true } : notif
+              )
+            );
+            setUnreadCount((prev) => Math.max(prev - 1, 0));
+          }
+        } else {
+          // For pending vendor notifications, just update local state
           setNotifications((prev) =>
             prev.map((notif) =>
               (notif._id || notif.id) === notificationId ? { ...notif, isRead: true } : notif
@@ -202,15 +286,32 @@ const VendorNotificationBell = ({
 
   const markAllAsRead = useCallback(async () => {
     try {
-      const response = await notificationApiService.markAllAsRead();
-      if (response.success) {
-        setNotifications((prev) => prev.map((notif) => ({ ...notif, isRead: true })));
-        setUnreadCount(0);
+      // Collect all pending vendor request IDs that need to be tracked as read
+      const pendingVendorRequestIds = notifications
+        .filter(n => n.type === 'vendor_request' && n._id?.startsWith('vendor_req_') && !n.isRead)
+        .map(n => n.metadata?.requestId)
+        .filter(id => id);
+
+      // Add them to the marked-as-read ref immediately (synchronous)
+      if (pendingVendorRequestIds.length > 0) {
+        pendingVendorRequestIds.forEach(id => markedAsReadVendorRequestsRef.current.add(id));
+        // Persist to localStorage so it survives page refresh
+        saveMarkedVendorRequests(markedAsReadVendorRequestsRef.current);
       }
+
+      // Immediately update local state to show all as read (optimistic update)
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+
+      // Mark all notifications as read via API
+      await notificationApiService.markAllAsRead();
+
+      // Don't refresh immediately - we've already updated the UI optimistically
+      // The next automatic poll will sync with the server
     } catch (err) {
       console.error('Failed to mark all notifications as read:', err);
     }
-  }, []);
+  }, [notifications]);
 
   const togglePanel = () => {
     if (!open) {
@@ -273,26 +374,24 @@ const VendorNotificationBell = ({
           notifications
         </span>
         {unreadCount > 0 && (
-          <span
-            style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              backgroundColor: '#dc2626',
-              color: '#fff',
-              borderRadius: '9999px',
-              minWidth: '18px',
-              height: '18px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.65rem',
-              fontWeight: 700,
-              padding: '0 4px'
-            }}
-          >
+          <div style={{
+            position: 'absolute',
+            top: '0.25rem',
+            right: '0.25rem',
+            backgroundColor: '#ef4444',
+            color: '#FFFFFF',
+            borderRadius: '50%',
+            width: '1.25rem',
+            height: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            border: '2px solid #FFFFFF'
+          }}>
             {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
+          </div>
         )}
       </button>
       {open && (
@@ -300,55 +399,64 @@ const VendorNotificationBell = ({
           data-vendor-notification-panel
           style={{
             position: 'absolute',
-            top: 'calc(100% + 0.5rem)',
-            right: 0,
-            width: '420px',
-            maxHeight: '500px',
-            backgroundColor: '#ffffff',
-            borderRadius: '1rem',
-            boxShadow: '0 30px 60px -20px rgba(15, 23, 42, 0.35)',
-            border: '1px solid #c7d7ff',
-            zIndex: 30,
+            top: '3.5rem',
+            right: '0',
+            width: '24rem',
+            maxHeight: '32rem',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.5rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            border: '1px solid #e2e8f0',
+            zIndex: 1000,
+            overflowY: 'auto',
             display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden'
+            flexDirection: 'column'
           }}
         >
           <div
             style={{
-              padding: '0.95rem 1.2rem',
+              padding: '1rem',
               borderBottom: '1px solid #e2e8f0',
+              backgroundColor: '#e0f2fe',
               display: 'flex',
-              alignItems: 'center',
               justifyContent: 'space-between',
-              backgroundColor: '#eff4ff'
+              alignItems: 'center'
             }}
           >
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: bellColor }}>
-                {label}
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: '#5c6ccf' }}>
-                {notifications.length === 0
-                  ? 'No notifications'
-                  : unreadCount > 0
-                  ? `${unreadCount} unread`
-                  : 'All caught up'}
-              </p>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <h3 style={{
+              fontSize: '1rem',
+              fontWeight: '600',
+              color: '#1D3557',
+              margin: 0
+            }}>
+              {label}
+            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <button
                 onClick={markAllAsRead}
                 disabled={unreadCount === 0}
                 style={{
-                  border: 'none',
                   background: 'none',
-                  color: unreadCount === 0 ? 'rgba(92, 108, 207, 0.4)' : bellColor,
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
+                  border: 'none',
+                  cursor: unreadCount > 0 ? 'pointer' : 'default',
+                  padding: 0,
+                  color: unreadCount > 0 ? '#2563eb' : '#9ca3af',
+                  fontSize: '0.875rem',
                   textDecoration: 'underline',
-                  cursor: unreadCount === 0 ? 'not-allowed' : 'pointer',
-                  padding: 0
+                  fontWeight: '500',
+                  opacity: unreadCount > 0 ? 1 : 0.6
+                }}
+                onMouseEnter={(e) => {
+                  if (unreadCount > 0) {
+                    e.currentTarget.style.color = '#1d4ed8';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (unreadCount > 0) {
+                    e.currentTarget.style.color = '#2563eb';
+                  } else {
+                    e.currentTarget.style.color = '#9ca3af';
+                  }
                 }}
               >
                 Mark all as read
@@ -356,15 +464,18 @@ const VendorNotificationBell = ({
               <button
                 onClick={() => setOpen(false)}
                 style={{
-                  border: 'none',
                   background: 'none',
-                  color: '#94a3b8',
+                  border: 'none',
                   cursor: 'pointer',
-                  padding: 0
+                  padding: '0.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6b7280'
                 }}
                 aria-label="Close notifications panel"
               >
-                <span className="material-symbols-outlined" style={{ fontSize: '1.35rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
                   close
                 </span>
               </button>
@@ -384,115 +495,103 @@ const VendorNotificationBell = ({
                 No notifications.
               </div>
             ) : (
-              notifications.map((notification) => {
-                const id = notification._id || notification.id;
-                const { icon, title, message, typeLabel } = getNotificationDisplay(notification);
+              <ul style={{
+                listStyle: 'none',
+                padding: 0,
+                margin: 0
+              }}>
+                {notifications.map((notification, idx) => {
+                  const id = notification._id || notification.id || `notif-${idx}`;
+                  const { icon, title, message, typeLabel } = getNotificationDisplay(notification);
 
-                const iconName = (() => {
-                  switch (notification.type) {
-                    case 'vendor_request':
-                      return 'storefront';
-                    case 'workshop_submission':
-                      return 'school';
-                    case 'event_announcement':
-                      return 'event';
-                    case 'event_reminder':
-                      return 'notifications_active';
-                    default:
-                      return 'notifications';
-                  }
-                })();
+                  const iconName = (() => {
+                    switch (notification.type) {
+                      case 'vendor_request':
+                        return 'storefront';
+                      case 'workshop_submission':
+                        return 'school';
+                      case 'event_announcement':
+                        return 'event';
+                      case 'event_reminder':
+                        return 'notifications_active';
+                      default:
+                        return 'notifications';
+                    }
+                  })();
 
-                return (
-                  <div
-                    key={id}
-                    onClick={() => markAsRead(id)}
-                    style={{
-                      padding: '0.85rem 1.1rem',
-                      borderBottom: '1px solid #f1f5f9',
-                      backgroundColor: notification.isRead ? '#ffffff' : '#f8fafc',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.2s',
-                      display: 'flex',
-                      gap: '0.75rem'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = notification.isRead ? '#f8fafc' : '#eef2ff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = notification.isRead ? '#ffffff' : '#f8fafc';
-                    }}
-                  >
-                    <div
+                  return (
+                    <li
+                      key={id}
+                      onClick={() => markAsRead(id)}
                       style={{
-                        flexShrink: 0,
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '9999px',
-                        backgroundColor: '#e2e8f0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#475569'
+                        padding: '1rem',
+                        borderBottom: '1px solid #f3f4f6',
+                        cursor: 'pointer',
+                        backgroundColor: !notification.isRead ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = !notification.isRead 
+                          ? 'rgba(59, 130, 246, 0.1)' 
+                          : 'rgba(0, 0, 0, 0.02)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = !notification.isRead 
+                          ? 'rgba(59, 130, 246, 0.05)' 
+                          : 'transparent';
                       }}
                     >
-                      <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                        {iconName}
-                      </span>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <div style={{
+                          backgroundColor: !notification.isRead ? '#dbeafe' : '#e5e7eb',
                           display: 'flex',
-                          justifyContent: 'space-between',
                           alignItems: 'center',
-                          marginBottom: '0.15rem'
-                        }}
-                      >
-                        <p
-                          style={{
-                            margin: 0,
-                            fontWeight: notification.isRead ? 500 : 600,
-                            color: '#0f172a'
-                          }}
-                        >
-                          {title}
-                        </p>
-                        {!notification.isRead && (
-                          <span
-                            style={{
-                              fontSize: '0.65rem',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                              color: bellColor
-                            }}
-                          >
-                            New
+                          justifyContent: 'center',
+                          width: '2.5rem',
+                          height: '2.5rem',
+                          borderRadius: '50%',
+                          flexShrink: 0
+                        }}>
+                          <span className="material-symbols-outlined" style={{ 
+                            color: !notification.isRead ? '#3b82f6' : '#6b7280', 
+                            fontSize: '1.25rem' 
+                          }}>
+                            {iconName}
                           </span>
-                        )}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            fontWeight: !notification.isRead ? '600' : '400',
+                            color: '#1D3557',
+                            margin: 0,
+                            marginBottom: '0.25rem'
+                          }}>
+                            {title}
+                          </p>
+                          {message && (
+                            <p style={{
+                              fontSize: '0.75rem',
+                              color: '#6b7280',
+                              margin: 0,
+                              marginBottom: '0.25rem'
+                            }}>
+                              {message}
+                            </p>
+                          )}
+                          <p style={{
+                            fontSize: '0.625rem',
+                            color: 'rgba(29, 53, 87, 0.5)',
+                            margin: 0
+                          }}>
+                            {formatNotificationDate(notification.createdAt)}
+                          </p>
+                        </div>
                       </div>
-                      {message && (
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569' }}>
-                          {message}
-                        </p>
-                      )}
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginTop: '0.35rem',
-                          fontSize: '0.75rem',
-                          color: '#94a3b8'
-                        }}
-                      >
-                        <span style={{ textTransform: 'capitalize' }}>{typeLabel}</span>
-                        <span>{formatNotificationDate(notification.createdAt)}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </div>
         </div>
