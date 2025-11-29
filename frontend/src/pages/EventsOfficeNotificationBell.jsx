@@ -6,7 +6,28 @@ const EventsOfficeNotificationBell = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   // Use ref instead of state so it's immediately available (not async)
-  const markedAsReadVendorRequestsRef = useRef(new Set());
+  // Load from localStorage on mount to persist across page refreshes
+  const getInitialMarkedVendorRequests = () => {
+    try {
+      const stored = localStorage.getItem('markedAsReadVendorRequests');
+      if (stored) {
+        return new Set(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Error loading marked vendor requests from localStorage:', error);
+    }
+    return new Set();
+  };
+  const markedAsReadVendorRequestsRef = useRef(getInitialMarkedVendorRequests());
+
+  // Helper function to save marked vendor requests to localStorage
+  const saveMarkedVendorRequests = (set) => {
+    try {
+      localStorage.setItem('markedAsReadVendorRequests', JSON.stringify(Array.from(set)));
+    } catch (error) {
+      console.error('Error saving marked vendor requests to localStorage:', error);
+    }
+  };
 
   // Close notification panel when clicking outside
   useEffect(() => {
@@ -174,6 +195,8 @@ const EventsOfficeNotificationBell = () => {
       // Add them to the marked-as-read ref immediately (synchronous)
       if (pendingVendorRequestIds.length > 0) {
         pendingVendorRequestIds.forEach(id => markedAsReadVendorRequestsRef.current.add(id));
+        // Persist to localStorage so it survives page refresh
+        saveMarkedVendorRequests(markedAsReadVendorRequestsRef.current);
       }
 
       // Immediately update local state to show all as read (optimistic update)
@@ -214,7 +237,7 @@ const EventsOfficeNotificationBell = () => {
       >
         <span className="material-symbols-outlined" style={{ 
           fontSize: '1.5rem', 
-          color: '#1D3557'
+          color: '#FFFFFF'
         }}>
           notifications
         </span>
@@ -344,6 +367,8 @@ const EventsOfficeNotificationBell = () => {
                           // If this is a pending vendor notification, track it as read (using ref for immediate access)
                           if (notif.type === 'vendor_request' && notif._id?.startsWith('vendor_req_') && notif.metadata?.requestId) {
                             markedAsReadVendorRequestsRef.current.add(notif.metadata.requestId);
+                            // Persist to localStorage so it survives page refresh
+                            saveMarkedVendorRequests(markedAsReadVendorRequestsRef.current);
                           }
                           
                           // Only call API if it's a real notification (not a pending vendor notification)

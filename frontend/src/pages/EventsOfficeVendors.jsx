@@ -591,9 +591,9 @@ const EventsOfficeVendors = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF',
+          backgroundColor: '#1D3557',
           position: 'fixed',
           top: 0,
           left: sidebarOpen ? '16rem' : '0',
@@ -601,7 +601,7 @@ const EventsOfficeVendors = () => {
           zIndex: 100,
           transition: 'left 0.3s ease, width 0.3s ease'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF' }}>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               style={{
@@ -612,7 +612,7 @@ const EventsOfficeVendors = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#1D3557'
+                color: '#FFFFFF'
               }}
               aria-label="Toggle sidebar"
             >
@@ -621,7 +621,7 @@ const EventsOfficeVendors = () => {
               </span>
             </button>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -637,14 +637,14 @@ const EventsOfficeVendors = () => {
               <p style={{
                 fontSize: '0.875rem',
                 fontWeight: '600',
-                color: '#1D3557',
+                color: '#FFFFFF',
                 margin: 0
               }}>
                 {displayName}
               </p>
               <p style={{
                 fontSize: '0.75rem',
-                color: '#6b7280',
+                color: 'rgba(255, 255, 255, 0.7)',
                 margin: 0
               }}>
                 Events Office
@@ -666,11 +666,11 @@ const EventsOfficeVendors = () => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#1D3557',
+                backgroundColor: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
+                color: '#1D3557',
                 fontWeight: '600'
               }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'E').toUpperCase()}
@@ -690,13 +690,32 @@ const EventsOfficeVendors = () => {
           marginTop: '73px'
         }}>
           {/* Page Title Banner */}
+          <style>{`
+            @keyframes fadeInUp {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes float {
+              0%, 100% { transform: translateY(0px); }
+              50% { transform: translateY(-10px); }
+            }
+            @keyframes pulse {
+              0%, 100% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.05); opacity: 0.9; }
+            }
+            @keyframes slideInRight {
+              from { opacity: 0; transform: translateX(30px); }
+              to { opacity: 1; transform: translateX(0); }
+            }
+          `}</style>
           <div style={{
             position: 'relative',
             height: '160px',
             borderRadius: '1rem',
             overflow: 'hidden',
             marginBottom: '2rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            animation: 'fadeInUp 0.6s ease-out'
           }}>
             {/* Background Image */}
             <div style={{
@@ -706,13 +725,37 @@ const EventsOfficeVendors = () => {
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
-              filter: 'blur(2px)'
+              filter: 'blur(2px)',
+              animation: 'pulse 4s ease-in-out infinite'
             }}></div>
             {/* Overlay */}
             <div style={{
               position: 'absolute',
               inset: 0,
               backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Floating Decorative Elements */}
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              right: '50px',
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              animation: 'float 3s ease-in-out infinite',
+              zIndex: 5
+            }}></div>
+            <div style={{
+              position: 'absolute',
+              bottom: '30px',
+              right: '100px',
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+              animation: 'float 2.5s ease-in-out infinite 0.5s',
+              zIndex: 5
             }}></div>
             {/* Content */}
             <div style={{
@@ -731,14 +774,16 @@ const EventsOfficeVendors = () => {
                 fontSize: '2rem',
                 fontWeight: '700',
                 margin: 0,
-                marginBottom: '0.5rem'
+                marginBottom: '0.5rem',
+                animation: 'slideInRight 0.8s ease-out'
               }}>
                 Vendors
               </h1>
               <p style={{
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '1rem',
-                margin: 0
+                margin: 0,
+                animation: 'slideInRight 0.8s ease-out 0.2s both'
               }}>
                 View and manage all registered vendors
               </p>

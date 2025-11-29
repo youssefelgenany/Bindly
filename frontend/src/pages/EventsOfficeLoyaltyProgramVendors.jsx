@@ -466,13 +466,13 @@ const EventsOfficeLoyaltyProgramVendors = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#1D3557',
         zIndex: 100,
         transition: 'left 0.3s ease'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF' }}>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             style={{
@@ -483,7 +483,7 @@ const EventsOfficeLoyaltyProgramVendors = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#1D3557'
+              color: '#FFFFFF'
             }}
             aria-label="Toggle sidebar"
           >
@@ -492,7 +492,7 @@ const EventsOfficeLoyaltyProgramVendors = () => {
             </span>
           </button>
           <h2 style={{
-            color: '#1D3557',
+            color: '#FFFFFF',
             fontSize: '1.5rem',
             fontWeight: '700',
             lineHeight: '1.25',
@@ -508,14 +508,14 @@ const EventsOfficeLoyaltyProgramVendors = () => {
             <p style={{
               fontSize: '0.875rem',
               fontWeight: '600',
-              color: '#1D3557',
+              color: '#FFFFFF',
               margin: 0
             }}>
               {displayName}
             </p>
             <p style={{
               fontSize: '0.75rem',
-              color: '#6b7280',
+              color: 'rgba(255, 255, 255, 0.7)',
               margin: 0
             }}>
               Events Office
@@ -537,11 +537,11 @@ const EventsOfficeLoyaltyProgramVendors = () => {
               width: '2.5rem',
               height: '2.5rem',
               borderRadius: '50%',
-              backgroundColor: '#1D3557',
+              backgroundColor: '#FFFFFF',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#FFFFFF',
+              color: '#1D3557',
               fontWeight: '600'
             }}>
               {(user?.firstName?.[0] || user?.name?.[0] || 'E').toUpperCase()}

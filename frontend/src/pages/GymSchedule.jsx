@@ -790,13 +790,13 @@ const GymSchedule = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '#1D3557' : '#FFFFFF',
+        backgroundColor: '#1D3557',
         zIndex: useFixedHeader ? 100 : 'auto',
         transition: useFixedHeader ? 'left 0.3s ease' : 'none'
       }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '#FFFFFF' : '#1D3557', flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
             {user?.userType !== 'Student' && user?.userType !== 'TA' && user?.userType !== 'Staff' && user?.userType !== 'Professor' && (
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -808,7 +808,7 @@ const GymSchedule = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#1D3557'
+                color: '#FFFFFF'
               }}
               aria-label="Toggle sidebar"
             >
@@ -819,7 +819,7 @@ const GymSchedule = () => {
             )}
             <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '#FFFFFF' : '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -1491,18 +1491,23 @@ const GymSchedule = () => {
               </div>
             )}
             
+            {/* Events Office Notification Bell */}
+            {isEventsOffice && (
+              <EventsOfficeNotificationBell />
+            )}
+            
             <div style={{ textAlign: 'right' }}>
               <p style={{
                 fontSize: '0.875rem',
                 fontWeight: '600',
-                color: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '#FFFFFF' : '#1D3557',
+                color: '#FFFFFF',
                 margin: 0
               }}>
                 {displayName}
               </p>
               <p style={{
                 fontSize: '0.75rem',
-                color: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'rgba(255, 255, 255, 0.7)' : '#6b7280',
+                color: 'rgba(255, 255, 255, 0.7)',
                 margin: 0
               }}>
                 {isEventsOffice ? 'Events Office' : getUserRole()}
@@ -1638,6 +1643,24 @@ const GymSchedule = () => {
           backgroundColor: '#f6f7f8'
         }}>
           {/* Page Title Banner */}
+          <style>{`
+            @keyframes fadeInUp {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes float {
+              0%, 100% { transform: translateY(0px); }
+              50% { transform: translateY(-10px); }
+            }
+            @keyframes pulse {
+              0%, 100% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.05); opacity: 0.9; }
+            }
+            @keyframes slideInRight {
+              from { opacity: 0; transform: translateX(30px); }
+              to { opacity: 1; transform: translateX(0); }
+            }
+          `}</style>
           <div 
             className={(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'banner-animate' : ''}
             style={{
@@ -1647,7 +1670,8 @@ const GymSchedule = () => {
               overflow: 'hidden',
               marginBottom: '1.5rem',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-              transition: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'transform 0.3s ease, box-shadow 0.3s ease' : 'none'
+              transition: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'transform 0.3s ease, box-shadow 0.3s ease' : 'none',
+              animation: isEventsOffice ? 'fadeInUp 0.6s ease-out' : 'none'
             }}
             onMouseEnter={(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? (e) => {
               e.currentTarget.style.transform = 'translateY(-2px)';
@@ -1667,7 +1691,7 @@ const GymSchedule = () => {
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
               filter: 'blur(2px)',
-              animation: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'pulse 4s ease-in-out infinite' : 'none'
+              animation: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? 'pulse 4s ease-in-out infinite' : (isEventsOffice ? 'pulse 4s ease-in-out infinite' : 'none')
             }}></div>
             {/* Blue Overlay */}
             <div style={{
@@ -1685,6 +1709,33 @@ const GymSchedule = () => {
                 zIndex: 1,
                 pointerEvents: 'none'
               }}></div>
+            )}
+            {/* Floating Decorative Elements - For Events Office */}
+            {isEventsOffice && (
+              <>
+                <div style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '50px',
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  animation: 'float 3s ease-in-out infinite',
+                  zIndex: 5
+                }}></div>
+                <div style={{
+                  position: 'absolute',
+                  bottom: '30px',
+                  right: '100px',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  animation: 'float 2.5s ease-in-out infinite 0.5s',
+                  zIndex: 5
+                }}></div>
+              </>
             )}
             {/* Content */}
             <div 
@@ -1707,7 +1758,8 @@ const GymSchedule = () => {
                   fontSize: '1.75rem',
                   fontWeight: '700',
                   margin: 0,
-                  marginBottom: '0.5rem'
+                  marginBottom: '0.5rem',
+                  animation: isEventsOffice ? 'slideInRight 0.8s ease-out' : 'none'
                 }}>
                   Gym Schedule
                 </h3>
@@ -1715,7 +1767,8 @@ const GymSchedule = () => {
                   color: 'rgba(255, 255, 255, 0.9)',
                   fontSize: '0.875rem',
                   fontWeight: '400',
-                  margin: 0
+                  margin: 0,
+                  animation: isEventsOffice ? 'slideInRight 0.8s ease-out 0.2s both' : 'none'
                 }}>
                   View sessions for the selected month
                 </p>
