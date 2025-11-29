@@ -137,6 +137,11 @@ export const vendorApi = {
         const res = await api.delete('/loyalty-program/my-application');
         return res.data;
     },
+    // Update my loyalty application
+    updateLoyaltyApplication: async (payload) => {
+        const res = await api.patch('/loyalty-program/my-application', payload);
+        return res.data;
+    },
     
     // Upload vendor documents (tax card and logo)
     uploadDocuments: async (formData) => {

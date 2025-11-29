@@ -23,6 +23,7 @@ const VendorLoyaltyProgram = () => {
     description: '',
     category: ''
   });
+  const [formMode, setFormMode] = useState('create'); // 'create' | 'update'
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -56,15 +57,22 @@ const VendorLoyaltyProgram = () => {
     };
     try {
       setLoading(true);
-      const res = await vendorApi.applyToLoyaltyProgram(payload);
+      let res;
+      if (formMode === 'update') {
+        // Update existing application
+        res = await vendorApi.updateLoyaltyApplication(payload);
+      } else {
+        // Create / apply
+        res = await vendorApi.applyToLoyaltyProgram(payload);
+      }
       if (res && res.success) {
-        setSuccess(res.message || 'Application submitted successfully');
+        setSuccess(res.message || (formMode === 'update' ? 'Application updated successfully' : 'Application submitted successfully'));
         // Refresh the application data
         const appRes = await vendorApi.getMyLoyaltyApplication();
         if (appRes && appRes.success) {
           setExistingApp(appRes.application || null);
         }
-        // Clear form
+        // Clear form and reset mode
         setForm({
           discountRate: '',
           discountType: 'percentage',
@@ -75,12 +83,13 @@ const VendorLoyaltyProgram = () => {
           description: '',
           category: ''
         });
+        setFormMode('create');
       } else {
-        setError(res?.message || 'Failed to submit application');
+        setError(res?.message || (formMode === 'update' ? 'Failed to update application' : 'Failed to submit application'));
       }
     } catch (err) {
       console.error('Error applying to loyalty program', err);
-      setError(err.response?.data?.message || err.message || 'Error submitting application');
+      setError(err.response?.data?.message || err.message || (formMode === 'update' ? 'Error updating application' : 'Error submitting application'));
     } finally {
       setLoading(false);
     }
@@ -142,6 +151,50 @@ const VendorLoyaltyProgram = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResubmit = () => {
+    if (!existingApp) return;
+    // Prefill the form with the previous application values so vendor can resubmit
+    setForm({
+      discountRate: existingApp.discountRate || '',
+      discountType: existingApp.discountType || 'percentage',
+      promoCode: existingApp.promoCode || '',
+      termsAndConditions: existingApp.termsAndConditions || '',
+      validFrom: existingApp.validFrom ? existingApp.validFrom.split('T')[0] : '',
+      validUntil: existingApp.validUntil ? existingApp.validUntil.split('T')[0] : '',
+      description: existingApp.description || '',
+      category: existingApp.category || ''
+    });
+    // Show the form by clearing existingApp so the form view renders
+    setExistingApp(null);
+    setFormMode('create');
+    // Scroll to the form area for better UX
+    setTimeout(() => {
+      const el = document.querySelector('form');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  };
+
+  const handleEditApplication = () => {
+    if (!existingApp) return;
+    setForm({
+      discountRate: existingApp.discountRate || '',
+      discountType: existingApp.discountType || 'percentage',
+      promoCode: existingApp.promoCode || '',
+      termsAndConditions: existingApp.termsAndConditions || '',
+      validFrom: existingApp.validFrom ? existingApp.validFrom.split('T')[0] : '',
+      validUntil: existingApp.validUntil ? existingApp.validUntil.split('T')[0] : '',
+      description: existingApp.description || '',
+      category: existingApp.category || ''
+    });
+    // Show the form and switch to update mode
+    setExistingApp(null);
+    setFormMode('update');
+    setTimeout(() => {
+      const el = document.querySelector('form');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
   };
 
   return (
@@ -284,16 +337,20 @@ const VendorLoyaltyProgram = () => {
                     <p style={{ color: '#374151' }}>Your loyalty program is active with promo code <strong>{existingApp.promoCode}</strong>. If you want to stop participating, you can cancel your membership below.</p>
                     {error && <div style={{ color: '#991b1b', marginBottom: '0.75rem' }}>{error}</div>}
                     {success && <div style={{ color: '#065f46', marginBottom: '0.75rem' }}>{success}</div>}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', gap: '0.5rem' }}>
+                      <button onClick={handleEditApplication} disabled={loading} style={{ backgroundColor: '#6b7280', color: '#fff', padding: '0.5rem 0.75rem', minWidth: '160px', fontWeight: 700, border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{loading ? 'Preparing…' : 'Update my application'}</button>
                       <button onClick={handleCancelMembership} disabled={loading} style={{ backgroundColor: '#ef4444', color: '#fff', padding: '0.5rem 0.75rem', minWidth: '160px', fontWeight: 700, border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{loading ? 'Cancelling…' : 'Cancel membership'}</button>
                     </div>
                   </>
-                ) : (
+                  ) : (
                   <>
                     <h4 style={{ marginTop: 0 }}>Your membership is inactive</h4>
                     <p style={{ color: '#374151' }}>Your loyalty program membership with promo code <strong>{existingApp.promoCode}</strong> is currently inactive. You can reactivate it by submitting a new application below.</p>
                     {error && <div style={{ color: '#991b1b', marginBottom: '0.75rem' }}>{error}</div>}
                     {success && <div style={{ color: '#065f46', marginBottom: '0.75rem' }}>{success}</div>}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                      <button onClick={handleResubmit} disabled={loading} style={{ backgroundColor: '#2563eb', color: '#fff', padding: '0.5rem 0.75rem', minWidth: '160px', fontWeight: 700, border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{loading ? 'Preparing…' : 'Resubmit Application'}</button>
+                    </div>
                   </>
                 )}
               </div>
