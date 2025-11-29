@@ -52,80 +52,103 @@ async function sendVendorRequestStatusEmail(vendor, request, status) {
         }
 
         const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #d32f2f; margin: 0;">Bindly</h1>
-          <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
+      <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; background-color: #f6f7f8;">
+        <!-- Header -->
+        <div style="background-color: #1D3557; padding: 30px 20px; text-align: center;">
+          <h1 style="color: #FFFFFF; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Bindly</h1>
+          <p style="color: rgba(255, 255, 255, 0.8); margin: 8px 0 0 0; font-size: 14px;">GUC Events Platform</p>
         </div>
         
-        <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-          <h2 style="color: #1D3557; margin-top: 0; margin-bottom: 10px;">
-            ${status.toLowerCase() === 'accepted' ? '✅' : status.toLowerCase() === 'rejected' ? '❌' : '⏳'} Vendor Request ${status.charAt(0).toUpperCase() + status.slice(1)}
-          </h2>
-          <p style="color: #1D3557; margin: 0;">Hi ${vendor.firstName || vendor.companyName || vendor.name || 'there'},</p>
-          <p style="color: #1D3557; margin: 10px 0;">
-            Your request to participate in the <strong>${eventName}</strong> has been <span style="color: ${statusColor}; font-weight: bold;">${status.toLowerCase()}</span>.
-          </p>
-        </div>
+        <!-- Content Container -->
+        <div style="background-color: #FFFFFF; margin: 20px; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+          <!-- Status Box -->
+          <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+            <h2 style="color: #1D3557; margin: 0 0 10px 0; font-size: 20px; font-weight: 600;">
+              ${status.toLowerCase() === 'accepted' ? '✅' : status.toLowerCase() === 'rejected' ? '❌' : '⏳'} Vendor Request ${status.charAt(0).toUpperCase() + status.slice(1)}
+            </h2>
+            <p style="color: #1D3557; margin: 8px 0; font-size: 14px; line-height: 1.6;">Hi ${vendor.firstName || vendor.companyName || vendor.name || 'there'},</p>
+            <p style="color: #1D3557; margin: 8px 0 0 0; font-size: 14px; line-height: 1.6;">
+              Your request to participate in the <strong>${eventName}</strong> has been <span style="color: ${statusColor}; font-weight: bold;">${status.toLowerCase()}</span>.
+            </p>
+          </div>
 
-        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-          <h3 style="color: #333; margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #e9ecef; padding-bottom: 10px;">Request Details</h3>
-          
-          <div style="margin-bottom: 12px;">
-            <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Event Type:</span>
-            <span style="color: #666;">${request.eventType === 'bazaar' ? 'Bazaar' : request.eventType === 'booth' ? 'Booth' : request.eventType === 'standaloneBooth' ? 'Standalone Booth' : 'Platform Booth'}</span>
+          <!-- Request Details -->
+          <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="color: #1D3557; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600;">Request Details</h3>
+            
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; font-weight: 600; color: #1D3557; font-size: 14px; width: 140px;">Event Type:</td>
+                <td style="padding: 8px 0; color: #1D3557; font-size: 14px;">${request.eventType === 'bazaar' ? 'Bazaar' : request.eventType === 'booth' ? 'Booth' : request.eventType === 'standaloneBooth' ? 'Standalone Booth' : 'Platform Booth'}</td>
+              </tr>
+              
+              <tr>
+                <td style="padding: 8px 0; font-weight: 600; color: #1D3557; font-size: 14px;">Event Name:</td>
+                <td style="padding: 8px 0; color: #1D3557; font-size: 14px;">${eventName}</td>
+              </tr>
+              
+              ${request.boothSize ? `
+              <tr>
+                <td style="padding: 8px 0; font-weight: 600; color: #1D3557; font-size: 14px;">Booth Size:</td>
+                <td style="padding: 8px 0; color: #1D3557; font-size: 14px;">${request.boothSize}</td>
+              </tr>
+              ` : ''}
+              
+              <tr>
+                <td style="padding: 8px 0; font-weight: 600; color: #1D3557; font-size: 14px;">Status:</td>
+                <td style="padding: 8px 0; color: ${statusColor}; font-weight: bold; font-size: 14px;">${status.charAt(0).toUpperCase() + status.slice(1)}</td>
+              </tr>
+
+              ${request.participationFee ? `
+              <tr>
+                <td style="padding: 8px 0; font-weight: 600; color: #1D3557; font-size: 14px;">Participation Fee:</td>
+                <td style="padding: 8px 0; color: #1D3557; font-size: 14px;">${request.participationFee} EGP</td>
+              </tr>
+              ` : ''}
+
+              ${request.paymentDeadline ? `
+              <tr>
+                <td style="padding: 8px 0; font-weight: 600; color: #1D3557; font-size: 14px;">Payment Deadline:</td>
+                <td style="padding: 8px 0; color: #1D3557; font-size: 14px;">${new Date(request.paymentDeadline).toLocaleDateString()}</td>
+              </tr>
+              ` : ''}
+            </table>
           </div>
-          
-          <div style="margin-bottom: 12px;">
-            <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Event Name:</span>
-            <span style="color: #666;">${eventName}</span>
+
+          ${status.toLowerCase() === 'accepted' ? `
+          <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 18px; border-radius: 8px; margin-bottom: 20px;">
+            <p style="margin: 0; color: #1D3557; font-size: 14px; line-height: 1.6;">
+              <strong style="font-size: 15px; color: #1D3557;">🎉 Congratulations!</strong><br>
+              Your participation has been approved. Please complete the payment to confirm your participation.
+            </p>
           </div>
-          
-          ${request.boothSize ? `
-          <div style="margin-bottom: 12px;">
-            <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Booth Size:</span>
-            <span style="color: #666;">${request.boothSize}</span>
+          ` : status.toLowerCase() === 'rejected' ? `
+          <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 18px; border-radius: 8px; margin-bottom: 20px;">
+            <p style="margin: 0; color: #1D3557; font-size: 14px; line-height: 1.6;">
+              <strong style="font-size: 15px; color: #1D3557;">Request Status</strong><br>
+              Unfortunately, your request was not approved at this time. If you have questions, please contact the Events Office.
+            </p>
           </div>
           ` : ''}
+
+          <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 18px; border-radius: 8px; margin-bottom: 25px;">
+            <p style="margin: 0; color: #1D3557; font-size: 14px; line-height: 1.6;">
+              If you have any questions, please contact the Events Office at <strong>events@guc.edu.eg</strong>
+            </p>
+          </div>
           
-          <div style="margin-bottom: 12px;">
-            <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Status:</span>
-            <span style="color: ${statusColor}; font-weight: bold;">${status.charAt(0).toUpperCase() + status.slice(1)}</span>
+          <!-- Footer -->
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f6f7f8; color: #666; font-size: 14px; line-height: 1.6;">
+            <p style="margin: 20px 0 0 0; color: #1D3557;">
+              Best regards,<br>
+              <strong style="color: #1D3557; font-size: 15px;">The Bindly Team</strong>
+            </p>
           </div>
-
-          ${request.participationFee ? `
-          <div style="margin-bottom: 12px;">
-            <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Participation Fee:</span>
-            <span style="color: #666;">${request.participationFee} EGP</span>
-          </div>
-          ` : ''}
-
-          ${request.paymentDeadline ? `
-          <div style="margin-bottom: 0;">
-            <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Payment Deadline:</span>
-            <span style="color: #666;">${new Date(request.paymentDeadline).toLocaleDateString()}</span>
-          </div>
-          ` : ''}
         </div>
-
-        ${status.toLowerCase() === 'accepted' ? `
-        <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #27ae60;">
-          <p style="margin: 0; color: #2e7d32; font-weight: bold;">🎉 Congratulations!</p>
-          <p style="margin: 8px 0 0 0; color: #558b2f;">Your participation has been approved. Please complete the payment to confirm your participation.</p>
-        </div>
-        ` : status.toLowerCase() === 'rejected' ? `
-        <div style="background: #ffebee; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #d32f2f;">
-          <p style="margin: 0; color: #c62828; font-weight: bold;">Request Status</p>
-          <p style="margin: 8px 0 0 0; color: #d32f2f;">Unfortunately, your request was not approved at this time. If you have questions, please contact the Events Office.</p>
-        </div>
-        ` : ''}
-
-        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-          <p style="margin: 0; color: #666; font-size: 14px;">If you have any questions, please contact the Events Office at <strong>events@guc.edu.eg</strong></p>
-        </div>
-
-        <div style="text-align: center; color: #999; font-size: 12px;">
-          <p style="margin: 0;">© 2025 Bindly - GUC Events Platform. All rights reserved.</p>
+        
+        <!-- Bottom Spacer -->
+        <div style="padding: 20px; text-align: center; color: #999; font-size: 12px;">
+          <p style="margin: 0;">© ${new Date().getFullYear()} Bindly - GUC Events Platform. All rights reserved.</p>
         </div>
       </div>
     `;

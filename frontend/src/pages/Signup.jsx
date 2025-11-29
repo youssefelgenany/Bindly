@@ -239,12 +239,22 @@ const Signup = () => {
       const result = await signup(submitData);
       
       if (result.success) {
-        setMessage('Account created successfully! Redirecting...');
-        // Store email and userType for verification page
-        localStorage.setItem('pendingVerificationEmail', formData.email);
-        localStorage.setItem('pendingVerificationUserType', actualUserType);
-        // Immediately redirect to verification page
-        navigate(`/verify-email?email=${encodeURIComponent(formData.email)}&userType=${encodeURIComponent(actualUserType)}`);
+        // For vendors, show success message and redirect to login immediately
+        if (actualUserType === 'Vendor') {
+          setMessage('Account signed up successfully!');
+          // Redirect to login after a brief delay
+          setTimeout(() => {
+            navigate('/login');
+          }, 1500);
+        } else {
+          // For other user types, redirect to verification page
+          setMessage('Account created successfully! Redirecting...');
+          // Store email and userType for verification page
+          localStorage.setItem('pendingVerificationEmail', formData.email);
+          localStorage.setItem('pendingVerificationUserType', actualUserType);
+          // Immediately redirect to verification page
+          navigate(`/verify-email?email=${encodeURIComponent(formData.email)}&userType=${encodeURIComponent(actualUserType)}`);
+        }
       } else {
         setMessage(result.message);
         console.error('Signup failed:', result.message);
