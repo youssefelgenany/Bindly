@@ -2493,8 +2493,16 @@ const ProfessorEventsView = () => {
                       attach_money
                     </span>
                     <div>
-                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Price</div>
-                      <div style={{ color: '#059669', fontWeight: '600' }}>${selectedEvent.price}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>
+                        {(selectedEvent.type === 'trip' || selectedEvent.type === 'workshop') ? 'Registration Fees' : 'Price'}
+                      </div>
+                      <div style={{ color: '#059669', fontWeight: '600' }}>
+                        {(selectedEvent.type === 'trip' || selectedEvent.type === 'workshop') ? (
+                          <span>{selectedEvent.price} EGP</span>
+                        ) : (
+                          `$${selectedEvent.price}`
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2671,7 +2679,7 @@ const ProfessorEventsView = () => {
                 </div>
               )}
 
-              {(selectedEvent.type === 'workshop' || selectedEvent.type === 'trip') && (
+              {(selectedEvent.type === 'workshop' || selectedEvent.type === 'trip' || selectedEvent.type === 'bazaar' || selectedEvent.type === 'conference' || selectedEvent.type === 'booth') && (
                 registeredEventIds.has(String(selectedEvent.id)) ? (
                   <button
                     disabled
@@ -2724,7 +2732,7 @@ const ProfessorEventsView = () => {
                       e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
                     }}
                   >
-                    Register for {selectedEvent.type === 'workshop' ? 'Workshop' : 'Trip'}
+                    Register for {selectedEvent.type === 'workshop' ? 'Workshop' : selectedEvent.type === 'trip' ? 'Trip' : selectedEvent.type === 'bazaar' ? 'Bazaar' : selectedEvent.type === 'conference' ? 'Conference' : selectedEvent.type === 'booth' ? 'Booth' : 'Event'}
                   </button>
                 )
               )}

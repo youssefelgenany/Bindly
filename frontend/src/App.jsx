@@ -801,6 +801,16 @@ const AppContent = () => {
           }
         />
         <Route
+          path="/event-office/loyalty-program-vendors"
+          element={
+            <ProtectedRoute>
+              <EventsOfficeOnly>
+                <EventsOfficeLoyaltyProgramVendors />
+              </EventsOfficeOnly>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/platform-booth-requests"
           element={
             <ProtectedRoute>

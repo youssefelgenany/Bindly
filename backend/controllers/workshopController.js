@@ -275,6 +275,20 @@ const createWorkshop = async (req, res) => {
       return res.status(400).json({ error: 'Registration deadline must be before the workshop start date' });
     }
 
+    // Calculate workshop price: 500 EGP per day
+    const calculateWorkshopPrice = (startDate, endDate) => {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      // Set both to start of day for accurate day calculation
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      const diffTime = end.getTime() - start.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end days
+      return diffDays * 500; // 500 EGP per day
+    };
+
+    const workshopPrice = calculateWorkshopPrice(startDateTime, endDateTime);
+
     // Create Event directly in events collection (not workshops collection)
     const newEvent = new Event({
       title: workshopName,
@@ -285,6 +299,7 @@ const createWorkshop = async (req, res) => {
       registrationDeadline: registrationDeadlineDate,
       location: location,
       capacity: capacity,
+      price: workshopPrice, // Store calculated price
       createdBy: req.user._id,
       status: 'pending', // Professors submit for approval
       // Workshop-specific fields
@@ -502,6 +517,20 @@ const updateWorkshop = async (req, res) => {
       return res.status(400).json({ error: 'Registration deadline must be before the workshop start date' });
     }
 
+    // Calculate workshop price: 500 EGP per day
+    const calculateWorkshopPrice = (startDate, endDate) => {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      // Set both to start of day for accurate day calculation
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      const diffTime = end.getTime() - start.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end days
+      return diffDays * 500; // 500 EGP per day
+    };
+
+    const workshopPrice = calculateWorkshopPrice(startDateTime, endDateTime);
+
     // First, find the existing event to check if it has edit requests
     const existingEvent = await Event.findOne({
       _id: req.params.id,
@@ -522,6 +551,7 @@ const updateWorkshop = async (req, res) => {
       endDate: endDateTime,
       registrationDeadline: registrationDeadlineDate,
       capacity: capacity,
+      price: workshopPrice, // Update calculated price
       // Workshop-specific fields
       agenda: fullAgenda,
       faculty: facultyResponsible,
@@ -670,6 +700,18 @@ const approveWorkshop = async (req, res) => {
       });
     }
     
+    // Calculate workshop price: 500 EGP per day (if not already set)
+    const calculateWorkshopPrice = (startDate, endDate) => {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      // Set both to start of day for accurate day calculation
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      const diffTime = end.getTime() - start.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end days
+      return diffDays * 500; // 500 EGP per day
+    };
+
     // Update the event status
     const updateData = {
       status: 'approved',
@@ -677,6 +719,13 @@ const approveWorkshop = async (req, res) => {
       editRequests: '',
       updatedAt: new Date()
     };
+    
+    // Calculate and set price if not already set or if dates changed
+    if (!event.price || event.price === 0) {
+      const workshopPrice = calculateWorkshopPrice(event.startDate, event.endDate);
+      updateData.price = workshopPrice;
+      console.log(`💰 Calculated workshop price: ${workshopPrice} EGP (${Math.ceil((new Date(event.endDate).getTime() - new Date(event.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1} days)`);
+    }
     
     // Add user type restrictions if provided
     if (allowedUserTypes && allowedUserTypes.length > 0) {
