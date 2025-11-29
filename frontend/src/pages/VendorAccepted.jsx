@@ -107,6 +107,37 @@ const VendorAccepted = () => {
                     </Link>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+                    {(() => {
+                        const avatarPath = user?.profilePicturePath || user?.vendorLogoPath;
+                        const avatarSrc = avatarPath ? (avatarPath.startsWith('http') ? avatarPath : `http://localhost:5000${avatarPath}`) : null;
+                        return avatarSrc ? (
+                            <img
+                                src={avatarSrc}
+                                alt="User profile"
+                                style={{
+                                    width: '2.5rem',
+                                    height: '2.5rem',
+                                    borderRadius: '50%',
+                                    objectFit: 'cover'
+                                }}
+                            />
+                        ) : (
+                            <div style={{
+                                width: '2.5rem',
+                                height: '2.5rem',
+                                borderRadius: '50%',
+                                backgroundColor: '#1D3557',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#FFFFFF',
+                                fontSize: '0.875rem',
+                                fontWeight: '600'
+                            }}>
+                                {(user?.companyName?.[0] || user?.firstName?.[0] || user?.name?.[0] || 'V').toUpperCase()}
+                            </div>
+                        );
+                    })()}
                     <div style={{ textAlign: 'right' }}>
                         <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1D3557', margin: 0 }}>{user?.companyName || user?.firstName}</p>
                         <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Vendor</p>
