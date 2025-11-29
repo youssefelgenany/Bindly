@@ -260,7 +260,7 @@ const BoothCard = ({ booth, activeBoothId, setActiveBoothId, formState, setFormS
                                 <div className="card" style={{ background: 'var(--white)', border: '1px solid var(--medium-gray)', marginBottom: '1rem', borderRadius: '8px' }}>
                                     <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                                         <div>
-                                            <label className="form-label">Booth Size <span style={{ color: 'var(--guc-red)' }}>*</span></label>
+                                            <label className="form-label">Booth Size <span style={{ color: '#ef4444' }}>*</span></label>
                                             <select
                                                 className="form-input"
                                                 value={formState.boothSize}
@@ -272,7 +272,7 @@ const BoothCard = ({ booth, activeBoothId, setActiveBoothId, formState, setFormS
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="form-label">Duration (weeks) <span style={{ color: 'var(--guc-red)' }}>*</span></label>
+                                            <label className="form-label">Duration (weeks) <span style={{ color: '#ef4444' }}>*</span></label>
                                             <select
                                                 className="form-input"
                                                 value={formState.durationWeeks}
@@ -291,7 +291,7 @@ const BoothCard = ({ booth, activeBoothId, setActiveBoothId, formState, setFormS
                                 {/* Location section */}
                                 <div className="card" style={{ background: 'var(--white)', border: '1px solid var(--medium-gray)', marginBottom: '1rem', borderRadius: '8px' }}>
                                     <div style={{ padding: '1rem' }}>
-                                        <label className="form-label">Booth Location <span style={{ color: 'var(--guc-red)' }}>*</span></label>
+                                        <label className="form-label">Booth Location <span style={{ color: '#ef4444' }}>*</span></label>
                                         <div style={{ height: '180px', background: '#f7f7f7', border: '1px dashed var(--medium-gray)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', marginBottom: '0.75rem' }}>
                                             Platform Map (placeholder)
                                         </div>

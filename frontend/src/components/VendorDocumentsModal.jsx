@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { vendorApi } from '../api/vendorApi';
+import FileChooser from './FileChooser';
 
 const VendorDocumentsModal = ({ onClose, onSuccess }) => {
     const [taxCardFile, setTaxCardFile] = useState(null);
@@ -165,28 +166,16 @@ const VendorDocumentsModal = ({ onClose, onSuccess }) => {
                         }}>
                             Tax Card
                         </label>
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem'
-                        }}>
-                            <input
-                                type="file"
+                        <div>
+                            <FileChooser
                                 id="taxCardInput"
                                 accept=".pdf,.png,.jpg,.jpeg,.jfif,.jpe,.jif,.webp,.gif,.bmp"
                                 onChange={handleTaxCardChange}
                                 disabled={uploading}
-                                style={{
-                                    flex: 1,
-                                    padding: '0.5rem',
-                                    border: '1px solid #e5e7eb',
-                                    borderRadius: '0.5rem',
-                                    fontSize: '0.875rem',
-                                    backgroundColor: '#f3f4f6',
-                                    cursor: uploading ? 'not-allowed' : 'pointer'
-                                }}
+                                buttonLabel="Choose File"
+                                showName={true}
+                                ariaLabel="Upload tax card"
                             />
-                            <span style={{ color: '#6b7280', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>(choose file)</span>
                         </div>
                         {taxCardFile && (
                             <div style={{
@@ -224,28 +213,16 @@ const VendorDocumentsModal = ({ onClose, onSuccess }) => {
                         }}>
                             Logo
                         </label>
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem'
-                        }}>
-                            <input
-                                type="file"
+                        <div>
+                            <FileChooser
                                 id="logoInput"
                                 accept="image/*"
                                 onChange={handleLogoChange}
                                 disabled={uploading}
-                                style={{
-                                    flex: 1,
-                                    padding: '0.5rem',
-                                    border: '1px solid #e5e7eb',
-                                    borderRadius: '0.5rem',
-                                    fontSize: '0.875rem',
-                                    backgroundColor: '#f3f4f6',
-                                    cursor: uploading ? 'not-allowed' : 'pointer'
-                                }}
+                                buttonLabel="Choose File"
+                                showName={true}
+                                ariaLabel="Upload logo"
                             />
-                            <span style={{ color: '#6b7280', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>(choose file)</span>
                         </div>
                         {logoFile && (
                             <div style={{

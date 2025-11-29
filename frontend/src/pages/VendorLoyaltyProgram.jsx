@@ -206,9 +206,43 @@ const VendorLoyaltyProgram = () => {
             <h2 style={{ color: '#1D3557', fontSize: '1.5rem', fontWeight: '700', margin: 0, cursor: 'pointer' }}>Bindly</h2>
           </Link>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1D3557', margin: 0 }}>{user?.companyName || user?.firstName}</p>
-          <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Vendor</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1D3557', margin: 0 }}>{user?.companyName || user?.firstName}</p>
+            <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Vendor</p>
+          </div>
+          <div
+            data-profile-dropdown
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => { /* kept simple here */ }}
+          >
+            {(() => {
+              const avatarPath = user?.profilePicturePath || user?.vendorLogoPath;
+              const avatarSrc = avatarPath ? (avatarPath.startsWith('http') ? avatarPath : `http://localhost:5000${avatarPath}`) : null;
+              return avatarSrc ? (
+                <img
+                  src={avatarSrc}
+                  alt="User profile"
+                  style={{ width: '2.5rem', height: '2.5rem', borderRadius: '50%', objectFit: 'cover' }}
+                />
+              ) : (
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  backgroundColor: '#1D3557',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}>
+                  {(user?.companyName?.[0] || user?.firstName?.[0] || user?.name?.[0] || 'V').toUpperCase()}
+                </div>
+              );
+            })()}
+          </div>
         </div>
       </header>
 
@@ -283,38 +317,7 @@ const VendorLoyaltyProgram = () => {
       </nav>
 
       <main style={{ flex: 1, padding: '2rem 4rem' }}>
-        {/* Back Button */}
-        <button
-          onClick={() => navigate('/vendor')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
-            marginBottom: '1.5rem',
-            backgroundColor: '#f3f4f6',
-            color: '#374151',
-            border: '1px solid #e5e7eb',
-            borderRadius: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => {
-            e.target.style.backgroundColor = '#e5e7eb';
-            e.target.style.borderColor = '#d1d5db';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.backgroundColor = '#f3f4f6';
-            e.target.style.borderColor = '#e5e7eb';
-          }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-            arrow_back
-          </span>
-          Back to Dashboard
-        </button>
+        {/* Back button removed per vendor UX: keep vendor on loyalty page */}
 
         <div style={{ position: 'relative', height: '140px', borderRadius: '0.75rem', overflow: 'hidden', marginBottom: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
           <div style={{ position: 'absolute', inset: 0, backgroundImage: 'url(/assets/images/bazaar-background.jpg)', backgroundSize: 'cover', filter: 'blur(2px)' }}></div>
@@ -362,18 +365,11 @@ const VendorLoyaltyProgram = () => {
                 <form onSubmit={handleSubmit}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                     <div>
-                      <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Discount Rate</label>
+                      <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Discount Rate<span style={{ color: '#ef4444', marginLeft: '0.25rem' }}>*</span></label>
                       <input name="discountRate" value={form.discountRate} onChange={handleChange} className="form-input" placeholder="e.g. 10" />
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Discount Type</label>
-                      <select name="discountType" value={form.discountType} onChange={handleChange} className="form-input">
-                        <option value="percentage">Percentage (%)</option>
-                        <option value="amount">Fixed amount</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Promo Code</label>
+                      <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Promo Code<span style={{ color: '#ef4444', marginLeft: '0.25rem' }}>*</span></label>
                       <input name="promoCode" value={form.promoCode} onChange={handleChange} className="form-input" placeholder="e.g. GUC10" />
                     </div>
                     <div>
@@ -383,7 +379,7 @@ const VendorLoyaltyProgram = () => {
                   </div>
 
                   <div style={{ marginTop: '0.75rem' }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Terms & Conditions</label>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Terms & Conditions<span style={{ color: '#ef4444', marginLeft: '0.25rem' }}>*</span></label>
                     <textarea name="termsAndConditions" value={form.termsAndConditions} onChange={handleChange} className="form-input" rows={4} />
                   </div>
 
