@@ -14,7 +14,8 @@ const TripForm = ({ onSubmit, loading = false, initialData = {}, submitLabel = '
   });
 
   const handleChange = (e) => {
-    const value = e.target.type === 'number' ? parseFloat(e.target.value) : e.target.value;
+    // Keep number inputs as strings to preserve exact user input
+    const value = e.target.value;
     setFormData({
       ...formData,
       [e.target.name]: value
@@ -34,7 +35,13 @@ const TripForm = ({ onSubmit, loading = false, initialData = {}, submitLabel = '
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    // Parse number fields on submit
+    const parsedData = {
+      ...formData,
+      price: formData.price ? parseFloat(formData.price) : '',
+      capacity: formData.capacity ? parseInt(formData.capacity, 10) : ''
+    };
+    onSubmit(parsedData);
   };
 
   const inputStyle = {

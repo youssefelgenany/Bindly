@@ -40,6 +40,7 @@ const StudentMyRegistrations = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRegistration, setSelectedRegistration] = useState(null);
+  const [selectedEventDetails, setSelectedEventDetails] = useState(null);
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   const [showRatingsCommentsModal, setShowRatingsCommentsModal] = useState(false);
   const [selectedEventForView, setSelectedEventForView] = useState(null); // { eventId, eventDate, eventEndDate, eventTitle }
@@ -1376,7 +1377,24 @@ const StudentMyRegistrations = () => {
                 {registrations.map(registration => (
                   <div
                     key={registration.id}
-                    onClick={() => setSelectedRegistration(registration)}
+                    onClick={async () => {
+                      setSelectedRegistration(registration);
+                      // Fetch full event details
+                      if (registration.eventId) {
+                        try {
+                          const eventResult = await eventsApiService.getAllEventsAuthenticated({});
+                          if (eventResult.success && Array.isArray(eventResult.data)) {
+                            const eventDetails = eventResult.data.find(
+                              (e) => String(e._id || e.id) === String(registration.eventId)
+                            );
+                            setSelectedEventDetails(eventDetails);
+                          }
+                        } catch (err) {
+                          console.error('Error fetching event details:', err);
+                          setSelectedEventDetails(null);
+                        }
+                      }
+                    }}
                     style={{
                       backgroundColor: '#FFFFFF',
                       borderRadius: '0.75rem',
@@ -1670,7 +1688,10 @@ const StudentMyRegistrations = () => {
       {/* Registration Detail Modal */}
       {selectedRegistration && (
         <div
-          onClick={() => setSelectedRegistration(null)}
+          onClick={() => {
+            setSelectedRegistration(null);
+            setSelectedEventDetails(null);
+          }}
           style={{
             position: 'fixed',
             inset: 0,
@@ -1888,6 +1909,50 @@ const StudentMyRegistrations = () => {
                     <div style={{ color: '#374151', fontWeight: '500' }}>{selectedRegistration.eventLocation}</div>
                   </div>
                 </div>
+                {(selectedEventDetails?.registrationDeadline || selectedRegistration.registrationDeadline) && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      schedule
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Registration Deadline</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>{formatDate(selectedEventDetails?.registrationDeadline || selectedRegistration.registrationDeadline)}</div>
+                    </div>
+                  </div>
+                )}
+                {(selectedEventDetails?.price || selectedRegistration.price) && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      attach_money
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>
+                        {(selectedRegistration.eventType === 'trip' || selectedRegistration.eventType === 'workshop') ? 'Registration Fees' : 'Price'}
+                      </div>
+                      <div style={{ fontWeight: '600' }}>
+                        {(selectedRegistration.eventType === 'trip' || selectedRegistration.eventType === 'workshop') ? (
+                          <span style={{ color: '#059669' }}>{(selectedEventDetails?.price || selectedRegistration.price)} EGP</span>
+                        ) : (
+                          <span style={{ color: '#059669' }}>${(selectedEventDetails?.price || selectedRegistration.price)}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {selectedRegistration.capacity && (
                   <div style={{
                     display: 'flex',
@@ -1903,6 +1968,47 @@ const StudentMyRegistrations = () => {
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Capacity</div>
                       <div style={{ color: '#374151', fontWeight: '500' }}>{selectedRegistration.registeredCount || 0}/{selectedRegistration.capacity} registered</div>
+                    </div>
+                  </div>
+                )}
+                {(selectedRegistration.eventType === 'workshop' || selectedRegistration.eventType === 'conference') && (selectedEventDetails?.professors || selectedEventDetails?.creatorName) && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      school
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Professor</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>
+                        {selectedEventDetails?.professors 
+                          ? (Array.isArray(selectedEventDetails.professors) ? selectedEventDetails.professors.join(', ') : selectedEventDetails.professors)
+                          : (selectedEventDetails?.creatorName || 'Professor')
+                        }
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {(selectedRegistration.eventType === 'bazaar' || selectedRegistration.eventType === 'booth') && selectedEventDetails?.vendors && selectedEventDetails.vendors.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      storefront
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Vendors</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>{selectedEventDetails.vendors.length} vendor{selectedEventDetails.vendors.length !== 1 ? 's' : ''} participating</div>
                     </div>
                   </div>
                 )}
@@ -1924,7 +2030,91 @@ const StudentMyRegistrations = () => {
                 </div>
               </div>
 
-              {selectedRegistration.eventDescription && (
+              {((selectedRegistration.eventType === 'bazaar' || selectedRegistration.eventType === 'booth') && selectedEventDetails?.vendors && selectedEventDetails.vendors.length > 0) ? (
+                <div style={{
+                  marginBottom: '1.5rem',
+                  padding: '1rem',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '0.5rem'
+                }}>
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#9ca3af',
+                    marginBottom: '0.75rem',
+                    fontWeight: '500',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                      storefront
+                    </span>
+                    Participating Vendors ({selectedEventDetails.vendors.length})
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem'
+                  }}>
+                    {selectedEventDetails.vendors.map((vendor, idx) => (
+                      <div key={vendor._id || idx} style={{
+                        padding: '0.75rem',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '0.375rem',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <div style={{
+                          fontWeight: '600',
+                          color: '#1D3557',
+                          fontSize: '0.875rem',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {vendor.name || vendor.companyName || 'Vendor'}
+                        </div>
+                        {vendor.contactName && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginBottom: '0.25rem'
+                          }}>
+                            Contact: {vendor.contactName}
+                          </div>
+                        )}
+                        {vendor.email && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginBottom: '0.25rem'
+                          }}>
+                            {vendor.email}
+                          </div>
+                        )}
+                        {selectedRegistration.eventType === 'booth' && vendor.boothSize && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginTop: '0.25rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                              square_foot
+                            </span>
+                            Booth Size: {vendor.boothSize}
+                            {vendor.durationWeeks && ` • Duration: ${vendor.durationWeeks} week${vendor.durationWeeks !== 1 ? 's' : ''}`}
+                            {vendor.boothLocation && ` • Location: ${vendor.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {(selectedRegistration.eventDescription || selectedEventDetails?.description) && (
                 <div style={{
                   marginBottom: '1.5rem',
                   padding: '1rem',
@@ -1947,7 +2137,7 @@ const StudentMyRegistrations = () => {
                     margin: 0,
                     fontSize: '0.875rem'
                   }}>
-                    {selectedRegistration.eventDescription}
+                    {selectedRegistration.eventDescription || selectedEventDetails?.description}
                   </p>
                 </div>
               )}
@@ -1980,16 +2170,23 @@ const StudentMyRegistrations = () => {
                 }}>
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Name</div>
-                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentName}</div>
+                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>
+                      {selectedRegistration.studentName || 
+                       (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.name || 'N/A')}
+                    </div>
                   </div>
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Student ID</div>
-                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentId}</div>
-          </div>
+                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>
+                      {selectedRegistration.studentId || user?.gucId || 'N/A'}
+                    </div>
+                  </div>
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Email</div>
-                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>{selectedRegistration.studentEmail}</div>
-          </div>
+                    <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem' }}>
+                      {selectedRegistration.studentEmail || user?.email || 'N/A'}
+                    </div>
+                  </div>
           </div>
         </div>
 

@@ -104,13 +104,13 @@ async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCo
           
           // Use CID reference in HTML instead of data URL
           vendorQRCodeHTML = `
-            <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
-              <h3 style="color: #333; margin-top: 0;">Your Vendor QR Code</h3>
-              <p style="color: #666; margin-bottom: 15px;">This is your QR code as a participating vendor. You can use this for check-in and identification at the event.</p>
+            <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+              <h3 style="color: #1D3557; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600;">Your Vendor QR Code</h3>
+              <p style="color: #1D3557; margin-bottom: 15px; font-size: 14px; line-height: 1.6;">This is your QR code as a participating vendor. You can use this for check-in and identification at the event.</p>
               <div style="text-align: center; padding: 20px;">
-                <img src="cid:${vendorQRCID}" alt="Vendor QR Code" style="width: 200px; height: 200px; border: 2px solid #ddd; padding: 10px; background: white; display: block; margin: 0 auto;" />
+                <img src="cid:${vendorQRCID}" alt="Vendor QR Code" style="width: 200px; height: 200px; border: 2px solid #1D3557; padding: 10px; background: white; display: block; margin: 0 auto; border-radius: 4px;" />
               </div>
-              <p style="color: #666; font-size: 14px; text-align: center; margin-top: 15px;">
+              <p style="color: #1D3557; font-size: 14px; text-align: center; margin-top: 15px;">
                 <strong>Vendor:</strong> ${vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim()}
               </p>
             </div>
@@ -119,18 +119,18 @@ async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCo
         } catch (bufferError) {
           console.error('❌ Error converting QR code to buffer:', bufferError);
           vendorQRCodeHTML = `
-            <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
-              <h3 style="color: #333; margin-top: 0;">Your Vendor QR Code</h3>
-              <p style="color: #dc2626; margin-bottom: 15px;">⚠️ QR code could not be processed. Please contact support.</p>
+            <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+              <h3 style="color: #1D3557; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600;">Your Vendor QR Code</h3>
+              <p style="color: #1D3557; margin-bottom: 15px; font-size: 14px; line-height: 1.6;">⚠️ QR code could not be processed. Please contact support.</p>
             </div>
           `;
         }
       } else {
         console.error('❌ QR code image source is invalid');
         vendorQRCodeHTML = `
-          <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
-            <h3 style="color: #333; margin-top: 0;">Your Vendor QR Code</h3>
-            <p style="color: #dc2626; margin-bottom: 15px;">⚠️ QR code could not be generated. Please contact support.</p>
+          <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="color: #1D3557; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600;">Your Vendor QR Code</h3>
+            <p style="color: #1D3557; margin-bottom: 15px; font-size: 14px; line-height: 1.6;">⚠️ QR code could not be generated. Please contact support.</p>
           </div>
         `;
       }
@@ -194,12 +194,12 @@ async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCo
         }
         
         return `
-          <tr style="border-bottom: 1px solid #ddd;">
-            <td style="padding: 12px; text-align: center;">${index + 1}</td>
-            <td style="padding: 12px;">${user.firstName || 'N/A'} ${user.lastName || ''}</td>
-            <td style="padding: 12px;">${user.email || 'N/A'}</td>
+          <tr style="border-bottom: 1px solid #e5e7eb;">
+            <td style="padding: 12px; text-align: center; color: #1D3557; font-size: 14px;">${index + 1}</td>
+            <td style="padding: 12px; color: #1D3557; font-size: 14px;">${user.firstName || 'N/A'} ${user.lastName || ''}</td>
+            <td style="padding: 12px; color: #1D3557; font-size: 14px;">${user.email || 'N/A'}</td>
             <td style="padding: 12px; text-align: center;">
-              ${qrCodeSrc ? `<img src="${qrCodeSrc}" alt="QR Code" style="width: 100px; height: 100px; border: 1px solid #ddd; padding: 5px; display: block; margin: 0 auto;" />` : '<span style="color: #999;">QR Code unavailable</span>'}
+              ${qrCodeSrc ? `<img src="${qrCodeSrc}" alt="QR Code" style="width: 100px; height: 100px; border: 2px solid #1D3557; padding: 5px; display: block; margin: 0 auto; border-radius: 4px;" />` : '<span style="color: #6B7280; font-size: 14px;">QR Code unavailable</span>'}
             </td>
           </tr>
         `;
@@ -207,7 +207,7 @@ async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCo
     } else {
       participantQRCodesHTML = `
         <tr>
-          <td colspan="4" style="padding: 20px; text-align: center; color: #666; font-style: italic;">
+          <td colspan="4" style="padding: 20px; text-align: center; color: #1D3557; font-size: 14px; font-style: italic;">
             No event participants have registered for this bazaar yet. QR codes for participants will be automatically generated and sent to you once they register to attend the event.
           </td>
         </tr>
@@ -219,79 +219,97 @@ async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCo
     const eventDate = event.startDate ? new Date(event.startDate).toLocaleDateString() : 'TBD';
 
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #d32f2f; margin: 0;">Bindly</h1>
-          <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
+      <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; background-color: #f6f7f8;">
+        <!-- Header -->
+        <div style="background-color: #1D3557; padding: 30px 20px; text-align: center;">
+          <h1 style="color: #FFFFFF; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Bindly</h1>
+          <p style="color: rgba(255, 255, 255, 0.8); margin: 8px 0 0 0; font-size: 14px;">GUC Events Platform</p>
         </div>
         
-        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-          <h2 style="color: #333; margin-top: 0;">${hasVendorQR ? 'Your Vendor QR Code' : 'Visitor QR Codes for Your Event'}</h2>
-          <p>Hi ${vendorName},</p>
-          ${hasVendorQR 
-            ? '<p>Your QR code as a participating vendor has been generated. You can use this QR code for check-in and identification at the event.</p>'
-            : '<p>Great news! We have generated QR codes for all registered visitors to your bazaar/booth. You can use these QR codes to verify attendance at your event.</p>'
-          }
-        </div>
-
-        ${vendorQRCodeHTML}
-
-        <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
-          <h3 style="color: #333; margin-top: 0;">Event Details</h3>
-          <table style="width: 100%;">
-            <tr>
-              <td style="padding: 8px; font-weight: bold; width: 150px;">Event Name:</td>
-              <td style="padding: 8px;">${eventName}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px; font-weight: bold;">Event Date:</td>
-              <td style="padding: 8px;">${eventDate}</td>
-            </tr>
-            ${hasParticipantRegistrations ? `
-            <tr>
-              <td style="padding: 8px; font-weight: bold;">Total Visitors:</td>
-              <td style="padding: 8px; font-weight: bold; color: #27ae60;">${registrationsWithQR.length}</td>
-            </tr>
-            ` : ''}
-          </table>
-        </div>
-
-        ${hasParticipantRegistrations ? `
-        <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
-          <h3 style="color: #333; margin-top: 0;">Registered Visitors</h3>
-          <table style="width: 100%; border-collapse: collapse; background: white; border: 1px solid #e9ecef;">
-            <thead>
-              <tr style="background: #f8f9fa;">
-                <th style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; text-align: center;">#</th>
-                <th style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold;">Name</th>
-                <th style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold;">Email</th>
-                <th style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; text-align: center;">QR Code</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${participantQRCodesHTML}
-            </tbody>
-          </table>
-        </div>
-        ` : ''}
-
-        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-          <p style="margin: 0; color: #666; font-size: 14px;">
+        <!-- Content Container -->
+        <div style="background-color: #FFFFFF; margin: 20px; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+          <!-- Main Info Box -->
+          <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+            <h2 style="color: #1D3557; margin: 0 0 10px 0; font-size: 20px; font-weight: 600;">${hasVendorQR ? 'Your Vendor QR Code' : 'Visitor QR Codes for Your Event'}</h2>
+            <p style="color: #1D3557; margin: 8px 0; font-size: 14px; line-height: 1.6;">Hi ${vendorName},</p>
             ${hasVendorQR 
-              ? '<strong>Your Vendor QR Code:</strong> Use this QR code for vendor check-in and identification at the event. '
-              : ''
+              ? '<p style="color: #1D3557; margin: 8px 0 0 0; font-size: 14px; line-height: 1.6;">Your QR code as a participating vendor has been generated. You can use this QR code for check-in and identification at the event.</p>'
+              : '<p style="color: #1D3557; margin: 8px 0 0 0; font-size: 14px; line-height: 1.6;">Great news! We have generated QR codes for all registered visitors to your bazaar/booth. You can use these QR codes to verify attendance at your event.</p>'
             }
-            ${hasParticipantRegistrations 
-              ? '<strong>Visitor QR Codes:</strong> You can scan these QR codes at your event to verify visitor attendance. Each QR code contains the visitor\'s name, email, and registration ID.'
-              : hasVendorQR 
-                ? 'Present this QR code when you arrive at the event for vendor check-in.'
-                : ''
-            }
-          </p>
-        </div>
+          </div>
 
-        <div style="text-align: center; color: #999; font-size: 12px;">
-          <p style="margin: 0;">© 2025 Bindly - GUC Events Platform. All rights reserved.</p>
+          ${vendorQRCodeHTML}
+
+          <!-- Event Details -->
+          <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="color: #1D3557; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600;">Event Details</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px; font-weight: 600; width: 150px; color: #1D3557; font-size: 14px;">Event Name:</td>
+                <td style="padding: 8px; color: #1D3557; font-size: 14px;">${eventName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; font-weight: 600; color: #1D3557; font-size: 14px;">Event Date:</td>
+                <td style="padding: 8px; color: #1D3557; font-size: 14px;">${eventDate}</td>
+              </tr>
+              ${hasParticipantRegistrations ? `
+              <tr>
+                <td style="padding: 8px; font-weight: 600; color: #1D3557; font-size: 14px;">Total Visitors:</td>
+                <td style="padding: 8px; font-weight: 700; color: #457B9D; font-size: 14px;">${registrationsWithQR.length}</td>
+              </tr>
+              ` : ''}
+            </table>
+          </div>
+
+          ${hasParticipantRegistrations ? `
+          <!-- Registered Visitors Table -->
+          <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="color: #1D3557; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600;">Registered Visitors</h3>
+            <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+              <thead>
+                <tr>
+                  <th style="padding: 12px; background: #1D3557; color: #FFFFFF; font-weight: 600; text-align: center; font-size: 14px; border: none;">#</th>
+                  <th style="padding: 12px; background: #1D3557; color: #FFFFFF; font-weight: 600; font-size: 14px; border: none;">Name</th>
+                  <th style="padding: 12px; background: #1D3557; color: #FFFFFF; font-weight: 600; font-size: 14px; border: none;">Email</th>
+                  <th style="padding: 12px; background: #1D3557; color: #FFFFFF; font-weight: 600; text-align: center; font-size: 14px; border: none;">QR Code</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${participantQRCodesHTML}
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
+
+          <!-- Instructions Box -->
+          <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 18px; border-radius: 8px; margin-bottom: 25px;">
+            <p style="margin: 0; color: #1D3557; font-size: 14px; line-height: 1.6;">
+              ${hasVendorQR 
+                ? '<strong style="font-size: 15px; color: #1D3557;">Your Vendor QR Code:</strong> Use this QR code for vendor check-in and identification at the event. '
+                : ''
+              }
+              ${hasParticipantRegistrations 
+                ? '<strong style="font-size: 15px; color: #1D3557;">Visitor QR Codes:</strong> You can scan these QR codes at your event to verify visitor attendance. Each QR code contains the visitor\'s name, email, and registration ID.'
+                : hasVendorQR 
+                  ? 'Present this QR code when you arrive at the event for vendor check-in.'
+                  : ''
+              }
+            </p>
+          </div>
+          
+          <!-- Footer -->
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f6f7f8; color: #666; font-size: 14px; line-height: 1.6;">
+            <p style="margin: 0 0 15px 0;">If you have any questions, please contact the event organizers.</p>
+            <p style="margin: 20px 0 0 0; color: #1D3557;">
+              Best regards,<br>
+              <strong style="color: #1D3557; font-size: 15px;">The Bindly Team</strong>
+            </p>
+          </div>
+        </div>
+        
+        <!-- Bottom Spacer -->
+        <div style="padding: 20px; text-align: center; color: #999; font-size: 12px;">
+          <p style="margin: 0;">© ${new Date().getFullYear()} Bindly. All rights reserved.</p>
         </div>
       </div>
     `;
