@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { eventsApiService, bazaarApi, tripApi } from '../api/eventsApi';
@@ -9,6 +9,8 @@ import ConferenceForm from '../components/ConferenceForm';
 import TripForm from '../components/TripForm';
 import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
 import axios from 'axios';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
 const EventsOfficeEventsView = () => {
   const { user, logout } = useAuth();
@@ -57,6 +59,7 @@ const EventsOfficeEventsView = () => {
   const [deleting, setDeleting] = useState(false);
   const [deletingEventId, setDeletingEventId] = useState(null);
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const expandedFromUrlRef = useRef(new Set());
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingBazaar, setEditingBazaar] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -91,14 +94,14 @@ const EventsOfficeEventsView = () => {
     navigate('/login');
   };
 
-  const loadEvents = useCallback(async () => {
+  const loadEvents = useCallback(async (searchTerm = '') => {
     try {
       setError('');
       setLoading(true);
-      console.log('🔍 Loading events with params:', { searchQuery, filter });
+      console.log('🔍 Loading events with params:', { searchTerm, filter });
       
       const result = await eventsApiService.getAllEventsAuthenticated({
-        q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
+        q: searchTerm && searchTerm.trim() ? searchTerm.trim() : undefined,
         type: filter !== 'all' ? filter : undefined
       });
       
@@ -150,6 +153,7 @@ const EventsOfficeEventsView = () => {
           creatorName: ev.creatorName || ev.professorName || ev.createdByName || (ev.createdBy ? `${ev.createdBy.firstName || ''} ${ev.createdBy.lastName || ''}`.trim() : null),
           creatorRole: ev.creatorRole || (ev.createdBy ? ev.createdBy.userType : null),
           creatorEmail: ev.createdBy?.email || ev.creatorEmail || null,
+          createdBy: ev.createdBy, // Keep the createdBy object for direct searching
           vendors: ev.vendors || [],
           vendorRequests: ev.vendorRequests || []
         }));
@@ -266,7 +270,48 @@ const EventsOfficeEventsView = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, filter]);
+  }, [filter]);
+
+  // Check for expand query parameter and auto-expand event
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const expandEventId = searchParams.get('expand');
+    if (expandEventId && events.length > 0 && !expandedFromUrlRef.current.has(expandEventId)) {
+      const event = events.find(e => String(e.id) === String(expandEventId));
+      if (event) {
+        // Mark as processed
+        expandedFromUrlRef.current.add(expandEventId);
+        
+        // Expand the event
+        setExpandedRows(prev => {
+          const newExpanded = new Set(prev);
+          newExpanded.add(expandEventId);
+          return newExpanded;
+        });
+        
+        // Load vendor requests if needed
+        if (event.type === 'bazaar' || event.type === 'booth' || event.type === 'platformBooth') {
+          const eventTypeForApi = event.type === 'platformBooth' ? 'booth' : event.type;
+          loadVendorRequests(expandEventId, eventTypeForApi);
+        }
+        
+        // Scroll to the event after a short delay to ensure it's rendered
+        setTimeout(() => {
+          const element = document.getElementById(`event-row-${expandEventId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 500);
+      }
+    }
+    // Reset ref when search params change (new expand request)
+    if (!expandEventId) {
+      expandedFromUrlRef.current.clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, events.length]);
+
+  // Load events on mount and when filter changes (not on search query change)
 
   useEffect(() => {
     loadEvents();
@@ -422,8 +467,107 @@ const EventsOfficeEventsView = () => {
     return Array.from(locs).sort();
   }, [events]);
 
-  // Filter events based on type, professor name, location, and date
+  // Filter events based on type, professor name, location, date, and search query
   // Events Office should see all events (including past ones), but we can filter by type
+  const filteredEvents = React.useMemo(() => {
+    return events.filter(event => {
+      // Skip invalid/empty events
+      const title = (event.title || event.name || '').trim();
+      if (!title) return false;
+      if (!event.startDate) return false;
+      
+      // Validate startDate is a valid date
+      const startDate = new Date(event.startDate);
+      if (isNaN(startDate.getTime())) return false;
+      
+      // Events Office can see all events (past and future), so don't filter by date
+      // Only filter out events with invalid end dates
+      if (event.endDate) {
+        const eventEndDate = new Date(event.endDate);
+        if (isNaN(eventEndDate.getTime())) return false;
+      }
+      
+      if (event.type === 'other') return false;
+      
+      // Filter by type
+      const typeMatch = filter === 'all' || (event.type && event.type === filter);
+      if (!typeMatch) return false;
+      
+      // Filter by search query (event name, professor name, or event type)
+      if (searchQuery.trim()) {
+        const query = searchQuery.trim().toLowerCase();
+        let matches = false;
+        
+        // Search by event name
+        if (title.toLowerCase().includes(query)) {
+          matches = true;
+        }
+        
+        // Search by professor name (for workshops and conferences)
+        // Check creator name first (professor who created/made the workshop)
+        if (!matches) {
+          // Check creatorName field
+          const creatorName = (event.creatorName || event.professorName || '').toLowerCase();
+          if (creatorName && creatorName.includes(query)) {
+            matches = true;
+          }
+          
+          // Also check createdBy object directly (in case creatorName wasn't populated)
+          if (!matches && event.createdBy) {
+            const createdByFirstName = (event.createdBy.firstName || '').toLowerCase();
+            const createdByLastName = (event.createdBy.lastName || '').toLowerCase();
+            const createdByFullName = `${createdByFirstName} ${createdByLastName}`.trim().toLowerCase();
+            if (createdByFirstName.includes(query) || 
+                createdByLastName.includes(query) || 
+                createdByFullName.includes(query)) {
+              matches = true;
+            }
+          }
+        }
+        
+        // Also check participating professors
+        if (!matches && event.professors) {
+          if (Array.isArray(event.professors)) {
+            matches = event.professors.some(prof => 
+              prof && typeof prof === 'string' && prof.toLowerCase().includes(query)
+            );
+          } else if (typeof event.professors === 'string') {
+            matches = event.professors.toLowerCase().includes(query);
+          }
+        }
+        
+        // Search by event type
+        if (!matches && event.type) {
+          const typeName = event.type.toLowerCase();
+          if (typeName.includes(query)) {
+            matches = true;
+          }
+        }
+        
+        if (!matches) return false;
+      }
+      
+      // Filter by professor name (for workshops and conferences)
+      // Checks both creatorName and professors array
+      if (professorNameFilter.trim()) {
+        const profFilter = professorNameFilter.trim().toLowerCase();
+        const creatorName = (event.creatorName || event.professorName || '').toLowerCase();
+        
+        // Check if creator name matches
+        let matches = creatorName.includes(profFilter);
+        
+        // If not matched, check professors array
+        if (!matches && event.professors) {
+          if (Array.isArray(event.professors)) {
+            matches = event.professors.some(prof => 
+              prof && typeof prof === 'string' && prof.toLowerCase().includes(profFilter)
+            );
+          } else if (typeof event.professors === 'string') {
+            matches = event.professors.toLowerCase().includes(profFilter);
+          }
+        }
+        
+        if (!matches) return false;
   const filteredEvents = events.filter(event => {
     // Skip invalid/empty events
     const title = (event.title || event.name || '').trim();
@@ -470,10 +614,28 @@ const EventsOfficeEventsView = () => {
         const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
         if (eventDateOnly.getTime() !== filterDateOnly.getTime()) return false;
       }
-    }
-    
-    return true;
-  });
+      
+      // Filter by location
+      if (locationFilter.trim()) {
+        const location = (event.location || '').trim();
+        if (location !== locationFilter.trim()) return false;
+      }
+      
+      // Filter by date
+      if (dateFilter.trim()) {
+        const filterDate = new Date(dateFilter);
+        if (!isNaN(filterDate.getTime())) {
+          const eventDate = new Date(event.startDate);
+          // Compare dates (ignore time)
+          const filterDateOnly = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate());
+          const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+          if (eventDateOnly.getTime() !== filterDateOnly.getTime()) return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [events, filter, searchQuery, professorNameFilter, locationFilter, dateFilter]);
   
   // Sort events
   const sortedAndFilteredEvents = React.useMemo(() => {
@@ -507,7 +669,9 @@ const EventsOfficeEventsView = () => {
   });
 
   const handleSearch = () => {
-    loadEvents();
+    // For now, search is done client-side, so no need to reload
+    // If you want to search server-side, uncomment the line below
+    // loadEvents(searchQuery);
   };
 
   const handleDeleteEvent = (event) => {
@@ -2020,7 +2184,7 @@ const EventsOfficeEventsView = () => {
                 </span>
                 <input
                   type="text"
-                  placeholder="Search by event name, professor name, location, or description..."
+                  placeholder="Search by event name, professor name, or event type..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -2363,12 +2527,14 @@ const EventsOfficeEventsView = () => {
 
                     return (
                       <React.Fragment key={event.id}>
-                        <tr style={{
-                          borderBottom: '1px solid #e5e7eb',
-                          transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        <tr 
+                          id={`event-row-${event.id}`}
+                          style={{
+                            borderBottom: '1px solid #e5e7eb',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
                           <td style={{
                             padding: '1rem 1.5rem',
@@ -2422,45 +2588,43 @@ const EventsOfficeEventsView = () => {
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
                               
-                              {/* Edit Button */}
-              <button
-                onClick={() => {
-                                  if (event.type === 'bazaar') openBazaarEdit(event);
-                                  else if (event.type === 'conference') openConferenceEdit(event);
-                                  else if (event.type === 'trip') openTripEdit(event);
-                                  else if (event.type === 'workshop') {
-                                    setEditingWorkshop(event);
-                                    setIsWorkshopModalOpen(true);
-                                  }
-                                }}
-                                disabled={!canEdit}
-                style={{
-                                  padding: '0.5rem',
-                  borderRadius: '0.5rem',
-                  border: 'none',
-                                  backgroundColor: 'transparent',
-                                  color: canEdit ? '#6b7280' : '#d1d5db',
-                                  cursor: canEdit ? 'pointer' : 'not-allowed',
-                                  opacity: canEdit ? 1 : 0.5
-                                }}
-                                title={canEdit ? 'Edit Event' : (event.type === 'bazaar' || event.type === 'trip' ? 'Cannot edit: event has started' : event.type === 'workshop' ? 'Cannot edit: workshop already accepted' : 'Cannot edit')}
-                onMouseEnter={(e) => {
-                                  if (canEdit) {
-                                    e.target.style.backgroundColor = '#f3f4f6';
-                                    e.target.style.color = '#137fec';
-                                  }
-                }}
-                onMouseLeave={(e) => {
-                                  if (canEdit) {
-                                    e.target.style.backgroundColor = 'transparent';
-                                    e.target.style.color = '#6b7280';
-                                  }
-                                }}
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                  edit
-                                </span>
-                              </button>
+                              {/* Edit Button - Events Office cannot edit workshops or platform booths */}
+                              {event.type !== 'workshop' && event.type !== 'platformBooth' && (
+                                <button
+                                  onClick={() => {
+                                    if (event.type === 'bazaar') openBazaarEdit(event);
+                                    else if (event.type === 'conference') openConferenceEdit(event);
+                                    else if (event.type === 'trip') openTripEdit(event);
+                                  }}
+                                  disabled={!canEdit}
+                                  style={{
+                                    padding: '0.5rem',
+                                    borderRadius: '0.5rem',
+                                    border: 'none',
+                                    backgroundColor: 'transparent',
+                                    color: canEdit ? '#6b7280' : '#d1d5db',
+                                    cursor: canEdit ? 'pointer' : 'not-allowed',
+                                    opacity: canEdit ? 1 : 0.5
+                                  }}
+                                  title={canEdit ? 'Edit Event' : (event.type === 'bazaar' || event.type === 'trip' ? 'Cannot edit: event has started' : 'Cannot edit')}
+                                  onMouseEnter={(e) => {
+                                    if (canEdit) {
+                                      e.target.style.backgroundColor = '#f3f4f6';
+                                      e.target.style.color = '#137fec';
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (canEdit) {
+                                      e.target.style.backgroundColor = 'transparent';
+                                      e.target.style.color = '#6b7280';
+                                    }
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                    edit
+                                  </span>
+                                </button>
+                              )}
 
                               {/* View Ratings Button */}
                               <button
@@ -2678,8 +2842,8 @@ const EventsOfficeEventsView = () => {
                         </div>
                       )}
 
-                                  {/* Capacity */}
-                                  {event.capacity && (
+                                  {/* Capacity - Hide for platform booths as they don't have registrations */}
+                                  {event.capacity && event.type !== 'platformBooth' && (
                                     <div>
                                       <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
                                         Capacity
@@ -2784,34 +2948,17 @@ const EventsOfficeEventsView = () => {
                                   </div>
                                 )}
 
-                                {/* Vendors (for bazaars and booths) - Only show accepted vendors */}
-                                {(event.type === 'bazaar' || event.type === 'booth') && (() => {
-                                  // Get only accepted vendors from vendor requests
-                                  const acceptedVendors = vendorRequests[event.id] 
-                                    ? vendorRequests[event.id].filter(r => r.status === 'accepted').map(r => r.vendor).filter(Boolean)
-                                    : (event.vendors || []);
-                                  
-                                  // Deduplicate by vendor ID
-                                  const uniqueVendors = [];
-                                  const seenVendorIds = new Set();
-                                  acceptedVendors.forEach(vendor => {
-                                    const vendorId = vendor._id || vendor.id || vendor.email;
-                                    if (vendorId && !seenVendorIds.has(vendorId)) {
-                                      seenVendorIds.add(vendorId);
-                                      uniqueVendors.push(vendor);
-                                    }
-                                  });
-                                  
-                                  return uniqueVendors.length > 0 ? (
+                                {/* Participating Vendors (for bazaars and booths) */}
+                                {(event.type === 'bazaar' || event.type === 'booth' || event.type === 'platformBooth') && event.vendors && event.vendors.length > 0 && (
                                   <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                                       <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
                                           store
                                         </span>
-                                        Participating Vendors ({uniqueVendors.length})
+                                        Participating Vendors ({event.vendors.length})
                                       </h4>
-                                      {/* QR Code Button - Only show if there are accepted vendors */}
+                                      {/* QR Code Button */}
                                       <button
                                         onClick={() => handleSendQRCodes(event.id)}
                                         disabled={!!sendingQRCodes[event.id]}
@@ -2851,9 +2998,56 @@ const EventsOfficeEventsView = () => {
                                       gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                                       gap: '1rem'
                                     }}>
-                                      {uniqueVendors.map((vendor, idx) => (
+                                      {event.vendors.map((vendor, idx) => {
+                                        // Debug: log first vendor to see structure
+                                        if (idx === 0) {
+                                          console.log('🔍 Vendor data structure:', vendor);
+                                          console.log('🔍 Vendor keys:', Object.keys(vendor));
+                                          console.log('🔍 companyName:', vendor.companyName);
+                                          console.log('🔍 name:', vendor.name);
+                                          console.log('🔍 email:', vendor.email);
+                                          console.log('🔍 vendorLogoPath:', vendor.vendorLogoPath);
+                                        }
+                                        
+                                        // Get vendor logo URL
+                                        const getVendorLogoSrc = (vendor) => {
+                                          if (!vendor) return null;
+                                          const candidates = [
+                                            vendor.vendorLogoPath,
+                                            vendor.logo,
+                                            vendor.logoUrl,
+                                            vendor.logoPath,
+                                            vendor.companyLogo
+                                          ].filter(Boolean);
+                                          
+                                          if (candidates.length === 0) return null;
+                                          const raw = candidates.find((src) => typeof src === 'string' && src.trim().length > 0) || null;
+                                          if (!raw) return null;
+                                          
+                                          const cleaned = raw.trim().replace(/\\/g, '/');
+                                          if (cleaned.startsWith('http://') || cleaned.startsWith('https://') || cleaned.startsWith('data:')) {
+                                            return cleaned;
+                                          }
+                                          const normalized = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+                                          return `${API_BASE_URL}${normalized}`;
+                                        };
+                                        
+                                        const vendorLogo = getVendorLogoSrc(vendor);
+                                        // Prioritize companyName, then name, then fallback
+                                        const vendorName = (vendor.companyName && vendor.companyName.trim()) || 
+                                                         (vendor.name && vendor.name.trim()) || 
+                                                         (vendor.firstName && vendor.lastName ? `${vendor.firstName} ${vendor.lastName}`.trim() : '') || 
+                                                         'Vendor';
+                                        const vendorEmail = (vendor.email && vendor.email.trim()) || '';
+                                        const vendorContact = (vendor.contactName && vendor.contactName.trim()) || 
+                                                             (vendor.firstName && vendor.lastName ? `${vendor.firstName} ${vendor.lastName}`.trim() : '') || '';
+                                        const vendorBoothSize = vendor.boothSize || '';
+                                        const vendorBoothLocation = vendor.boothLocation || '';
+                                        const vendorAttendees = Array.isArray(vendor.attendees) ? vendor.attendees : [];
+                                        
+                                        return (
                                         <div
-                                          key={idx}
+                                          key={vendor._id || idx}
                                           style={{
                                             padding: '1rem',
                                             backgroundColor: '#FFFFFF',
@@ -2874,8 +3068,33 @@ const EventsOfficeEventsView = () => {
                                             e.currentTarget.style.transform = 'translateY(0)';
                                           }}
                                         >
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem', color: '#3b82f6' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
+                                            {vendorLogo ? (
+                                              <img
+                                                src={vendorLogo}
+                                                alt={vendorName}
+                                                style={{
+                                                  width: '2rem',
+                                                  height: '2rem',
+                                                  objectFit: 'contain',
+                                                  borderRadius: '0.25rem',
+                                                  backgroundColor: '#f9fafb',
+                                                  padding: '0.25rem'
+                                                }}
+                                                onError={(e) => {
+                                                  e.target.style.display = 'none';
+                                                  e.target.nextSibling.style.display = 'flex';
+                                                }}
+                                              />
+                                            ) : null}
+                                            <span 
+                                              className="material-symbols-outlined" 
+                                              style={{ 
+                                                fontSize: '1.25rem', 
+                                                color: '#3b82f6',
+                                                display: vendorLogo ? 'none' : 'flex'
+                                              }}
+                                            >
                                               store
                                             </span>
                                             <p style={{
@@ -2884,10 +3103,10 @@ const EventsOfficeEventsView = () => {
                                               color: '#111827',
                                               margin: 0
                                             }}>
-                                              {vendor.companyName || vendor.name || 'Vendor'}
+                                              {vendorName}
                                             </p>
                                           </div>
-                                          {vendor.email && (
+                                          {vendorEmail && (
                                             <p style={{
                                               fontSize: '0.8125rem',
                                               color: '#6b7280',
@@ -2899,10 +3118,10 @@ const EventsOfficeEventsView = () => {
                                               <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
                                                 email
                                               </span>
-                                              {vendor.email}
+                                              {vendorEmail}
                                             </p>
                                           )}
-                                          {vendor.contactName && (
+                                          {vendorContact && (
                                             <p style={{
                                               fontSize: '0.8125rem',
                                               color: '#6b7280',
@@ -2914,15 +3133,69 @@ const EventsOfficeEventsView = () => {
                                               <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
                                                 person
                                               </span>
-                                              Contact: {vendor.contactName}
+                                              Contact: {vendorContact}
                                             </p>
                                           )}
+                                          {vendorBoothSize && (
+                                            <p style={{
+                                              fontSize: '0.8125rem',
+                                              color: '#6b7280',
+                                              margin: 0,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '0.25rem'
+                                            }}>
+                                              <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                square_foot
+                                              </span>
+                                              Booth Size: {vendorBoothSize}
+                                            </p>
+                                          )}
+                                          {vendorBoothLocation && (
+                                            <p style={{
+                                              fontSize: '0.8125rem',
+                                              color: '#6b7280',
+                                              margin: 0,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '0.25rem'
+                                            }}>
+                                              <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                location_on
+                                              </span>
+                                              Location: {vendorBoothLocation}
+                                            </p>
+                                          )}
+                                          {vendorAttendees.length > 0 && (
+                                            <div style={{
+                                              fontSize: '0.8125rem',
+                                              color: '#6b7280',
+                                              margin: 0,
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              gap: '0.25rem'
+                                            }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '500' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                  groups
+                                                </span>
+                                                Attendees ({vendorAttendees.length}):
+                                              </div>
+                                              <div style={{ paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                                                {vendorAttendees.map((attendee, aIdx) => (
+                                                  <span key={aIdx} style={{ fontSize: '0.75rem' }}>
+                                                    • {attendee.name || attendee || `Attendee ${aIdx + 1}`}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </div>
-                                  ) : null;
-                                })()}
+                                )}
 
                                 {/* Vendor Participation Requests (for bazaars and booths) - Only show pending and rejected */}
                                 {(event.type === 'bazaar' || event.type === 'booth') && (

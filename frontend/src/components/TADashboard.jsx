@@ -158,15 +158,15 @@ const TADashboard = () => {
                         console.error('Failed to fetch registrations:', registrationsRes.message);
                     }
 
-                    const now = new Date();
-                    
-                    // Filter upcoming events - check both eventDate and event.startDate
-                    const upcoming = registrations.filter(reg => {
-                        const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
-                        if (!eventDate) return false;
-                        const date = new Date(eventDate);
-                        return !isNaN(date.getTime()) && date > now;
-                    });
+                const now = new Date();
+                
+                // Filter upcoming events - check both eventDate and event.startDate
+                const upcoming = registrations.filter(reg => {
+                    const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
+                    if (!eventDate) return false;
+                    const date = new Date(eventDate);
+                    return !isNaN(date.getTime()) && date > now;
+                });
 
                 // Calculate stats
                 const enrolledCount = registrations.length;
@@ -1234,7 +1234,7 @@ const TADashboard = () => {
                                             </span>
                                         </div>
                                         {/* Wallet Icon - Top Right (Red) */}
-                                        <div style={{
+                                    <div style={{
                                             position: 'absolute',
                                             top: '-10px',
                                             right: '-25px',
@@ -1258,16 +1258,16 @@ const TADashboard = () => {
                                             </span>
                                         </div>
                                         {/* Percentage Icon - Bottom Left (Black) */}
-                                        <div style={{
+                                            <div style={{
                                             position: 'absolute',
                                             bottom: '-10px',
                                             left: '-20px',
                                             width: '55px',
                                             height: '55px',
                                             backgroundColor: '#FFFFFF',
-                                            borderRadius: '50%',
-                                            display: 'flex',
-                                            alignItems: 'center',
+                                                borderRadius: '50%',
+                                                display: 'flex',
+                                                alignItems: 'center',
                                             justifyContent: 'center',
                                             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
                                             animation: 'float 3s ease-in-out infinite 0.6s',
@@ -1279,8 +1279,8 @@ const TADashboard = () => {
                                                 color: '#2c2c2c'
                                             }}>
                                                 percent
-                                            </span>
-                                        </div>
+                                                </span>
+                                            </div>
                                         {/* Money Icon - Bottom Right (Gold) */}
                                         <div style={{
                                             position: 'absolute',
@@ -1304,7 +1304,7 @@ const TADashboard = () => {
                                             }}>
                                                 attach_money
                                             </span>
-                                        </div>
+                                            </div>
 
                                         {/* Ad Image Container */}
                                         <div style={{
@@ -1324,7 +1324,7 @@ const TADashboard = () => {
                                                     height: 'auto',
                                                     display: 'block',
                                                     objectFit: 'contain',
-                                                    borderRadius: '0.75rem',
+                                            borderRadius: '0.75rem',
                                                     transition: 'transform 0.5s ease'
                                                 }}
                                                 onError={(e) => {
@@ -1397,10 +1397,10 @@ const TADashboard = () => {
                                         </h2>
 
                                         {/* Description */}
-                                        <p style={{
+                                                <p style={{
                                             fontSize: '1.1rem',
                                             color: '#2c2c2c',
-                                            margin: 0,
+                                                    margin: 0,
                                             marginBottom: '2rem',
                                             lineHeight: '1.6',
                                             fontWeight: '500',
@@ -1422,7 +1422,7 @@ const TADashboard = () => {
                                                 border: 'none',
                                                 borderRadius: '9999px',
                                                 fontSize: '1rem',
-                                                fontWeight: '700',
+                                                    fontWeight: '700',
                                                 cursor: 'pointer',
                                                 transition: 'all 0.3s ease',
                                                 boxShadow: '0 4px 12px rgba(255, 215, 0, 0.4)',
@@ -1453,13 +1453,13 @@ const TADashboard = () => {
                                             color: '#1D3557',
                                             fontSize: '1.125rem',
                                             fontWeight: '600',
-                                            margin: 0
-                                        }}>
+                                                    margin: 0
+                                                }}>
                                             Upcoming Events
                                         </h3>
-                                    </div>
+                                            </div>
 
-                                    <div style={{
+                                        <div style={{
                                         display: 'grid',
                                         gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
                                         gap: '0.85rem'
@@ -1475,14 +1475,14 @@ const TADashboard = () => {
                                                         }
                                                     }}
                                                     style={{
-                                                        backgroundColor: '#FFFFFF',
+                                            backgroundColor: '#FFFFFF',
                                                         borderRadius: '1rem',
                                                         overflow: 'hidden',
                                                         border: '1px solid #e5e7eb',
                                                         boxShadow: '0 12px 20px -6px rgba(15, 23, 42, 0.15)',
                                                         position: 'relative',
                                                         cursor: shouldBlurCard ? 'pointer' : 'default',
-                                                        display: 'flex',
+                                            display: 'flex',
                                                         flexDirection: 'column',
                                                         minHeight: '260px',
                                                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1499,7 +1499,7 @@ const TADashboard = () => {
                                                         e.currentTarget.style.borderColor = '#e5e7eb';
                                                     }}
                                                 >
-                                                    <div style={{
+                                            <div style={{
                                                         height: '200px',
                                                         overflow: 'hidden',
                                                         position: 'relative'
@@ -1524,12 +1524,12 @@ const TADashboard = () => {
                                                                 top: '0.75rem',
                                                                 right: '0.75rem',
                                                                 backgroundColor: 'rgba(255,255,255,0.9)',
-                                                                borderRadius: '50%',
+                                                borderRadius: '50%',
                                                                 border: 'none',
                                                                 width: '2.25rem',
                                                                 height: '2.25rem',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
+                                                display: 'flex',
+                                                alignItems: 'center',
                                                                 justifyContent: 'center',
                                                                 cursor: 'pointer',
                                                                 boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
@@ -1537,17 +1537,17 @@ const TADashboard = () => {
                                                         >
                                                             <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: '#1D3557' }}>
                                                                 favorite
-                                                            </span>
+                                                </span>
                                                         </button>
-                                                    </div>
+                                            </div>
 
                                                     <div style={{ padding: '0.7rem 0.8rem 0.9rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
-                                                        <p style={{
+                                                <p style={{
                                                             color: '#1D3557',
                                                             fontSize: '0.9rem',
                                                             fontWeight: '600',
-                                                            margin: 0
-                                                        }}>
+                                                    margin: 0
+                                                }}>
                                                             {event.title}
                                                         </p>
                                                         {event.rating ? (
@@ -1568,11 +1568,11 @@ const TADashboard = () => {
                                                                             grade
                                                                         </span>
                                                                     ))}
-                                                                </div>
+                                            </div>
                                                                 <span style={{ color: '#6b7280', fontSize: '0.65rem' }}>
                                                                     ({event.ratingCount || '—'})
                                                                 </span>
-                                                            </div>
+                                        </div>
                                                         ) : (
                                                             <p style={{ color: '#9ca3af', fontSize: '0.65rem', margin: 0 }}>
                                                                 Not rated yet
@@ -1598,9 +1598,9 @@ const TADashboard = () => {
                                                             }}
                                                         >
                                                             Discover more events
-                                                        </div>
-                                                    )}
-                                                </div>
+                                    </div>
+                                )}
+                            </div>
                                             );
                                         })}
                                     </div>

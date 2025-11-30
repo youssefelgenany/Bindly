@@ -11,7 +11,8 @@ const EventsOfficeDashboard = () => {
   const [stats, setStats] = useState({
     totalEvents: 0,
     upcomingEvents: 0,
-    pendingApproval: 0
+    pendingApproval: 0,
+    totalVendors: 0
   });
   const [recentActivity, setRecentActivity] = useState([]);
   const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
@@ -35,7 +36,7 @@ const EventsOfficeDashboard = () => {
 
       // Fetch all data in parallel
       // Use minimal=true for events to skip vendor details and speed up dashboard loading
-      const [eventsRes, vendorRequestsRes, notificationsRes, unreadCountRes, vendorNotificationsRes, pendingVendorRes] = await Promise.all([
+      const [eventsRes, vendorRequestsRes, notificationsRes, unreadCountRes, vendorNotificationsRes, pendingVendorRes, vendorsRes] = await Promise.all([
         axios.get('http://localhost:5000/api/events?minimal=true', { headers }).catch(err => {
           console.error('Error fetching events:', err);
           return { data: [] };
@@ -59,6 +60,10 @@ const EventsOfficeDashboard = () => {
         axios.get('http://localhost:5000/api/vendor-requests/pending/notifications?limit=25', { headers }).catch(err => {
           console.error('Error fetching pending vendor notifications:', err);
           return { data: { success: false, notifications: [] } };
+        }),
+        axios.get('http://localhost:5000/api/vendor/', { headers }).catch(err => {
+          console.error('Error fetching vendors:', err);
+          return { data: { success: false, count: 0, vendors: [] } };
         })
       ]);
       
@@ -146,11 +151,20 @@ const EventsOfficeDashboard = () => {
         return startDate > now;
       }).length;
       const pendingApproval = events.filter(e => e.status === 'pending').length;
+      
+      // Get vendors count
+      let totalVendors = 0;
+      if (vendorsRes.data?.success) {
+        totalVendors = vendorsRes.data.count || (vendorsRes.data.vendors?.length || 0);
+      } else if (Array.isArray(vendorsRes.data?.vendors)) {
+        totalVendors = vendorsRes.data.vendors.length;
+      }
 
       setStats({
         totalEvents,
         upcomingEvents,
-        pendingApproval
+        pendingApproval,
+        totalVendors
       });
 
       // Generate recent activities from multiple sources
@@ -163,16 +177,19 @@ const EventsOfficeDashboard = () => {
           const daysDiff = (now - created) / (1000 * 60 * 60 * 24);
           return daysDiff <= 7;
         })
-        .map(event => ({
-          id: event._id,
-          type: 'event_created',
-          eventType: event.type,
-          title: event.title || event.name,
-          timestamp: event.createdAt || event.created,
-          icon: getEventIcon(event.type),
-          action: 'A new event was created',
-          user: event.createdBy?.name || event.createdBy?.firstName || 'Unknown'
-        }));
+        .map(event => {
+          const eventTypeFormatted = formatEventType(event.type);
+          return {
+            id: event._id,
+            type: 'event_created',
+            eventType: event.type,
+            title: event.title || event.name,
+            timestamp: event.createdAt || event.created,
+            icon: getEventIcon(event.type),
+            action: `A new ${eventTypeFormatted}`,
+            user: null
+          };
+        });
 
       // 2. Events that started today or recently
       const startedEvents = events
@@ -205,29 +222,39 @@ const EventsOfficeDashboard = () => {
             'Unknown Vendor';
           const eventName = request.event?.name || request.eventName || 'Event';
           
+          // Determine event type - check for platform booth, booth, standaloneBooth, or bazaar
+          const eventTypeRaw = request.eventType || '';
+          const isPlatformBooth = eventTypeRaw === 'platformBooth' || 
+                                 eventTypeRaw === 'booth' || 
+                                 eventTypeRaw === 'standaloneBooth' ||
+                                 eventTypeRaw.toLowerCase().includes('booth');
+          const eventTypeDisplay = isPlatformBooth ? 'Platform Booth' : 'Bazaar';
+          
           let action = '';
           let icon = 'storefront';
           
           if (request.status === 'accepted') {
-            action = `Vendor request accepted for ${eventName}`;
+            action = `submitted a ${eventTypeDisplay} request for`;
             icon = 'check_circle';
           } else if (request.status === 'rejected') {
-            action = `Vendor request rejected for ${eventName}`;
+            action = `submitted a ${eventTypeDisplay} request for`;
             icon = 'cancel';
           } else {
-            action = `New vendor request from ${vendorName} for ${eventName}`;
+            action = `submitted a ${eventTypeDisplay} request for`;
             icon = 'storefront';
           }
           
           return {
             id: request._id,
             type: 'vendor_request',
-            eventType: request.eventType || 'bazaar',
+            eventType: eventTypeRaw,
+            eventTypeDisplay: eventTypeDisplay,
             title: eventName,
             timestamp: request.createdAt || request.created,
             icon: icon,
             action: action,
-            user: vendorName
+            user: vendorName,
+            status: request.status
           };
         });
 
@@ -285,26 +312,49 @@ const EventsOfficeDashboard = () => {
         })
         .map(event => {
           const deadline = new Date(event.registrationDeadline);
-          const daysDiff = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+          const timeDiff = deadline - now;
+          const msPerMinute = 1000 * 60;
+          const msPerHour = msPerMinute * 60;
+          const msPerDay = msPerHour * 24;
+          
+          // Check if same day
+          const today = new Date(now);
+          today.setHours(0, 0, 0, 0);
+          const deadlineDate = new Date(deadline);
+          deadlineDate.setHours(0, 0, 0, 0);
+          const isToday = deadlineDate.getTime() === today.getTime();
+          const isTomorrow = deadlineDate.getTime() === today.getTime() + msPerDay;
           
           let dueText = '';
           let color = '#eab308'; // Default yellow
           
-          if (daysDiff === 0) {
-            dueText = 'Today';
+          if (isToday) {
+            const hours = Math.floor(timeDiff / msPerHour);
+            const minutes = Math.floor((timeDiff % msPerHour) / msPerMinute);
+            
+            if (hours > 0) {
+              dueText = `In ${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+            } else if (minutes > 0) {
+              dueText = `In ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+            } else {
+              dueText = 'Very soon';
+            }
             color = '#ef4444'; // Red
-          } else if (daysDiff === 1) {
+          } else if (isTomorrow) {
             dueText = 'Tomorrow';
             color = '#ef4444'; // Red
-          } else if (daysDiff <= 3) {
-            dueText = `In ${daysDiff} days`;
-            color = '#f97316'; // Orange
-          } else if (daysDiff <= 7) {
-            dueText = `In ${daysDiff} days`;
-            color = '#eab308'; // Yellow
           } else {
-            dueText = `In ${daysDiff} days`;
-            color = '#eab308'; // Yellow
+            const daysDiff = Math.floor(timeDiff / msPerDay);
+            if (daysDiff <= 3) {
+              dueText = `In ${daysDiff} days`;
+              color = '#f97316'; // Orange
+            } else if (daysDiff <= 7) {
+              dueText = `In ${daysDiff} days`;
+              color = '#eab308'; // Yellow
+            } else {
+              dueText = `In ${daysDiff} days`;
+              color = '#eab308'; // Yellow
+            }
           }
           
           return {
@@ -335,6 +385,31 @@ const EventsOfficeDashboard = () => {
       'gym': 'fitness_center'
     };
     return icons[type?.toLowerCase()] || 'event';
+  };
+
+  const formatEventType = (type) => {
+    if (!type) return 'Event';
+    const typeLower = type.toLowerCase();
+    const typeMap = {
+      'bazaar': 'Bazaar',
+      'trip': 'Trip',
+      'conference': 'Conference',
+      'workshop': 'Workshop',
+      'gym': 'Gym',
+      'booth': 'Booth',
+      'standalonebooth': 'Standalone Booth',
+      'platformbooth': 'Platform Booth'
+    };
+    
+    if (typeMap[typeLower]) {
+      return typeMap[typeLower];
+    }
+    
+    // Handle camelCase: "platformBooth" -> "Platform Booth"
+    return type
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim();
   };
 
   const formatTimeAgo = (date) => {
@@ -1001,39 +1076,69 @@ const EventsOfficeDashboard = () => {
                   </h3>
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    gap: '1.5rem'
+                    gridTemplateColumns: '1fr 1fr 1.25fr 1.25fr',
+                    gap: '0.75rem',
+                    width: '100%',
+                    boxSizing: 'border-box'
                   }}>
                     {/* Total Events Card */}
-                    <div style={{
-                      backgroundColor: '#FFFFFF',
-                      padding: '1.5rem',
-                      borderRadius: '0.5rem',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                    }}>
+                    <div 
+                      onClick={() => navigate('/event-office/events')}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        padding: '1.5rem',
+                        borderRadius: '0.5rem',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        minHeight: '100px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s, box-shadow 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(29, 53, 87, 0.02)';
+                        e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                      }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <div style={{
-                          backgroundColor: '#dbeafe',
+                          backgroundColor: '#fef3c7',
                           padding: '0.75rem',
-                          borderRadius: '50%'
+                          borderRadius: '50%',
+                          flexShrink: 0
                         }}>
-                          <span className="material-symbols-outlined" style={{ color: '#1D3557', fontSize: '1.5rem' }}>
+                          <span className="material-symbols-outlined" style={{ color: '#f59e0b', fontSize: '1.5rem' }}>
                             event
                           </span>
                         </div>
-                        <div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{
                             color: 'rgba(29, 53, 87, 0.6)',
                             fontSize: '0.875rem',
-                            margin: 0
+                            fontWeight: '500',
+                            margin: 0,
+                            marginBottom: '0.25rem',
+                            lineHeight: '1.25',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
                           }}>
-                            Total Events
+                            Events
                           </p>
                           <p style={{
                             color: '#1D3557',
                             fontSize: '1.5rem',
                             fontWeight: '700',
-                            margin: 0
+                            margin: 0,
+                            lineHeight: '1.2'
                           }}>
                             {stats.totalEvents}
                           </p>
@@ -1041,28 +1146,120 @@ const EventsOfficeDashboard = () => {
                       </div>
                     </div>
 
+                    {/* Total Vendors Card */}
+                    <div 
+                      onClick={() => navigate('/event-office/vendors')}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        padding: '1.5rem',
+                        borderRadius: '0.5rem',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        minHeight: '100px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s, box-shadow 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(29, 53, 87, 0.02)';
+                        e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{
+                          backgroundColor: '#d1fae5',
+                          padding: '0.75rem',
+                          borderRadius: '50%',
+                          flexShrink: 0
+                        }}>
+                          <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: '1.5rem' }}>
+                            storefront
+                          </span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{
+                            color: 'rgba(29, 53, 87, 0.6)',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            margin: 0,
+                            marginBottom: '0.25rem',
+                            lineHeight: '1.25',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            Vendors
+                          </p>
+                          <p style={{
+                            color: '#1D3557',
+                            fontSize: '1.5rem',
+                            fontWeight: '700',
+                            margin: 0,
+                            lineHeight: '1.2'
+                          }}>
+                            {stats.totalVendors}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Upcoming Events Card */}
-                    <div style={{
-                      backgroundColor: '#FFFFFF',
-                      padding: '1.5rem',
-                      borderRadius: '0.5rem',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                    }}>
+                    <div 
+                      onClick={() => navigate('/event-office/events')}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        padding: '1.5rem',
+                        borderRadius: '0.5rem',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        minHeight: '100px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s, box-shadow 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(29, 53, 87, 0.02)';
+                        e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                      }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <div style={{
                           backgroundColor: '#dcfce7',
                           padding: '0.75rem',
-                          borderRadius: '50%'
+                          borderRadius: '50%',
+                          flexShrink: 0
                         }}>
                           <span className="material-symbols-outlined" style={{ color: '#15803d', fontSize: '1.5rem' }}>
                             upcoming
                           </span>
                         </div>
-                        <div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{
                             color: 'rgba(29, 53, 87, 0.6)',
                             fontSize: '0.875rem',
-                            margin: 0
+                            fontWeight: '500',
+                            margin: 0,
+                            marginBottom: '0.25rem',
+                            lineHeight: '1.25',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
                           }}>
                             Upcoming Events
                           </p>
@@ -1070,7 +1267,8 @@ const EventsOfficeDashboard = () => {
                             color: '#1D3557',
                             fontSize: '1.5rem',
                             fontWeight: '700',
-                            margin: 0
+                            margin: 0,
+                            lineHeight: '1.2'
                           }}>
                             {stats.upcomingEvents}
                           </p>
@@ -1079,27 +1277,54 @@ const EventsOfficeDashboard = () => {
                     </div>
 
                     {/* Pending Approval Card */}
-                    <div style={{
-                      backgroundColor: '#FFFFFF',
-                      padding: '1.5rem',
-                      borderRadius: '0.5rem',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                    }}>
+                    <div 
+                      onClick={() => navigate('/event-office/events')}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        padding: '1.5rem',
+                        borderRadius: '0.5rem',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        minHeight: '100px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s, box-shadow 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(29, 53, 87, 0.02)';
+                        e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                      }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <div style={{
-                          backgroundColor: '#fed7aa',
+                          backgroundColor: '#fee2e2',
                           padding: '0.75rem',
-                          borderRadius: '50%'
+                          borderRadius: '50%',
+                          flexShrink: 0
                         }}>
-                          <span className="material-symbols-outlined" style={{ color: '#c2410c', fontSize: '1.5rem' }}>
+                          <span className="material-symbols-outlined" style={{ color: '#dc2626', fontSize: '1.5rem' }}>
                             pending_actions
                           </span>
                         </div>
-                        <div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{
                             color: 'rgba(29, 53, 87, 0.6)',
                             fontSize: '0.875rem',
-                            margin: 0
+                            fontWeight: '500',
+                            margin: 0,
+                            marginBottom: '0.25rem',
+                            lineHeight: '1.25',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
                           }}>
                             Pending Approval
                           </p>
@@ -1107,7 +1332,8 @@ const EventsOfficeDashboard = () => {
                             color: '#1D3557',
                             fontSize: '1.5rem',
                             fontWeight: '700',
-                            margin: 0
+                            margin: 0,
+                            lineHeight: '1.2'
                           }}>
                             {stats.pendingApproval}
                           </p>
@@ -1143,90 +1369,141 @@ const EventsOfficeDashboard = () => {
                     flexDirection: 'column',
                     gap: '1rem'
                   }}>
-                    {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
-                      <li key={`${activity.type}-${activity.id}-${index}`} style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '1rem',
-                        padding: activity.type === 'workshop_submission' && !activity.isRead ? '0.75rem' : '0',
-                        backgroundColor: activity.type === 'workshop_submission' && !activity.isRead ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                        borderRadius: activity.type === 'workshop_submission' && !activity.isRead ? '0.5rem' : '0',
-                        borderLeft: activity.type === 'workshop_submission' && !activity.isRead ? '3px solid #3b82f6' : 'none'
-                      }}>
-                        {activity.type === 'workshop_submission' ? (
-                          <div style={{
-                            backgroundColor: '#dbeafe',
+                    {recentActivity.length > 0 ? recentActivity.map((activity, index) => {
+                      // Get redirect URL based on activity type
+                      const getActivityUrl = (act) => {
+                        switch (act.type) {
+                          case 'vendor_request': {
+                            const eventTypeRaw = act.eventType || '';
+                            const isPlatformBooth = eventTypeRaw === 'platformBooth' || 
+                                                   eventTypeRaw === 'booth' || 
+                                                   eventTypeRaw === 'standaloneBooth' ||
+                                                   eventTypeRaw.toLowerCase().includes('booth');
+                            return isPlatformBooth ? '/event-office/platform-booth-requests' : '/event-office/events';
+                          }
+                          case 'event_created':
+                          case 'event_started':
+                            return '/event-office/events';
+                          case 'workshop_submission':
+                            return '/event-office/workshops';
+                          default:
+                            return null;
+                        }
+                      };
+                      
+                      const url = getActivityUrl(activity);
+                      
+                      return (
+                        <li 
+                          key={`${activity.type}-${activity.id}-${index}`} 
+                          onClick={() => url && navigate(url)}
+                          style={{
                             display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '2.5rem',
-                            height: '2.5rem',
-                            borderRadius: '50%',
-                            flexShrink: 0
-                          }}>
-                            <span className="material-symbols-outlined" style={{ color: '#3b82f6', fontSize: '1.25rem' }}>
-                              {activity.icon}
-                            </span>
+                            alignItems: 'flex-start',
+                            gap: '1rem',
+                            padding: activity.type === 'workshop_submission' && !activity.isRead ? '0.75rem' : url ? '0.5rem' : '0',
+                            backgroundColor: activity.type === 'workshop_submission' && !activity.isRead 
+                              ? 'rgba(59, 130, 246, 0.1)' 
+                              : url 
+                                ? 'transparent' 
+                                : 'transparent',
+                            borderRadius: (activity.type === 'workshop_submission' && !activity.isRead) || url ? '0.5rem' : '0',
+                            borderLeft: activity.type === 'workshop_submission' && !activity.isRead ? '3px solid #3b82f6' : 'none',
+                            cursor: url ? 'pointer' : 'default',
+                            transition: url ? 'background-color 0.2s' : 'none'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (url) {
+                              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (url) {
+                              e.currentTarget.style.backgroundColor = activity.type === 'workshop_submission' && !activity.isRead 
+                                ? 'rgba(59, 130, 246, 0.1)' 
+                                : 'transparent';
+                            }
+                          }}
+                        >
+                          {activity.type === 'workshop_submission' ? (
+                            <div style={{
+                              backgroundColor: '#dbeafe',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              borderRadius: '50%',
+                              flexShrink: 0
+                            }}>
+                              <span className="material-symbols-outlined" style={{ color: '#3b82f6', fontSize: '1.25rem' }}>
+                                {activity.icon}
+                              </span>
+                            </div>
+                          ) : activity.user && index === 0 ? (
+                            <div style={{
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              borderRadius: '50%',
+                              backgroundColor: '#e5e7eb',
+                              backgroundImage: user?.profilePicturePath ? `url(http://localhost:5000${user.profilePicturePath})` : 'none',
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                              flexShrink: 0
+                            }}></div>
+                          ) : (
+                            <div style={{
+                              backgroundColor: '#e5e7eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              borderRadius: '50%',
+                              flexShrink: 0
+                            }}>
+                              <span className="material-symbols-outlined" style={{ color: '#6b7280', fontSize: '1.25rem' }}>
+                                {activity.icon}
+                              </span>
+                            </div>
+                          )}
+                          <div style={{ flex: 1 }}>
+                            <p style={{
+                              fontSize: '0.875rem',
+                              color: '#1D3557',
+                              margin: 0,
+                              fontWeight: activity.type === 'workshop_submission' && !activity.isRead ? '600' : '400'
+                            }}>
+                              {activity.type === 'workshop_submission' ? (
+                                <>
+                                  Professor <span style={{ fontWeight: '600', color: '#3b82f6' }}>{activity.professorName}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
+                                </>
+                              ) : activity.user ? (
+                                <>
+                                  <span style={{ fontWeight: '600' }}>{activity.user}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
+                                </>
+                              ) : activity.type === 'event_started' ? (
+                                <>
+                                  {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
+                                </>
+                              ) : (
+                                <>
+                                  {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span> was created.
+                                </>
+                              )}
+                            </p>
+                            <p style={{
+                              fontSize: '0.75rem',
+                              color: 'rgba(29, 53, 87, 0.6)',
+                              marginTop: '0.25rem',
+                              margin: 0
+                            }}>
+                              {formatTimeAgo(activity.timestamp)}
+                            </p>
                           </div>
-                        ) : activity.user && index === 0 ? (
-                          <div style={{
-                            width: '2.5rem',
-                            height: '2.5rem',
-                            borderRadius: '50%',
-                            backgroundColor: '#e5e7eb',
-                            backgroundImage: user?.profilePicturePath ? `url(http://localhost:5000${user.profilePicturePath})` : 'none',
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            flexShrink: 0
-                          }}></div>
-                        ) : (
-                          <div style={{
-                            backgroundColor: '#e5e7eb',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '2.5rem',
-                            height: '2.5rem',
-                            borderRadius: '50%',
-                            flexShrink: 0
-                          }}>
-                            <span className="material-symbols-outlined" style={{ color: '#6b7280', fontSize: '1.25rem' }}>
-                              {activity.icon}
-                            </span>
-                          </div>
-                        )}
-                        <div style={{ flex: 1 }}>
-                          <p style={{
-                            fontSize: '0.875rem',
-                            color: '#1D3557',
-                            margin: 0,
-                            fontWeight: activity.type === 'workshop_submission' && !activity.isRead ? '600' : '400'
-                          }}>
-                            {activity.type === 'workshop_submission' ? (
-                              <>
-                                Professor <span style={{ fontWeight: '600', color: '#3b82f6' }}>{activity.professorName}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
-                              </>
-                            ) : activity.user ? (
-                              <>
-                                <span style={{ fontWeight: '600' }}>{activity.user}</span> {activity.action} the <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
-                              </>
-                            ) : (
-                              <>
-                                {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span> was created.
-                              </>
-                            )}
-                          </p>
-                          <p style={{
-                            fontSize: '0.75rem',
-                            color: 'rgba(29, 53, 87, 0.6)',
-                            marginTop: '0.25rem',
-                            margin: 0
-                          }}>
-                            {formatTimeAgo(activity.timestamp)}
-                          </p>
-                        </div>
-                      </li>
-                    )) : (
+                        </li>
+                      );
+                    }) : (
                       <li style={{ color: '#6b7280', fontSize: '0.875rem' }}>
                         No recent activity
                       </li>
@@ -1267,39 +1544,53 @@ const EventsOfficeDashboard = () => {
                       flexDirection: 'column',
                       gap: '1rem'
                     }}>
-                  {upcomingDeadlines.map((deadline) => (
-                    <li key={deadline.id} style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '0.75rem'
-                    }}>
-                      <div style={{
-                        marginTop: '0.25rem',
-                        width: '0.5rem',
-                        height: '0.5rem',
-                        borderRadius: '50%',
-                        backgroundColor: deadline.color,
-                        flexShrink: 0
-                      }}></div>
-                      <div>
-                        <p style={{
-                          fontWeight: '500',
-                          fontSize: '0.875rem',
-                          color: '#1D3557',
-                          margin: 0
-                        }}>
-                          {deadline.task}
-                        </p>
-                        <p style={{
-                          fontSize: '0.75rem',
-                          color: 'rgba(29, 53, 87, 0.6)',
-                          margin: 0
-                        }}>
-                          Due: {deadline.due}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
+                          {upcomingDeadlines.map((deadline) => (
+                            <li 
+                              key={deadline.id} 
+                              onClick={() => navigate(`/event-office/events?expand=${deadline.id}`)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: '0.75rem',
+                                cursor: 'pointer',
+                                padding: '0.5rem',
+                                borderRadius: '0.5rem',
+                                transition: 'background-color 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(29, 53, 87, 0.02)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }}
+                            >
+                              <div style={{
+                                marginTop: '0.25rem',
+                                width: '0.5rem',
+                                height: '0.5rem',
+                                borderRadius: '50%',
+                                backgroundColor: deadline.color,
+                                flexShrink: 0
+                              }}></div>
+                              <div>
+                                <p style={{
+                                  fontWeight: '500',
+                                  fontSize: '0.875rem',
+                                  color: '#1D3557',
+                                  margin: 0
+                                }}>
+                                  {deadline.task}
+                                </p>
+                                <p style={{
+                                  fontSize: '0.75rem',
+                                  color: 'rgba(29, 53, 87, 0.6)',
+                                  margin: 0
+                                }}>
+                                  Due: {deadline.due}
+                                </p>
+                              </div>
+                            </li>
+                          ))}
                     </ul>
                   </div>
                 </div>

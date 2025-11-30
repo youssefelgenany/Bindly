@@ -85,11 +85,43 @@ const EventsOfficeNotificationBell = () => {
         })
       ]);
 
-      // Handle notifications
+      // Handle notifications - include ALL notification types (workshop_submission, event_announcement, vendor_request, etc.)
       let notificationsData = [];
-      if (notificationsRes.data?.success && notificationsRes.data.data?.notifications) {
-        notificationsData = notificationsRes.data.data.notifications;
+      if (notificationsRes.data?.success) {
+        // Try multiple response structures
+        if (notificationsRes.data.data?.notifications && Array.isArray(notificationsRes.data.data.notifications)) {
+          notificationsData = notificationsRes.data.data.notifications;
+        } else if (Array.isArray(notificationsRes.data.data)) {
+          notificationsData = notificationsRes.data.data;
+        } else if (Array.isArray(notificationsRes.data.notifications)) {
+          notificationsData = notificationsRes.data.notifications;
+        }
+      } else if (Array.isArray(notificationsRes.data)) {
+        notificationsData = notificationsRes.data;
+      } else if (notificationsRes.data?.data && Array.isArray(notificationsRes.data.data)) {
+        notificationsData = notificationsRes.data.data;
       }
+      
+      // Include ALL notification types - don't filter anything out
+      // This ensures workshop_submission, event_announcement, vendor_request, and all other types are shown
+      console.log('📬 Raw notifications from API:', {
+        success: notificationsRes.data?.success,
+        responseStructure: {
+          hasData: !!notificationsRes.data?.data,
+          hasNotifications: !!notificationsRes.data?.data?.notifications,
+          isArray: Array.isArray(notificationsRes.data),
+          keys: notificationsRes.data ? Object.keys(notificationsRes.data) : []
+        },
+        count: notificationsData.length,
+        types: notificationsData.map(n => n?.type).filter(Boolean),
+        sample: notificationsData.slice(0, 5).map(n => ({
+          id: n._id || n.id,
+          type: n.type,
+          title: n.title,
+          isRead: n.isRead
+        }))
+      });
+      
       let vendorNotificationsData = [];
       if (vendorNotificationsRes.data?.success) {
         vendorNotificationsData =
@@ -108,51 +140,87 @@ const EventsOfficeNotificationBell = () => {
       // Also check locally marked-as-read vendor requests (from ref for immediate access)
       const allReadVendorRequestIds = new Set([...readVendorRequestIds, ...markedAsReadVendorRequestsRef.current]);
 
+      // Include ALL pending vendor requests, but mark them as read if they've been read
       const pendingVendorNotifications =
         pendingVendorRes.data?.success && Array.isArray(pendingVendorRes.data.notifications)
           ? pendingVendorRes.data.notifications
-              .filter((req) => {
-                // Only include if there's no corresponding read notification and hasn't been marked as read locally
+              .map((req) => {
                 const requestId = String(req.id || req._id);
-                return !allReadVendorRequestIds.has(requestId);
+                const isRead = allReadVendorRequestIds.has(requestId);
+                
+                // Determine event type - check for platform booth, booth, standaloneBooth, or bazaar
+                const eventTypeRaw = req.eventType || '';
+                const isPlatformBooth = eventTypeRaw === 'platformBooth' || 
+                                       eventTypeRaw === 'booth' || 
+                                       eventTypeRaw === 'standaloneBooth' ||
+                                       eventTypeRaw.toLowerCase().includes('booth');
+                const eventType = isPlatformBooth ? 'Platform Booth' : 'Bazaar';
+                const vendorName = req.vendor?.companyName ||
+                                  `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim() ||
+                                  'Vendor';
+                const eventName = req.event?.name || req.eventName || 'Event';
+                
+                return {
+                  _id: `vendor_req_${req.id || req._id}`,
+                  type: 'vendor_request',
+                  title: vendorName,
+                  message: `${vendorName} submitted a ${eventType} request for "${eventName}".`,
+                  createdAt: req.submittedAt || req.createdAt || new Date().toISOString(),
+                  metadata: {
+                    requestId: requestId, // Store the actual request ID for filtering
+                    vendorName: vendorName,
+                    eventName: eventName,
+                    eventType: eventType,
+                    eventTypeRaw: eventTypeRaw // Store raw eventType for better detection
+                  },
+                  isRead: isRead // Mark as read if it's been read, but still show it
+                };
               })
-              .map((req) => ({
-                _id: `vendor_req_${req.id || req._id}`,
-                type: 'vendor_request',
-                title: req.vendor?.companyName || 'Vendor Request',
-                message: `${req.vendor?.companyName || 'Vendor'} submitted a ${
-                  req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
-                } request for "${req.event?.name || req.eventName || 'Event'}".`,
-                createdAt: req.submittedAt || req.createdAt || new Date().toISOString(),
-                metadata: {
-                  requestId: String(req.id || req._id), // Store the actual request ID for filtering
-                  vendorName:
-                    req.vendor?.companyName ||
-                    `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim() ||
-                    'Vendor',
-                  eventName: req.event?.name || req.eventName || 'Event',
-                  eventType: req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
-                },
-                isRead: false
-              }))
           : [];
 
       const mergedNotificationMap = new Map();
+      
+      // Add all general notifications (workshop_submission, event_announcement, etc.)
       notificationsData.forEach((notif) => {
         const id = notif?._id || notif?.id;
-        if (id) mergedNotificationMap.set(id, notif);
+        if (id && notif) {
+          mergedNotificationMap.set(id, notif);
+        }
       });
+      
+      // Add vendor-specific notifications
       vendorNotificationsData.forEach((notif) => {
         const id = notif?._id || notif?.id;
-        if (id) mergedNotificationMap.set(id, notif);
+        if (id && notif) {
+          mergedNotificationMap.set(id, notif);
+        }
       });
+      
+      // Add pending vendor requests
       pendingVendorNotifications.forEach((notif) => {
         const id = notif?._id || notif?.id;
-        if (id && !mergedNotificationMap.has(id)) mergedNotificationMap.set(id, notif);
+        if (id && notif && !mergedNotificationMap.has(id)) {
+          mergedNotificationMap.set(id, notif);
+        }
       });
+      
       const mergedNotifications = Array.from(mergedNotificationMap.values()).sort(
         (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0)
       );
+
+      console.log('🔔 Final merged notifications:', {
+        total: mergedNotifications.length,
+        byType: mergedNotifications.reduce((acc, n) => {
+          acc[n.type] = (acc[n.type] || 0) + 1;
+          return acc;
+        }, {}),
+        sample: mergedNotifications.slice(0, 5).map(n => ({
+          id: n._id || n.id,
+          type: n.type,
+          title: n.title,
+          isRead: n.isRead
+        }))
+      });
 
       setNotifications(mergedNotifications);
 
@@ -182,6 +250,122 @@ const EventsOfficeNotificationBell = () => {
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays === 1) return '1 day ago';
     return `${diffInDays} days ago`;
+  };
+
+  // Get the redirect URL based on notification type
+  const getNotificationUrl = (notification) => {
+    const metadata = notification.metadata || {};
+    
+    switch (notification.type) {
+      case 'vendor_request': {
+        // Determine event type - prioritize metadata.eventType, then check eventTypeRaw
+        let eventType = metadata.eventType || '';
+        
+        if (!eventType) {
+          // Check eventTypeRaw for platform booth indicators
+          const eventTypeRaw = metadata.eventTypeRaw || '';
+          if (eventTypeRaw === 'platformBooth' || 
+              eventTypeRaw === 'booth' || 
+              eventTypeRaw === 'standaloneBooth' ||
+              eventTypeRaw.toLowerCase().includes('booth')) {
+            eventType = 'Platform Booth';
+          } else {
+            // Check notification message as fallback
+            const message = notification.message || '';
+            if (message.includes('Platform Booth') || message.includes('platform booth')) {
+              eventType = 'Platform Booth';
+            } else {
+              eventType = 'Bazaar';
+            }
+          }
+        }
+        
+        // Platform booth requests go to platform booth requests page
+        if (eventType === 'Platform Booth' || 
+            eventType.includes('Booth') || 
+            eventType.includes('Platform')) {
+          return '/event-office/platform-booth-requests';
+        } else {
+          // Bazaar requests go to events view page
+          return '/event-office/events';
+        }
+      }
+      case 'workshop_submission': {
+        // Redirect to workshops page
+        return '/event-office/workshops';
+      }
+      case 'event_announcement': {
+        // Redirect to events page
+        return '/event-office/events';
+      }
+      case 'event_reminder': {
+        // Redirect to events page
+        return '/event-office/events';
+      }
+      default:
+        return null;
+    }
+  };
+
+  // Get notification display text (for all notification types)
+  const getNotificationDisplay = (notification) => {
+    const metadata = notification.metadata || {};
+    
+    if (notification.type === 'vendor_request') {
+      const vendorName = metadata.vendorName || notification.title || 'Vendor';
+      const eventName = metadata.eventName || 'Event';
+      
+      // Determine event type - prioritize metadata.eventType, then check eventTypeRaw
+      let eventType = metadata.eventType || '';
+      if (!eventType) {
+        // Check eventTypeRaw for platform booth indicators
+        const eventTypeRaw = metadata.eventTypeRaw || '';
+        if (eventTypeRaw === 'platformBooth' || 
+            eventTypeRaw === 'booth' || 
+            eventTypeRaw === 'standaloneBooth' ||
+            eventTypeRaw.toLowerCase().includes('booth')) {
+          eventType = 'Platform Booth';
+        } else {
+          // Check notification message as fallback
+          const message = notification.message || '';
+          if (message.includes('Platform Booth') || message.includes('platform booth')) {
+            eventType = 'Platform Booth';
+          } else {
+            eventType = 'Bazaar'; // Default to Bazaar
+          }
+        }
+      }
+      
+      return {
+        title: vendorName,
+        message: `${vendorName} submitted a ${eventType} request for "${eventName}".`
+      };
+    }
+    
+    if (notification.type === 'event_announcement') {
+      return {
+        title: notification.title || 'New Event',
+        message: notification.message || 'A new event has been added'
+      };
+    }
+    
+    if (notification.type === 'workshop_submission') {
+      const professorName = metadata.professorName || 
+        (metadata.professorFirstName && metadata.professorLastName 
+          ? `${metadata.professorFirstName} ${metadata.professorLastName}`
+          : 'Professor');
+      const workshopName = metadata.workshopName || notification.title?.replace('New Workshop Request: ', '') || 'Workshop';
+      return {
+        title: `Workshop Request: ${workshopName}`,
+        message: `Professor ${professorName} submitted a request for a new workshop "${workshopName}"`
+      };
+    }
+    
+    // Default for all other notification types
+    return {
+      title: notification.title || 'Notification',
+      message: notification.message || ''
+    };
   };
 
   const markAllAsRead = async () => {
@@ -364,11 +548,9 @@ const EventsOfficeNotificationBell = () => {
                     onClick={async () => {
                       const notifId = notif._id || notif.id || `notif-${idx}`;
 
-                      const alreadyHandled = handledNotificationIdsRef.current.has(notifId);
-                      if (!alreadyHandled) handledNotificationIdsRef.current.add(notifId);
-
-                      // Only attempt to mark-as-read / call API if we haven't handled this notif yet
-                      if (!alreadyHandled && !notif.isRead && notifId) {
+                      // IMPORTANT: Only mark as read when user explicitly clicks, NOT automatically
+                      // This fixes the issue where notifications were being auto-marked as read
+                      if (!notif.isRead && notifId) {
                         try {
                           const token = localStorage.getItem('token');
 
@@ -388,6 +570,7 @@ const EventsOfficeNotificationBell = () => {
                             );
                           }
 
+                          // Update local state to mark as read
                           setNotifications(prev => prev.map(n => 
                             (n._id === notifId || n.id === notifId) ? { ...n, isRead: true } : n
                           ));
@@ -397,21 +580,12 @@ const EventsOfficeNotificationBell = () => {
                         }
                       }
 
-                      // Always navigate for event-related notifications, even if already read/handled
-                      if (notif.type === 'new_event' || notif.type === 'event_announcement') {
+                      // Get the redirect URL and navigate
+                      const url = getNotificationUrl(notif);
+                      if (url) {
                         try {
                           setNotificationPanelOpen(false);
-                          navigate('/event-office/events');
-                        } catch (navErr) {
-                          console.error('Navigation error after clicking notification:', navErr);
-                        }
-                      }
-
-                      // Navigate to workshops page for professor workshop submissions
-                      if (notif.type === 'workshop_submission') {
-                        try {
-                          setNotificationPanelOpen(false);
-                          navigate('/event-office/workshops');
+                          navigate(url);
                         } catch (navErr) {
                           console.error('Navigation error after clicking notification:', navErr);
                         }
@@ -450,60 +624,101 @@ const EventsOfficeNotificationBell = () => {
                           color: !notif.isRead ? '#3b82f6' : '#6b7280', 
                           fontSize: '1.25rem' 
                         }}>
-                          {notif.type === 'workshop_submission' ? 'school' : 'notifications'}
+                          {notif.type === 'workshop_submission' ? 'school' : 
+                           notif.type === 'vendor_request' ? 'storefront' :
+                           notif.type === 'event_announcement' ? 'event' :
+                           notif.type === 'event_reminder' ? 'notifications_active' :
+                           notif.type === 'system' ? 'info' :
+                           'notifications'}
                         </span>
                       </div>
                       <div style={{ flex: 1 }}>
-                        {notif.type === 'workshop_submission' ? (
-                          <>
-                            <p style={{
-                              fontSize: '0.875rem',
-                              fontWeight: !notif.isRead ? '600' : '400',
-                              color: '#1D3557',
-                              margin: 0,
-                              marginBottom: '0.25rem'
-                            }}>
-                              Professor {notif.metadata?.professorName || 
-                                (notif.metadata?.professorFirstName && notif.metadata?.professorLastName 
-                                  ? `${notif.metadata.professorFirstName} ${notif.metadata.professorLastName}`
-                                  : notif.message?.match(/Professor\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/)?.[1] || 'Unknown')} submitted a request for a new workshop "{notif.metadata?.workshopName || notif.title?.replace('New Workshop Request: ', '') || 'Workshop'}"
-                            </p>
-                            <p style={{
-                              fontSize: '0.625rem',
-                              color: 'rgba(29, 53, 87, 0.5)',
-                              margin: 0
-                            }}>
-                              {formatTimeAgo(notif.createdAt)}
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <p style={{
-                              fontSize: '0.875rem',
-                              fontWeight: !notif.isRead ? '600' : '400',
-                              color: '#1D3557',
-                              margin: 0,
-                              marginBottom: '0.25rem'
-                            }}>
-                              {notif.title}
-                            </p>
-                            <p style={{
-                              fontSize: '0.75rem',
-                              color: '#6b7280',
-                              margin: 0,
-                              marginBottom: '0.25rem'
-                            }}>
-                              {notif.message}
-                            </p>
-                            <p style={{
-                              fontSize: '0.625rem',
-                              color: 'rgba(29, 53, 87, 0.5)',
-                              margin: 0
-                            }}>
-                              {formatTimeAgo(notif.createdAt)}
-                            </p>
-                          </>
-                        )}
+                        {(() => {
+                          const display = getNotificationDisplay(notif);
+                          if (notif.type === 'workshop_submission') {
+                            return (
+                              <>
+                                <p style={{
+                                  fontSize: '0.875rem',
+                                  fontWeight: !notif.isRead ? '600' : '400',
+                                  color: '#1D3557',
+                                  margin: 0,
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  Professor {notif.metadata?.professorName || 
+                                    (notif.metadata?.professorFirstName && notif.metadata?.professorLastName 
+                                      ? `${notif.metadata.professorFirstName} ${notif.metadata.professorLastName}`
+                                      : notif.message?.match(/Professor\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/)?.[1] || 'Unknown')} submitted a request for a new workshop "{notif.metadata?.workshopName || notif.title?.replace('New Workshop Request: ', '') || 'Workshop'}"
+                                </p>
+                                <p style={{
+                                  fontSize: '0.625rem',
+                                  color: 'rgba(29, 53, 87, 0.5)',
+                                  margin: 0
+                                }}>
+                                  {formatTimeAgo(notif.createdAt)}
+                                </p>
+                              </>
+                            );
+                          } else if (notif.type === 'event_announcement') {
+                            return (
+                              <>
+                                <p style={{
+                                  fontSize: '0.875rem',
+                                  fontWeight: !notif.isRead ? '600' : '400',
+                                  color: '#1D3557',
+                                  margin: 0,
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  {notif.title || 'New Event'}
+                                </p>
+                                <p style={{
+                                  fontSize: '0.75rem',
+                                  color: '#6b7280',
+                                  margin: 0,
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  {notif.message || 'A new event has been added'}
+                                </p>
+                                <p style={{
+                                  fontSize: '0.625rem',
+                                  color: 'rgba(29, 53, 87, 0.5)',
+                                  margin: 0
+                                }}>
+                                  {formatTimeAgo(notif.createdAt)}
+                                </p>
+                              </>
+                            );
+                          } else {
+                            return (
+                              <>
+                                <p style={{
+                                  fontSize: '0.875rem',
+                                  fontWeight: !notif.isRead ? '600' : '400',
+                                  color: '#1D3557',
+                                  margin: 0,
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  {display.title}
+                                </p>
+                                <p style={{
+                                  fontSize: '0.75rem',
+                                  color: '#6b7280',
+                                  margin: 0,
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  {display.message}
+                                </p>
+                                <p style={{
+                                  fontSize: '0.625rem',
+                                  color: 'rgba(29, 53, 87, 0.5)',
+                                  margin: 0
+                                }}>
+                                  {formatTimeAgo(notif.createdAt)}
+                                </p>
+                              </>
+                            );
+                          }
+                        })()}
                       </div>
                       {!notif.isRead && (
                         <div style={{
