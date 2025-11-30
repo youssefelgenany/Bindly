@@ -59,6 +59,7 @@ const courtRoutes = require("./routes/courtRoutes");
 const boothRoutes = require("./routes/boothRoutes");
 const gymSessionRoutes = require("./routes/gymSessionRoutes");
 const devEmailRoutes = require("./routes/devEmailRoutes");
+const devEmailTestRoutes = require("./routes/devEmailTestRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const { verifyByToken } = require("./controllers/authVerifyController");
 
@@ -84,6 +85,7 @@ app.use("/api/notifications", notificationRoutes);
 // Development email routes (only in development)
 if (process.env.NODE_ENV !== 'production') {
   app.use("/api/dev", devEmailRoutes);
+  app.use("/api/dev", devEmailTestRoutes);
 }
 
 // Email verification link route

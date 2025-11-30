@@ -999,8 +999,35 @@ const VendorAcceptedEvents = () => {
                                 ✓ Paid
                               </button>
                             ) : (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleOpenPaymentModal(event); }}
+                              (() => {
+                                // Determine if payment window expired (paymentDeadline set by backend when accepted)
+                                const isExpired = event.paymentDeadline && (new Date() > new Date(event.paymentDeadline));
+                                if (isExpired) {
+                                  return (
+                                    <button
+                                      disabled
+                                      style={{
+                                        padding: '0.75rem 1rem',
+                                        borderRadius: '0.5rem',
+                                        backgroundColor: '#9ca3af',
+                                        color: '#FFFFFF',
+                                        border: 'none',
+                                        cursor: 'not-allowed',
+                                        fontSize: '0.875rem',
+                                        fontWeight: '600',
+                                        opacity: 0.9,
+                                        transition: 'all 0.2s',
+                                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                      }}
+                                    >
+                                      Expired
+                                    </button>
+                                  );
+                                }
+
+                                return (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleOpenPaymentModal(event); }}
                                 style={{
                                   padding: '0.75rem 1rem',
                                   borderRadius: '0.5rem',
@@ -1024,6 +1051,8 @@ const VendorAcceptedEvents = () => {
                               >
                                 Payment
                               </button>
+                                );
+                              })()
                             )}
 
                             {/* Cancel Button - only show if not paid */}
