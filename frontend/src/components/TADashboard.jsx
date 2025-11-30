@@ -145,7 +145,7 @@ const TADashboard = () => {
             // Still fetch registrations for stats
             if (user?.email) {
                 try {
-                    const registrationsRes = await studentRegistrationApi.getMyRegistrations(user.email);
+                    const registrationsRes = await studentRegistrationApi.getMyRegistrations();
                     
                     // Handle different response formats
                     let registrations = [];
@@ -787,6 +787,7 @@ const TADashboard = () => {
                                                     } else if (
                                                         notification.type === 'new_loyalty_partner' ||
                                                         notification.type === 'loyalty_partner_added' ||
+                                                        notification.type === 'loyalty_program_application' ||
                                                         (notification.type === 'system' && notification.metadata?.vendorId)
                                                     ) {
                                                         navigate('/ta/loyalty-vendors');

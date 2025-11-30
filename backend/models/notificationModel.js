@@ -9,7 +9,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['workshop_approved', 'workshop_rejected', 'workshop_edits_requested', 'workshop_submission', 'event_announcement', 'system', 'event_reminder', 'workshop_reminder', 'trip_reminder', 'gym_session_reminder', 'conference_reminder'],
+    enum: ['workshop_approved', 'workshop_rejected', 'workshop_edits_requested', 'workshop_submission', 'event_announcement', 'system', 'event_reminder', 'workshop_reminder', 'trip_reminder', 'gym_session_reminder', 'conference_reminder', 'loyalty_program_application'],
     required: true
   },
   title: {

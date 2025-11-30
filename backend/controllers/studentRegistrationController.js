@@ -73,11 +73,49 @@ exports.registerStudentForEvent = async (req, res) => {
       });
     }
 
-    // Check for duplicate registration - exclude cancelled registrations
+    // Get or create user first to get userId
+    const crypto = require('crypto');
+    const User = require('../models/userModel');
+    
+    // Check if User already exists
+    let user = await User.findOne({ email: studentEmail.toLowerCase().trim() });
+    
+    // Generate verification token and expiry
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    
+    if (!user) {
+      // Create User record if it doesn't exist
+      // Generate a temporary password (user will need to reset it via password reset flow)
+      const tempPassword = crypto.randomBytes(16).toString('hex');
+      
+      user = await User.create({
+        email: studentEmail.toLowerCase().trim(),
+        password: tempPassword, // Temporary password - user should reset via password reset
+        userType: 'Student',
+        gucId: studentId.trim(), // Map studentId to gucId (required field)
+        firstName: studentName.split(' ')[0] || studentName,
+        lastName: studentName.split(' ').slice(1).join(' ') || '',
+        isVerified: false,
+        verificationToken: token,
+        verificationExpiresAt: expiresAt,
+        status: 'blocked'
+      });
+    } else {
+      // Update existing user with new verification token if not already verified
+      if (!user.isVerified) {
+        user.verificationToken = token;
+        user.verificationExpiresAt = expiresAt;
+        await user.save();
+      }
+    }
+
+    // Check for duplicate registration by userId - exclude cancelled registrations
     const existingRegistration = await StudentRegistration.findOne({ 
-      event: eventId, 
-      studentEmail: studentEmail.toLowerCase(),
-      status: { $ne: 'cancelled' } // Exclude cancelled registrations
+      $or: [
+        { event: eventId, student: user._id, status: { $ne: 'cancelled' } },
+        { event: eventId, studentEmail: studentEmail.toLowerCase(), student: { $exists: false }, status: { $ne: 'cancelled' } } // Fallback for old records
+      ]
     });
     
     // If registration exists, check if it's a valid (paid) registration
@@ -106,12 +144,13 @@ exports.registerStudentForEvent = async (req, res) => {
       }
     }
 
-    // Create registration
+    // Create registration with userId
     const registrationData = {
       event: eventId,
+      student: user._id, // Link to userId
       studentName: studentName.trim(),
       studentId: studentId.trim(),
-      studentEmail: studentEmail.toLowerCase().trim(),
+      studentEmail: studentEmail.toLowerCase().trim(), // Keep for backwards compatibility
       eventType: event.type,
     };
 
@@ -314,32 +353,71 @@ exports.getEventRegistrations = async (req, res) => {
   }
 };
 
-// Get student registrations by email (for students to view their own registrations)
+// Get student registrations by userId (for authenticated students to view their own registrations)
 exports.getStudentRegistrationsByEmail = async (req, res) => {
   try {
-    const { email } = req.query;
-
-    console.log('🔍 Student registration search request for email:', email);
-
-    if (!email) {
-      return res.status(400).json({ 
+    // User must be authenticated (route is protected)
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ 
         success: false,
-        message: 'Email is required' 
+        message: 'Authentication required' 
       });
     }
 
-    const registrations = await StudentRegistration.find({ 
-      studentEmail: email.toLowerCase().trim() 
-    })
-    .populate('event', 'title startDate endDate location type description capacity registeredCount')
+    const userId = req.user.id;
+    const User = require('../models/userModel');
+    const user = await User.findById(userId);
+    const email = user?.email;
+
+    console.log('🔍 Student registration search request for userId:', userId, 'email:', email);
+
+    // Query by userId (preferred) with fallback to email for old records
+    const query = {
+      $or: [
+        { student: userId },
+        { studentEmail: email?.toLowerCase()?.trim(), student: { $exists: false } } // Old records without userId
+      ]
+    };
+    
+    const registrations = await StudentRegistration.find(query)
+    .populate('event', 'title startDate endDate location type description capacity registeredCount price')
     .sort({ registeredAt: -1 })
     .lean();
+
+    // Update old records to include userId
+    const oldRecords = registrations.filter(reg => !reg.student);
+    if (oldRecords.length > 0) {
+      await StudentRegistration.updateMany(
+        { _id: { $in: oldRecords.map(r => r._id) }, student: { $exists: false } },
+        { $set: { student: userId } }
+      );
+      // Update the lean results to include student field
+      oldRecords.forEach(reg => {
+        reg.student = userId;
+      });
+    }
 
     console.log('🔍 Found registrations:', registrations.length);
 
     // Format the response - filter out registrations with deleted events
+    // For workshops/trips with price > 0, only include paid registrations
     const formattedRegistrations = registrations
-      .filter(reg => reg.event && reg.event !== null) // Filter out registrations where event was deleted
+      .filter(reg => {
+        // Filter out registrations where event was deleted
+        if (!reg.event || reg.event === null) return false;
+        
+        // For workshops and trips, if event has a price, only show paid registrations
+        const eventType = reg.event?.type || reg.eventType;
+        const eventPrice = reg.event?.price || 0;
+        
+        if ((eventType === 'workshop' || eventType === 'trip') && eventPrice > 0) {
+          // Only include if paid
+          return reg.paid === true;
+        }
+        
+        // For free events or other event types, include all registrations
+        return true;
+      })
       .map(reg => ({
         id: reg._id,
         eventId: reg.event?._id ? String(reg.event._id) : null, // Include event ID for checking registration status

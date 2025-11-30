@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { vendorApi } from '../api/vendorApi';
 import FileChooser from './FileChooser';
 
-const VendorDocumentsModal = ({ onClose, onSuccess }) => {
+const VendorDocumentsModal = ({ onClose, onSuccess, existingTaxCard, existingLogo, isVerified = false }) => {
     const [taxCardFile, setTaxCardFile] = useState(null);
     const [logoFile, setLogoFile] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
+    const [removeTaxCard, setRemoveTaxCard] = useState(false);
+    const [removeLogo, setRemoveLogo] = useState(false);
 
     const handleTaxCardChange = (e) => {
         const file = e.target.files?.[0];
@@ -24,12 +26,50 @@ const VendorDocumentsModal = ({ onClose, onSuccess }) => {
         }
     };
 
+    const handleRemoveTaxCard = () => {
+        setTaxCardFile(null);
+        if (existingTaxCard) {
+            setRemoveTaxCard(true);
+        }
+        // Reset the input element
+        const input = document.getElementById('taxCardInput');
+        if (input) {
+            input.value = '';
+        }
+    };
+
+    const handleRemoveLogo = () => {
+        setLogoFile(null);
+        if (existingLogo) {
+            setRemoveLogo(true);
+        }
+        // Reset the input element
+        const input = document.getElementById('logoInput');
+        if (input) {
+            input.value = '';
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage({ type: '', text: '' });
 
-        if (!taxCardFile && !logoFile) {
+        // Allow submission if:
+        // 1. New files are selected, OR
+        // 2. Removing existing files, OR
+        // 3. Verified (allows keeping existing files or updating)
+        const hasNewFiles = taxCardFile || logoFile;
+        const isRemoving = removeTaxCard || removeLogo;
+        const hasChanges = hasNewFiles || isRemoving;
+        
+        if (!hasChanges && !isVerified) {
             setMessage({ type: 'error', text: 'Please select at least one file to upload.' });
+            return;
+        }
+        
+        // If verified but no changes, user is just viewing - don't submit
+        if (isVerified && !hasChanges) {
+            setMessage({ type: 'info', text: 'No changes to save.' });
             return;
         }
 
@@ -58,9 +98,15 @@ const VendorDocumentsModal = ({ onClose, onSuccess }) => {
             const formData = new FormData();
             if (taxCardFile) {
                 formData.append('vendorTaxCard', taxCardFile);
+            } else if (removeTaxCard) {
+                // Signal to remove tax card
+                formData.append('removeTaxCard', 'true');
             }
             if (logoFile) {
                 formData.append('vendorLogo', logoFile);
+            } else if (removeLogo) {
+                // Signal to remove logo
+                formData.append('removeLogo', 'true');
             }
 
             const result = await vendorApi.uploadDocuments(formData);
@@ -128,7 +174,7 @@ const VendorDocumentsModal = ({ onClose, onSuccess }) => {
                         fontWeight: '600',
                         color: '#1f2937'
                     }}>
-                        Upload Documents
+                        {isVerified ? 'Edit Documents' : 'Upload Documents'}
                     </h2>
                     <button
                         type="button"
@@ -166,38 +212,92 @@ const VendorDocumentsModal = ({ onClose, onSuccess }) => {
                         }}>
                             Tax Card
                         </label>
-                        <div>
+                        {(!taxCardFile && !existingTaxCard) || removeTaxCard ? (
                             <FileChooser
                                 id="taxCardInput"
                                 accept=".pdf,.png,.jpg,.jpeg,.jfif,.jpe,.jif,.webp,.gif,.bmp"
-                                onChange={handleTaxCardChange}
+                                onChange={(e) => {
+                                    handleTaxCardChange(e);
+                                    setRemoveTaxCard(false);
+                                }}
                                 disabled={uploading}
                                 buttonLabel="Choose File"
-                                showName={true}
+                                showName={false}
                                 ariaLabel="Upload tax card"
                             />
-                        </div>
-                        {taxCardFile && (
+                        ) : (
                             <div style={{
-                                marginTop: '0.5rem',
-                                padding: '0.5rem',
-                                backgroundColor: '#f9fafb',
-                                borderRadius: '0.375rem',
-                                fontSize: '0.75rem',
-                                color: '#374151',
-                                display: 'flex',
+                                display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '0.5rem'
+                                gap: '0.5rem',
+                                padding: '0.5rem 0.75rem',
+                                backgroundColor: '#f9fafb',
+                                borderRadius: '0.5rem',
+                                border: '1px solid #e5e7eb',
+                                position: 'relative'
                             }}>
                                 <span className="material-symbols-outlined" style={{
-                                    fontSize: '1rem',
-                                    color: taxCardFile.type === 'application/pdf' ? '#ef4444' : '#3b82f6'
+                                    fontSize: '1.25rem',
+                                    color: (taxCardFile?.type === 'application/pdf' || (existingTaxCard && existingTaxCard.toLowerCase().endsWith('.pdf'))) ? '#ef4444' : '#3b82f6'
                                 }}>
-                                    {taxCardFile.type === 'application/pdf' ? 'description' : 'image'}
+                                    {(taxCardFile?.type === 'application/pdf' || (existingTaxCard && existingTaxCard.toLowerCase().endsWith('.pdf'))) ? 'description' : 'image'}
                                 </span>
-                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {taxCardFile.name}
+                                <span style={{ 
+                                    fontSize: '0.875rem',
+                                    color: '#374151',
+                                    maxWidth: '200px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                }}>
+                                    {taxCardFile ? taxCardFile.name : (existingTaxCard ? existingTaxCard.split('/').pop() : 'Tax Card')}
                                 </span>
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveTaxCard}
+                                    disabled={uploading}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: uploading ? 'not-allowed' : 'pointer',
+                                        padding: '0.25rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#ef4444',
+                                        borderRadius: '50%',
+                                        transition: 'all 0.2s',
+                                        opacity: uploading ? 0.5 : 1
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!uploading) {
+                                            e.target.style.backgroundColor = '#fee2e2';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.backgroundColor = 'transparent';
+                                    }}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                                        close
+                                    </span>
+                                </button>
+                            </div>
+                        )}
+                        {((taxCardFile || existingTaxCard) && !removeTaxCard) && (
+                            <div style={{ marginTop: '0.5rem' }}>
+                                <FileChooser
+                                    id="taxCardInputReplace"
+                                    accept=".pdf,.png,.jpg,.jpeg,.jfif,.jpe,.jif,.webp,.gif,.bmp"
+                                    onChange={(e) => {
+                                        handleTaxCardChange(e);
+                                        setRemoveTaxCard(false);
+                                    }}
+                                    disabled={uploading}
+                                    buttonLabel="Change File"
+                                    showName={false}
+                                    ariaLabel="Replace tax card"
+                                />
                             </div>
                         )}
                     </div>
@@ -213,38 +313,92 @@ const VendorDocumentsModal = ({ onClose, onSuccess }) => {
                         }}>
                             Logo
                         </label>
-                        <div>
+                        {(!logoFile && !existingLogo) || removeLogo ? (
                             <FileChooser
                                 id="logoInput"
                                 accept="image/*"
-                                onChange={handleLogoChange}
+                                onChange={(e) => {
+                                    handleLogoChange(e);
+                                    setRemoveLogo(false);
+                                }}
                                 disabled={uploading}
                                 buttonLabel="Choose File"
-                                showName={true}
+                                showName={false}
                                 ariaLabel="Upload logo"
                             />
-                        </div>
-                        {logoFile && (
+                        ) : (
                             <div style={{
-                                marginTop: '0.5rem',
-                                padding: '0.5rem',
-                                backgroundColor: '#f9fafb',
-                                borderRadius: '0.375rem',
-                                fontSize: '0.75rem',
-                                color: '#374151',
-                                display: 'flex',
+                                display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '0.5rem'
+                                gap: '0.5rem',
+                                padding: '0.5rem 0.75rem',
+                                backgroundColor: '#f9fafb',
+                                borderRadius: '0.5rem',
+                                border: '1px solid #e5e7eb',
+                                position: 'relative'
                             }}>
                                 <span className="material-symbols-outlined" style={{
-                                    fontSize: '1rem',
+                                    fontSize: '1.25rem',
                                     color: '#3b82f6'
                                 }}>
                                     image
                                 </span>
-                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {logoFile.name}
+                                <span style={{ 
+                                    fontSize: '0.875rem',
+                                    color: '#374151',
+                                    maxWidth: '200px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                }}>
+                                    {logoFile ? logoFile.name : (existingLogo ? existingLogo.split('/').pop() : 'Logo')}
                                 </span>
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveLogo}
+                                    disabled={uploading}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: uploading ? 'not-allowed' : 'pointer',
+                                        padding: '0.25rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#ef4444',
+                                        borderRadius: '50%',
+                                        transition: 'all 0.2s',
+                                        opacity: uploading ? 0.5 : 1
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!uploading) {
+                                            e.target.style.backgroundColor = '#fee2e2';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.backgroundColor = 'transparent';
+                                    }}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                                        close
+                                    </span>
+                                </button>
+                            </div>
+                        )}
+                        {((logoFile || existingLogo) && !removeLogo) && (
+                            <div style={{ marginTop: '0.5rem' }}>
+                                <FileChooser
+                                    id="logoInputReplace"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                        handleLogoChange(e);
+                                        setRemoveLogo(false);
+                                    }}
+                                    disabled={uploading}
+                                    buttonLabel="Change File"
+                                    showName={false}
+                                    ariaLabel="Replace logo"
+                                />
                             </div>
                         )}
                     </div>
@@ -294,22 +448,31 @@ const VendorDocumentsModal = ({ onClose, onSuccess }) => {
                     </button>
                     <button
                         type="submit"
-                        disabled={uploading || (!taxCardFile && !logoFile)}
+                        disabled={uploading || (!taxCardFile && !logoFile && !removeTaxCard && !removeLogo && !isVerified)}
                         style={{
                             padding: '0.5rem 1.5rem',
                             borderRadius: '0.375rem',
                             border: 'none',
-                            backgroundColor: uploading || (!taxCardFile && !logoFile) ? '#d1d5db' : '#1e40af',
+                            backgroundColor: uploading || (!taxCardFile && !logoFile && !removeTaxCard && !removeLogo && !isVerified) ? '#d1d5db' : '#1D3557',
                             color: '#FFFFFF',
-                            cursor: uploading || (!taxCardFile && !logoFile) ? 'not-allowed' : 'pointer',
+                            cursor: uploading || (!taxCardFile && !logoFile && !removeTaxCard && !removeLogo && !isVerified) ? 'not-allowed' : 'pointer',
                             fontSize: '0.875rem',
                             fontWeight: '600',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.5rem'
+                            gap: '0.5rem',
+                            transition: 'all 0.2s'
                         }}
-                        onMouseEnter={(e) => !uploading && (taxCardFile || logoFile) && (e.target.style.backgroundColor = '#1e3a8a')}
-                        onMouseLeave={(e) => !uploading && (taxCardFile || logoFile) && (e.target.style.backgroundColor = '#1e40af')}
+                        onMouseEnter={(e) => {
+                            if (!uploading && (taxCardFile || logoFile || removeTaxCard || removeLogo || isVerified)) {
+                                e.target.style.backgroundColor = '#152843';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (!uploading && (taxCardFile || logoFile || removeTaxCard || removeLogo || isVerified)) {
+                                e.target.style.backgroundColor = '#1D3557';
+                            }
+                        }}
                     >
                         {uploading ? (
                             <>

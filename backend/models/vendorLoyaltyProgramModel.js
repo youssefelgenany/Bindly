@@ -2,6 +2,12 @@ const mongoose = require('mongoose');
 
 const vendorLoyaltyProgramSchema = new mongoose.Schema(
   {
+    vendor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: false, // Optional for backwards compatibility with existing records
+      index: true
+    },
     vendorName: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
     category: { type: String, trim: true },
@@ -23,9 +29,16 @@ const vendorLoyaltyProgramSchema = new mongoose.Schema(
   }
 );
 
+// Index on vendor ID to ensure one application per vendor
+vendorLoyaltyProgramSchema.index(
+  { vendor: 1 },
+  { unique: true }
+);
+
+// Keep vendorName index for backwards compatibility and searching
 vendorLoyaltyProgramSchema.index(
   { vendorName: 1 },
-  { unique: true, collation: { locale: 'en', strength: 2 } }
+  { collation: { locale: 'en', strength: 2 } }
 );
 
 module.exports = mongoose.model(

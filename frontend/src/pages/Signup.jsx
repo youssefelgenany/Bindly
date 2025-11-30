@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import FileChooser from '../components/FileChooser';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -19,6 +20,8 @@ const Signup = () => {
   const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: '', color: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [taxCardFile, setTaxCardFile] = useState(null);
+  const [logoFile, setLogoFile] = useState(null);
 
   const { signup } = useAuth();
   const navigate = useNavigate();
@@ -109,13 +112,33 @@ const Signup = () => {
     }
   };
 
-  const handleFileChange = (e) => {
-    const { name, files } = e.target;
-    if (files && files[0]) {
-      setFormData(prev => ({
-        ...prev,
-        [name]: files[0]
-      }));
+  const handleTaxCardChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setTaxCardFile(file);
+    }
+  };
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+    }
+  };
+
+  const handleRemoveTaxCard = () => {
+    setTaxCardFile(null);
+    const input = document.getElementById('taxCardInput');
+    if (input) {
+      input.value = '';
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    const input = document.getElementById('logoInput');
+    if (input) {
+      input.value = '';
     }
   };
 
@@ -227,14 +250,12 @@ const Signup = () => {
         submitData.append('companyName', formData.companyName);
       }
 
-      // If vendor, include uploaded files (logo and tax card) when present
-      if (formData.userType === 'Vendor') {
-        if (formData.vendorLogo) {
-          submitData.append('vendorLogo', formData.vendorLogo);
-        }
-        if (formData.vendorTaxCard) {
-          submitData.append('vendorTaxCard', formData.vendorTaxCard);
-        }
+      // Optional vendor documents
+      if (taxCardFile) {
+        submitData.append('vendorTaxCard', taxCardFile);
+      }
+      if (logoFile) {
+        submitData.append('vendorLogo', logoFile);
       }
 
       const result = await signup(submitData);
@@ -921,57 +942,169 @@ const Signup = () => {
                   </label>
                 </div>
 
-                {/* Vendor file uploads: logo and tax card (styled like other inputs, last entry) */}
+                {/* Optional Vendor Documents */}
                 {formData.userType === 'Vendor' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', marginBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {/* Tax Card Upload */}
                     <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                      <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#1A202C', paddingBottom: '0.5rem' }}>Company Logo (PNG/JPEG/WebP)</p>
-                      <input
-                        type="file"
-                        name="vendorLogo"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        disabled={loading}
-                        style={{
-                          display: 'flex',
-                          width: '100%',
-                          borderRadius: '0.375rem',
-                          border: '1px solid #D1D5DB',
-                          backgroundColor: '#FFFFFF',
-                          padding: '0.75rem 1rem',
-                          fontSize: '1rem',
-                          color: '#1A202C'
-                        }}
-                      />
-                      {formData.vendorLogo && (
-                        <div style={{ fontSize: '0.875rem', color: '#374151', marginTop: '0.25rem' }}>
-                          Selected: {formData.vendorLogo.name}
+                      <p style={{
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        paddingBottom: '0.5rem',
+                        color: '#1A202C',
+                        margin: 0
+                      }}>
+                        Tax Card <span style={{ color: '#6B7280', fontWeight: '400' }}>(Optional)</span>
+                      </p>
+                      {!taxCardFile ? (
+                        <FileChooser
+                          id="taxCardInput"
+                          accept=".pdf,.png,.jpg,.jpeg,.jfif,.jpe,.jif,.webp,.gif,.bmp"
+                          onChange={handleTaxCardChange}
+                          disabled={loading}
+                          buttonLabel="Upload Tax Card"
+                          showName={false}
+                          ariaLabel="Upload tax card"
+                        />
+                      ) : (
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.5rem 0.75rem',
+                          backgroundColor: '#f9fafb',
+                          borderRadius: '0.5rem',
+                          border: '1px solid #e5e7eb',
+                          position: 'relative'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.25rem',
+                            color: taxCardFile.type === 'application/pdf' ? '#ef4444' : '#3b82f6'
+                          }}>
+                            {taxCardFile.type === 'application/pdf' ? 'description' : 'image'}
+                          </span>
+                          <span style={{ 
+                            fontSize: '0.875rem',
+                            color: '#374151',
+                            maxWidth: '200px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {taxCardFile.name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleRemoveTaxCard}
+                            disabled={loading}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: loading ? 'not-allowed' : 'pointer',
+                              padding: '0.25rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#ef4444',
+                              borderRadius: '50%',
+                              transition: 'all 0.2s',
+                              opacity: loading ? 0.5 : 1
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!loading) {
+                                e.target.style.backgroundColor = '#fee2e2';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                              close
+                            </span>
+                          </button>
                         </div>
                       )}
                     </label>
 
+                    {/* Logo Upload */}
                     <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                      <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#1A202C', paddingBottom: '0.5rem' }}>Tax Card (PDF or Image)</p>
-                      <input
-                        type="file"
-                        name="vendorTaxCard"
-                        accept="image/*,application/pdf"
-                        onChange={handleFileChange}
-                        disabled={loading}
-                        style={{
-                          display: 'flex',
-                          width: '100%',
-                          borderRadius: '0.375rem',
-                          border: '1px solid #D1D5DB',
-                          backgroundColor: '#FFFFFF',
-                          padding: '0.75rem 1rem',
-                          fontSize: '1rem',
-                          color: '#1A202C'
-                        }}
-                      />
-                      {formData.vendorTaxCard && (
-                        <div style={{ fontSize: '0.875rem', color: '#374151', marginTop: '0.25rem' }}>
-                          Selected: {formData.vendorTaxCard.name}
+                      <p style={{
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        paddingBottom: '0.5rem',
+                        color: '#1A202C',
+                        margin: 0
+                      }}>
+                        Company Logo <span style={{ color: '#6B7280', fontWeight: '400' }}>(Optional)</span>
+                      </p>
+                      {!logoFile ? (
+                        <FileChooser
+                          id="logoInput"
+                          accept="image/*"
+                          onChange={handleLogoChange}
+                          disabled={loading}
+                          buttonLabel="Upload Logo"
+                          showName={false}
+                          ariaLabel="Upload logo"
+                        />
+                      ) : (
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.5rem 0.75rem',
+                          backgroundColor: '#f9fafb',
+                          borderRadius: '0.5rem',
+                          border: '1px solid #e5e7eb',
+                          position: 'relative'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.25rem',
+                            color: '#3b82f6'
+                          }}>
+                            image
+                          </span>
+                          <span style={{ 
+                            fontSize: '0.875rem',
+                            color: '#374151',
+                            maxWidth: '200px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {logoFile.name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleRemoveLogo}
+                            disabled={loading}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: loading ? 'not-allowed' : 'pointer',
+                              padding: '0.25rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#ef4444',
+                              borderRadius: '50%',
+                              transition: 'all 0.2s',
+                              opacity: loading ? 0.5 : 1
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!loading) {
+                                e.target.style.backgroundColor = '#fee2e2';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                              close
+                            </span>
+                          </button>
                         </div>
                       )}
                     </label>

@@ -3,13 +3,15 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { vendorApi } from '../api/vendorApi';
 import IDUploadModal from '../components/IDUploadModal';
+import VendorDocumentsModal from '../components/VendorDocumentsModal';
 import axios from 'axios';
 
 const VendorAcceptedEvents = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -56,32 +58,49 @@ const VendorAcceptedEvents = () => {
       setError('');
       // Use requests endpoint so we receive requestId and payment fields
       const data = await vendorApi.listMyRequests({ status: 'accepted' });
-      const eventsList = Array.isArray(data?.events) ? data.events : (Array.isArray(data) ? data : []);
+      
+      // Handle different response formats
+      let eventsList = [];
+      if (Array.isArray(data)) {
+        eventsList = data;
+      } else if (data && Array.isArray(data.events)) {
+        eventsList = data.events;
+      } else if (data && data.success !== false) {
+        // If response has success: true but no events array, treat as empty
+        eventsList = [];
+      } else {
+        // If response indicates failure, throw error
+        throw new Error(data?.message || 'Invalid response format');
+      }
 
       // Sort events: upcoming first (nearest first), then past events (most recent past first)
       const now = new Date();
       const upcomingEvents = eventsList.filter(ev => {
-        const startDate = new Date(ev.startDate || ev.date || 0);
+        const startDate = new Date(ev.startDate || ev.date || ev.bazaar?.startDate || ev.booth?.startDate || 0);
         return startDate >= now;
       }).sort((a, b) => {
-        const dateA = new Date(a.startDate || a.date || 0);
-        const dateB = new Date(b.startDate || b.date || 0);
+        const dateA = new Date(a.startDate || a.date || a.bazaar?.startDate || a.booth?.startDate || 0);
+        const dateB = new Date(b.startDate || b.date || b.bazaar?.startDate || b.booth?.startDate || 0);
         return dateA - dateB; // Ascending: nearest first
       });
 
       const pastEvents = eventsList.filter(ev => {
-        const startDate = new Date(ev.startDate || ev.date || 0);
+        const startDate = new Date(ev.startDate || ev.date || ev.bazaar?.startDate || ev.booth?.startDate || 0);
         return startDate < now;
       }).sort((a, b) => {
-        const dateA = new Date(a.startDate || a.date || 0);
-        const dateB = new Date(b.startDate || b.date || 0);
+        const dateA = new Date(a.startDate || a.date || a.bazaar?.startDate || a.booth?.startDate || 0);
+        const dateB = new Date(b.startDate || b.date || b.bazaar?.startDate || b.booth?.startDate || 0);
         return dateB - dateA; // Descending: most recent past first
       });
 
       setEvents([...upcomingEvents, ...pastEvents]);
+      
+      // Clear error if we successfully loaded (even if list is empty)
+      setError('');
     } catch (err) {
       console.error('Error loading accepted events:', err);
-      setError('Failed to load accepted events');
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load accepted events';
+      setError(errorMessage);
       setEvents([]);
     } finally {
       setLoading(false);
@@ -303,14 +322,14 @@ const VendorAcceptedEvents = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF'
+        backgroundColor: '#1D3557'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/vendor" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -321,29 +340,180 @@ const VendorAcceptedEvents = () => {
             </h2>
           </Link>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{
+        
+        {/* Centered Navigation Menu */}
+        <nav style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+          gap: '1.25rem'
+        }}>
+          <Link
+            to="/vendor"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
-              fontWeight: '600',
-              color: '#1D3557',
-              margin: 0
-            }}>
-              {displayName}
-            </p>
-            <p style={{
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              margin: 0
-            }}>
-              Vendor
-            </p>
-          </div>
-          <div
-            data-profile-dropdown
-            style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+              fontWeight: isActiveRoute('/vendor') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
           >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              dashboard
+            </span>
+            Dashboard
+          </Link>
+          <Link
+            to="/vendor/bazaars"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/bazaars') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/bazaars') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/bazaars') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              explore
+            </span>
+            Discover Bazaars
+          </Link>
+          <Link
+            to="/vendor/accepted-events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/accepted-events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/accepted-events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/accepted-events') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              event
+            </span>
+            My Participations
+          </Link>
+          <Link
+            to="/vendor/my-requests"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/my-requests') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/my-requests') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/my-requests') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              description
+            </span>
+            My Applications
+          </Link>
+          <Link
+            to="/vendor/loyalty-program"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/loyalty-program') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/loyalty-program') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/loyalty-program') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              badge
+            </span>
+            Join Loyalty Program
+          </Link>
+        </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {(() => {
+              const hasTaxCard = !!(user?.vendorTaxCardPath || user?.hasTaxCard);
+              const hasLogo = !!(user?.vendorLogoPath || user?.hasLogo);
+              const isVerified = hasTaxCard && hasLogo;
+              
+              return (
+                <div
+                  onClick={!isVerified ? () => setShowDocumentsModal(true) : undefined}
+                  style={{
+                    position: 'relative',
+                    cursor: isVerified ? 'default' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    transition: 'all 0.2s',
+                    alignSelf: 'flex-start',
+                    marginTop: '0.125rem'
+                  }}
+                  onMouseEnter={!isVerified ? (e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  } : undefined}
+                  onMouseLeave={!isVerified ? (e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  } : undefined}
+                  title={!isVerified ? "Verify Account" : undefined}
+                >
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.25rem',
+                    color: isVerified ? '#10b981' : 'rgba(255, 255, 255, 0.7)',
+                    fontVariationSettings: isVerified ? "'FILL' 1" : "'FILL' 0"
+                  }}>
+                    verified
+                  </span>
+                  {!isVerified && (
+                    <div style={{
+                      width: '0.25rem',
+                      height: '0.25rem',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(255, 255, 255, 0.5)'
+                    }}></div>
+                  )}
+                </div>
+              );
+            })()}
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#FFFFFF',
+                margin: 0
+              }}>
+                {displayName}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: 'rgba(255, 255, 255, 0.7)',
+                margin: 0
+              }}>
+                Vendor
+              </p>
+            </div>
+            <div
+              data-profile-dropdown
+              style={{ position: 'relative', cursor: 'pointer' }}
+              onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            >
             {(() => {
               const avatarPath = user?.profilePicturePath || user?.vendorLogoPath;
               const avatarSrc = avatarPath ? (avatarPath.startsWith('http') ? avatarPath : `http://localhost:5000${avatarPath}`) : null;
@@ -363,7 +533,7 @@ const VendorAcceptedEvents = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: '50%',
-                  backgroundColor: '#1D3557',
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -417,73 +587,10 @@ const VendorAcceptedEvents = () => {
                 </button>
               </div>
             )}
+            </div>
           </div>
         </div>
       </header>
-
-      {/* Horizontal Menu Bar */}
-      <nav style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '1rem 2rem',
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #e2e8f0'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <Link
-            to="/vendor"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/vendor/bazaars"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/bazaars') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/bazaars') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/bazaars') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Discover Bazaars
-          </Link>
-          <Link
-            to="/vendor/accepted-events"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/accepted-events') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/accepted-events') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/accepted-events') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Participations
-          </Link>
-          <Link
-            to="/vendor/my-requests"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/my-requests') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/my-requests') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/my-requests') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Applications
-          </Link>
-        </div>
-      </nav>
 
       {/* Main Content */}
       <main style={{
@@ -505,15 +612,38 @@ const VendorAcceptedEvents = () => {
             marginLeft: '4rem',
             marginRight: '4rem'
           }}>
-            {/* Page Title Box */}
+            {/* Page Title Box - Animated */}
             <div style={{
               position: 'relative',
               height: '140px',
               borderRadius: '0.75rem',
               overflow: 'hidden',
               marginBottom: '1.5rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              animation: 'fadeInUp 0.6s ease-out'
             }}>
+              <style>{`
+                @keyframes fadeInUp {
+                  from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                  }
+                  to {
+                    opacity: 1;
+                    transform: translateY(0);
+                  }
+                }
+                @keyframes slideInRight {
+                  from {
+                    opacity: 0;
+                    transform: translateX(30px);
+                  }
+                  to {
+                    opacity: 1;
+                    transform: translateX(0);
+                  }
+                }
+              `}</style>
               {/* Background Image */}
               <div style={{
                 position: 'absolute',
@@ -547,7 +677,8 @@ const VendorAcceptedEvents = () => {
                   fontSize: '1.75rem',
                   fontWeight: '700',
                   margin: 0,
-                  marginBottom: '0.5rem'
+                  marginBottom: '0.5rem',
+                  animation: 'slideInRight 0.8s ease-out'
                 }}>
                   My Participations
                 </h3>
@@ -555,94 +686,90 @@ const VendorAcceptedEvents = () => {
                   color: 'rgba(255, 255, 255, 0.9)',
                   fontSize: '0.875rem',
                   fontWeight: '400',
-                  margin: 0
+                  margin: 0,
+                  animation: 'slideInRight 0.8s ease-out 0.2s both'
                 }}>
                   View all upcoming bazaars and booth setups you are participating in (accepted requests only).
                 </p>
               </div>
             </div>
 
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-              gap: '1.5rem'
-            }}>
-              {loading ? (
+            {loading ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '4rem 2rem',
+                color: '#6b7280',
+                fontSize: '0.875rem'
+              }} >
                 <div style={{
-                  textAlign: 'center',
-                  padding: '4rem 2rem',
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  border: '3px solid #e5e7eb',
+                  borderTop: '3px solid #1e40af',
+                  borderRadius: '50%',
+                  margin: '0 auto 1rem',
+                  display: 'inline-block'
+                }} className="spinner"></div>
+                <p style={{ margin: 0, color: '#6b7280' }}>Loading accepted events...</p>
+              </div >
+            ) : error && error !== 'No accepted events found' ? (
+              <div style={{
+                padding: '0.75rem 1rem',
+                marginBottom: '1.5rem',
+                borderRadius: '0.375rem',
+                backgroundColor: '#fee2e2',
+                color: '#991b1b',
+                fontSize: '0.875rem'
+              }}>
+                {error}
+              </div>
+            ) : events.length === 0 ? (
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '0.75rem',
+                padding: '4rem 2rem',
+                textAlign: 'center',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+              }}>
+                <div style={{
+                  fontSize: '3rem',
+                  marginBottom: '1rem',
+                  opacity: 0.5
+                }}>📅</div>
+                <p style={{
+                  color: '#374151',
+                  fontSize: '1.125rem',
+                  fontWeight: '500',
+                  marginBottom: '0.5rem',
+                  marginTop: 0
+                }}>
+                  No accepted events found
+                </p>
+                <p style={{
                   color: '#6b7280',
-                  fontSize: '0.875rem'
-                }} >
-                  <div style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    border: '3px solid #e5e7eb',
-                    borderTop: '3px solid #1e40af',
-                    borderRadius: '50%',
-                    margin: '0 auto 1rem',
-                    display: 'inline-block'
-                  }} className="spinner"></div>
-                  <p style={{ margin: 0, color: '#6b7280' }}>Loading accepted events...</p>
-                </div >
-              ) : error ? (
-                <div style={{
-                  padding: '0.75rem 1rem',
+                  fontSize: '0.875rem',
                   marginBottom: '1.5rem',
-                  borderRadius: '0.375rem',
-                  backgroundColor: '#fee2e2',
-                  color: '#991b1b',
-                  fontSize: '0.875rem'
+                  marginTop: 0
                 }}>
-                  {error}
-                </div>
-              ) : events.length === 0 ? (
+                  You haven't been accepted to any events yet.
+                </p>
+              </div>
+            ) : (
+              <>
                 <div style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '0.75rem',
-                  padding: '4rem 2rem',
-                  textAlign: 'center',
-                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+                  marginBottom: '1.5rem',
+                  color: '#6b7280',
+                  fontSize: '0.875rem',
+                  fontWeight: '500'
                 }}>
-                  <div style={{
-                    fontSize: '3rem',
-                    marginBottom: '1rem',
-                    opacity: 0.5
-                  }}>📅</div>
-                  <p style={{
-                    color: '#374151',
-                    fontSize: '1.125rem',
-                    fontWeight: '500',
-                    marginBottom: '0.5rem',
-                    marginTop: 0
-                  }}>
-                    No accepted events found
-                  </p>
-                  <p style={{
-                    color: '#6b7280',
-                    fontSize: '0.875rem',
-                    marginBottom: '1.5rem',
-                    marginTop: 0
-                  }}>
-                    You haven't been accepted to any events yet.
-                  </p>
+                  Found {events.length} participation{events.length !== 1 ? 's' : ''}
                 </div>
-              ) : (
-                <>
-                  <div style={{
-                    marginBottom: '1.5rem',
-                    color: '#6b7280',
-                    fontSize: '0.875rem',
-                    fontWeight: '500'
-                  }}>
-                    Found {events.length} participation{events.length !== 1 ? 's' : ''}
-                  </div>
 
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-                    gap: '1.5rem'
-                  }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                  gap: '1.5rem'
+                }}>
                     {events.map((event) => {
                       const eventId = event._id || event.id;
                       const eventType = event.type || event.eventType || 'bazaar';
@@ -1087,10 +1214,9 @@ const VendorAcceptedEvents = () => {
                         </div>
                       );
                     })}
-                  </div>
-                </>
-              )}
-            </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </main>
@@ -1108,7 +1234,28 @@ const VendorAcceptedEvents = () => {
       }
 
       {/* Vendor payments now use the full-page flow at /vendor-requests/:requestId/payment */}
-    </div >
+
+      {/* Vendor Documents Modal */}
+      {showDocumentsModal && (
+        <VendorDocumentsModal
+          onClose={() => setShowDocumentsModal(false)}
+          onSuccess={(vendorData) => {
+            if (vendorData) {
+              const updatedUser = { ...user };
+              if (vendorData.taxCardPath !== null && vendorData.taxCardPath !== undefined) {
+                updatedUser.vendorTaxCardPath = vendorData.taxCardPath;
+              }
+              if (vendorData.logoPath !== null && vendorData.logoPath !== undefined) {
+                updatedUser.vendorLogoPath = vendorData.logoPath;
+              }
+              updatedUser.hasTaxCard = vendorData.hasTaxCard !== undefined ? vendorData.hasTaxCard : !!vendorData.taxCardPath;
+              updatedUser.hasLogo = vendorData.hasLogo !== undefined ? vendorData.hasLogo : !!vendorData.logoPath;
+              updateUser(updatedUser);
+            }
+          }}
+        />
+      )}
+    </div>
   );
 };
 

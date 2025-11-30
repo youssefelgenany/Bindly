@@ -128,8 +128,13 @@ export const vendorApi = {
 
     // Get my loyalty application
     getMyLoyaltyApplication: async () => {
-        const res = await api.get('/loyalty-program/my-application');
-        return res.data;
+        try {
+            const res = await api.get('/loyalty-program/my-application');
+            return res.data;
+        } catch (error) {
+            // Re-throw the error so the component can handle 404 properly
+            throw error;
+        }
     }
     ,
     // Cancel my loyalty application
