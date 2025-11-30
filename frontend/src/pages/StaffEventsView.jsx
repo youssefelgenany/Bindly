@@ -508,8 +508,13 @@ const StaffEventsView = () => {
     if (!dateString) return null;
     const eventDate = new Date(dateString);
     const today = new Date();
-    const diffTime = eventDate - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Set both dates to midnight for accurate day comparison
+    const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    
+    const diffTime = eventDateOnly - todayOnly;
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays < 0) return null;
     if (diffDays === 0) return 'Today';
@@ -1787,20 +1792,11 @@ const StaffEventsView = () => {
                       
                         <div style={{
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
-                          color: '#6b7280'
+                          flexDirection: 'column',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem',
+                          flex: 1
                         }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            location_on
-                          </span>
-                          <span>{event.location}</span>
-                        </div>
-                        {event.price && (
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1812,14 +1808,10 @@ const StaffEventsView = () => {
                               fontSize: '1.125rem',
                               color: '#9ca3af'
                             }}>
-                              attach_money
+                              calendar_today
                             </span>
-                            <span style={{ fontWeight: '500', color: '#059669' }}>
-                              {(event.type === 'trip' || event.type === 'workshop') ? `${event.price} EGP` : `$${event.price}`}
-                            </span>
+                            <span>{formatDate(event.startDate)}</span>
                           </div>
-                        )}
-                        {event.capacity && (
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1831,12 +1823,47 @@ const StaffEventsView = () => {
                               fontSize: '1.125rem',
                               color: '#9ca3af'
                             }}>
-                              people
+                              location_on
                             </span>
                             <span>{event.location}</span>
                           </div>
-                        )}
-                        {(event.type === 'bazaar' || event.type === 'booth') && event.vendors && (
+                          {event.price && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.625rem',
+                              fontSize: '0.8125rem',
+                              color: '#6b7280'
+                            }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.125rem',
+                                color: '#9ca3af'
+                              }}>
+                                attach_money
+                              </span>
+                              <span style={{ fontWeight: '500', color: '#059669' }}>
+                                {(event.type === 'trip' || event.type === 'workshop') ? `${event.price} EGP` : `$${event.price}`}
+                              </span>
+                            </div>
+                          )}
+                          {event.capacity && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.625rem',
+                              fontSize: '0.8125rem',
+                              color: '#6b7280'
+                            }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1.125rem',
+                                color: '#9ca3af'
+                              }}>
+                                people
+                              </span>
+                              <span>{event.registeredCount || 0}/{event.capacity} registered</span>
+                            </div>
+                          )}
+                          {(event.type === 'bazaar' || event.type === 'booth') && (
                             <div style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -1872,6 +1899,7 @@ const StaffEventsView = () => {
                               </span>
                             </div>
                           )}
+                        </div>
 
                         {event.description && (
                           <p style={{
@@ -2557,7 +2585,7 @@ const StaffEventsView = () => {
                 </div>
               )}
 
-              {(selectedEvent.type === 'workshop' || selectedEvent.type === 'trip' || selectedEvent.type === 'bazaar' || selectedEvent.type === 'conference' || selectedEvent.type === 'booth') && (
+              {(selectedEvent.type === 'workshop' || selectedEvent.type === 'trip') && (
                 registeredEventIds.has(String(selectedEvent.id)) ? (
                   <button
                     disabled
@@ -2610,7 +2638,7 @@ const StaffEventsView = () => {
                       e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
                     }}
                   >
-                    Register for {selectedEvent.type === 'workshop' ? 'Workshop' : selectedEvent.type === 'trip' ? 'Trip' : selectedEvent.type === 'bazaar' ? 'Bazaar' : selectedEvent.type === 'conference' ? 'Conference' : selectedEvent.type === 'booth' ? 'Booth' : 'Event'}
+                    Register for {selectedEvent.type === 'workshop' ? 'Workshop' : selectedEvent.type === 'trip' ? 'Trip' : 'Event'}
                   </button>
                 )
               )}

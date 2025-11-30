@@ -530,8 +530,13 @@ const StudentMyRegistrations = () => {
     if (!dateString) return null;
     const eventDate = new Date(dateString);
     const today = new Date();
-    const diffTime = eventDate - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Set both dates to midnight for accurate day comparison
+    const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    
+    const diffTime = eventDateOnly - todayOnly;
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays < 0) return 'Past';
     if (diffDays === 0) return 'Today';

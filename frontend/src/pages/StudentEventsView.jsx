@@ -562,8 +562,13 @@ const StudentEventsView = () => {
     if (!dateString) return null;
     const eventDate = new Date(dateString);
     const today = new Date();
-    const diffTime = eventDate - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Set both dates to midnight for accurate day comparison
+    const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    
+    const diffTime = eventDateOnly - todayOnly;
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays < 0) return null;
     if (diffDays === 0) return 'Today';
@@ -2088,7 +2093,7 @@ const StudentEventsView = () => {
                       </button>
                     </div>
 
-                    {(event.type === 'workshop' || event.type === 'trip' || event.type === 'bazaar' || event.type === 'conference' || event.type === 'booth') && (
+                    {(event.type === 'workshop' || event.type === 'trip') && (
                           isRegistered ? (
                         <button
                           disabled
@@ -2142,7 +2147,7 @@ const StudentEventsView = () => {
                             e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
                           }}
                         >
-                          Register for {event.type === 'workshop' ? 'Workshop' : event.type === 'trip' ? 'Trip' : event.type === 'bazaar' ? 'Bazaar' : event.type === 'conference' ? 'Conference' : event.type === 'booth' ? 'Booth' : 'Event'}
+                          Register for {event.type === 'workshop' ? 'Workshop' : event.type === 'trip' ? 'Trip' : 'Event'}
                         </button>
                       )
                     )}
@@ -2576,7 +2581,7 @@ const StudentEventsView = () => {
                 </div>
               )}
 
-              {(selectedEvent.type === 'workshop' || selectedEvent.type === 'trip' || selectedEvent.type === 'bazaar' || selectedEvent.type === 'conference' || selectedEvent.type === 'booth') && (
+              {(selectedEvent.type === 'workshop' || selectedEvent.type === 'trip') && (
                 registeredEventIds.has(String(selectedEvent.id)) ? (
                   <button
                     disabled
@@ -2629,7 +2634,7 @@ const StudentEventsView = () => {
                       e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
                     }}
                   >
-                    Register for {selectedEvent.type === 'workshop' ? 'Workshop' : selectedEvent.type === 'trip' ? 'Trip' : selectedEvent.type === 'bazaar' ? 'Bazaar' : selectedEvent.type === 'conference' ? 'Conference' : selectedEvent.type === 'booth' ? 'Booth' : 'Event'}
+                    Register for {selectedEvent.type === 'workshop' ? 'Workshop' : selectedEvent.type === 'trip' ? 'Trip' : 'Event'}
                   </button>
                 )
               )}
