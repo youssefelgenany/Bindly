@@ -133,7 +133,16 @@ exports.registerStudentForEvent = async (req, res) => {
     
     // Check if User already exists
     let user = await User.findOne({ email: studentEmail.toLowerCase().trim() });
-    
+    if (!user) {
+      user = new User({
+        email: studentEmail,
+        name: studentName,
+        userType: 'Student',
+        gucId: studentId, // map to gucId
+        password: tempPassword
+      });
+      await user.save();  // <-- fails here
+}
     // Generate verification token and expiry
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
@@ -147,7 +156,6 @@ exports.registerStudentForEvent = async (req, res) => {
         email: studentEmail.toLowerCase().trim(),
         password: tempPassword, // Temporary password - user should reset via password reset
         userType: 'Student',
-        gucId: studentId.trim(), // Map studentId to gucId (required field)
         firstName: studentName.split(' ')[0] || studentName,
         lastName: studentName.split(' ').slice(1).join(' ') || '',
         isVerified: false,
@@ -320,20 +328,6 @@ exports.getStudentRegistrationsByEmail = async (req, res) => {
       });
     }
 
-    // Check if a user with this email exists - if not, return empty (user was deleted)
-    const User = require('../models/userModel');
-    const userExists = await User.findOne({ email: email.toLowerCase().trim() });
-    
-    // If no user exists with this email, return empty (user was deleted, registrations should be cleaned up)
-    if (!userExists) {
-      console.log('⚠️ No user found for email:', email, '- returning empty registrations (user may have been deleted)');
-      return res.json({
-        success: true,
-        registrations: [],
-        count: 0
-      });
-    }
-    
     const registrations = await StudentRegistration.find({ 
       studentEmail: email.toLowerCase().trim() 
     })

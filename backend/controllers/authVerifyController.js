@@ -29,15 +29,8 @@ exports.verifyByToken = async (req, res) => {
     user.verificationToken = null;
     user.verificationExpiresAt = null;
 
-    // Set status to active after verification for students and Staff/TA/Professor
-    if (user.status === 'blocked') {
-      if (user.userType === 'Student' || ['Staff', 'TA', 'Professor'].includes(user.userType)) {
-        user.status = 'active';
-      }
-    }
-
     await user.save();
-    console.log(`✅ verifyByToken: User ${user.email} verified and activated`);
+    console.log(`✅ verifyByToken: User ${user.email} verified`);
 
     const redirectUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     res.redirect(`${redirectUrl}/login`);
