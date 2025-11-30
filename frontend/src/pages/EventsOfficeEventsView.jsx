@@ -2135,64 +2135,6 @@ const EventsOfficeEventsView = () => {
                             textAlign: 'right'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                              {/* Workshop Accept/Reject buttons */}
-                              {event.type === 'workshop' && event.status === 'pending' && (
-                                <>
-                                  <button
-                                    onClick={() => handleEventStatusChange(event.id, 'approved')}
-                                    disabled={!!processingIds[event.id]}
-                                    style={{
-                                      padding: '0.5rem',
-                                      borderRadius: '0.5rem',
-                                      border: 'none',
-                                      backgroundColor: 'transparent',
-                                      color: canEdit ? '#137fec' : '#d1d5db',
-                                      cursor: canEdit ? 'pointer' : 'not-allowed',
-                                      opacity: canEdit ? 1 : 0.5
-                                    }}
-                                    title={canEdit ? 'Accept Workshop' : 'Workshop already accepted'}
-                                    onMouseEnter={(e) => {
-                                      if (canEdit) {
-                                        e.target.style.backgroundColor = '#f3f4f6';
-                                        e.target.style.color = '#137fec';
-                                      }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      if (canEdit) {
-                                        e.target.style.backgroundColor = 'transparent';
-                                        e.target.style.color = '#137fec';
-                                      }
-                                    }}
-                                  >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                      check_circle
-                                    </span>
-                                  </button>
-                                  <button
-                                    onClick={() => handleEventStatusChange(event.id, 'rejected')}
-                                    disabled={!!processingIds[event.id]}
-                                    style={{
-                                      padding: '0.5rem',
-                                      borderRadius: '0.5rem',
-                                      border: 'none',
-                                      backgroundColor: 'transparent',
-                                      color: '#ef4444',
-                                      cursor: 'pointer'
-                                    }}
-                                    title="Reject Workshop"
-                                    onMouseEnter={(e) => {
-                                      e.target.style.backgroundColor = '#fee2e2';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.target.style.backgroundColor = 'transparent';
-                                    }}
-                                  >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                      cancel
-                                    </span>
-                                  </button>
-                                </>
-                              )}
                               
                               {/* Edit Button */}
               <button
