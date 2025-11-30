@@ -3,12 +3,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { vendorApi } from '../api/vendorApi';
 import BoothApplicationForm from '../components/BoothApplicationForm';
+import VendorDocumentsModal from '../components/VendorDocumentsModal';
 
 const VendorBazaars = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [bazaars, setBazaars] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,6 +18,7 @@ const VendorBazaars = () => {
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [selectedBooth, setSelectedBooth] = useState(null);
   const [showBoothForm, setShowBoothForm] = useState(false);
+  const [appliedBazaarIds, setAppliedBazaarIds] = useState(new Set());
 
   const isActiveRoute = (path) => {
     const currentPath = location.pathname;
@@ -51,8 +54,29 @@ const VendorBazaars = () => {
     try {
       setLoading(true);
       setError('');
-      const data = await vendorApi.listUpcoming('bazaar');
-      const list = Array.isArray(data) ? data : [];
+      const [bazaarData, pendingRequests, acceptedRequests] = await Promise.all([
+        vendorApi.listUpcoming('bazaar'),
+        vendorApi.listMyRequests({ status: 'pending', type: 'bazaar' }).catch(() => ({ events: [] })),
+        vendorApi.listMyRequests({ status: 'accepted', type: 'bazaar' }).catch(() => ({ events: [] }))
+      ]);
+      
+      const list = Array.isArray(bazaarData) ? bazaarData : [];
+      
+      // Get all applied bazaar IDs (pending, accepted, or rejected)
+      const appliedIds = new Set();
+      const allRequests = [
+        ...(Array.isArray(pendingRequests?.events) ? pendingRequests.events : []),
+        ...(Array.isArray(acceptedRequests?.events) ? acceptedRequests.events : [])
+      ];
+      
+      allRequests.forEach(req => {
+        const eventId = req.eventId || req.bazaar?._id || req.bazaar || req._id;
+        if (eventId) {
+          appliedIds.add(String(eventId));
+        }
+      });
+      
+      setAppliedBazaarIds(appliedIds);
       setBazaars(list);
     } catch (e) {
       setBazaars([]);
@@ -124,6 +148,12 @@ const VendorBazaars = () => {
       }
       
       const result = await vendorApi.applyToEvent(applicationData);
+      
+      // Reload bazaars to update applied status
+      if (result && result.success) {
+        await loadBazaars();
+      }
+      
       return result;
     } catch (error) {
       console.error('❌ Error in handleBoothApplicationSubmit:', error);
@@ -279,14 +309,14 @@ const VendorBazaars = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF'
+        backgroundColor: '#1D3557'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/vendor" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -297,25 +327,176 @@ const VendorBazaars = () => {
             </h2>
           </Link>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{
+        
+        {/* Centered Navigation Menu */}
+        <nav style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+          gap: '1.25rem'
+        }}>
+          <Link
+            to="/vendor"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
-              fontWeight: '600',
-              color: '#1D3557',
-              margin: 0
-            }}>
-              {displayName}
-            </p>
-            <p style={{
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              margin: 0
-            }}>
-              Vendor
-            </p>
-          </div>
-          <div 
+              fontWeight: isActiveRoute('/vendor') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              dashboard
+            </span>
+            Dashboard
+          </Link>
+          <Link
+            to="/vendor/bazaars"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/bazaars') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/bazaars') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/bazaars') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              explore
+            </span>
+            Discover Bazaars
+          </Link>
+          <Link
+            to="/vendor/accepted-events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/accepted-events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/accepted-events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/accepted-events') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              event
+            </span>
+            My Participations
+          </Link>
+          <Link
+            to="/vendor/my-requests"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/my-requests') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/my-requests') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/my-requests') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              description
+            </span>
+            My Applications
+          </Link>
+          <Link
+            to="/vendor/loyalty-program"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/loyalty-program') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/loyalty-program') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/loyalty-program') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              badge
+            </span>
+            Join Loyalty Program
+          </Link>
+        </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {(() => {
+              const hasTaxCard = !!(user?.vendorTaxCardPath || user?.hasTaxCard);
+              const hasLogo = !!(user?.vendorLogoPath || user?.hasLogo);
+              const isVerified = hasTaxCard && hasLogo;
+              
+              return (
+                <div
+                  onClick={!isVerified ? () => setShowDocumentsModal(true) : undefined}
+                  style={{
+                    position: 'relative',
+                    cursor: isVerified ? 'default' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    transition: 'all 0.2s',
+                    alignSelf: 'flex-start',
+                    marginTop: '0.125rem'
+                  }}
+                  onMouseEnter={!isVerified ? (e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  } : undefined}
+                  onMouseLeave={!isVerified ? (e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  } : undefined}
+                  title={!isVerified ? "Verify Account" : undefined}
+                >
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.25rem',
+                    color: isVerified ? '#10b981' : 'rgba(255, 255, 255, 0.7)',
+                    fontVariationSettings: isVerified ? "'FILL' 1" : "'FILL' 0"
+                  }}>
+                    verified
+                  </span>
+                  {!isVerified && (
+                    <div style={{
+                      width: '0.25rem',
+                      height: '0.25rem',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(255, 255, 255, 0.5)'
+                    }}></div>
+                  )}
+                </div>
+              );
+            })()}
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#FFFFFF',
+                margin: 0
+              }}>
+                {displayName}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: 'rgba(255, 255, 255, 0.7)',
+                margin: 0
+              }}>
+                Vendor
+              </p>
+            </div>
+            <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
             onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
@@ -339,7 +520,7 @@ const VendorBazaars = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: '50%',
-                  backgroundColor: '#1D3557',
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -393,73 +574,10 @@ const VendorBazaars = () => {
                 </button>
               </div>
             )}
+            </div>
           </div>
         </div>
       </header>
-
-      {/* Horizontal Menu Bar */}
-      <nav style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '1rem 2rem',
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #e2e8f0'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <Link
-            to="/vendor"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/vendor/bazaars"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/bazaars') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/bazaars') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/bazaars') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Discover Bazaars
-          </Link>
-          <Link
-            to="/vendor/accepted-events"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/accepted-events') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/accepted-events') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/accepted-events') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Participations
-          </Link>
-          <Link
-            to="/vendor/my-requests"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/my-requests') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/my-requests') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/my-requests') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Applications
-          </Link>
-        </div>
-      </nav>
 
       {/* Main Content */}
       <main style={{
@@ -481,15 +599,38 @@ const VendorBazaars = () => {
             marginLeft: '4rem',
             marginRight: '4rem'
           }}>
-          {/* Page Title Banner */}
+          {/* Page Title Banner - Animated */}
           <div style={{
             position: 'relative',
             height: '140px',
             borderRadius: '0.75rem',
             overflow: 'hidden',
             marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            animation: 'fadeInUp 0.6s ease-out'
           }}>
+            <style>{`
+              @keyframes fadeInUp {
+                from {
+                  opacity: 0;
+                  transform: translateY(20px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+              }
+              @keyframes slideInRight {
+                from {
+                  opacity: 0;
+                  transform: translateX(30px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateX(0);
+                }
+              }
+            `}</style>
             {/* Background Image */}
             <div style={{
               position: 'absolute',
@@ -523,7 +664,8 @@ const VendorBazaars = () => {
                 fontSize: '1.75rem',
                 fontWeight: '700',
                 margin: 0,
-                marginBottom: '0.5rem'
+                marginBottom: '0.5rem',
+                animation: 'slideInRight 0.8s ease-out'
               }}>
                 Discover Bazaars
               </h3>
@@ -531,7 +673,8 @@ const VendorBazaars = () => {
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '0.875rem',
                 fontWeight: '400',
-                margin: 0
+                margin: 0,
+                animation: 'slideInRight 0.8s ease-out 0.2s both'
               }}>
                 Browse and apply to upcoming bazaars.
               </p>
@@ -762,6 +905,8 @@ const VendorBazaars = () => {
                   const eventName = event.name || event.title || 'Untitled Bazaar';
                   const startDate = event.startDate || event.date;
                   const isUpcoming = startDate ? new Date(startDate) > new Date() : true;
+                  const eventId = event._id || event.id;
+                  const hasApplied = appliedBazaarIds.has(String(eventId));
 
                   return (
                     <div
@@ -957,7 +1102,7 @@ const VendorBazaars = () => {
                           </p>
                         )}
 
-                        {isUpcoming && (
+                        {isUpcoming && !hasApplied && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -994,6 +1139,31 @@ const VendorBazaars = () => {
                             Apply to Bazaar
                           </button>
                         )}
+                        {hasApplied && (
+                          <button
+                            disabled
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '0.5rem',
+                              backgroundColor: '#10b981',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              cursor: 'not-allowed',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              marginTop: 'auto',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.5rem',
+                              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
+                            Registered
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -1012,6 +1182,27 @@ const VendorBazaars = () => {
           bazaar={selectedBooth.bazaar || { name: selectedBooth.booth.name || 'Bazaar' }}
           onClose={closeBoothForm}
           onSubmit={handleBoothApplicationSubmit}
+        />
+      )}
+
+      {/* Vendor Documents Modal */}
+      {showDocumentsModal && (
+        <VendorDocumentsModal
+          onClose={() => setShowDocumentsModal(false)}
+          onSuccess={(vendorData) => {
+            if (vendorData) {
+              const updatedUser = { ...user };
+              if (vendorData.taxCardPath !== null && vendorData.taxCardPath !== undefined) {
+                updatedUser.vendorTaxCardPath = vendorData.taxCardPath;
+              }
+              if (vendorData.logoPath !== null && vendorData.logoPath !== undefined) {
+                updatedUser.vendorLogoPath = vendorData.logoPath;
+              }
+              updatedUser.hasTaxCard = vendorData.hasTaxCard !== undefined ? vendorData.hasTaxCard : !!vendorData.taxCardPath;
+              updatedUser.hasLogo = vendorData.hasLogo !== undefined ? vendorData.hasLogo : !!vendorData.logoPath;
+              updateUser(updatedUser);
+            }
+          }}
         />
       )}
     </div>

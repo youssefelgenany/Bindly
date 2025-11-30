@@ -362,19 +362,71 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
                                         />
                                     </div>
                                         <div>
-                                            <FileChooser
-                                                id={`attendeeFile_${idx}`}
-                                                accept="image/*,application/pdf"
-                                                onChange={(e) => handleFileChange(e, idx)}
-                                                disabled={submitting}
-                                                buttonLabel="Choose File"
-                                                showName={true}
-                                                ariaLabel={`Attendee ${idx + 1} ID file`}
-                                            />
-                                            {formData.attendeeFiles && formData.attendeeFiles[idx] && (
-                                                <div style={{ marginTop: '0.25rem', color: '#374151', fontSize: '0.75rem' }}>
-                                                    {formData.attendeeFiles[idx].name}
+                                            {formData.attendeeFiles && formData.attendeeFiles[idx] ? (
+                                                <div style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem',
+                                                    padding: '0.5rem 0.75rem',
+                                                    backgroundColor: '#f9fafb',
+                                                    borderRadius: '0.5rem',
+                                                    border: '1px solid #e5e7eb'
+                                                }}>
+                                                    <span className="material-symbols-outlined" style={{
+                                                        fontSize: '1.25rem',
+                                                        color: formData.attendeeFiles[idx].type === 'application/pdf' ? '#ef4444' : '#3b82f6'
+                                                    }}>
+                                                        {formData.attendeeFiles[idx].type === 'application/pdf' ? 'description' : 'image'}
+                                                    </span>
+                                                    <span style={{
+                                                        flex: 1,
+                                                        fontSize: '0.875rem',
+                                                        color: '#374151',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        {formData.attendeeFiles[idx].name}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const nextFiles = [...(formData.attendeeFiles || [])];
+                                                            nextFiles[idx] = null;
+                                                            setFormData(prev => ({ ...prev, attendeeFiles: nextFiles }));
+                                                            // Reset the file input
+                                                            const fileInput = document.getElementById(`attendeeFile_${idx}`);
+                                                            if (fileInput) fileInput.value = '';
+                                                        }}
+                                                        disabled={submitting}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            cursor: submitting ? 'not-allowed' : 'pointer',
+                                                            padding: '0.25rem',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            color: '#ef4444',
+                                                            opacity: submitting ? 0.5 : 1
+                                                        }}
+                                                        title="Remove file"
+                                                    >
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                                            close
+                                                        </span>
+                                                    </button>
                                                 </div>
+                                            ) : (
+                                                <FileChooser
+                                                    id={`attendeeFile_${idx}`}
+                                                    accept="image/*,application/pdf"
+                                                    onChange={(e) => handleFileChange(e, idx)}
+                                                    disabled={submitting}
+                                                    buttonLabel="Upload ID"
+                                                    showName={false}
+                                                    ariaLabel={`Attendee ${idx + 1} ID file`}
+                                                />
                                             )}
                                         </div>
                                     {formData.attendees.length > 1 && (

@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AdminUsers from './pages/AdminUsers';
 import AdminVendors from './pages/AdminVendors';
-import AdminEvents from './pages/AdminEvents';
 import AdminEventsView from './pages/AdminEventsView';
 import AdminPlatformBoothRequests from './pages/AdminPlatformBoothRequests';
 import AdminProfile from './pages/AdminProfile';
@@ -756,16 +755,6 @@ const AppContent = () => {
             <ProtectedRoute>
               <AdminOnly>
                 <AdminVendors />
-              </AdminOnly>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/events"
-          element={
-            <ProtectedRoute>
-              <AdminOnly>
-                <AdminEvents />
               </AdminOnly>
             </ProtectedRoute>
           }

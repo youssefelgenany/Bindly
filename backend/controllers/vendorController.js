@@ -922,12 +922,21 @@ module.exports.applyToLoyaltyProgram = async (req, res) => {
     }
 
     // Check if vendor already has an active loyalty program application
+    // Use vendor ID, with fallback to vendorName for old records
+    const vendorName = vendor.companyName || `${vendor.firstName} ${vendor.lastName}`;
     const existingApplication = await VendorLoyaltyProgram.findOne({
-      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`,
-      isActive: true
+      $or: [
+        { vendor: vendorId, isActive: true },
+        { vendorName: vendorName, vendor: { $exists: false }, isActive: true } // Old records
+      ]
     });
 
     if (existingApplication) {
+      // Update old records to have vendor field
+      if (!existingApplication.vendor) {
+        existingApplication.vendor = vendorId;
+        await existingApplication.save();
+      }
       return res.status(400).json({
         success: false,
         message: 'You already have an active loyalty program application. Update it instead.'
@@ -936,12 +945,16 @@ module.exports.applyToLoyaltyProgram = async (req, res) => {
 
     // If there's an inactive application, reactivate it instead of creating a new one
     const inactiveApplication = await VendorLoyaltyProgram.findOne({
-      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`,
-      isActive: false
+      $or: [
+        { vendor: vendorId, isActive: false },
+        { vendorName: vendorName, vendor: { $exists: false }, isActive: false } // Old records
+      ]
     });
 
     if (inactiveApplication) {
       // Reactivate and update the existing application
+      inactiveApplication.vendor = vendorId; // Ensure vendor ID is set
+      inactiveApplication.vendorName = vendor.companyName || `${vendor.firstName} ${vendor.lastName}`; // Update name in case it changed
       inactiveApplication.discountRate = discountRate;
       inactiveApplication.discountType = discountType || 'percentage';
       inactiveApplication.promoCode = promoCode.toUpperCase();
@@ -955,6 +968,15 @@ module.exports.applyToLoyaltyProgram = async (req, res) => {
         vendor.vendorLogoPath || vendor.logoUrl || vendor.companyLogo
       );
       await inactiveApplication.save();
+
+      // Notify Staff, TA, Professor, and Student users about the reactivated loyalty program application
+      try {
+        const notificationService = require('../services/notificationService');
+        await notificationService.notifyLoyaltyProgramApplication(inactiveApplication, vendor);
+      } catch (notifError) {
+        console.error('Error creating loyalty program application notification:', notifError);
+        // Don't fail the request if notification fails
+      }
 
       return res.status(200).json({
         success: true,
@@ -977,6 +999,7 @@ module.exports.applyToLoyaltyProgram = async (req, res) => {
 
     // Create new loyalty program application
     const loyaltyApplication = new VendorLoyaltyProgram({
+      vendor: vendorId,
       vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`,
       description: description || '',
       category: category || '',
@@ -993,6 +1016,15 @@ module.exports.applyToLoyaltyProgram = async (req, res) => {
     });
 
     await loyaltyApplication.save();
+
+    // Notify Staff, TA, Professor, and Student users about the new loyalty program application
+    try {
+      const notificationService = require('../services/notificationService');
+      await notificationService.notifyLoyaltyProgramApplication(loyaltyApplication, vendor);
+    } catch (notifError) {
+      console.error('Error creating loyalty program application notification:', notifError);
+      // Don't fail the request if notification fails
+    }
 
     return res.status(201).json({
       success: true,
@@ -1034,9 +1066,14 @@ module.exports.getMyLoyaltyApplication = async (req, res) => {
       });
     }
 
-    // Find vendor's loyalty program application (active or inactive)
+    // Find vendor's loyalty program application (active or inactive) by vendor ID
+    // Fallback to vendorName for backwards compatibility with old records
+    const vendorName = vendor.companyName || `${vendor.firstName} ${vendor.lastName}`;
     const application = await VendorLoyaltyProgram.findOne({
-      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`
+      $or: [
+        { vendor: vendorId },
+        { vendorName: vendorName, vendor: { $exists: false } } // Only match by name if vendor field doesn't exist (old records)
+      ]
     });
 
     if (!application) {
@@ -1044,6 +1081,12 @@ module.exports.getMyLoyaltyApplication = async (req, res) => {
         success: false,
         message: 'No loyalty program application found'
       });
+    }
+    
+    // If application exists but doesn't have vendor field, update it
+    if (!application.vendor) {
+      application.vendor = vendorId;
+      await application.save();
     }
 
     return res.status(200).json({
@@ -1090,9 +1133,9 @@ module.exports.updateLoyaltyApplication = async (req, res) => {
       });
     }
 
-    // Find vendor's loyalty program application
+    // Find vendor's loyalty program application by vendor ID
     const application = await VendorLoyaltyProgram.findOne({
-      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`
+      vendor: vendorId
     });
 
     if (!application) {
@@ -1176,9 +1219,14 @@ module.exports.cancelLoyaltyProgram = async (req, res) => {
       });
     }
 
-    // Find vendor's loyalty program application (active or inactive)
+    // Find vendor's loyalty program application (active or inactive) by vendor ID
+    // Fallback to vendorName for backwards compatibility with old records
+    const vendorName = vendor.companyName || `${vendor.firstName} ${vendor.lastName}`;
     const application = await VendorLoyaltyProgram.findOne({
-      vendorName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`
+      $or: [
+        { vendor: vendorId },
+        { vendorName: vendorName, vendor: { $exists: false } } // Old records
+      ]
     });
 
     if (!application) {
@@ -1186,6 +1234,12 @@ module.exports.cancelLoyaltyProgram = async (req, res) => {
         success: false,
         message: 'No loyalty program application found to cancel'
       });
+    }
+    
+    // If application exists but doesn't have vendor field, update it
+    if (!application.vendor) {
+      application.vendor = vendorId;
+      await application.save();
     }
 
     // Check if already inactive

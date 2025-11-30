@@ -324,7 +324,7 @@ const StudentEventsView = () => {
         // Load student registrations (StudentRegistration model) - only for workshops/trips
         if (user.email) {
           try {
-            const studentRegResult = await studentRegistrationApi.getMyRegistrations(user.email);
+            const studentRegResult = await studentRegistrationApi.getMyRegistrations();
             if (studentRegResult.success && studentRegResult.data?.registrations) {
               studentRegResult.data.registrations.forEach(reg => {
                 // Only include paid registrations
@@ -509,7 +509,7 @@ const StudentEventsView = () => {
     const loadUserRegistrations = async () => {
       if (!user?.email) return;
       try {
-        const result = await studentRegistrationApi.getMyRegistrations(user.email);
+        const result = await studentRegistrationApi.getMyRegistrations();
         if (result.success && result.data.registrations) {
           const registeredIds = new Set();
           result.data.registrations.forEach(reg => {
@@ -1190,6 +1190,7 @@ const StudentEventsView = () => {
                           } else if (
                             notification.type === 'new_loyalty_partner' || 
                             notification.type === 'loyalty_partner_added' ||
+                            notification.type === 'loyalty_program_application' ||
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
                             // Navigate to Loyalty Partners page

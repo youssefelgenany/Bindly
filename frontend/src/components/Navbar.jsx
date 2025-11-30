@@ -419,7 +419,7 @@ const Navbar = () => {
                     Vendor Requests
                   </Link>
                   <Link
-                    to="/admin/events"
+                    to="/admin/events-view"
                     className="btn btn-outline"
                     style={{ width: '100%' }}
                     onClick={closeSidebar}

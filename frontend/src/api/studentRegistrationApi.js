@@ -18,10 +18,15 @@ export const studentRegistrationApi = {
     }
   },
 
-  // Get student registrations by email
-  getMyRegistrations: async (email) => {
+  // Get student registrations by userId (authenticated)
+  getMyRegistrations: async () => {
     try {
-      const response = await axios.get(`${API_BASE}/student-registrations/my-registrations?email=${encodeURIComponent(email)}`);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE}/student-registrations/my-registrations`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Error fetching my registrations:', error);

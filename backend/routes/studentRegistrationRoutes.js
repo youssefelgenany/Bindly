@@ -14,8 +14,8 @@ const { protect, permit } = require('../middleware/authMiddleware');
 // Register a student for a workshop or trip (public - no auth required)
 router.post('/:eventId/register', registerStudentForEvent);
 
-// Get student registrations by email (public - for students to view their own)
-router.get('/my-registrations', getStudentRegistrationsByEmail);
+// Get student registrations by userId (protected - requires authentication)
+router.get('/my-registrations', protect, getStudentRegistrationsByEmail);
 
 // Get registrations for a specific event (protected - for event organizers)
 router.get('/:eventId/registrations', protect, getEventRegistrations);
