@@ -166,50 +166,6 @@ exports.registerStudentForEvent = async (req, res) => {
     registrationData.paid = eventPrice <= 0;
 
     const registration = await StudentRegistration.create(registrationData);
-
-    const crypto = require('crypto');
-    const User = require('../models/userModel');
-    
-    // Check if User already exists
-    let user = await User.findOne({ email: studentEmail.toLowerCase().trim() });
-    if (!user) {
-      user = new User({
-        email: studentEmail,
-        name: studentName,
-        userType: 'Student',
-        gucId: studentId, // map to gucId
-        password: tempPassword
-      });
-      await user.save();  // <-- fails here
-}
-    // Generate verification token and expiry
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-    
-    if (!user) {
-      // Create User record if it doesn't exist
-      // Generate a temporary password (user will need to reset it via password reset flow)
-      const tempPassword = crypto.randomBytes(16).toString('hex');
-      
-      user = await User.create({
-        email: studentEmail.toLowerCase().trim(),
-        password: tempPassword, // Temporary password - user should reset via password reset
-        userType: 'Student',
-        firstName: studentName.split(' ')[0] || studentName,
-        lastName: studentName.split(' ').slice(1).join(' ') || '',
-        isVerified: false,
-        verificationToken: token,
-        verificationExpiresAt: expiresAt,
-        status: 'blocked'
-      });
-    } else {
-      // Update existing user with new verification token if not already verified
-      if (!user.isVerified) {
-        user.verificationToken = token;
-        user.verificationExpiresAt = expiresAt;
-        await user.save();
-      }
-    }
     
     // Only send verification email if user is not already verified
     if (!user.isVerified) {
