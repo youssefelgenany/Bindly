@@ -30,34 +30,40 @@ exports.assignRoleAndSendVerification = async (req, res) => {
         : user.email.split('@')[0]; // fallback to email prefix
     }
 
-    // Update userType and generate verification token
-    // User must click verification link in email to verify their account
+    // Update userType - but keep isVerified as false until they click email link
+    // Admin assigning a role is approval, but user still needs to verify via email
     user.userType = role;
-    user.isVerified = false; // Keep user unverified until they click the email link
-    user.status = 'active'; // Activate the account when admin assigns role
-    // Generate verification token - user must click link to verify
+    // Keep isVerified as false - user must click verification link in email
+    // Generate new verification token for email confirmation
     user.verificationToken = crypto.randomBytes(32).toString("hex");
-    user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    user.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await user.save();
 
     // Send verification email (use first + last name if available)
-    const name = user.firstName ? `${user.firstName} ${user.lastName}` : user.name;
-    const emailResult = await sendVerificationEmail(user.email, user.verificationToken, name);
+    const name = user.firstName 
+      ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`.trim() 
+      : (user.name || user.email.split('@')[0]);
     
-    if (emailResult.sent) {
+    console.log('📧 Sending verification email to:', user.email, 'with name:', name, 'token:', user.verificationToken);
+    const emailResult = await sendVerificationEmail(user.email, user.verificationToken, name);
+    console.log('📧 Email result:', emailResult);
+    
+    if (emailResult && emailResult.sent) {
       console.log('✅ Verification email sent successfully to:', user.email);
       res.json({ 
-        msg: "Role assigned and verification email sent successfully. User must click the verification link to activate their account.", 
+        msg: "Role assigned and verification email sent successfully.", 
         token: user.verificationToken,
         emailSent: true
       });
     } else {
-      console.error('❌ Verification email not sent:', emailResult.reason || emailResult.error);
+      const errorReason = emailResult?.reason || emailResult?.error || 'Unknown error';
+      console.error('❌ Verification email not sent:', errorReason);
+      console.error('❌ Full email result:', JSON.stringify(emailResult, null, 2));
       res.json({ 
-        msg: "Role assigned successfully, but verification email could not be sent. " + (emailResult.reason || emailResult.error || "Please try sending the email again.") + " User must click the verification link to activate their account.", 
+        msg: "Role assigned successfully, but verification email could not be sent. " + errorReason + ". Please try sending the email again.", 
         token: user.verificationToken,
         emailSent: false,
-        emailError: emailResult.reason || emailResult.error
+        emailError: errorReason
       });
     }
   } catch (err) {
@@ -360,12 +366,9 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    // Normalize email to lowercase (emails are stored in lowercase)
-    const normalizedEmail = email ? email.toLowerCase().trim() : user.email;
-    
     // Check if email is already taken by another user
-    if (normalizedEmail !== user.email) {
-      const existingUser = await User.findOne({ email: normalizedEmail });
+    if (email !== user.email) {
+      const existingUser = await User.findOne({ email });
       if (existingUser) {
         return res.status(400).json({
           success: false,
@@ -377,7 +380,7 @@ exports.updateProfile = async (req, res) => {
     // Update user profile
     user.firstName = firstName;
     user.lastName = lastName;
-    user.email = normalizedEmail;
+    user.email = email;
     await user.save();
 
     res.status(200).json({

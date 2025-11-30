@@ -184,9 +184,8 @@ module.exports = async (req, res) => {
     // Send receipt email
     console.log('📧 Sending receipt email...');
     if (user) {
-      // Get user's name for greeting (works for all user types: Student, Staff, TA, Professor, Vendor)
-      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.companyName || user.email;
-      console.log('📧 User type:', user.userType || 'Unknown', 'Email:', user.email);
+      // Get vendor's personal name for greeting
+      const vendorPersonalName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.companyName || user.email;
       let receiptDetails = {};
       
       if (payment.vendorRequest) {
@@ -205,7 +204,7 @@ module.exports = async (req, res) => {
       try {
         const emailResult = await sendReceiptEmail(
           user.email,
-          userName,
+          vendorPersonalName,
           eventTitle,
           payment.amount,
           'card',
