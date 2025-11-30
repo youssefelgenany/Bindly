@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { notificationApiService } from '../api/notificationApi';
 import { vendorRequestApi } from '../api/vendorRequestApi';
@@ -38,10 +39,28 @@ const getNotificationDisplay = (notification) => {
         notification.vendorName ||
         'Vendor';
       const eventName = metadata.eventName || notification.eventName || 'Event';
-      const eventType =
-        metadata.eventType ||
-        (metadata.eventTypeRaw || '').replace(/_/g, ' ') ||
-        'Bazaar';
+      
+      // Determine event type - prioritize metadata.eventType, then check eventTypeRaw
+      let eventType = metadata.eventType;
+      if (!eventType) {
+        // Check eventTypeRaw for platform booth indicators
+        const eventTypeRaw = metadata.eventTypeRaw || '';
+        if (eventTypeRaw === 'platformBooth' || 
+            eventTypeRaw === 'booth' || 
+            eventTypeRaw === 'standaloneBooth' ||
+            eventTypeRaw.toLowerCase().includes('booth')) {
+          eventType = 'Platform Booth';
+        } else {
+          // Check notification message as fallback
+          const message = notification.message || '';
+          if (message.includes('Platform Booth') || message.includes('platform booth')) {
+            eventType = 'Platform Booth';
+          } else {
+            eventType = 'Bazaar'; // Default to Bazaar
+          }
+        }
+      }
+      
       return {
         icon: 'storefront',
         title: vendorName,
@@ -94,8 +113,10 @@ const VendorNotificationBell = ({
   label = 'Notifications',
   bellColor = '#FFFFFF',
   pollIntervalMs = 30000,
-  style = {}
+  style = {},
+  managePath = '/admin/platform-booth-requests' // Default path for vendor requests
 }) => {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -158,7 +179,8 @@ const VendorNotificationBell = ({
       // Handle notifications response
       let generalNotifications = [];
       if (notificationsRes.data?.success) {
-        if (notificationsRes.data.data?.notifications) {
+        // API returns { success: true, data: { notifications, total, unreadCount, ... } }
+        if (notificationsRes.data.data?.notifications && Array.isArray(notificationsRes.data.data.notifications)) {
           generalNotifications = notificationsRes.data.data.notifications;
         } else if (Array.isArray(notificationsRes.data.data)) {
           generalNotifications = notificationsRes.data.data;
@@ -167,12 +189,15 @@ const VendorNotificationBell = ({
         }
       } else if (Array.isArray(notificationsRes.data)) {
         generalNotifications = notificationsRes.data;
+      } else if (notificationsRes.data?.data && Array.isArray(notificationsRes.data.data)) {
+        generalNotifications = notificationsRes.data.data;
       }
 
       // Handle vendor notifications response
       let vendorNotifications = [];
       if (vendorNotificationsRes.data?.success) {
-        if (vendorNotificationsRes.data.data?.notifications) {
+        // API returns { success: true, data: { notifications, total, unreadCount, ... } }
+        if (vendorNotificationsRes.data.data?.notifications && Array.isArray(vendorNotificationsRes.data.data.notifications)) {
           vendorNotifications = vendorNotificationsRes.data.data.notifications;
         } else if (Array.isArray(vendorNotificationsRes.data.data)) {
           vendorNotifications = vendorNotificationsRes.data.data;
@@ -181,6 +206,8 @@ const VendorNotificationBell = ({
         }
       } else if (Array.isArray(vendorNotificationsRes.data)) {
         vendorNotifications = vendorNotificationsRes.data;
+      } else if (vendorNotificationsRes.data?.data && Array.isArray(vendorNotificationsRes.data.data)) {
+        vendorNotifications = vendorNotificationsRes.data.data;
       }
 
       console.log('📬 Raw API Responses:', {
@@ -188,10 +215,33 @@ const VendorNotificationBell = ({
         vendorRes: vendorNotificationsRes.data,
         pendingRes: pendingVendorRes.data,
         generalCount: generalNotifications.length,
-        vendorCount: vendorNotifications.length
+        vendorCount: vendorNotifications.length,
+        generalNotifications: generalNotifications,
+        vendorNotifications: vendorNotifications
       });
 
-      // Create a set of read notification request IDs to filter out pending vendor requests that are already read
+      // Debug: Log if we're not getting notifications
+      if (generalNotifications.length === 0 && vendorNotifications.length === 0) {
+        console.warn('⚠️ No notifications found from API. Response structures:', {
+          generalResponseStructure: {
+            success: notificationsRes.data?.success,
+            hasData: !!notificationsRes.data?.data,
+            hasNotifications: !!notificationsRes.data?.data?.notifications,
+            isArray: Array.isArray(notificationsRes.data?.data),
+            keys: notificationsRes.data ? Object.keys(notificationsRes.data) : []
+          },
+          vendorResponseStructure: {
+            success: vendorNotificationsRes.data?.success,
+            hasData: !!vendorNotificationsRes.data?.data,
+            hasNotifications: !!vendorNotificationsRes.data?.data?.notifications,
+            isArray: Array.isArray(vendorNotificationsRes.data?.data),
+            keys: vendorNotificationsRes.data ? Object.keys(vendorNotificationsRes.data) : []
+          }
+        });
+      }
+
+      // Create a set of read notification request IDs to track which vendor requests have been read
+      // But we'll still show them - we just need to mark them as read
       const readVendorRequestIds = new Set();
       [...generalNotifications, ...vendorNotifications].forEach((notif) => {
         if (notif.isRead && notif.type === 'vendor_request' && notif.metadata?.requestId) {
@@ -202,36 +252,44 @@ const VendorNotificationBell = ({
       // Also check locally marked-as-read vendor requests (from ref for immediate access)
       const allReadVendorRequestIds = new Set([...readVendorRequestIds, ...markedAsReadVendorRequestsRef.current]);
 
+      // Include ALL pending vendor requests, but mark them as read if they've been read
       const vendorRequestItems =
         pendingVendorRes.data?.success && Array.isArray(pendingVendorRes.data.notifications)
           ? pendingVendorRes.data.notifications
-              .filter((req) => {
-                // Only include if there's no corresponding read notification and hasn't been marked as read locally
+              .map((req) => {
                 const requestId = String(req.id || req._id);
-                return !allReadVendorRequestIds.has(requestId);
+                const isRead = allReadVendorRequestIds.has(requestId);
+                
+                // Determine event type - check for platform booth, booth, standaloneBooth, or bazaar
+                const eventTypeRaw = req.eventType || '';
+                const isPlatformBooth = eventTypeRaw === 'platformBooth' || 
+                                       eventTypeRaw === 'booth' || 
+                                       eventTypeRaw === 'standaloneBooth' ||
+                                       eventTypeRaw.toLowerCase().includes('booth');
+                const eventType = isPlatformBooth ? 'Platform Booth' : 'Bazaar';
+                
+                return {
+                  _id: `vendor_req_${req.id || req._id}`,
+                  type: 'vendor_request',
+                  title: req.vendor?.companyName || 'Vendor Request',
+                  message: `${req.vendor?.companyName || 'Vendor'} submitted a ${eventType} request for "${req.event?.name || req.eventName || 'Event'}".`,
+                  createdAt: req.submittedAt || req.createdAt || new Date().toISOString(),
+                  metadata: {
+                    requestId: requestId, // Store the actual request ID for filtering
+                    vendorName:
+                      req.vendor?.companyName ||
+                      `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim() ||
+                      'Vendor',
+                    eventName: req.event?.name || req.eventName || 'Event',
+                    eventType: eventType,
+                    eventTypeRaw: eventTypeRaw // Store raw eventType for better detection
+                  },
+                  isRead: isRead // Mark as read if it's been read, but still show it
+                };
               })
-              .map((req) => ({
-                _id: `vendor_req_${req.id || req._id}`,
-                type: 'vendor_request',
-                title: req.vendor?.companyName || 'Vendor Request',
-                message: `${req.vendor?.companyName || 'Vendor'} submitted a ${
-                  req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
-                } request for "${req.event?.name || req.eventName || 'Event'}".`,
-                createdAt: req.submittedAt || req.createdAt || new Date().toISOString(),
-                metadata: {
-                  requestId: String(req.id || req._id), // Store the actual request ID for filtering
-                  vendorName:
-                    req.vendor?.companyName ||
-                    `${req.vendor?.firstName || ''} ${req.vendor?.lastName || ''}`.trim() ||
-                    'Vendor',
-                  eventName: req.event?.name || req.eventName || 'Event',
-                  eventType: req.eventType?.includes('booth') ? 'Platform Booth' : 'Bazaar'
-                },
-                isRead: false
-              }))
           : [];
 
-      // Merge all notifications - include ALL general and vendor notifications
+      // Merge all notifications - include ALL general and vendor notifications (both read and unread)
       const mergedMap = new Map();
       generalNotifications.forEach((notif) => {
         const id = notif?._id || notif?.id;
@@ -257,17 +315,18 @@ const VendorNotificationBell = ({
         vendor: vendorNotifications.length,
         pending: vendorRequestItems.length,
         total: merged.length,
-        generalNotifications: generalNotifications,
-        vendorNotifications: vendorNotifications,
-        vendorRequestItems: vendorRequestItems,
-        merged: merged,
-        notificationsRes: notificationsRes.data,
-        vendorNotificationsRes: vendorNotificationsRes.data,
-        pendingVendorRes: pendingVendorRes.data
+        mergedNotifications: merged.slice(0, 5), // Log first 5 for debugging
+        allGeneralIds: generalNotifications.map(n => n._id || n.id),
+        allVendorIds: vendorNotifications.map(n => n._id || n.id),
+        allPendingIds: vendorRequestItems.map(n => n._id || n.id),
+        mergedIds: merged.map(n => n._id || n.id)
       });
 
+      // Always set notifications, even if empty (so we can see "No notifications" message)
       setNotifications(merged);
-      setUnreadCount(merged.filter((notif) => !notif.isRead).length);
+      const unread = merged.filter((notif) => !notif.isRead);
+      console.log('📊 Unread count:', unread.length, 'out of', merged.length);
+      setUnreadCount(unread.length);
 
       if (!notificationsRes.data?.success && !vendorNotificationsRes.data?.success) {
         setError('Failed to load notifications');
@@ -282,11 +341,100 @@ const VendorNotificationBell = ({
     }
   }, []);
 
+  // Get the redirect URL based on notification type
+  // This function determines the appropriate page based on the current user's role
+  const getNotificationUrl = useCallback((notification) => {
+    const metadata = notification.metadata || {};
+    
+    // Determine if we're on an Admin or Events Office page based on managePath
+    const isAdmin = managePath?.includes('/admin') || !managePath?.includes('/event-office');
+    const basePath = isAdmin ? '/admin' : '/event-office';
+    
+    switch (notification.type) {
+      case 'vendor_request': {
+        // Determine event type - prioritize metadata.eventType, then check eventTypeRaw
+        let eventType = metadata.eventType || '';
+        
+        if (!eventType) {
+          // Check eventTypeRaw for platform booth indicators
+          const eventTypeRaw = metadata.eventTypeRaw || '';
+          if (eventTypeRaw === 'platformBooth' || 
+              eventTypeRaw === 'booth' || 
+              eventTypeRaw === 'standaloneBooth' ||
+              eventTypeRaw.toLowerCase().includes('booth')) {
+            eventType = 'Platform Booth';
+          } else {
+            // Check notification message as fallback
+            const message = notification.message || '';
+            if (message.includes('Platform Booth') || message.includes('platform booth')) {
+              eventType = 'Platform Booth';
+            } else {
+              eventType = 'Bazaar';
+            }
+          }
+        }
+        
+        // Platform booth requests go to platform booth requests page
+        if (eventType === 'Platform Booth' || 
+            eventType.includes('Booth') || 
+            eventType.includes('Platform')) {
+          return isAdmin ? '/admin/platform-booth-requests' : '/event-office/platform-booth-requests';
+        } else {
+          // Bazaar requests go to events view page (AdminEventsView)
+          return isAdmin ? '/admin/events-view' : '/event-office/events';
+        }
+      }
+      case 'workshop_submission': {
+        // Redirect to workshops page
+        return isAdmin ? '/admin/events-view?type=workshops' : '/event-office/workshops';
+      }
+      case 'event_announcement': {
+        // Redirect to events page
+        return isAdmin ? '/admin/events-view' : '/event-office/events';
+      }
+      case 'event_reminder': {
+        // Redirect to events page
+        return isAdmin ? '/admin/events-view' : '/event-office/events';
+      }
+      default:
+        return null;
+    }
+  }, [managePath]);
+
+  const handleNotificationClick = useCallback(
+    async (notificationId) => {
+      if (!notificationId) return;
+      const notification = notifications.find((n) => n._id === notificationId || n.id === notificationId);
+      if (!notification) return;
+      
+      // Get the redirect URL
+      const url = getNotificationUrl(notification);
+      
+      // Mark as read first
+      await markAsRead(notificationId);
+      
+      // Close the notification panel
+      setOpen(false);
+      
+      // Navigate to the appropriate page
+      if (url) {
+        navigate(url);
+      }
+    },
+    [notifications, getNotificationUrl, navigate]
+  );
+
   const markAsRead = useCallback(
     async (notificationId) => {
       if (!notificationId) return;
       const notification = notifications.find((n) => n._id === notificationId || n.id === notificationId);
-      if (!notification || notification.isRead) return;
+      if (!notification) return;
+      
+      // Don't do anything if already read (but don't return early - allow re-marking)
+      if (notification.isRead) {
+        console.log('Notification already marked as read:', notificationId);
+        return;
+      }
       
       // If this is a pending vendor notification, track it as read (using ref for immediate access)
       if (notification.type === 'vendor_request' && notification._id?.startsWith('vendor_req_') && notification.metadata?.requestId) {
@@ -295,29 +443,42 @@ const VendorNotificationBell = ({
         saveMarkedVendorRequests(markedAsReadVendorRequestsRef.current);
       }
       
+      // Optimistically update the UI immediately (before API call)
+      setNotifications((prev) =>
+        prev.map((notif) =>
+          (notif._id || notif.id) === notificationId ? { ...notif, isRead: true } : notif
+        )
+      );
+      setUnreadCount((prev) => Math.max(prev - 1, 0));
+      
       try {
         // Only call API if it's a real notification (not a pending vendor notification)
         if (!notification._id?.startsWith('vendor_req_')) {
           const response = await notificationApiService.markAsRead(notificationId);
-          if (response.success) {
+          if (!response.success) {
+            // If API call failed, revert the optimistic update
+            console.error('Failed to mark notification as read via API, reverting:', response);
             setNotifications((prev) =>
               prev.map((notif) =>
-                (notif._id || notif.id) === notificationId ? { ...notif, isRead: true } : notif
+                (notif._id || notif.id) === notificationId ? { ...notif, isRead: false } : notif
               )
             );
-            setUnreadCount((prev) => Math.max(prev - 1, 0));
+            setUnreadCount((prev) => prev + 1);
+          } else {
+            console.log('✅ Notification marked as read successfully:', notificationId);
           }
         } else {
-          // For pending vendor notifications, just update local state
-          setNotifications((prev) =>
-            prev.map((notif) =>
-              (notif._id || notif.id) === notificationId ? { ...notif, isRead: true } : notif
-            )
-          );
-          setUnreadCount((prev) => Math.max(prev - 1, 0));
+          console.log('✅ Pending vendor notification marked as read locally:', notificationId);
         }
       } catch (err) {
         console.error('Failed to mark notification as read:', err);
+        // Revert optimistic update on error
+        setNotifications((prev) =>
+          prev.map((notif) =>
+            (notif._id || notif.id) === notificationId ? { ...notif, isRead: false } : notif
+          )
+        );
+        setUnreadCount((prev) => prev + 1);
       }
     },
     [notifications]
@@ -561,7 +722,7 @@ const VendorNotificationBell = ({
                   return (
                     <li
                       key={id}
-                      onClick={() => markAsRead(id)}
+                      onClick={() => handleNotificationClick(id)}
                       style={{
                         padding: '1rem',
                         borderBottom: '1px solid #f3f4f6',

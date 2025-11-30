@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { eventsApiService, bazaarApi, tripApi } from '../api/eventsApi';
@@ -9,6 +9,8 @@ import BazaarForm from '../components/BazaarForm';
 import ConferenceForm from '../components/ConferenceForm';
 import TripForm from '../components/TripForm';
 import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
 const AdminEventsView = () => {
   const { user, logout } = useAuth();
@@ -55,6 +57,7 @@ const AdminEventsView = () => {
   const [deleting, setDeleting] = useState(false);
   const [deletingEventId, setDeletingEventId] = useState(null);
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const expandedFromUrlRef = useRef(new Set());
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingBazaar, setEditingBazaar] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -84,14 +87,14 @@ const AdminEventsView = () => {
     navigate('/login');
   };
 
-  const loadEvents = useCallback(async () => {
+  const loadEvents = useCallback(async (searchTerm = '') => {
     try {
       setError('');
       setLoading(true);
-      console.log('🔍 Loading events with params:', { searchQuery, filter });
+      console.log('🔍 Loading events with params:', { searchTerm, filter });
       
       const result = await eventsApiService.getAllEventsAuthenticated({
-        q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
+        q: searchTerm && searchTerm.trim() ? searchTerm.trim() : undefined,
         type: filter !== 'all' ? filter : undefined
       });
       
@@ -142,6 +145,7 @@ const AdminEventsView = () => {
           creatorName: ev.creatorName || ev.professorName || ev.createdByName || (ev.createdBy ? `${ev.createdBy.firstName || ''} ${ev.createdBy.lastName || ''}`.trim() : null),
           creatorRole: ev.creatorRole || (ev.createdBy ? ev.createdBy.userType : null),
           creatorEmail: ev.createdBy?.email || ev.creatorEmail || null,
+          createdBy: ev.createdBy, // Keep the createdBy object for direct searching
           vendors: ev.vendors || [],
           vendorRequests: ev.vendorRequests || []
         }));
@@ -258,8 +262,48 @@ const AdminEventsView = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, filter]);
+  }, [filter]);
 
+  // Check for expand query parameter and auto-expand event
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const expandEventId = searchParams.get('expand');
+    if (expandEventId && events.length > 0 && !expandedFromUrlRef.current.has(expandEventId)) {
+      const event = events.find(e => String(e.id) === String(expandEventId));
+      if (event) {
+        // Mark as processed
+        expandedFromUrlRef.current.add(expandEventId);
+        
+        // Expand the event
+        setExpandedRows(prev => {
+          const newExpanded = new Set(prev);
+          newExpanded.add(expandEventId);
+          return newExpanded;
+        });
+        
+        // Load vendor requests if needed
+        if (event.type === 'bazaar' || event.type === 'booth' || event.type === 'platformBooth') {
+          const eventTypeForApi = event.type === 'platformBooth' ? 'booth' : event.type;
+          loadVendorRequests(expandEventId, eventTypeForApi);
+        }
+        
+        // Scroll to the event after a short delay to ensure it's rendered
+        setTimeout(() => {
+          const element = document.getElementById(`event-row-${expandEventId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 500);
+      }
+    }
+    // Reset ref when search params change (new expand request)
+    if (!expandEventId) {
+      expandedFromUrlRef.current.clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, events.length]);
+
+  // Load events on mount and when filter changes (not on search query change)
   useEffect(() => {
     loadEvents();
   }, [filter, loadEvents]);
@@ -313,74 +357,130 @@ const AdminEventsView = () => {
     return Array.from(locs).sort();
   }, [events]);
 
-  // Filter events based on type, professor name, location, and date
+  // Filter events based on type, professor name, location, date, and search query
   // Admin should see all events (including past ones), but we can filter by type
-  const filteredEvents = events.filter(event => {
-    // Skip invalid/empty events
-    const title = (event.title || event.name || '').trim();
-    if (!title) return false;
-    if (!event.startDate) return false;
-    
-    // Validate startDate is a valid date
-    const startDate = new Date(event.startDate);
-    if (isNaN(startDate.getTime())) return false;
-    
-    // Admin can see all events (past and future), so don't filter by date
-    // Only filter out events with invalid end dates
-    if (event.endDate) {
-      const eventEndDate = new Date(event.endDate);
-      if (isNaN(eventEndDate.getTime())) return false;
-    }
-    
-    if (event.type === 'other') return false;
-    
-    // Filter by type
-    const typeMatch = filter === 'all' || (event.type && event.type === filter);
-    if (!typeMatch) return false;
-    
-    // Filter by professor name (for workshops and conferences)
-    // Checks both creatorName and professors array
-    if (professorNameFilter.trim()) {
-      const profFilter = professorNameFilter.trim().toLowerCase();
-      const creatorName = (event.creatorName || event.professorName || '').toLowerCase();
+  const filteredEvents = React.useMemo(() => {
+    return events.filter(event => {
+      // Skip invalid/empty events
+      const title = (event.title || event.name || '').trim();
+      if (!title) return false;
+      if (!event.startDate) return false;
       
-      // Check if creator name matches
-      let matches = creatorName.includes(profFilter);
+      // Validate startDate is a valid date
+      const startDate = new Date(event.startDate);
+      if (isNaN(startDate.getTime())) return false;
       
-      // If not matched, check professors array
-      if (!matches && event.professors) {
-        if (Array.isArray(event.professors)) {
-          matches = event.professors.some(prof => 
-            prof && typeof prof === 'string' && prof.toLowerCase().includes(profFilter)
-          );
-        } else if (typeof event.professors === 'string') {
-          matches = event.professors.toLowerCase().includes(profFilter);
+      // Admin can see all events (past and future), so don't filter by date
+      // Only filter out events with invalid end dates
+      if (event.endDate) {
+        const eventEndDate = new Date(event.endDate);
+        if (isNaN(eventEndDate.getTime())) return false;
+      }
+      
+      if (event.type === 'other') return false;
+      
+      // Filter by type
+      const typeMatch = filter === 'all' || (event.type && event.type === filter);
+      if (!typeMatch) return false;
+      
+      // Filter by search query (event name, professor name, or event type)
+      if (searchQuery.trim()) {
+        const query = searchQuery.trim().toLowerCase();
+        let matches = false;
+        
+        // Search by event name
+        if (title.toLowerCase().includes(query)) {
+          matches = true;
+        }
+        
+        // Search by professor name (for workshops and conferences)
+        // Check creator name first (professor who created/made the workshop)
+        if (!matches) {
+          // Check creatorName field
+          const creatorName = (event.creatorName || event.professorName || '').toLowerCase();
+          if (creatorName && creatorName.includes(query)) {
+            matches = true;
+          }
+          
+          // Also check createdBy object directly (in case creatorName wasn't populated)
+          if (!matches && event.createdBy) {
+            const createdByFirstName = (event.createdBy.firstName || '').toLowerCase();
+            const createdByLastName = (event.createdBy.lastName || '').toLowerCase();
+            const createdByFullName = `${createdByFirstName} ${createdByLastName}`.trim().toLowerCase();
+            if (createdByFirstName.includes(query) || 
+                createdByLastName.includes(query) || 
+                createdByFullName.includes(query)) {
+              matches = true;
+            }
+          }
+        }
+        
+        // Also check participating professors
+        if (!matches && event.professors) {
+          if (Array.isArray(event.professors)) {
+            matches = event.professors.some(prof => 
+              prof && typeof prof === 'string' && prof.toLowerCase().includes(query)
+            );
+          } else if (typeof event.professors === 'string') {
+            matches = event.professors.toLowerCase().includes(query);
+          }
+        }
+        
+        // Search by event type
+        if (!matches && event.type) {
+          const typeName = event.type.toLowerCase();
+          if (typeName.includes(query)) {
+            matches = true;
+          }
+        }
+        
+        if (!matches) return false;
+      }
+      
+      // Filter by professor name (for workshops and conferences)
+      // Checks both creatorName and professors array
+      if (professorNameFilter.trim()) {
+        const profFilter = professorNameFilter.trim().toLowerCase();
+        const creatorName = (event.creatorName || event.professorName || '').toLowerCase();
+        
+        // Check if creator name matches
+        let matches = creatorName.includes(profFilter);
+        
+        // If not matched, check professors array
+        if (!matches && event.professors) {
+          if (Array.isArray(event.professors)) {
+            matches = event.professors.some(prof => 
+              prof && typeof prof === 'string' && prof.toLowerCase().includes(profFilter)
+            );
+          } else if (typeof event.professors === 'string') {
+            matches = event.professors.toLowerCase().includes(profFilter);
+          }
+        }
+        
+        if (!matches) return false;
+      }
+      
+      // Filter by location
+      if (locationFilter.trim()) {
+        const location = (event.location || '').trim();
+        if (location !== locationFilter.trim()) return false;
+      }
+      
+      // Filter by date
+      if (dateFilter.trim()) {
+        const filterDate = new Date(dateFilter);
+        if (!isNaN(filterDate.getTime())) {
+          const eventDate = new Date(event.startDate);
+          // Compare dates (ignore time)
+          const filterDateOnly = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate());
+          const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+          if (eventDateOnly.getTime() !== filterDateOnly.getTime()) return false;
         }
       }
       
-      if (!matches) return false;
-    }
-    
-    // Filter by location
-    if (locationFilter.trim()) {
-      const location = (event.location || '').trim();
-      if (location !== locationFilter.trim()) return false;
-    }
-    
-    // Filter by date
-    if (dateFilter.trim()) {
-      const filterDate = new Date(dateFilter);
-      if (!isNaN(filterDate.getTime())) {
-        const eventDate = new Date(event.startDate);
-        // Compare dates (ignore time)
-        const filterDateOnly = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate());
-        const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-        if (eventDateOnly.getTime() !== filterDateOnly.getTime()) return false;
-      }
-    }
-    
-    return true;
-  });
+      return true;
+    });
+  }, [events, filter, searchQuery, professorNameFilter, locationFilter, dateFilter]);
 
   // Sort events
   const sortedAndFilteredEvents = React.useMemo(() => {
@@ -413,7 +513,9 @@ const AdminEventsView = () => {
   });
 
   const handleSearch = () => {
-    loadEvents();
+    // For now, search is done client-side, so no need to reload
+    // If you want to search server-side, uncomment the line below
+    // loadEvents(searchQuery);
   };
 
   const loadAttendeesReport = async () => {
@@ -1405,7 +1507,7 @@ const AdminEventsView = () => {
                   </span>
                   <input
                     type="text"
-                    placeholder="Search by event name, professor name, location, or description..."
+                    placeholder="Search by event name, professor name, or event type..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -1710,12 +1812,14 @@ const AdminEventsView = () => {
 
                     return (
                       <React.Fragment key={event.id}>
-                        <tr style={{
-                          borderBottom: '1px solid #e5e7eb',
-                          transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        <tr 
+                          id={`event-row-${event.id}`}
+                          style={{
+                            borderBottom: '1px solid #e5e7eb',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
                           <td style={{
                             padding: '1rem 1.5rem',
@@ -1768,45 +1872,47 @@ const AdminEventsView = () => {
                             textAlign: 'right'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                              {/* Edit Button */}
-                              <button
-                                onClick={() => {
-                                  if (event.type === 'bazaar') openBazaarEdit(event);
-                                  else if (event.type === 'conference') openConferenceEdit(event);
-                                  else if (event.type === 'trip') openTripEdit(event);
-                                  else if (event.type === 'workshop') {
-                                    setEditingWorkshop(event);
-                                    setIsWorkshopModalOpen(true);
-                                  }
-                                }}
-                                disabled={!canEdit}
-                                style={{
-                                  padding: '0.5rem',
-                                  borderRadius: '0.5rem',
-                                  border: 'none',
-                                  backgroundColor: 'transparent',
-                                  color: canEdit ? '#6b7280' : '#d1d5db',
-                                  cursor: canEdit ? 'pointer' : 'not-allowed',
-                                  opacity: canEdit ? 1 : 0.5
-                                }}
-                                title={canEdit ? 'Edit Event' : (event.type === 'bazaar' || event.type === 'trip' ? 'Cannot edit: event has started' : event.type === 'workshop' ? 'Cannot edit: workshop already accepted' : 'Cannot edit')}
-                                onMouseEnter={(e) => {
-                                  if (canEdit) {
-                                    e.target.style.backgroundColor = '#f3f4f6';
-                                    e.target.style.color = '#137fec';
-                                  }
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (canEdit) {
-                                    e.target.style.backgroundColor = 'transparent';
-                                    e.target.style.color = '#6b7280';
-                                  }
-                                }}
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                  edit
-                                </span>
-                              </button>
+                              {/* Edit Button - Admin cannot edit any events */}
+                              {isAdmin ? null : (
+                                <button
+                                  onClick={() => {
+                                    if (event.type === 'bazaar') openBazaarEdit(event);
+                                    else if (event.type === 'conference') openConferenceEdit(event);
+                                    else if (event.type === 'trip') openTripEdit(event);
+                                    else if (event.type === 'workshop') {
+                                      setEditingWorkshop(event);
+                                      setIsWorkshopModalOpen(true);
+                                    }
+                                  }}
+                                  disabled={!canEdit}
+                                  style={{
+                                    padding: '0.5rem',
+                                    borderRadius: '0.5rem',
+                                    border: 'none',
+                                    backgroundColor: 'transparent',
+                                    color: canEdit ? '#6b7280' : '#d1d5db',
+                                    cursor: canEdit ? 'pointer' : 'not-allowed',
+                                    opacity: canEdit ? 1 : 0.5
+                                  }}
+                                  title={canEdit ? 'Edit Event' : (event.type === 'bazaar' || event.type === 'trip' ? 'Cannot edit: event has started' : event.type === 'workshop' ? 'Cannot edit: workshop already accepted' : 'Cannot edit')}
+                                  onMouseEnter={(e) => {
+                                    if (canEdit) {
+                                      e.target.style.backgroundColor = '#f3f4f6';
+                                      e.target.style.color = '#137fec';
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (canEdit) {
+                                      e.target.style.backgroundColor = 'transparent';
+                                      e.target.style.color = '#6b7280';
+                                    }
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                    edit
+                                  </span>
+                                </button>
+                              )}
 
                               {/* View Ratings Button */}
                               <button
@@ -2058,60 +2164,205 @@ const AdminEventsView = () => {
                                   </div>
                                 )}
 
-                                {/* Vendors (for bazaars and booths) */}
-                                {(event.type === 'bazaar' || event.type === 'booth') && event.vendors && event.vendors.length > 0 && (
+                                {/* Participating Vendors (for bazaars and booths) */}
+                                {(event.type === 'bazaar' || event.type === 'booth' || event.type === 'platformBooth') && event.vendors && event.vendors.length > 0 && (
                                   <div>
-                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
-                                      Participating Vendors
+                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                        store
+                                      </span>
+                                      Participating Vendors ({event.vendors.length})
                                     </h4>
                                     <div style={{
                                       display: 'grid',
-                                      gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                                      gap: '0.75rem'
+                                      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                      gap: '1rem'
                                     }}>
-                                      {event.vendors.map((vendor, idx) => (
+                                      {event.vendors.map((vendor, idx) => {
+                                        // Get vendor logo URL
+                                        const getVendorLogoSrc = (vendor) => {
+                                          if (!vendor) return null;
+                                          const candidates = [
+                                            vendor.vendorLogoPath,
+                                            vendor.logo,
+                                            vendor.logoUrl,
+                                            vendor.logoPath,
+                                            vendor.companyLogo
+                                          ].filter(Boolean);
+                                          
+                                          if (candidates.length === 0) return null;
+                                          const raw = candidates.find((src) => typeof src === 'string' && src.trim().length > 0) || null;
+                                          if (!raw) return null;
+                                          
+                                          const cleaned = raw.trim().replace(/\\/g, '/');
+                                          if (cleaned.startsWith('http://') || cleaned.startsWith('https://') || cleaned.startsWith('data:')) {
+                                            return cleaned;
+                                          }
+                                          const normalized = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+                                          return `${API_BASE_URL}${normalized}`;
+                                        };
+                                        
+                                        const vendorLogo = getVendorLogoSrc(vendor);
+                                        const vendorName = vendor.companyName || vendor.name || (vendor.firstName && vendor.lastName ? `${vendor.firstName} ${vendor.lastName}`.trim() : '') || 'Vendor';
+                                        const vendorEmail = vendor.email || '';
+                                        const vendorContact = vendor.contactName || (vendor.firstName && vendor.lastName ? `${vendor.firstName} ${vendor.lastName}`.trim() : '') || '';
+                                        const vendorBoothSize = vendor.boothSize || '';
+                                        const vendorBoothLocation = vendor.boothLocation || '';
+                                        const vendorAttendees = Array.isArray(vendor.attendees) ? vendor.attendees : [];
+                                        
+                                        return (
                                         <div
-                                          key={idx}
+                                          key={vendor._id || idx}
                                           style={{
-                                            padding: '0.75rem',
+                                            padding: '1rem',
                                             backgroundColor: '#FFFFFF',
-                                            borderRadius: '0.5rem',
-                                            border: '1px solid #e5e7eb'
+                                            borderRadius: '0.75rem',
+                                            border: '1px solid #e5e7eb',
+                                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                                            transition: 'all 0.2s',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '0.5rem'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+                                            e.currentTarget.style.transform = 'translateY(-2px)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
+                                            e.currentTarget.style.transform = 'translateY(0)';
                                           }}
                                         >
-                                          <p style={{
-                                            fontSize: '0.875rem',
-                                            fontWeight: '500',
-                                            color: '#111827',
-                                            margin: '0 0 0.25rem 0'
-                                          }}>
-                                            {vendor.companyName || vendor.name || 'Vendor'}
-                                          </p>
-                                          {vendor.email && (
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
+                                            {vendorLogo ? (
+                                              <img
+                                                src={vendorLogo}
+                                                alt={vendorName}
+                                                style={{
+                                                  width: '2rem',
+                                                  height: '2rem',
+                                                  objectFit: 'contain',
+                                                  borderRadius: '0.25rem',
+                                                  backgroundColor: '#f9fafb',
+                                                  padding: '0.25rem'
+                                                }}
+                                                onError={(e) => {
+                                                  e.target.style.display = 'none';
+                                                  e.target.nextSibling.style.display = 'flex';
+                                                }}
+                                              />
+                                            ) : null}
+                                            <span 
+                                              className="material-symbols-outlined" 
+                                              style={{ 
+                                                fontSize: '1.25rem', 
+                                                color: '#3b82f6',
+                                                display: vendorLogo ? 'none' : 'flex'
+                                              }}
+                                            >
+                                              store
+                                            </span>
                                             <p style={{
-                                              fontSize: '0.75rem',
-                                              color: '#6b7280',
+                                              fontSize: '0.9375rem',
+                                              fontWeight: '600',
+                                              color: '#111827',
                                               margin: 0
                                             }}>
-                                              {vendor.email}
+                                              {vendorName}
+                                            </p>
+                                          </div>
+                                          {vendorEmail && (
+                                            <p style={{
+                                              fontSize: '0.8125rem',
+                                              color: '#6b7280',
+                                              margin: 0,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '0.25rem'
+                                            }}>
+                                              <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                email
+                                              </span>
+                                              {vendorEmail}
                                             </p>
                                           )}
-                                          {vendor.contactName && (
+                                          {vendorContact && (
                                             <p style={{
-                                              fontSize: '0.75rem',
+                                              fontSize: '0.8125rem',
                                               color: '#6b7280',
-                                              margin: 0
+                                              margin: 0,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '0.25rem'
                                             }}>
-                                              Contact: {vendor.contactName}
+                                              <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                person
+                                              </span>
+                                              Contact: {vendorContact}
                                             </p>
+                                          )}
+                                          {vendorBoothSize && (
+                                            <p style={{
+                                              fontSize: '0.8125rem',
+                                              color: '#6b7280',
+                                              margin: 0,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '0.25rem'
+                                            }}>
+                                              <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                square_foot
+                                              </span>
+                                              Booth Size: {vendorBoothSize}
+                                            </p>
+                                          )}
+                                          {vendorBoothLocation && (
+                                            <p style={{
+                                              fontSize: '0.8125rem',
+                                              color: '#6b7280',
+                                              margin: 0,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '0.25rem'
+                                            }}>
+                                              <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                location_on
+                                              </span>
+                                              Location: {vendorBoothLocation}
+                                            </p>
+                                          )}
+                                          {vendorAttendees.length > 0 && (
+                                            <div style={{
+                                              fontSize: '0.8125rem',
+                                              color: '#6b7280',
+                                              margin: 0,
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              gap: '0.25rem'
+                                            }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '500' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                  groups
+                                                </span>
+                                                Attendees ({vendorAttendees.length}):
+                                              </div>
+                                              <div style={{ paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                                                {vendorAttendees.map((attendee, aIdx) => (
+                                                  <span key={aIdx} style={{ fontSize: '0.75rem' }}>
+                                                    • {attendee.name || attendee || `Attendee ${aIdx + 1}`}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            </div>
                                           )}
                                         </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 )}
 
-                                {/* Vendor Participation Requests (for bazaars and booths) */}
+                                {/* Vendor Participation Requests (for bazaars and booths) - Only show pending and rejected */}
                                 {(event.type === 'bazaar' || event.type === 'booth') && (
                                   <div>
                                     <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>
@@ -2122,8 +2373,10 @@ const AdminEventsView = () => {
                                         Loading vendor requests...
                                       </p>
                                     ) : vendorRequests[event.id] && vendorRequests[event.id].length > 0 ? (
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                        {vendorRequests[event.id].map((request) => {
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+                                        {vendorRequests[event.id]
+                                          .filter(request => request.status !== 'accepted') // Only show pending and rejected
+                                          .map((request) => {
                                           const vendor = request.vendor || {};
                                           const status = request.status || 'pending';
                                           const isProcessing = !!processingIds[request._id];
@@ -2132,221 +2385,285 @@ const AdminEventsView = () => {
                                             <div
                                               key={request._id}
                                               style={{
-                                                padding: '1rem',
+                                                padding: '1.25rem',
                                                 backgroundColor: '#FFFFFF',
-                                                borderRadius: '0.5rem',
-                                                border: '1px solid #e5e7eb',
+                                                borderRadius: '0.75rem',
+                                                border: status === 'accepted' ? '2px solid #10b981' : '1px solid #e5e7eb',
+                                                boxShadow: status === 'accepted' ? '0 1px 3px rgba(16, 185, 129, 0.1)' : '0 1px 2px rgba(0, 0, 0, 0.05)',
                                                 display: 'flex',
                                                 flexDirection: 'column',
-                                                gap: '0.75rem'
+                                                gap: '1rem',
+                                                transition: 'all 0.2s'
                                               }}
                                             >
-                                              {/* Vendor Info */}
-                                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                              {/* Header with Vendor Info and Status */}
+                                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
                                                 <div style={{ flex: 1 }}>
-                                                  <p style={{
-                                                    fontSize: '0.875rem',
-                                                    fontWeight: '600',
-                                                    color: '#111827',
-                                                    margin: '0 0 0.25rem 0'
-                                                  }}>
-                                                    {vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Vendor'}
-                                                  </p>
+                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem', color: '#6b7280' }}>
+                                                      store
+                                                    </span>
+                                                    <p style={{
+                                                      fontSize: '0.9375rem',
+                                                      fontWeight: '600',
+                                                      color: '#111827',
+                                                      margin: 0
+                                                    }}>
+                                                      {vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Vendor'}
+                                                    </p>
+                                                  </div>
                                                   {vendor.email && (
                                                     <p style={{
-                                                      fontSize: '0.75rem',
+                                                      fontSize: '0.8125rem',
                                                       color: '#6b7280',
-                                                      margin: '0 0 0.5rem 0'
+                                                      margin: '0 0 0.5rem 0',
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      gap: '0.25rem'
                                                     }}>
+                                                      <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                        email
+                                                      </span>
                                                       {vendor.email}
                                                     </p>
                                                   )}
-                                                  
-                                                  {/* Attendees */}
-                                                  {request.attendees && request.attendees.length > 0 && (
-                                                    <div style={{ marginTop: '0.5rem' }}>
-                                                      <p style={{
-                                                        fontSize: '0.75rem',
-                                                        fontWeight: '500',
-                                                        color: '#374151',
-                                                        margin: '0 0 0.25rem 0'
-                                                      }}>
-                                                        Attendees:
-                                                      </p>
+                                                </div>
+                                                {/* Status Badge */}
+                                                <div style={{
+                                                  padding: '0.375rem 0.75rem',
+                                                  borderRadius: '0.5rem',
+                                                  fontSize: '0.75rem',
+                                                  fontWeight: '600',
+                                                  backgroundColor: 
+                                                    status === 'accepted' ? '#d1fae5' :
+                                                    status === 'rejected' ? '#fee2e2' :
+                                                    '#fef3c7',
+                                                  color:
+                                                    status === 'accepted' ? '#065f46' :
+                                                    status === 'rejected' ? '#991b1b' :
+                                                    '#92400e',
+                                                  whiteSpace: 'nowrap'
+                                                }}>
+                                                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                                                </div>
+                                              </div>
+
+                                              {/* Details Section */}
+                                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                {/* Attendees */}
+                                                {request.attendees && request.attendees.length > 0 && (
+                                                  <div style={{ 
+                                                    padding: '0.75rem',
+                                                    backgroundColor: '#f9fafb',
+                                                    borderRadius: '0.5rem',
+                                                    border: '1px solid #e5e7eb'
+                                                  }}>
+                                                    <p style={{
+                                                      fontSize: '0.75rem',
+                                                      fontWeight: '600',
+                                                      color: '#374151',
+                                                      margin: '0 0 0.5rem 0',
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      gap: '0.25rem'
+                                                    }}>
+                                                      <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                        people
+                                                      </span>
+                                                      Attendees ({request.attendees.length})
+                                                    </p>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                                       {request.attendees.map((attendee, idx) => (
                                                         <p key={idx} style={{
                                                           fontSize: '0.75rem',
                                                           color: '#6b7280',
-                                                          margin: '0 0 0.25rem 0',
+                                                          margin: 0,
                                                           paddingLeft: '0.5rem'
                                                         }}>
-                                                          • {attendee.name} ({attendee.email})
+                                                          • {attendee.name} <span style={{ color: '#9ca3af' }}>({attendee.email})</span>
                                                         </p>
                                                       ))}
                                                     </div>
-                                                  )}
-
-                                                  {/* Booth Size */}
-                                                  {request.boothSize && (
-                                                    <p style={{
-                                                      fontSize: '0.75rem',
-                                                      color: '#6b7280',
-                                                      margin: '0.25rem 0 0 0'
-                                                    }}>
-                                                      Booth Size: {request.boothSize}
-                                                    </p>
-                                                  )}
-
-                                                  {/* Duration (for booths) */}
-                                                  {request.durationWeeks && (
-                                                    <p style={{
-                                                      fontSize: '0.75rem',
-                                                      color: '#6b7280',
-                                                      margin: '0.25rem 0 0 0'
-                                                    }}>
-                                                      Duration: {request.durationWeeks} week{request.durationWeeks !== 1 ? 's' : ''}
-                                                    </p>
-                                                  )}
-
-                                                  {/* Booth Location */}
-                                                  {request.boothLocation && (
-                                                    <p style={{
-                                                      fontSize: '0.75rem',
-                                                      color: '#6b7280',
-                                                      margin: '0.25rem 0 0 0'
-                                                    }}>
-                                                      Location: {request.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                                    </p>
-                                                  )}
-
-                                                  {/* Message */}
-                                                  {request.message && (
-                                                    <div style={{ marginTop: '0.5rem' }}>
-                                                      <p style={{
-                                                        fontSize: '0.75rem',
-                                                        fontWeight: '500',
-                                                        color: '#374151',
-                                                        margin: '0 0 0.25rem 0'
-                                                      }}>
-                                                        Message:
-                                                      </p>
-                                                      <p style={{
-                                                        fontSize: '0.75rem',
-                                                        color: '#6b7280',
-                                                        margin: 0,
-                                                        fontStyle: 'italic',
-                                                        paddingLeft: '0.5rem'
-                                                      }}>
-                                                        "{request.message}"
-                                                      </p>
-                                                    </div>
-                                                  )}
-
-                                                  {/* Request Date */}
-                                                  {request.createdAt && (
-                                                    <p style={{
-                                                      fontSize: '0.75rem',
-                                                      color: '#9ca3af',
-                                                      margin: '0.5rem 0 0 0'
-                                                    }}>
-                                                      Requested: {new Date(request.createdAt).toLocaleDateString()}
-                                                    </p>
-                                                  )}
-                                                </div>
-
-                                                {/* Status Badge and Actions */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-                                                  {/* Status Badge */}
-                                                  <div style={{
-                                                    padding: '0.25rem 0.75rem',
-                                                    borderRadius: '0.375rem',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: '500',
-                                                    backgroundColor: 
-                                                      status === 'accepted' ? '#d1fae5' :
-                                                      status === 'rejected' ? '#fee2e2' :
-                                                      '#fef3c7',
-                                                    color:
-                                                      status === 'accepted' ? '#065f46' :
-                                                      status === 'rejected' ? '#991b1b' :
-                                                      '#92400e'
-                                                  }}>
-                                                    {status.charAt(0).toUpperCase() + status.slice(1)}
                                                   </div>
+                                                )}
 
-                                                  {/* Action Buttons (only show for pending) */}
-                                                  {status === 'pending' && (
-                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                      <button
-                                                        onClick={() => handleVendorRequestStatus(request._id, 'accepted', event.id)}
-                                                        disabled={isProcessing}
-                                                        style={{
-                                                          padding: '0.5rem 1rem',
-                                                          borderRadius: '0.375rem',
-                                                          border: 'none',
-                                                          backgroundColor: isProcessing ? '#9ca3af' : '#10b981',
-                                                          color: '#FFFFFF',
-                                                          fontSize: '0.75rem',
-                                                          fontWeight: '500',
-                                                          cursor: isProcessing ? 'not-allowed' : 'pointer',
-                                                          display: 'flex',
-                                                          alignItems: 'center',
-                                                          gap: '0.25rem',
-                                                          transition: 'background-color 0.2s'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                          if (!isProcessing) {
-                                                            e.target.style.backgroundColor = '#059669';
-                                                          }
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                          if (!isProcessing) {
-                                                            e.target.style.backgroundColor = '#10b981';
-                                                          }
-                                                        }}
-                                                      >
-                                                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-                                                          check
-                                                        </span>
-                                                        Accept
-                                                      </button>
-                                                      <button
-                                                        onClick={() => handleVendorRequestStatus(request._id, 'rejected', event.id)}
-                                                        disabled={isProcessing}
-                                                        style={{
-                                                          padding: '0.5rem 1rem',
-                                                          borderRadius: '0.375rem',
-                                                          border: 'none',
-                                                          backgroundColor: isProcessing ? '#9ca3af' : '#ef4444',
-                                                          color: '#FFFFFF',
-                                                          fontSize: '0.75rem',
-                                                          fontWeight: '500',
-                                                          cursor: isProcessing ? 'not-allowed' : 'pointer',
-                                                          display: 'flex',
-                                                          alignItems: 'center',
-                                                          gap: '0.25rem',
-                                                          transition: 'background-color 0.2s'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                          if (!isProcessing) {
-                                                            e.target.style.backgroundColor = '#dc2626';
-                                                          }
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                          if (!isProcessing) {
-                                                            e.target.style.backgroundColor = '#ef4444';
-                                                          }
-                                                        }}
-                                                      >
-                                                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-                                                          close
-                                                        </span>
-                                                        Reject
-                                                      </button>
+                                                {/* Request Details Grid */}
+                                                <div style={{ 
+                                                  display: 'grid', 
+                                                  gridTemplateColumns: 'repeat(2, 1fr)', 
+                                                  gap: '0.5rem',
+                                                  marginTop: request.attendees && request.attendees.length > 0 ? '0' : '0.5rem'
+                                                }}>
+                                                  {request.boothSize && (
+                                                    <div style={{ 
+                                                      padding: '0.5rem',
+                                                      backgroundColor: '#f9fafb',
+                                                      borderRadius: '0.375rem'
+                                                    }}>
+                                                      <p style={{ fontSize: '0.625rem', color: '#9ca3af', margin: '0 0 0.25rem 0', fontWeight: '500' }}>
+                                                        Booth Size
+                                                      </p>
+                                                      <p style={{ fontSize: '0.75rem', color: '#111827', margin: 0, fontWeight: '500' }}>
+                                                        {request.boothSize}
+                                                      </p>
+                                                    </div>
+                                                  )}
+                                                  {request.durationWeeks && (
+                                                    <div style={{ 
+                                                      padding: '0.5rem',
+                                                      backgroundColor: '#f9fafb',
+                                                      borderRadius: '0.375rem'
+                                                    }}>
+                                                      <p style={{ fontSize: '0.625rem', color: '#9ca3af', margin: '0 0 0.25rem 0', fontWeight: '500' }}>
+                                                        Duration
+                                                      </p>
+                                                      <p style={{ fontSize: '0.75rem', color: '#111827', margin: 0, fontWeight: '500' }}>
+                                                        {request.durationWeeks} week{request.durationWeeks !== 1 ? 's' : ''}
+                                                      </p>
+                                                    </div>
+                                                  )}
+                                                  {request.boothLocation && (
+                                                    <div style={{ 
+                                                      padding: '0.5rem',
+                                                      backgroundColor: '#f9fafb',
+                                                      borderRadius: '0.375rem',
+                                                      gridColumn: 'span 2'
+                                                    }}>
+                                                      <p style={{ fontSize: '0.625rem', color: '#9ca3af', margin: '0 0 0.25rem 0', fontWeight: '500' }}>
+                                                        Location
+                                                      </p>
+                                                      <p style={{ fontSize: '0.75rem', color: '#111827', margin: 0, fontWeight: '500' }}>
+                                                        {request.boothLocation.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                                      </p>
                                                     </div>
                                                   )}
                                                 </div>
+
+                                                {/* Message */}
+                                                {request.message && (
+                                                  <div style={{ 
+                                                    marginTop: '0.5rem',
+                                                    padding: '0.75rem',
+                                                    backgroundColor: '#fef3c7',
+                                                    borderRadius: '0.5rem',
+                                                    border: '1px solid #fde68a'
+                                                  }}>
+                                                    <p style={{
+                                                      fontSize: '0.75rem',
+                                                      fontWeight: '500',
+                                                      color: '#92400e',
+                                                      margin: '0 0 0.25rem 0'
+                                                    }}>
+                                                      Message:
+                                                    </p>
+                                                    <p style={{
+                                                      fontSize: '0.75rem',
+                                                      color: '#78350f',
+                                                      margin: 0,
+                                                      fontStyle: 'italic'
+                                                    }}>
+                                                      "{request.message}"
+                                                    </p>
+                                                  </div>
+                                                )}
+
+                                                {/* Request Date */}
+                                                {request.createdAt && (
+                                                  <p style={{
+                                                    fontSize: '0.6875rem',
+                                                    color: '#9ca3af',
+                                                    margin: '0.5rem 0 0 0',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.25rem'
+                                                  }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '0.75rem' }}>
+                                                      schedule
+                                                    </span>
+                                                    Requested: {new Date(request.createdAt).toLocaleDateString('en-US', { 
+                                                      year: 'numeric', 
+                                                      month: 'short', 
+                                                      day: 'numeric' 
+                                                    })}
+                                                  </p>
+                                                )}
                                               </div>
+
+                                              {/* Action Buttons (only show for pending) */}
+                                              {status === 'pending' && (
+                                                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid #e5e7eb' }}>
+                                                  <button
+                                                    onClick={() => handleVendorRequestStatus(request._id, 'accepted', event.id)}
+                                                    disabled={isProcessing}
+                                                    style={{
+                                                      flex: 1,
+                                                      padding: '0.625rem 1rem',
+                                                      borderRadius: '0.5rem',
+                                                      border: 'none',
+                                                      backgroundColor: isProcessing ? '#9ca3af' : '#10b981',
+                                                      color: '#FFFFFF',
+                                                      fontSize: '0.8125rem',
+                                                      fontWeight: '500',
+                                                      cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'center',
+                                                      gap: '0.5rem',
+                                                      transition: 'background-color 0.2s'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                      if (!isProcessing) {
+                                                        e.target.style.backgroundColor = '#059669';
+                                                      }
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                      if (!isProcessing) {
+                                                        e.target.style.backgroundColor = '#10b981';
+                                                      }
+                                                    }}
+                                                  >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                                      check
+                                                    </span>
+                                                    Accept
+                                                  </button>
+                                                  <button
+                                                    onClick={() => handleVendorRequestStatus(request._id, 'rejected', event.id)}
+                                                    disabled={isProcessing}
+                                                    style={{
+                                                      flex: 1,
+                                                      padding: '0.625rem 1rem',
+                                                      borderRadius: '0.5rem',
+                                                      border: 'none',
+                                                      backgroundColor: isProcessing ? '#9ca3af' : '#ef4444',
+                                                      color: '#FFFFFF',
+                                                      fontSize: '0.8125rem',
+                                                      fontWeight: '500',
+                                                      cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'center',
+                                                      gap: '0.5rem',
+                                                      transition: 'background-color 0.2s'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                      if (!isProcessing) {
+                                                        e.target.style.backgroundColor = '#dc2626';
+                                                      }
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                      if (!isProcessing) {
+                                                        e.target.style.backgroundColor = '#ef4444';
+                                                      }
+                                                    }}
+                                                  >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                                      close
+                                                    </span>
+                                                    Reject
+                                                  </button>
+                                                </div>
+                                              )}
                                             </div>
                                           );
                                         })}

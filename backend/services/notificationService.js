@@ -381,7 +381,7 @@ exports.notifyWorkshopSubmitted = async (event, submitter) => {
       }
     });
     const recipients = Array.from(recipientMap.values());
-
+    
     for (const user of recipients) {
       const existingNotification = await Notification.findOne({
         recipient: user._id,

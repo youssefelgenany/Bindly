@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Event = require("../models/eventModel");
 const Registration = require("../models/registrationModel");
 const StudentRegistration = require("../models/studentRegistrationModel");
@@ -754,8 +755,32 @@ exports.getAllEvents = async (req, res) => {
     
     // Batch fetch all vendor requests for bazaar/booth events (only if not minimal)
     const vendorRequestsMap = new Map();
+    const vendorsMap = new Map(); // Make vendorsMap accessible in outer scope - MUST be in outer scope!
+    const originalVendorIds = new Map(); // Store original vendor IDs before populate
     if (bazaarBoothEventIds.length > 0 && !isMinimal) {
       try {
+        // Fetch vendor requests WITH populate to get vendor data directly
+        // Try populate first - if it works, we get vendor data immediately
+        const allVendorRequestsRaw = await VendorRequest.find({
+          status: 'accepted',
+          $or: [
+            { bazaar: { $in: bazaarBoothEventIds } },
+            { booth: { $in: bazaarBoothEventIds } },
+            { standaloneBooth: { $in: bazaarBoothEventIds } }
+          ]
+        })
+        .select('vendor bazaar booth standaloneBooth boothSize durationWeeks boothLocation attendees message status createdAt eventName eventType')
+        .lean();
+        
+        // Store original vendor IDs before populate (originalVendorIds is already declared in outer scope)
+        allVendorRequestsRaw.forEach(vr => {
+          if (vr.vendor) {
+            const vendorId = vr.vendor.toString ? vr.vendor.toString() : String(vr.vendor);
+            originalVendorIds.set(String(vr._id), vendorId);
+          }
+        });
+        
+        // Now populate
         const allVendorRequests = await VendorRequest.find({
           status: 'accepted',
           $or: [
@@ -764,10 +789,210 @@ exports.getAllEvents = async (req, res) => {
             { standaloneBooth: { $in: bazaarBoothEventIds } }
           ]
         })
-        .populate('vendor', 'firstName lastName companyName email')
+        .select('vendor bazaar booth standaloneBooth boothSize durationWeeks boothLocation attendees message status createdAt eventName eventType')
+        .populate({
+          path: 'vendor',
+          select: 'firstName lastName companyName email vendorLogoPath userType',
+          options: { strictPopulate: false } // Don't fail if vendor doesn't exist
+        })
         .lean();
         
-        allVendorRequests.forEach(vr => {
+        // Check if populate worked - if vendors are already populated, add them to map
+        const populatedVendors = allVendorRequests.filter(vr => 
+          vr.vendor && 
+          typeof vr.vendor === 'object' && 
+          vr.vendor._id &&
+          (vr.vendor.companyName !== undefined || vr.vendor.email !== undefined)
+        );
+        
+        console.log(`🔍 Populate result: ${populatedVendors.length} out of ${allVendorRequests.length} vendor requests have populated vendor data`);
+        
+        if (populatedVendors.length > 0) {
+          console.log('✅ Using populated vendor data from VendorRequest.populate()');
+          populatedVendors.forEach(vr => {
+            if (vr.vendor && vr.vendor._id) {
+              vendorsMap.set(String(vr.vendor._id), vr.vendor);
+              console.log(`✅ Added populated vendor ${String(vr.vendor._id)}: ${vr.vendor.companyName || vr.vendor.email || 'No name'}`);
+            }
+          });
+        }
+        
+        // Get all unique vendor IDs that still need to be fetched (not populated or missing data)
+        const vendorIds = [...new Set(
+          allVendorRequests
+            .filter(vr => {
+              // Need to fetch if: no vendor, vendor is ObjectId, or vendor exists but missing key fields
+              if (!vr.vendor) return true;
+              if (typeof vr.vendor !== 'object') return true;
+              // If it's an ObjectId (has toString but no _id or companyName/email)
+              if (vr.vendor.toString && typeof vr.vendor.toString === 'function' && !vr.vendor._id) {
+                return true;
+              }
+              // If it's an object but missing key fields
+              if (vr.vendor._id && !vr.vendor.companyName && !vr.vendor.email) {
+                return true;
+              }
+              return false;
+            })
+            .map(vr => {
+              const vid = vr.vendor;
+              if (!vid) return null;
+              try {
+                if (vid.toString && typeof vid.toString === 'function' && !vid._id) {
+                  return vid.toString();
+                }
+                if (vid._id) {
+                  return String(vid._id);
+                }
+                return String(vid);
+              } catch {
+                return String(vid);
+              }
+            })
+            .filter(Boolean)
+        )];
+        
+        console.log(`🔍 Need to fetch ${vendorIds.length} additional vendor IDs (${populatedVendors.length} already populated)`);
+        
+        // Fetch all vendors in one query (vendorsMap is already declared in outer scope)
+        if (vendorIds.length > 0) {
+          console.log(`🔍 Vendor IDs to fetch (${vendorIds.length}):`, vendorIds);
+          
+          // Convert string IDs to ObjectIds for query
+          const vendorObjectIds = vendorIds.map(id => {
+            try {
+              if (!mongoose.Types.ObjectId.isValid(id)) {
+                console.warn(`⚠️ Invalid ObjectId: ${id}`);
+                return null;
+              }
+              return new mongoose.Types.ObjectId(id);
+            } catch (err) {
+              console.error(`❌ Error converting ${id} to ObjectId:`, err);
+              return null;
+            }
+          }).filter(Boolean); // Remove nulls
+          
+          console.log(`🔍 Converted ${vendorObjectIds.length} valid ObjectIds:`, vendorObjectIds.map(id => String(id)));
+          
+          // Try querying with and without userType filter
+          let vendors = await User.find({ 
+            _id: { $in: vendorObjectIds },
+            userType: 'Vendor' // Ensure we only get vendors
+          })
+            .select('_id firstName lastName companyName email vendorLogoPath userType')
+            .lean();
+          
+          console.log(`🔍 Query result: Found ${vendors.length} vendors`);
+          
+          // If no results, try without userType filter to see if users exist
+          if (vendors.length === 0) {
+            console.warn('⚠️ No vendors found with userType filter, trying without filter...');
+            const allUsers = await User.find({ _id: { $in: vendorObjectIds } })
+              .select('_id firstName lastName companyName email vendorLogoPath userType')
+              .lean();
+            console.log(`🔍 Found ${allUsers.length} users (any type):`, allUsers.map(u => ({
+              _id: String(u._id),
+              userType: u.userType,
+              companyName: u.companyName,
+              email: u.email
+            })));
+          }
+          
+          vendors.forEach(v => {
+            vendorsMap.set(String(v._id), v);
+            console.log(`✅ Added vendor to map: ${String(v._id)} - ${v.companyName || 'No company name'} (${v.email || 'No email'})`);
+          });
+          
+          console.log(`✅ Fetched ${vendors.length} vendors for ${vendorIds.length} vendor requests`);
+          console.log(`✅ vendorsMap now has ${vendorsMap.size} entries`);
+          
+          if (vendors.length === 0) {
+            console.error('❌ NO VENDORS FOUND! This is the problem!');
+            console.error('❌ Vendor IDs that were queried:', vendorObjectIds.map(id => String(id)));
+            
+            // Last resort: Fetch ALL vendors in the database and create an email-to-vendor map
+            // This will help us match vendors by attendee email even if the vendor ID is wrong
+            console.log('🔍 Fetching ALL vendors in database as fallback...');
+            const allVendorsInDB = await User.find({ userType: 'Vendor' })
+              .select('_id firstName lastName companyName email vendorLogoPath userType')
+              .lean();
+            
+            console.log(`🔍 Found ${allVendorsInDB.length} total vendors in database`);
+            
+            // Create email-to-vendor map for quick lookup
+            const emailToVendorMap = new Map();
+            allVendorsInDB.forEach(v => {
+              if (v.email) {
+                emailToVendorMap.set(v.email.toLowerCase(), v);
+              }
+            });
+            
+            // Store this map for use in the fallback logic
+            // We'll access it via closure in the Promise.all below
+            global.tempEmailToVendorMap = emailToVendorMap;
+            console.log(`✅ Created email-to-vendor map with ${emailToVendorMap.size} entries`);
+          } else {
+            console.log('🔍 Sample vendor from DB:', {
+              _id: String(vendors[0]._id),
+              userType: vendors[0].userType,
+              companyName: vendors[0].companyName,
+              email: vendors[0].email,
+              vendorLogoPath: vendors[0].vendorLogoPath,
+              firstName: vendors[0].firstName,
+              lastName: vendors[0].lastName
+            });
+          }
+        }
+        
+        // Attach vendor data to vendor requests
+        allVendorRequests.forEach((vr, idx) => {
+          // Extract vendor ID from ObjectId - MUST convert ObjectId to string
+          let vendorId = null;
+          if (vr.vendor) {
+            try {
+              // ObjectId has toString() method
+              if (vr.vendor.toString && typeof vr.vendor.toString === 'function') {
+                vendorId = vr.vendor.toString();
+              } else if (vr.vendor._id) {
+                vendorId = String(vr.vendor._id);
+              } else {
+                vendorId = String(vr.vendor);
+              }
+            } catch (e) {
+              vendorId = String(vr.vendor);
+            }
+          }
+          
+          // Replace ObjectId with full vendor object
+          if (vendorId && vendorsMap.has(vendorId)) {
+            const fullVendor = vendorsMap.get(vendorId);
+            // IMPORTANT: Directly replace the ObjectId with the full vendor object
+            vr.vendor = fullVendor;
+            
+            // Verify replacement worked immediately
+            if (idx === 0) {
+              console.log('✅ Attached vendor to first vendorRequest:', {
+                vendorRequestId: String(vr._id),
+                vendorId: vendorId,
+                vendorCompanyName: vr.vendor?.companyName,
+                vendorEmail: vr.vendor?.email,
+                vendorLogoPath: vr.vendor?.vendorLogoPath,
+                vendorIsObject: typeof vr.vendor === 'object',
+                vendorHasToString: vr.vendor && typeof vr.vendor.toString === 'function',
+                vendorKeys: vr.vendor && typeof vr.vendor === 'object' ? Object.keys(vr.vendor) : 'no vendor'
+              });
+            }
+          } else if (idx === 0) {
+            console.warn('⚠️ Could not attach vendor to first vendorRequest:', {
+              vendorRequestId: String(vr._id),
+              vendorId: vendorId,
+              hasVendorInMap: vendorId ? vendorsMap.has(vendorId) : false,
+              vendorIdsInMap: Array.from(vendorsMap.keys()).slice(0, 3),
+              vendorType: typeof vr.vendor,
+              vendorValue: vr.vendor
+            });
+          }
+          
           const eventId = vr.bazaar || vr.booth || vr.standaloneBooth;
           if (eventId) {
             const eventIdStr = String(eventId);
@@ -783,7 +1008,7 @@ exports.getAllEvents = async (req, res) => {
     }
     
     // Now process events with pre-fetched data
-    const eventsWithVendors = events.map((e) => {
+    const eventsWithVendors = await Promise.all(events.map(async (e) => {
       const creatorFullName = e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null;
       const eventIdStr = String(e._id);
       
@@ -840,16 +1065,212 @@ exports.getAllEvents = async (req, res) => {
           }
 
           // Keep the original vendors array for backward compatibility
-          baseEvent.vendors = vendorRequests.map(vr => ({
-            _id: vr.vendor?._id,
-            name: vr.vendor?.companyName || `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
-            companyName: vr.vendor?.companyName,
-            contactName: `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
-            email: vr.vendor?.email,
-            boothSize: vr.boothSize,
-            durationWeeks: vr.durationWeeks,
-            boothLocation: vr.boothLocation,
-            attendees: vr.attendees || []
+          // Process vendors - handle async fetch if needed
+          baseEvent.vendors = await Promise.all(vendorRequests.map(async (vr, index) => {
+            let vendor = vr.vendor;
+            
+            // Get the original vendor ID from the map we created
+            const originalVendorId = originalVendorIds.get(String(vr._id));
+            
+            // Check if vendor is populated (has companyName or email)
+            const isPopulated = vendor && 
+                               typeof vendor === 'object' && 
+                               vendor._id &&
+                               (vendor.companyName !== undefined || vendor.email !== undefined);
+            
+            // If vendor is not populated, try to get it from vendorsMap or fetch directly
+            if (!isPopulated && originalVendorId) {
+              const vendorIdStr = originalVendorId;
+              console.log(`🔍 Detected ObjectId for vendor (${vendorIdStr}), attempting to resolve...`);
+              
+              // Try to get from vendorsMap first
+              if (vendorsMap.has(vendorIdStr)) {
+                vendor = vendorsMap.get(vendorIdStr);
+                vr.vendor = vendor; // Update the vendor request
+                console.log(`✅ Retrieved vendor ${vendorIdStr} from vendorsMap:`, {
+                  companyName: vendor.companyName,
+                  email: vendor.email
+                });
+              } else {
+                console.warn(`⚠️ Vendor ${vendorIdStr} not found in vendorsMap (size: ${vendorsMap.size}) for vendorRequest ${vr._id}`);
+                
+                // Last resort: fetch directly from database
+                try {
+                  console.log(`🔍 Attempting to fetch vendor ${vendorIdStr} directly from DB...`);
+                  
+                  // Try with userType filter first
+                  let directVendor = await User.findOne({ 
+                    _id: vendorIdStr,
+                    userType: 'Vendor'
+                  })
+                    .select('_id firstName lastName companyName email vendorLogoPath userType')
+                    .lean();
+                  
+                  // If not found, try without userType filter to see if user exists at all
+                  if (!directVendor) {
+                    console.warn(`⚠️ Vendor ${vendorIdStr} not found with userType='Vendor', trying without filter...`);
+                    directVendor = await User.findById(vendorIdStr)
+                      .select('_id firstName lastName companyName email vendorLogoPath userType')
+                      .lean();
+                    
+                    if (directVendor) {
+                      console.warn(`⚠️ Found user ${vendorIdStr} but userType is '${directVendor.userType}', not 'Vendor'`);
+                    }
+                  }
+                  
+                  if (directVendor) {
+                    console.log(`✅ Fetched vendor ${vendorIdStr} directly from DB:`, {
+                      _id: String(directVendor._id),
+                      userType: directVendor.userType,
+                      companyName: directVendor.companyName,
+                      email: directVendor.email,
+                      vendorLogoPath: directVendor.vendorLogoPath,
+                      firstName: directVendor.firstName,
+                      lastName: directVendor.lastName
+                    });
+                    vendor = directVendor;
+                    vr.vendor = directVendor; // Update the vendor request
+                    vendorsMap.set(vendorIdStr, directVendor); // Cache it for future use
+                  } else {
+                    console.error(`❌ Vendor ${vendorIdStr} does NOT exist in User collection!`);
+                    console.error(`❌ This vendor ID is referenced in VendorRequest ${vr._id} but the user doesn't exist.`);
+                    
+                    // Last resort: Try to find vendor by matching attendee email
+                    // (Sometimes the vendor's email might be in the attendees list)
+                    let matchedVendor = null;
+                    if (vr.attendees && Array.isArray(vr.attendees) && vr.attendees.length > 0) {
+                      const attendeeEmails = vr.attendees.map(a => a.email).filter(Boolean);
+                      console.log(`🔍 Attempting to match vendor by attendee emails:`, attendeeEmails);
+                      
+                      // First try using the global email-to-vendor map if it exists (more efficient)
+                      if (global.tempEmailToVendorMap) {
+                        for (const email of attendeeEmails) {
+                          matchedVendor = global.tempEmailToVendorMap.get(email.toLowerCase());
+                          if (matchedVendor) {
+                            console.log(`✅ Found vendor by attendee email match (from map):`, {
+                              email: email,
+                              vendorId: String(matchedVendor._id),
+                              companyName: matchedVendor.companyName
+                            });
+                            break;
+                          }
+                        }
+                      }
+                      
+                      // If not found in map, try direct database query
+                      if (!matchedVendor) {
+                        for (const email of attendeeEmails) {
+                          matchedVendor = await User.findOne({
+                            email: email,
+                            userType: 'Vendor'
+                          })
+                            .select('_id firstName lastName companyName email vendorLogoPath userType')
+                            .lean();
+                          
+                          if (matchedVendor) {
+                            console.log(`✅ Found vendor by attendee email match (from DB):`, {
+                              email: email,
+                              vendorId: String(matchedVendor._id),
+                              companyName: matchedVendor.companyName
+                            });
+                            break;
+                          }
+                        }
+                      }
+                    }
+                    
+                    if (matchedVendor) {
+                      vendor = matchedVendor;
+                      vr.vendor = matchedVendor; // Update the vendor request
+                      vendorsMap.set(vendorIdStr, matchedVendor); // Cache it
+                    } else {
+                      // Try to find ANY user with similar ID pattern (for debugging)
+                      const similarUsers = await User.find({
+                        _id: { $gte: new mongoose.Types.ObjectId(vendorIdStr.substring(0, 8) + '0000000000000000') }
+                      })
+                        .select('_id email userType companyName')
+                        .limit(5)
+                        .lean();
+                      console.log(`🔍 Similar user IDs found:`, similarUsers.map(u => ({
+                        _id: String(u._id),
+                        email: u.email,
+                        userType: u.userType,
+                        companyName: u.companyName
+                      })));
+                      
+                      // Create a placeholder vendor object so the frontend doesn't break
+                      vendor = {
+                        _id: new mongoose.Types.ObjectId(vendorIdStr),
+                        companyName: null,
+                        email: null,
+                        vendorLogoPath: null,
+                        firstName: null,
+                        lastName: null,
+                        userType: 'Vendor'
+                      };
+                    }
+                  }
+                } catch (fetchErr) {
+                  console.error(`❌ Error fetching vendor ${vendorIdStr} directly:`, fetchErr.message);
+                  console.error(`❌ Full error:`, fetchErr);
+                  // Only create placeholder if we have a valid vendorIdStr
+                  if (vendorIdStr && mongoose.Types.ObjectId.isValid(vendorIdStr)) {
+                    vendor = {
+                      _id: new mongoose.Types.ObjectId(vendorIdStr),
+                      companyName: null,
+                      email: null,
+                      vendorLogoPath: null,
+                      firstName: null,
+                      lastName: null,
+                      userType: 'Vendor'
+                    };
+                  } else {
+                    console.error(`❌ Cannot create placeholder - invalid vendorIdStr: ${vendorIdStr}`);
+                    vendor = null;
+                  }
+                }
+              }
+            } else if (vendor && typeof vendor === 'object' && !vendor.companyName && !vendor.email) {
+              // Vendor exists but we couldn't extract a valid ID - log it
+              console.warn(`⚠️ Could not extract vendor ID from vendor object for vendorRequest ${vr._id}:`, {
+                vendorType: typeof vendor,
+                vendorKeys: Object.keys(vendor || {}),
+                hasId: !!vendor._id
+              });
+            }
+            
+            // Debug first vendor
+            if (index === 0) {
+              console.log('🔍 Creating vendor object from vendorRequest:', {
+                vendorRequestId: vr._id,
+                vendorObject: vendor,
+                vendorType: typeof vendor,
+                vendorIsObjectId: vendor && vendor.toString && typeof vendor.toString === 'function' && !vendor.companyName,
+                vendorKeys: vendor && typeof vendor === 'object' ? Object.keys(vendor) : 'not an object',
+                companyName: vendor.companyName,
+                email: vendor.email,
+                vendorLogoPath: vendor.vendorLogoPath
+              });
+            }
+            
+            const result = {
+              _id: vendor._id || null,
+              name: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Vendor',
+              companyName: vendor.companyName || null,
+              contactName: `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || null,
+              email: vendor.email || null,
+              vendorLogoPath: vendor.vendorLogoPath || null,
+              boothSize: vr.boothSize || null,
+              durationWeeks: vr.durationWeeks || null,
+              boothLocation: vr.boothLocation || null,
+              attendees: Array.isArray(vr.attendees) ? vr.attendees : []
+            };
+            
+            if (index === 0) {
+              console.log('🔍 Final vendor result:', result);
+            }
+            
+            return result;
           }));
         } catch (vendorError) {
           console.error('Error processing vendor info for event:', e._id, vendorError);
@@ -862,7 +1283,12 @@ exports.getAllEvents = async (req, res) => {
       }
 
       return baseEvent;
-    });
+    }));
+
+    // Clean up global temporary map
+    if (global.tempEmailToVendorMap) {
+      delete global.tempEmailToVendorMap;
+    }
 
     res.json(eventsWithVendors);
   } catch (err) {
@@ -2111,8 +2537,12 @@ exports.exportRegistrations = async (req, res) => {
       status: { $ne: 'cancelled' } 
     })
       .populate('user', 'firstName lastName email gucId userType')
+      .select('user event status paid createdAt')
       .sort({ createdAt: 1 });
     console.log('📊 Found', registrations.length, 'registrations from Registration model');
+    registrations.forEach(reg => {
+      console.log(`📋 Registration: user=${reg.user?.email}, paid=${reg.paid}, paid type=${typeof reg.paid}`);
+    });
     
     // Get registrations from StudentRegistration model (for workshops/trips)
     console.log('📊 Fetching registrations from StudentRegistration model...');
@@ -2120,8 +2550,51 @@ exports.exportRegistrations = async (req, res) => {
       event: eventId, 
       status: { $ne: 'cancelled' } 
     })
+      .select('studentName studentEmail studentId status paid createdAt')
       .sort({ createdAt: 1 });
     console.log('📊 Found', studentRegistrations.length, 'registrations from StudentRegistration model');
+    studentRegistrations.forEach(reg => {
+      console.log(`📋 StudentRegistration: email=${reg.studentEmail}, paid=${reg.paid}, paid type=${typeof reg.paid}`);
+    });
+    
+    // For bazaars, also get vendor attendees from VendorRequest
+    let vendorAttendees = [];
+    if (event.type === 'bazaar') {
+      console.log('📊 Fetching vendor attendees from VendorRequest model for bazaar...');
+      const VendorRequest = require('../models/vendorRequest');
+      const vendorRequests = await VendorRequest.find({
+        $or: [
+          { bazaar: eventId },
+          { booth: eventId },
+          { standaloneBooth: eventId }
+        ],
+        status: 'accepted'
+      })
+        .populate('vendor', 'email firstName lastName companyName userType')
+        .select('vendor attendees createdAt status')
+        .sort({ createdAt: 1 });
+      
+      console.log('📊 Found', vendorRequests.length, 'accepted vendor requests for bazaar');
+      
+      // Extract all attendees from all vendor requests
+      vendorRequests.forEach(vr => {
+        if (vr.attendees && Array.isArray(vr.attendees)) {
+          vr.attendees.forEach(attendee => {
+            vendorAttendees.push({
+              name: attendee.name || 'N/A',
+              email: attendee.email || 'N/A',
+              vendorCompany: vr.vendor?.companyName || 'N/A',
+              vendorEmail: vr.vendor?.email || 'N/A',
+              createdAt: vr.createdAt || new Date(),
+              status: 'approved', // Vendor attendees are considered approved
+              isVendorAttendee: true
+            });
+          });
+        }
+      });
+      
+      console.log('📊 Found', vendorAttendees.length, 'vendor attendees for bazaar');
+    }
     
     // Look up user types for StudentRegistration entries by email
     const User = require('../models/userModel');
@@ -2147,6 +2620,8 @@ exports.exportRegistrations = async (req, res) => {
       status: 'success'
     }).populate('user', 'email _id');
     
+    console.log('📊 Found', payments.length, 'successful payments for event', eventId);
+    
     // Create maps for payment verification
     const paymentByUserId = new Map();
     const paymentByEmail = new Map();
@@ -2154,10 +2629,14 @@ exports.exportRegistrations = async (req, res) => {
       if (payment.user) {
         if (payment.user._id) {
           paymentByUserId.set(payment.user._id.toString(), true);
+          console.log('✅ Payment found for user ID:', payment.user._id.toString());
         }
         if (payment.user.email) {
           paymentByEmail.set(payment.user.email.toLowerCase(), true);
+          console.log('✅ Payment found for email:', payment.user.email.toLowerCase());
         }
+      } else {
+        console.log('⚠️ Payment', payment._id, 'has no user populated');
       }
     });
     
@@ -2171,25 +2650,30 @@ exports.exportRegistrations = async (req, res) => {
     // Add registrations from Registration model
     registrations.forEach(reg => {
       if (reg.user) {
-        // Determine paid status:
-        // 1. If event is free, always paid
-        // 2. Otherwise, check reg.paid field first (source of truth)
-        // 3. If reg.paid is false, check Payment model as fallback
+        // Determine paid status with priority:
+        // 1. If event is free (price <= 0), always paid
+        // 2. Check Payment model first (most reliable source of truth for actual payments)
+        // 3. Fall back to reg.paid field if no payment record found
         let isPaid = false;
         if (isFreeEvent) {
           isPaid = true;
-        } else if (reg.paid === true) {
-          isPaid = true;
         } else {
-          // Check Payment model as fallback
           const userId = reg.user._id?.toString();
           const userEmail = reg.user.email?.toLowerCase();
-          isPaid = (userId && paymentByUserId.get(userId)) || 
-                   (userEmail && paymentByEmail.get(userEmail)) || 
-                   false;
+          // Check Payment model first (most reliable)
+          const hasPaymentByUserId = userId && paymentByUserId.has(userId);
+          const hasPaymentByEmail = userEmail && paymentByEmail.has(userEmail);
+          const hasPaymentRecord = hasPaymentByUserId || hasPaymentByEmail;
+          
+          console.log(`🔍 Registration for ${userEmail}: reg.paid=${reg.paid}, hasPaymentRecord=${hasPaymentRecord}, userId=${userId}`);
+          
+          // Use Payment model if found, otherwise use reg.paid
+          // Handle different data types for reg.paid (boolean, string, number)
+          const regPaidValue = reg.paid === true || reg.paid === 'true' || reg.paid === 1 || reg.paid === '1';
+          isPaid = hasPaymentRecord || regPaidValue;
         }
         
-        data.push({
+        const registrationRow = {
           'Name': `${reg.user.firstName || ''} ${reg.user.lastName || ''}`.trim() || 'N/A',
           'Email': reg.user.email || 'N/A',
           'Student ID': reg.user.gucId || 'N/A',
@@ -2197,7 +2681,14 @@ exports.exportRegistrations = async (req, res) => {
           'Registration Date': reg.createdAt ? new Date(reg.createdAt).toLocaleDateString() : 'N/A',
           'Status': reg.status || 'N/A',
           'Paid': isPaid ? 'Yes' : 'No'
-        });
+        };
+        
+        // Add Vendor Company column for bazaars (empty for regular registrations)
+        if (event.type === 'bazaar') {
+          registrationRow['Vendor Company'] = 'N/A';
+        }
+        
+        data.push(registrationRow);
       }
     });
     
@@ -2206,21 +2697,28 @@ exports.exportRegistrations = async (req, res) => {
       const email = reg.studentEmail?.toLowerCase();
       const userType = email ? (userTypeMap.get(email) || 'Student') : 'Student';
       
-      // Determine paid status:
-      // 1. If event is free, always paid
-      // 2. Otherwise, check reg.paid field first (source of truth)
-      // 3. If reg.paid is false, check Payment model as fallback
+      // Determine paid status with priority:
+      // 1. If event is free (price <= 0), always paid
+      // 2. Check Payment model first (most reliable source of truth for actual payments)
+      // 3. Fall back to reg.paid field if no payment record found
       let isPaid = false;
       if (isFreeEvent) {
         isPaid = true;
-      } else if (reg.paid === true) {
-        isPaid = true;
       } else if (email) {
-        // Check Payment model as fallback
-        isPaid = paymentByEmail.get(email) || false;
+        // Check Payment model first (most reliable)
+        const hasPaymentRecord = paymentByEmail.has(email);
+        console.log(`🔍 StudentRegistration for ${email}: reg.paid=${reg.paid}, hasPaymentRecord=${hasPaymentRecord}`);
+        // Use Payment model if found, otherwise use reg.paid
+        // Handle different data types for reg.paid (boolean, string, number)
+        const regPaidValue = reg.paid === true || reg.paid === 'true' || reg.paid === 1 || reg.paid === '1';
+        isPaid = hasPaymentRecord || regPaidValue;
+      } else {
+        // No email, fall back to reg.paid
+        // Handle different data types for reg.paid (boolean, string, number)
+        isPaid = reg.paid === true || reg.paid === 'true' || reg.paid === 1 || reg.paid === '1';
       }
       
-      data.push({
+      const studentRegRow = {
         'Name': reg.studentName || 'N/A',
         'Email': reg.studentEmail || 'N/A',
         'Student ID': reg.studentId || 'N/A',
@@ -2228,8 +2726,61 @@ exports.exportRegistrations = async (req, res) => {
         'Registration Date': reg.createdAt ? new Date(reg.createdAt).toLocaleDateString() : 'N/A',
         'Status': reg.status || 'N/A',
         'Paid': isPaid ? 'Yes' : 'No'
-      });
+      };
+      
+      // Add Vendor Company column for bazaars (empty for student registrations)
+      if (event.type === 'bazaar') {
+        studentRegRow['Vendor Company'] = 'N/A';
+      }
+      
+      data.push(studentRegRow);
     });
+    
+    // Add vendor attendees for bazaars
+    if (event.type === 'bazaar' && vendorAttendees.length > 0) {
+      console.log('📊 Adding', vendorAttendees.length, 'vendor attendees to export...');
+      
+      // Look up user types for vendor attendees by email
+      const vendorAttendeeEmails = vendorAttendees
+        .map(att => att.email?.toLowerCase())
+        .filter(email => email && email !== 'N/A');
+      
+      const vendorAttendeeUsers = await User.find({ 
+        email: { $in: vendorAttendeeEmails } 
+      }).select('email userType gucId');
+      
+      const vendorAttendeeUserTypeMap = new Map();
+      const vendorAttendeeGucIdMap = new Map();
+      vendorAttendeeUsers.forEach(user => {
+        vendorAttendeeUserTypeMap.set(user.email.toLowerCase(), user.userType);
+        vendorAttendeeGucIdMap.set(user.email.toLowerCase(), user.gucId);
+      });
+      
+      vendorAttendees.forEach(att => {
+        const email = att.email?.toLowerCase();
+        const userType = email && email !== 'n/a' ? (vendorAttendeeUserTypeMap.get(email) || 'Vendor Attendee') : 'Vendor Attendee';
+        const gucId = email && email !== 'n/a' ? (vendorAttendeeGucIdMap.get(email) || 'N/A') : 'N/A';
+        
+        // Vendor attendees are typically considered paid (they're part of vendor's participation)
+        // But check Payment model if available
+        let isPaid = true; // Default to paid for vendor attendees
+        if (!isFreeEvent && email && email !== 'n/a') {
+          const hasPaymentRecord = paymentByEmail.has(email);
+          isPaid = hasPaymentRecord || true; // Vendor attendees are usually paid
+        }
+        
+        data.push({
+          'Name': att.name || 'N/A',
+          'Email': att.email || 'N/A',
+          'Student ID': gucId,
+          'User Type': userType,
+          'Registration Date': att.createdAt ? new Date(att.createdAt).toLocaleDateString() : 'N/A',
+          'Status': att.status || 'N/A',
+          'Paid': isPaid ? 'Yes' : 'No',
+          'Vendor Company': att.vendorCompany || 'N/A'
+        });
+      });
+    }
     
     if (data.length === 0) {
       return res.status(404).json({ message: 'No registrations found for this event' });
@@ -2240,8 +2791,17 @@ exports.exportRegistrations = async (req, res) => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Registrations');
     
-    // Set column widths
-    const colWidths = [
+    // Set column widths (adjust if vendor company column is added for bazaars)
+    const colWidths = event.type === 'bazaar' ? [
+      { wch: 25 }, // Name
+      { wch: 30 }, // Email
+      { wch: 15 }, // Student ID
+      { wch: 15 }, // User Type
+      { wch: 20 }, // Registration Date
+      { wch: 12 }, // Status
+      { wch: 10 }, // Paid
+      { wch: 25 }  // Vendor Company (for bazaars)
+    ] : [
       { wch: 25 }, // Name
       { wch: 30 }, // Email
       { wch: 15 }, // Student ID
