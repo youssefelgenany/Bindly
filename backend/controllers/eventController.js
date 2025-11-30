@@ -476,23 +476,57 @@ exports.getAllEvents = async (req, res) => {
 
     if (search) {
       const nameRegex = new RegExp(search, 'i');
+      // Map search query to event types for better matching
+      const searchLower = search.toLowerCase().trim();
+      const typeMatches = [];
+      
+      // Check for exact matches or word boundaries
+      const workshopRegex = /\b(workshop|workshops)\b/i;
+      const tripRegex = /\b(trip|trips)\b/i;
+      const bazaarRegex = /\b(bazaar|bazaars)\b/i;
+      const boothRegex = /\b(booth|booths)\b/i;
+      const conferenceRegex = /\b(conference|conferences)\b/i;
+      
+      if (workshopRegex.test(search)) {
+        typeMatches.push('workshop');
+      }
+      if (tripRegex.test(search)) {
+        typeMatches.push('trip');
+      }
+      if (bazaarRegex.test(search)) {
+        typeMatches.push('bazaar');
+      }
+      if (boothRegex.test(search)) {
+        typeMatches.push('booth');
+      }
+      if (conferenceRegex.test(search)) {
+        typeMatches.push('conference');
+      }
+      
+      const searchConditions = [
+        { title: nameRegex },
+        { name: nameRegex },
+        { description: nameRegex },
+        { location: nameRegex },
+        { faculty: nameRegex },
+        { professors: nameRegex },
+        { 'creator.firstName': nameRegex },
+        { 'creator.lastName': nameRegex },
+        { creatorFullName: nameRegex },
+        // Search in the concatenated student names field
+        { allStudentNames: nameRegex },
+        // Search in the concatenated registered user names field
+        { allRegisteredUserNames: nameRegex }
+      ];
+      
+      // Add type matching if search query matches event types
+      if (typeMatches.length > 0) {
+        searchConditions.push({ type: { $in: typeMatches } });
+      }
+      
       pipeline.push({
         $match: {
-          $or: [
-            { title: nameRegex },
-            { name: nameRegex },
-            { description: nameRegex },
-            { location: nameRegex },
-            { faculty: nameRegex },
-            { professors: nameRegex },
-            { 'creator.firstName': nameRegex },
-            { 'creator.lastName': nameRegex },
-            { creatorFullName: nameRegex },
-            // Search in the concatenated student names field
-            { allStudentNames: nameRegex },
-            // Search in the concatenated registered user names field
-            { allRegisteredUserNames: nameRegex }
-          ]
+          $or: searchConditions
         }
       });
     }
@@ -1574,24 +1608,64 @@ exports.getAllEventsForStudents = async (req, res) => {
             }
           }
         }
-      },
+      }
+    ];
+    
+    // Build search match condition if query exists
+    if (q) {
+      const searchQuery = q.trim();
+      const typeMatches = [];
+      
+      // Check for exact matches or word boundaries using regex
+      const workshopRegex = /\b(workshop|workshops)\b/i;
+      const tripRegex = /\b(trip|trips)\b/i;
+      const bazaarRegex = /\b(bazaar|bazaars)\b/i;
+      const boothRegex = /\b(booth|booths)\b/i;
+      const conferenceRegex = /\b(conference|conferences)\b/i;
+      
+      if (workshopRegex.test(searchQuery)) {
+        typeMatches.push('workshop');
+      }
+      if (tripRegex.test(searchQuery)) {
+        typeMatches.push('trip');
+      }
+      if (bazaarRegex.test(searchQuery)) {
+        typeMatches.push('bazaar');
+      }
+      if (boothRegex.test(searchQuery)) {
+        typeMatches.push('booth');
+      }
+      if (conferenceRegex.test(searchQuery)) {
+        typeMatches.push('conference');
+      }
+      
+      const searchConditions = [
+        { title: new RegExp(q, "i") },
+        { description: new RegExp(q, "i") },
+        { location: new RegExp(q, "i") },
+        { faculty: new RegExp(q, "i") },
+        { professors: new RegExp(q, "i") },
+        { creatorFullName: new RegExp(q, "i") },
+        // Search in the concatenated student names field
+        { allStudentNames: new RegExp(q, "i") },
+        // Search in the concatenated registered user names field
+        { allRegisteredUserNames: new RegExp(q, "i") }
+      ];
+      
+      // Add type matching if search query matches event types
+      if (typeMatches.length > 0) {
+        searchConditions.push({ type: { $in: typeMatches } });
+      }
+      
       // Apply search filter after adding creator name and student registrations
-      ...(q ? [{
+      pipeline.push({
         $match: {
-          $or: [
-            { title: new RegExp(q, "i") },
-            { description: new RegExp(q, "i") },
-            { location: new RegExp(q, "i") },
-            { faculty: new RegExp(q, "i") },
-            { professors: new RegExp(q, "i") },
-            { creatorFullName: new RegExp(q, "i") },
-            // Search in the concatenated student names field
-            { allStudentNames: new RegExp(q, "i") },
-            // Search in the concatenated registered user names field
-            { allRegisteredUserNames: new RegExp(q, "i") }
-          ]
+          $or: searchConditions
         }
-      }] : []),
+      });
+    }
+    
+    pipeline.push(
       { $sort: { startDate: 1 } },
       {
         $project: {
@@ -1632,7 +1706,7 @@ exports.getAllEventsForStudents = async (req, res) => {
           }
         }
       }
-    ];
+    );
 
     let events = [];
     try {
