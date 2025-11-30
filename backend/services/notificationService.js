@@ -1,5 +1,7 @@
 const Notification = require('../models/notificationModel');
 const StudentRegistration = require('../models/studentRegistrationModel');
+const Registration = require('../models/registrationModel');
+const GymRegistration = require('../models/gymRegistrationModel');
 const Event = require('../models/eventModel');
 const Trip = require('../models/tripModel');
 const GymSession = require('../models/gymSessionModel');
@@ -74,11 +76,20 @@ exports.createEventReminders = async () => {
 async function processEventReminders(events, timeframe) {
   for (const event of events) {
     try {
-      const registrations = await StudentRegistration.find({
-        event: event._id
+      // Get student registrations (for workshops/trips)
+      const studentRegistrations = await StudentRegistration.find({
+        event: event._id,
+        status: { $ne: 'cancelled' }
       });
       
-      for (const registration of registrations) {
+      // Get regular registrations (for Staff, TA, Professor, and other students)
+      const regularRegistrations = await Registration.find({
+        event: event._id,
+        status: { $in: ['approved', 'pending'] }
+      });
+      
+      // Process student registrations
+      for (const registration of studentRegistrations) {
         // Use userId if available, otherwise fallback to email lookup
         let userId = registration.student;
         if (!userId && registration.studentEmail) {
@@ -90,6 +101,42 @@ async function processEventReminders(events, timeframe) {
           }
         }
         
+        if (!userId) continue; // Skip if no user found
+        
+        // For workshops/trips, only send reminders for paid registrations if event has a price
+        if (event.price > 0 && registration.paid !== true) {
+          continue; // Skip unpaid registrations for paid events
+        }
+        
+        const existingNotification = await Notification.findOne({
+          type: 'event_reminder',
+          recipient: userId,
+          'metadata.timeframe': timeframe,
+          'metadata.eventId': event._id.toString()
+        });
+        
+        if (!existingNotification) {
+          await Notification.create({
+            recipient: userId,
+            type: 'event_reminder',
+            title: `Reminder: ${event.title} starts in ${timeframe}`,
+            message: `The event "${event.title}" will start in ${timeframe} at ${event.location}`,
+            relatedEvent: event._id,
+            priority: timeframe === '1 hour' ? 'high' : 'medium',
+            metadata: {
+              eventTitle: event.title,
+              eventDate: event.startDate,
+              location: event.location,
+              timeframe: timeframe,
+              eventId: event._id.toString()
+            }
+          });
+        }
+      }
+      
+      // Process regular registrations (Staff, TA, Professor, etc.)
+      for (const registration of regularRegistrations) {
+        const userId = registration.user;
         if (!userId) continue; // Skip if no user found
         
         const existingNotification = await Notification.findOne({
@@ -126,11 +173,20 @@ async function processEventReminders(events, timeframe) {
 async function processWorkshopReminders(workshops, timeframe) {
   for (const workshop of workshops) {
     try {
-      const registrations = await StudentRegistration.find({
-        event: workshop._id
+      // Get student registrations (for workshops)
+      const studentRegistrations = await StudentRegistration.find({
+        event: workshop._id,
+        status: { $ne: 'cancelled' }
       });
       
-      for (const registration of registrations) {
+      // Get regular registrations (for Staff, TA, Professor, etc.)
+      const regularRegistrations = await Registration.find({
+        event: workshop._id,
+        status: { $in: ['approved', 'pending'] }
+      });
+      
+      // Process student registrations
+      for (const registration of studentRegistrations) {
         // Use userId if available, otherwise fallback to email lookup
         let userId = registration.student;
         if (!userId && registration.studentEmail) {
@@ -142,6 +198,42 @@ async function processWorkshopReminders(workshops, timeframe) {
           }
         }
         
+        if (!userId) continue; // Skip if no user found
+        
+        // For workshops with price, only send reminders for paid registrations
+        if (workshop.price > 0 && registration.paid !== true) {
+          continue; // Skip unpaid registrations for paid workshops
+        }
+        
+        const existingNotification = await Notification.findOne({
+          type: 'workshop_reminder',
+          recipient: userId,
+          'metadata.timeframe': timeframe,
+          'metadata.workshopId': workshop._id.toString()
+        });
+        
+        if (!existingNotification) {
+          await Notification.create({
+            recipient: userId,
+            type: 'workshop_reminder',
+            title: `Reminder: ${workshop.title} starts in ${timeframe}`,
+            message: `The workshop "${workshop.title}" will start in ${timeframe} at ${workshop.location}`,
+            relatedEvent: workshop._id,
+            priority: timeframe === '1 hour' ? 'high' : 'medium',
+            metadata: {
+              workshopName: workshop.title,
+              workshopDate: workshop.startDate,
+              location: workshop.location,
+              timeframe: timeframe,
+              workshopId: workshop._id.toString()
+            }
+          });
+        }
+      }
+      
+      // Process regular registrations (Staff, TA, Professor, etc.)
+      for (const registration of regularRegistrations) {
+        const userId = registration.user;
         if (!userId) continue; // Skip if no user found
         
         const existingNotification = await Notification.findOne({
@@ -178,11 +270,20 @@ async function processWorkshopReminders(workshops, timeframe) {
 async function processTripReminders(trips, timeframe) {
   for (const trip of trips) {
     try {
-      const registrations = await StudentRegistration.find({
-        event: trip._id
+      // Get student registrations (for trips)
+      const studentRegistrations = await StudentRegistration.find({
+        event: trip._id,
+        status: { $ne: 'cancelled' }
       });
       
-      for (const registration of registrations) {
+      // Get regular registrations (for Staff, TA, Professor, etc.)
+      const regularRegistrations = await Registration.find({
+        event: trip._id,
+        status: { $in: ['approved', 'pending'] }
+      });
+      
+      // Process student registrations
+      for (const registration of studentRegistrations) {
         // Use userId if available, otherwise fallback to email lookup
         let userId = registration.student;
         if (!userId && registration.studentEmail) {
@@ -194,6 +295,41 @@ async function processTripReminders(trips, timeframe) {
           }
         }
         
+        if (!userId) continue; // Skip if no user found
+        
+        // For trips with price, only send reminders for paid registrations
+        if (trip.price > 0 && registration.paid !== true) {
+          continue; // Skip unpaid registrations for paid trips
+        }
+        
+        const existingNotification = await Notification.findOne({
+          type: 'trip_reminder',
+          recipient: userId,
+          'metadata.timeframe': timeframe,
+          'metadata.tripId': trip._id.toString()
+        });
+        
+        if (!existingNotification) {
+          await Notification.create({
+            recipient: userId,
+            type: 'trip_reminder',
+            title: `Reminder: ${trip.name} starts in ${timeframe}`,
+            message: `The trip "${trip.name}" will start in ${timeframe} at ${trip.location}`,
+            priority: timeframe === '1 hour' ? 'high' : 'medium',
+            metadata: {
+              tripName: trip.name,
+              tripDate: trip.startDate,
+              location: trip.location,
+              timeframe: timeframe,
+              tripId: trip._id.toString()
+            }
+          });
+        }
+      }
+      
+      // Process regular registrations (Staff, TA, Professor, etc.)
+      for (const registration of regularRegistrations) {
+        const userId = registration.user;
         if (!userId) continue; // Skip if no user found
         
         const existingNotification = await Notification.findOne({
@@ -229,22 +365,14 @@ async function processTripReminders(trips, timeframe) {
 async function processGymSessionReminders(gymSessions, timeframe) {
   for (const gymSession of gymSessions) {
     try {
-      const registrations = await StudentRegistration.find({
-        event: gymSession._id
+      // Get gym registrations (for all user types: Student, Staff, TA, Professor)
+      const gymRegistrations = await GymRegistration.find({
+        gymSession: gymSession._id,
+        status: 'registered'
       });
       
-      for (const registration of registrations) {
-        // Use userId if available, otherwise fallback to email lookup
-        let userId = registration.student;
-        if (!userId && registration.studentEmail) {
-          const user = await User.findOne({ email: registration.studentEmail });
-          if (user) {
-            userId = user._id;
-            // Update registration to include userId
-            await StudentRegistration.findByIdAndUpdate(registration._id, { student: userId });
-          }
-        }
-        
+      for (const registration of gymRegistrations) {
+        const userId = registration.user;
         if (!userId) continue; // Skip if no user found
         
         const existingNotification = await Notification.findOne({
