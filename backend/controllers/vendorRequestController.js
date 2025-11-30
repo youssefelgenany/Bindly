@@ -2075,9 +2075,9 @@ const handleStripePaymentSuccess = async (req, res) => {
     console.log('✅ Payment processing complete. Redirecting...');
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
 
-    // If this was a vendor-request payment, redirect vendors straight to their dashboard
+    // If this was a vendor-request payment, redirect vendors straight to their vendor dashboard
     if (type === 'vendor-request' || (payment && payment.vendorRequest)) {
-      return res.redirect(`${clientUrl}/dashboard`);
+      return res.redirect(`${clientUrl}/vendor`);
     }
 
     // Default: redirect to generic payment success page
