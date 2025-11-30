@@ -39,14 +39,25 @@ const FileChooser = ({ id, accept, multiple, onChange, disabled, buttonLabel = '
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    backgroundColor: disabled ? '#9ca3af' : '#2b82f6',
+                    backgroundColor: disabled ? '#9ca3af' : '#1D3557',
                     color: '#ffffff',
                     padding: '0.5rem 1rem',
-                    borderRadius: '0.75rem',
+                    borderRadius: '0.5rem',
                     border: 'none',
                     cursor: disabled ? 'not-allowed' : 'pointer',
-                    fontSize: '0.9375rem',
-                    fontWeight: 600
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                    if (!disabled) {
+                        e.target.style.backgroundColor = '#152843';
+                    }
+                }}
+                onMouseLeave={(e) => {
+                    if (!disabled) {
+                        e.target.style.backgroundColor = '#1D3557';
+                    }
                 }}
             >
                 <span className="material-symbols-outlined" style={{ fontSize: '1.05rem' }}>

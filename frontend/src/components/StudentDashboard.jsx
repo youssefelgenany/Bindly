@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { studentRegistrationApi } from '../api/studentRegistrationApi';
+import { eventsApiService } from '../api/eventsApi';
 import { notificationApiService } from '../api/notificationApi';
 
 const StudentDashboard = () => {
@@ -174,10 +175,105 @@ const StudentDashboard = () => {
         try {
             setLoading(true);
             
-            // Fetch student registrations
+            // Fetch events from discover events for upcoming events preview
+            try {
+                const eventsResult = await eventsApiService.getAllEventsAuthenticated({});
+                
+                if (eventsResult.success) {
+                    const eventsList = Array.isArray(eventsResult.data) ? eventsResult.data : (eventsResult.data?.events || []);
+                    
+                    const now = new Date();
+                    // Filter for upcoming events (future dates)
+                    const upcoming = eventsList.filter(ev => {
+                        if (!ev.startDate) return false;
+                        const date = new Date(ev.startDate);
+                        return !isNaN(date.getTime()) && date > now;
+                    });
+
+                    // Sort by date
+                    const sortedByDate = upcoming.slice().sort((a, b) => {
+                        const dateA = new Date(a.startDate || 0);
+                        const dateB = new Date(b.startDate || 0);
+                        return dateA - dateB;
+                    });
+
+                    // Select specific event types in order: Trip, Workshop, Bazaar, Conference/Booth
+                    const selectedEvents = [];
+                    const priorityTypes = ['trip', 'workshop', 'bazaar', 'conference', 'booth'];
+                    
+                    // First pass: get one of each priority type in order
+                    for (const type of priorityTypes) {
+                        if (selectedEvents.length >= 4) break;
+                        const found = sortedByDate.find(ev => {
+                            const eventType = (ev.type || '').toLowerCase();
+                            return eventType === type && !selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id));
+                        });
+                        if (found) {
+                            selectedEvents.push(found);
+                        }
+                    }
+                    
+                    // If we don't have 4 yet, fill with any remaining events
+                    for (const ev of sortedByDate) {
+                        if (selectedEvents.length >= 4) break;
+                        if (!selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id))) {
+                            selectedEvents.push(ev);
+                        }
+                    }
+
+                    // Load ratings for selected events
+                    const ratingsMap = {};
+                    await Promise.all(selectedEvents.slice(0, 4).map(async (ev) => {
+                        if (ev._id || ev.id) {
+                            try {
+                                const ratingResult = await eventsApiService.getRatingsAndComments(ev._id || ev.id);
+                                if (ratingResult.success && ratingResult.data?.ratings) {
+                                    ratingsMap[ev._id || ev.id] = {
+                                        average: ratingResult.data.ratings.average || 0,
+                                        count: ratingResult.data.ratings.count || 0
+                                    };
+                                }
+                            } catch (err) {
+                                // Silently fail - ratings are optional
+                            }
+                        }
+                    }));
+
+                    const previewCards = selectedEvents
+                        .slice(0, 4)
+                        .map((ev) => {
+                            const eventId = ev._id || ev.id;
+                            const ratingData = ratingsMap[eventId] || { average: null, count: 0 };
+                            const banner = ev.bannerFile || ev.banner;
+                            const image = banner 
+                                ? (banner.startsWith('http') ? banner : `http://localhost:5000${banner}`)
+                                : eventTypeImages[(ev.type || '').toLowerCase()] || eventTypeImages.other;
+                            
+                            return {
+                                id: eventId,
+                                title: ev.title || 'Upcoming Event',
+                                subtitle: ev.location || ev.faculty || ev.type || 'On Campus',
+                                dateLabel: formatEventDateLabel(ev.startDate),
+                                image: image,
+                                rating: ratingData.average,
+                                ratingCount: ratingData.count,
+                                priceLabel: getPriceLabel(ev.price),
+                                typeLabel: ev.type || 'Event'
+                            };
+                        });
+                    setUpcomingEventsPreview(previewCards);
+                } else {
+                    setUpcomingEventsPreview([]);
+                }
+            } catch (eventsError) {
+                console.error('Error fetching events for upcoming events preview:', eventsError);
+                setUpcomingEventsPreview([]);
+            }
+
+            // Still fetch registrations for stats
             if (user?.email) {
                 console.log('Loading dashboard data for user:', user.email);
-                const registrationsRes = await studentRegistrationApi.getMyRegistrations(user.email);
+                const registrationsRes = await studentRegistrationApi.getMyRegistrations();
                 console.log('Registrations API response:', registrationsRes);
                 
                 // Handle different response formats
@@ -186,10 +282,21 @@ const StudentDashboard = () => {
                     // The API returns { success: true, data: response.data }
                     // where response.data is { success: true, registrations: [...] }
                     // So we need to check registrationsRes.data.registrations
-                    registrations = registrationsRes.data?.registrations || 
+                    let allRegs = registrationsRes.data?.registrations || 
                                    registrationsRes.data?.data?.registrations ||
                                    (Array.isArray(registrationsRes.data) ? registrationsRes.data : []) ||
                                    [];
+                    
+                    // Filter out unpaid registrations for workshops/trips
+                    registrations = allRegs.filter(reg => {
+                      const eventType = (reg.event?.type || reg.eventType || '').toLowerCase();
+                      // For workshops and trips, only include if paid
+                      if ((eventType === 'workshop' || eventType === 'trip') && !reg.paid) {
+                        return false;
+                      }
+                      return true;
+                    });
+                    
                     console.log('Extracted registrations:', registrations.length, registrations);
                 } else {
                     console.error('Failed to fetch registrations:', registrationsRes.message);
@@ -206,56 +313,6 @@ const StudentDashboard = () => {
                     return !isNaN(date.getTime()) && date > now;
                 });
                 console.log('Upcoming events:', upcoming.length);
-
-                // Sort by date
-                const sortedByDate = upcoming.slice().sort((a, b) => {
-                    const dateA = new Date(a.eventDate || a.event?.startDate || 0);
-                    const dateB = new Date(b.eventDate || b.event?.startDate || 0);
-                    return dateA - dateB;
-                });
-
-                // Select specific event types in order: Trip, Workshop, Bazaar, Conference/Booth (blurred)
-                const selectedEvents = [];
-                const priorityTypes = ['trip', 'workshop', 'bazaar', 'conference', 'booth'];
-                
-                // First pass: get one of each priority type in order
-                for (const type of priorityTypes) {
-                    if (selectedEvents.length >= 4) break;
-                    const found = sortedByDate.find(reg => {
-                        const eventType = (reg.event?.type || reg.eventType || 'Event').toLowerCase();
-                        return eventType === type && !selectedEvents.find(e => (e.id || e._id) === (reg.id || reg._id));
-                    });
-                    if (found) {
-                        selectedEvents.push(found);
-                    }
-                }
-                
-                // If we don't have 4 yet, fill with any remaining events
-                for (const reg of sortedByDate) {
-                    if (selectedEvents.length >= 4) break;
-                    if (!selectedEvents.find(e => (e.id || e._id) === (reg.id || reg._id))) {
-                        selectedEvents.push(reg);
-                    }
-                }
-
-                const previewCards = selectedEvents
-                    .slice(0, 4)
-                    .map((reg) => {
-                        const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
-                        const { rating, ratingCount } = getRatingSummary(reg);
-                        return {
-                            id: reg.id || reg._id,
-                            title: reg.eventTitle || reg.event?.title || 'Upcoming Event',
-                            subtitle: reg.event?.location || reg.event?.faculty || reg.event?.type || 'On Campus',
-                            dateLabel: formatEventDateLabel(eventDate),
-                            image: getEventPreviewImage(reg),
-                            rating,
-                            ratingCount,
-                            priceLabel: getPriceLabel(reg.event?.price || reg.event?.cost || reg.price),
-                            typeLabel: reg.event?.type || reg.eventType || 'Event'
-                        };
-                    });
-                setUpcomingEventsPreview(previewCards);
 
                 // Calculate stats
                 const enrolledCount = registrations.length;
@@ -754,6 +811,7 @@ const StudentDashboard = () => {
                                                     } else if (
                                                         notification.type === 'new_loyalty_partner' || 
                                                         notification.type === 'loyalty_partner_added' ||
+                                                        notification.type === 'loyalty_program_application' ||
                                                         (notification.type === 'system' && notification.metadata?.vendorId)
                                                     ) {
                                                         // Navigate to Loyalty Partners page
@@ -1417,35 +1475,208 @@ const StudentDashboard = () => {
                             </div>
                         </div>
 
-                        {/* Upcoming Events Preview */}
-                        {upcomingEventsPreview.length > 0 && (
-                            <section style={{ marginBottom: '1.5rem' }}>
-                                <div style={{ marginBottom: '0.75rem' }}>
-                                    <h3 style={{
-                                        color: '#1D3557',
-                                        fontSize: '1.125rem',
-                                        fontWeight: '600',
-                                        margin: 0
-                                    }}>
-                                        Upcoming Events
-                                    </h3>
-                                </div>
+                        {/* Upcoming Events Preview - Always show section with 4 events */}
+                        <section style={{ marginBottom: '1.5rem' }}>
+                            <div style={{ marginBottom: '0.75rem' }}>
+                                <h3 style={{
+                                    color: '#1D3557',
+                                    fontSize: '1.125rem',
+                                    fontWeight: '600',
+                                    margin: 0
+                                }}>
+                                    Upcoming Events
+                                </h3>
+                            </div>
 
+                            {loading ? (
+                                <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                    Loading events...
+                                </div>
+                            ) : (
                                 <div style={{
                                     display: 'grid',
                                     gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
                                     gap: '0.85rem'
                                 }}>
-                                    {upcomingEventsPreview.map((event, index) => {
-                                        const shouldBlurCard = upcomingEventsPreview.length > 1 && index === upcomingEventsPreview.length - 1;
-                                        return (
-                                            <div
-                                                key={event.id || index}
-                                                onClick={() => {
-                                                    if (shouldBlurCard) {
+                                    {upcomingEventsPreview.length > 0 ? (
+                                        // Ensure we always show exactly 4 cards
+                                        Array.from({ length: 4 }).map((_, index) => {
+                                            const event = upcomingEventsPreview[index];
+                                            // Always blur the last card (4th card) to indicate "Discover more"
+                                            const shouldBlurCard = index === 3;
+                                            
+                                            // If we don't have enough events, show placeholder for remaining slots
+                                            if (!event) {
+                                                return (
+                                                    <div
+                                                        key={`placeholder-${index}`}
+                                                        onClick={() => navigate('/student/events')}
+                                                        style={{
+                                                            backgroundColor: '#FFFFFF',
+                                                            borderRadius: '1rem',
+                                                            overflow: 'hidden',
+                                                            border: '1px solid #e5e7eb',
+                                                            boxShadow: '0 12px 20px -6px rgba(15, 23, 42, 0.15)',
+                                                            position: 'relative',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            minHeight: '260px',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            color: '#6b7280'
+                                                        }}
+                                                    >
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>
+                                                            event
+                                                        </span>
+                                                        <p style={{ margin: 0, fontSize: '0.875rem' }}>Discover more events</p>
+                                                    </div>
+                                                );
+                                            }
+                                            
+                                            return (
+                                                <div
+                                                    key={event.id || index}
+                                                    onClick={() => {
+                                                        // All cards redirect to Discover Events
                                                         navigate('/student/events');
-                                                    }
-                                                }}
+                                                    }}
+                                                    style={{
+                                                        backgroundColor: '#FFFFFF',
+                                                        borderRadius: '1rem',
+                                                        overflow: 'hidden',
+                                                        border: '1px solid #e5e7eb',
+                                                        boxShadow: '0 12px 20px -6px rgba(15, 23, 42, 0.15)',
+                                                        position: 'relative',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        minHeight: '260px',
+                                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                        animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both`
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                                                        e.currentTarget.style.boxShadow = '0 25px 40px -10px rgba(15,23,42,0.25)';
+                                                        e.currentTarget.style.borderColor = '#1e40af';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                                        e.currentTarget.style.boxShadow = '0 12px 20px -6px rgba(15, 23, 42, 0.15)';
+                                                        e.currentTarget.style.borderColor = '#e5e7eb';
+                                                    }}
+                                                >
+                                                    <div style={{
+                                                        height: '200px',
+                                                        overflow: 'hidden',
+                                                        position: 'relative'
+                                                    }}>
+                                                        <img
+                                                            src={event.image}
+                                                            alt={event.title}
+                                                            style={{
+                                                                width: '100%',
+                                                                height: '100%',
+                                                                objectFit: 'cover',
+                                                                objectPosition: 'center'
+                                                            }}
+                                                            onError={(e) => {
+                                                                e.target.style.display = 'none';
+                                                                e.target.parentElement.style.backgroundColor = '#f1f5f9';
+                                                            }}
+                                                        />
+                                                        <button
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: '0.75rem',
+                                                                right: '0.75rem',
+                                                                backgroundColor: 'rgba(255,255,255,0.9)',
+                                                                borderRadius: '50%',
+                                                                border: 'none',
+                                                                width: '2.25rem',
+                                                                height: '2.25rem',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                cursor: 'pointer',
+                                                                boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                                                            }}
+                                                        >
+                                                            <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: '#1D3557' }}>
+                                                                favorite
+                                                            </span>
+                                                        </button>
+                                                    </div>
+
+                                                    <div style={{ padding: '0.7rem 0.8rem 0.9rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
+                                                        <p style={{
+                                                            color: '#1D3557',
+                                                            fontSize: '0.9rem',
+                                                            fontWeight: '600',
+                                                            margin: 0
+                                                        }}>
+                                                            {event.title}
+                                                        </p>
+                                                        {event.rating ? (
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                                                <span style={{ fontWeight: '600', color: '#065f46', fontSize: '0.75rem' }}>
+                                                                    {event.rating.toFixed(1)}
+                                                                </span>
+                                                                <div style={{ display: 'flex', gap: '0.05rem' }}>
+                                                                    {[1, 2, 3, 4, 5].map((star) => (
+                                                                        <span
+                                                                            key={star}
+                                                                            className="material-symbols-outlined"
+                                                                            style={{
+                                                                                fontSize: '0.8rem',
+                                                                                color: star <= Math.round(event.rating) ? '#22c55e' : '#d1d5db'
+                                                                            }}
+                                                                        >
+                                                                            grade
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                                <span style={{ color: '#6b7280', fontSize: '0.65rem' }}>
+                                                                    ({event.ratingCount || '—'})
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <p style={{ color: '#9ca3af', fontSize: '0.65rem', margin: 0 }}>
+                                                                Not rated yet
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    {shouldBlurCard && (
+                                                        <div
+                                                            style={{
+                                                                position: 'absolute',
+                                                                inset: 0,
+                                                                backgroundColor: 'rgba(248,250,252,0.7)',
+                                                                backdropFilter: 'blur(2px)',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                textAlign: 'center',
+                                                                padding: '0.5rem',
+                                                                color: '#1D3557',
+                                                                fontWeight: '600',
+                                                                fontSize: '0.9rem'
+                                                            }}
+                                                        >
+                                                            Discover more events
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        // Show placeholder cards if no events
+                                        Array.from({ length: 4 }).map((_, index) => (
+                                            <div
+                                                key={`placeholder-${index}`}
+                                                onClick={() => navigate('/student/events')}
                                                 style={{
                                                     backgroundColor: '#FFFFFF',
                                                     borderRadius: '1rem',
@@ -1453,131 +1684,25 @@ const StudentDashboard = () => {
                                                     border: '1px solid #e5e7eb',
                                                     boxShadow: '0 12px 20px -6px rgba(15, 23, 42, 0.15)',
                                                     position: 'relative',
-                                                    cursor: shouldBlurCard ? 'pointer' : 'default',
+                                                    cursor: 'pointer',
                                                     display: 'flex',
                                                     flexDirection: 'column',
                                                     minHeight: '260px',
-                                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                    animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both`
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-                                                    e.currentTarget.style.boxShadow = '0 25px 40px -10px rgba(15,23,42,0.25)';
-                                                    e.currentTarget.style.borderColor = '#1e40af';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                                                    e.currentTarget.style.boxShadow = '0 12px 20px -6px rgba(15, 23, 42, 0.15)';
-                                                    e.currentTarget.style.borderColor = '#e5e7eb';
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: '#6b7280'
                                                 }}
                                             >
-                                                <div style={{
-                                                    height: '200px',
-                                                    overflow: 'hidden',
-                                                    position: 'relative'
-                                                }}>
-                                                    <img
-                                                        src={event.image}
-                                                        alt={event.title}
-                                                        style={{
-                                                            width: '100%',
-                                                            height: '100%',
-                                                            objectFit: 'cover',
-                                                            objectPosition: 'center'
-                                                        }}
-                                                        onError={(e) => {
-                                                            e.target.style.display = 'none';
-                                                            e.target.parentElement.style.backgroundColor = '#f1f5f9';
-                                                        }}
-                                                    />
-                                                    <button
-                                                        style={{
-                                                            position: 'absolute',
-                                                            top: '0.75rem',
-                                                            right: '0.75rem',
-                                                            backgroundColor: 'rgba(255,255,255,0.9)',
-                                                            borderRadius: '50%',
-                                                            border: 'none',
-                                                            width: '2.25rem',
-                                                            height: '2.25rem',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            cursor: 'pointer',
-                                                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
-                                                        }}
-                                                    >
-                                                        <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: '#1D3557' }}>
-                                                            favorite
-                                                        </span>
-                                                    </button>
-                                                </div>
-
-                                                <div style={{ padding: '0.7rem 0.8rem 0.9rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
-                                                    <p style={{
-                                                        color: '#1D3557',
-                                                        fontSize: '0.9rem',
-                                                        fontWeight: '600',
-                                                        margin: 0
-                                                    }}>
-                                                        {event.title}
-                                                    </p>
-                                                    {event.rating ? (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                                            <span style={{ fontWeight: '600', color: '#065f46', fontSize: '0.75rem' }}>
-                                                                {event.rating.toFixed(1)}
-                                                            </span>
-                                                            <div style={{ display: 'flex', gap: '0.05rem' }}>
-                                                                {[1, 2, 3, 4, 5].map((star) => (
-                                                                    <span
-                                                                        key={star}
-                                                                        className="material-symbols-outlined"
-                                                                        style={{
-                                                                            fontSize: '0.8rem',
-                                                                            color: star <= Math.round(event.rating) ? '#22c55e' : '#d1d5db'
-                                                                        }}
-                                                                    >
-                                                                        grade
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                            <span style={{ color: '#6b7280', fontSize: '0.65rem' }}>
-                                                                ({event.ratingCount || '—'})
-                                                            </span>
-                                                        </div>
-                                                    ) : (
-                                                        <p style={{ color: '#9ca3af', fontSize: '0.65rem', margin: 0 }}>
-                                                            Not rated yet
-                                                        </p>
-                                                    )}
-                                                </div>
-
-                                                {shouldBlurCard && (
-                                                    <div
-                                                        style={{
-                                                            position: 'absolute',
-                                                            inset: 0,
-                                                            backgroundColor: 'rgba(248,250,252,0.7)',
-                                                            backdropFilter: 'blur(2px)',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            textAlign: 'center',
-                                                            padding: '0.5rem',
-                                                            color: '#1D3557',
-                                                            fontWeight: '600',
-                                                            fontSize: '0.9rem'
-                                                        }}
-                                                    >
-                                                        Discover more events
-                                                    </div>
-                                                )}
+                                                <span className="material-symbols-outlined" style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>
+                                                    event
+                                                </span>
+                                                <p style={{ margin: 0, fontSize: '0.875rem' }}>Discover events</p>
                                             </div>
-                                        );
-                                    })}
+                                        ))
+                                    )}
                                 </div>
-                            </section>
-                        )}
+                            )}
+                        </section>
 
                         {/* Quick Actions */}
                         <div style={{ marginBottom: '1.5rem' }}>

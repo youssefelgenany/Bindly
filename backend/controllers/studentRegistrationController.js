@@ -73,61 +73,7 @@ exports.registerStudentForEvent = async (req, res) => {
       });
     }
 
-    // Check for duplicate registration - exclude cancelled registrations
-    const existingRegistration = await StudentRegistration.findOne({ 
-      event: eventId, 
-      studentEmail: studentEmail.toLowerCase(),
-      status: { $ne: 'cancelled' } // Exclude cancelled registrations
-    });
-    
-    // If registration exists, check if it's a valid (paid) registration
-    if (existingRegistration) {
-      const eventPrice = event.price || 0;
-      if (eventPrice > 0) {
-        // For paid events, only block if the registration is paid
-        if (existingRegistration.paid === true) {
-          return res.status(400).json({ 
-            success: false,
-            message: 'You are already registered for this event' 
-          });
-        }
-        // If unpaid, delete the old unpaid registration to allow new registration
-        // This handles cases where user went back from payment page without paying
-        console.log('🗑️ Deleting unpaid registration to allow re-registration:', existingRegistration._id);
-        await StudentRegistration.findByIdAndDelete(existingRegistration._id);
-        // Decrement event registered count
-        await Event.findByIdAndUpdate(eventId, { $inc: { registeredCount: -1 } });
-      } else {
-        // For free events, block any existing registration
-        return res.status(400).json({ 
-          success: false,
-          message: 'You are already registered for this event' 
-        });
-      }
-    }
-
-    // Create registration
-    const registrationData = {
-      event: eventId,
-      studentName: studentName.trim(),
-      studentId: studentId.trim(),
-      studentEmail: studentEmail.toLowerCase().trim(),
-      eventType: event.type,
-    };
-
-    // Add additional fields for trips
-    if (event.type === 'trip') {
-      if (emergencyContact) registrationData.emergencyContact = emergencyContact;
-      if (dietaryRequirements) registrationData.dietaryRequirements = dietaryRequirements;
-      if (medicalConditions) registrationData.medicalConditions = medicalConditions;
-    }
-
-    // Set paid status: false if event has a price (requires payment), true if free
-    const eventPrice = event.price || 0;
-    registrationData.paid = eventPrice <= 0;
-
-    const registration = await StudentRegistration.create(registrationData);
-
+    // Get or create user first to get userId
     const crypto = require('crypto');
     const User = require('../models/userModel');
     
@@ -163,6 +109,63 @@ exports.registerStudentForEvent = async (req, res) => {
         await user.save();
       }
     }
+
+    // Check for duplicate registration by userId - exclude cancelled registrations
+    const existingRegistration = await StudentRegistration.findOne({ 
+      $or: [
+        { event: eventId, student: user._id, status: { $ne: 'cancelled' } },
+        { event: eventId, studentEmail: studentEmail.toLowerCase(), student: { $exists: false }, status: { $ne: 'cancelled' } } // Fallback for old records
+      ]
+    });
+    
+    // If registration exists, check if it's a valid (paid) registration
+    if (existingRegistration) {
+      const eventPrice = event.price || 0;
+      if (eventPrice > 0) {
+        // For paid events, only block if the registration is paid
+        if (existingRegistration.paid === true) {
+          return res.status(400).json({ 
+            success: false,
+            message: 'You are already registered for this event' 
+          });
+        }
+        // If unpaid, delete the old unpaid registration to allow new registration
+        // This handles cases where user went back from payment page without paying
+        console.log('🗑️ Deleting unpaid registration to allow re-registration:', existingRegistration._id);
+        await StudentRegistration.findByIdAndDelete(existingRegistration._id);
+        // Decrement event registered count
+        await Event.findByIdAndUpdate(eventId, { $inc: { registeredCount: -1 } });
+      } else {
+        // For free events, block any existing registration
+        return res.status(400).json({ 
+          success: false,
+          message: 'You are already registered for this event' 
+        });
+      }
+    }
+
+    // Create registration with userId
+    const registrationData = {
+      event: eventId,
+      student: user._id, // Link to userId
+      studentName: studentName.trim(),
+      studentId: studentId.trim(),
+      studentEmail: studentEmail.toLowerCase().trim(), // Keep for backwards compatibility
+      eventType: event.type,
+    };
+
+    // Add additional fields for trips
+    if (event.type === 'trip') {
+      if (emergencyContact) registrationData.emergencyContact = emergencyContact;
+      if (dietaryRequirements) registrationData.dietaryRequirements = dietaryRequirements;
+      if (medicalConditions) registrationData.medicalConditions = medicalConditions;
+    }
+
+    // Set paid status: false if event has a price (requires payment), true if free
+    const eventPrice = event.price || 0;
+    registrationData.paid = eventPrice <= 0;
+
+    const registration = await StudentRegistration.create(registrationData);
     
     // Only send verification email if user is not already verified
     if (!user.isVerified) {
@@ -306,46 +309,71 @@ exports.getEventRegistrations = async (req, res) => {
   }
 };
 
-// Get student registrations by email (for students to view their own registrations)
+// Get student registrations by userId (for authenticated students to view their own registrations)
 exports.getStudentRegistrationsByEmail = async (req, res) => {
   try {
-    const { email } = req.query;
-
-    console.log('🔍 Student registration search request for email:', email);
-
-    if (!email) {
-      return res.status(400).json({ 
+    // User must be authenticated (route is protected)
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ 
         success: false,
-        message: 'Email is required' 
+        message: 'Authentication required' 
       });
     }
 
-    // Check if a user with this email exists - if not, return empty (user was deleted)
+    const userId = req.user.id;
     const User = require('../models/userModel');
-    const userExists = await User.findOne({ email: email.toLowerCase().trim() });
+    const user = await User.findById(userId);
+    const email = user?.email;
+
+    console.log('🔍 Student registration search request for userId:', userId, 'email:', email);
+
+    // Query by userId (preferred) with fallback to email for old records
+    const query = {
+      $or: [
+        { student: userId },
+        { studentEmail: email?.toLowerCase()?.trim(), student: { $exists: false } } // Old records without userId
+      ]
+    };
     
-    // If no user exists with this email, return empty (user was deleted, registrations should be cleaned up)
-    if (!userExists) {
-      console.log('⚠️ No user found for email:', email, '- returning empty registrations (user may have been deleted)');
-      return res.json({
-        success: true,
-        registrations: [],
-        count: 0
-      });
-    }
-    
-    const registrations = await StudentRegistration.find({ 
-      studentEmail: email.toLowerCase().trim() 
-    })
-    .populate('event', 'title startDate endDate location type description capacity registeredCount')
+    const registrations = await StudentRegistration.find(query)
+    .populate('event', 'title startDate endDate location type description capacity registeredCount price')
     .sort({ registeredAt: -1 })
     .lean();
+
+    // Update old records to include userId
+    const oldRecords = registrations.filter(reg => !reg.student);
+    if (oldRecords.length > 0) {
+      await StudentRegistration.updateMany(
+        { _id: { $in: oldRecords.map(r => r._id) }, student: { $exists: false } },
+        { $set: { student: userId } }
+      );
+      // Update the lean results to include student field
+      oldRecords.forEach(reg => {
+        reg.student = userId;
+      });
+    }
 
     console.log('🔍 Found registrations:', registrations.length);
 
     // Format the response - filter out registrations with deleted events
+    // For workshops/trips with price > 0, only include paid registrations
     const formattedRegistrations = registrations
-      .filter(reg => reg.event && reg.event !== null) // Filter out registrations where event was deleted
+      .filter(reg => {
+        // Filter out registrations where event was deleted
+        if (!reg.event || reg.event === null) return false;
+        
+        // For workshops and trips, if event has a price, only show paid registrations
+        const eventType = reg.event?.type || reg.eventType;
+        const eventPrice = reg.event?.price || 0;
+        
+        if ((eventType === 'workshop' || eventType === 'trip') && eventPrice > 0) {
+          // Only include if paid
+          return reg.paid === true;
+        }
+        
+        // For free events or other event types, include all registrations
+        return true;
+      })
       .map(reg => ({
         id: reg._id,
         eventId: reg.event?._id ? String(reg.event._id) : null, // Include event ID for checking registration status

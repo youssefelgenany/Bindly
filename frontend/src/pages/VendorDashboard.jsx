@@ -216,14 +216,14 @@ const VendorDashboard = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF'
+        backgroundColor: '#1D3557'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/vendor" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -234,51 +234,202 @@ const VendorDashboard = () => {
             </h2>
           </Link>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{
+        
+        {/* Centered Navigation Menu */}
+        <nav style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+          gap: '1.25rem'
+        }}>
+          <Link
+            to="/vendor"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
-              fontWeight: '600',
-              color: '#1D3557',
-              margin: 0
-            }}>
-              {displayName}
-            </p>
-            <p style={{
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              margin: 0
-            }}>
-              Vendor
-            </p>
-          </div>
-          <div 
-            data-profile-dropdown
-            style={{ position: 'relative', cursor: 'pointer' }}
-            onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+              fontWeight: isActiveRoute('/vendor') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
           >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              dashboard
+            </span>
+            Dashboard
+          </Link>
+          <Link
+            to="/vendor/bazaars"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/bazaars') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/bazaars') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/bazaars') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              explore
+            </span>
+            Discover Bazaars
+          </Link>
+          <Link
+            to="/vendor/accepted-events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/accepted-events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/accepted-events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/accepted-events') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              event
+            </span>
+            My Participations
+          </Link>
+          <Link
+            to="/vendor/my-requests"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/my-requests') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/my-requests') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/my-requests') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              description
+            </span>
+            My Applications
+          </Link>
+          <Link
+            to="/vendor/loyalty-program"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/loyalty-program') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/loyalty-program') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/loyalty-program') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              badge
+            </span>
+            Join Loyalty Program
+          </Link>
+        </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             {(() => {
-              const avatarPath = user?.profilePicturePath || user?.vendorLogoPath;
-              const avatarSrc = avatarPath ? (avatarPath.startsWith('http') ? avatarPath : `http://localhost:5000${avatarPath}`) : null;
-              return avatarSrc ? (
-                <img src={avatarSrc} alt="User profile" style={{ width: '2.5rem', height: '2.5rem', borderRadius: '50%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '50%',
-                  backgroundColor: '#1D3557',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#FFFFFF',
-                  fontSize: '0.875rem',
-                  fontWeight: '600'
-                }}>
-                  {(user?.companyName?.[0] || user?.firstName?.[0] || user?.name?.[0] || 'V').toUpperCase()}
+              const hasTaxCard = !!(user?.vendorTaxCardPath || user?.hasTaxCard);
+              const hasLogo = !!(user?.vendorLogoPath || user?.hasLogo);
+              const isVerified = hasTaxCard && hasLogo;
+              
+              return (
+                <div
+                  onClick={!isVerified ? () => setShowDocumentsModal(true) : undefined}
+                  style={{
+                    position: 'relative',
+                    cursor: isVerified ? 'default' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    transition: 'all 0.2s',
+                    alignSelf: 'flex-start',
+                    marginTop: '0.125rem'
+                  }}
+                  onMouseEnter={!isVerified ? (e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  } : undefined}
+                  onMouseLeave={!isVerified ? (e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  } : undefined}
+                  title={!isVerified ? "Verify Account" : undefined}
+                >
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.25rem',
+                    color: isVerified ? '#10b981' : 'rgba(255, 255, 255, 0.7)',
+                    fontVariationSettings: isVerified ? "'FILL' 1" : "'FILL' 0"
+                  }}>
+                    verified
+                  </span>
+                  {!isVerified && (
+                    <div style={{
+                      width: '0.25rem',
+                      height: '0.25rem',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(255, 255, 255, 0.5)'
+                    }}></div>
+                  )}
                 </div>
               );
             })()}
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#FFFFFF',
+                margin: 0
+              }}>
+                {displayName}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: 'rgba(255, 255, 255, 0.7)',
+                margin: 0
+              }}>
+                Vendor
+              </p>
+            </div>
+            <div 
+              data-profile-dropdown
+              style={{ position: 'relative', cursor: 'pointer' }}
+              onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            >
+              {(() => {
+                const avatarPath = user?.profilePicturePath || user?.vendorLogoPath;
+                const avatarSrc = avatarPath ? (avatarPath.startsWith('http') ? avatarPath : `http://localhost:5000${avatarPath}`) : null;
+                return avatarSrc ? (
+                  <img src={avatarSrc} alt="User profile" style={{ width: '2.5rem', height: '2.5rem', borderRadius: '50%', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#FFFFFF',
+                    fontSize: '0.875rem',
+                    fontWeight: '600'
+                  }}>
+                    {(user?.companyName?.[0] || user?.firstName?.[0] || user?.name?.[0] || 'V').toUpperCase()}
+                  </div>
+                );
+              })()}
             {showLogoutDropdown && (
               <div style={{
                 position: 'absolute',
@@ -321,73 +472,10 @@ const VendorDashboard = () => {
                 </button>
               </div>
             )}
+            </div>
           </div>
         </div>
       </header>
-
-      {/* Horizontal Menu Bar */}
-      <nav style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '1rem 2rem',
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #e2e8f0'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <Link
-            to="/vendor"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/vendor/bazaars"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/bazaars') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/bazaars') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/bazaars') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Discover Bazaars
-          </Link>
-          <Link
-            to="/vendor/accepted-events"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/accepted-events') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/accepted-events') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/accepted-events') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Participations
-          </Link>
-          <Link
-            to="/vendor/my-requests"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/my-requests') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/my-requests') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/my-requests') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Applications
-          </Link>
-        </div>
-      </nav>
 
       {/* Main Content */}
       <main style={{
@@ -415,15 +503,38 @@ const VendorDashboard = () => {
               </div>
             ) : (
               <>
-                {/* Dashboard Banner with Background Image */}
+                {/* Dashboard Banner with Background Image - Animated */}
                 <div style={{
                   position: 'relative',
                   height: '140px',
                   borderRadius: '0.75rem',
                   overflow: 'hidden',
                   marginBottom: '1.5rem',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  animation: 'fadeInUp 0.6s ease-out'
                 }}>
+                  <style>{`
+                    @keyframes fadeInUp {
+                      from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                      }
+                      to {
+                        opacity: 1;
+                        transform: translateY(0);
+                      }
+                    }
+                    @keyframes slideInRight {
+                      from {
+                        opacity: 0;
+                        transform: translateX(30px);
+                      }
+                      to {
+                        opacity: 1;
+                        transform: translateX(0);
+                      }
+                    }
+                  `}</style>
                   {/* Background Image */}
                   <div style={{
                     position: 'absolute',
@@ -457,7 +568,8 @@ const VendorDashboard = () => {
                       fontSize: '1.75rem',
                       fontWeight: '700',
                       margin: 0,
-                      marginBottom: '0.5rem'
+                      marginBottom: '0.5rem',
+                      animation: 'slideInRight 0.8s ease-out'
                     }}>
                       Dashboard
                     </h3>
@@ -465,7 +577,8 @@ const VendorDashboard = () => {
                       color: 'rgba(255, 255, 255, 0.9)',
                       fontSize: '0.875rem',
                       fontWeight: '400',
-                      margin: 0
+                      margin: 0,
+                      animation: 'slideInRight 0.8s ease-out 0.2s both'
                     }}>
                       Overview of your applications, participations, and upcoming events.
                     </p>
@@ -484,6 +597,327 @@ const VendorDashboard = () => {
                   flexDirection: 'column',
                   gap: '1.5rem'
                 }}>
+                  {/* Animated Vendor Loyalty Partner Ad - Tripadvisor Style Layout */}
+                  <div 
+                    style={{
+                      marginBottom: '1.5rem',
+                      position: 'relative',
+                      width: '100%',
+                      background: 'linear-gradient(to bottom, #fafafa, #f0f0f0)',
+                      borderRadius: '1.25rem',
+                      padding: '2.5rem',
+                      boxShadow: '0 8px 24px -8px rgba(0, 0, 0, 0.15)',
+                      animation: 'fadeInUp 0.8s ease-out',
+                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                      animationDelay: '0.2s',
+                      animationFillMode: 'both',
+                      overflow: 'hidden'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-5px)';
+                      e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(0, 0, 0, 0.2)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 8px 24px -8px rgba(0, 0, 0, 0.15)';
+                    }}
+                  >
+                    <style>{`
+                      @keyframes fadeInUp {
+                        from {
+                          opacity: 0;
+                          transform: translateY(20px);
+                        }
+                        to {
+                          opacity: 1;
+                          transform: translateY(0);
+                        }
+                      }
+                      @keyframes float {
+                        0%, 100% { transform: translateY(0px); }
+                        50% { transform: translateY(-10px); }
+                      }
+                      @keyframes pulse {
+                        0%, 100% { transform: scale(1); opacity: 1; }
+                        50% { transform: scale(1.05); opacity: 0.9; }
+                      }
+                      @keyframes slideInRight {
+                        from {
+                          opacity: 0;
+                          transform: translateX(30px);
+                        }
+                        to {
+                          opacity: 1;
+                          transform: translateX(0);
+                        }
+                      }
+                    `}</style>
+                    
+                    {/* Subtle Background Pattern Animation */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+                      animation: 'pulse 4s ease-in-out infinite',
+                      zIndex: 1,
+                      pointerEvents: 'none'
+                    }}></div>
+
+                    <div style={{
+                      position: 'relative',
+                      zIndex: 2,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3rem',
+                      flexWrap: 'wrap'
+                    }}>
+                      {/* Left Side - Image with Reward Icons */}
+                      <div style={{
+                        position: 'relative',
+                        flex: '0 0 auto',
+                        width: '400px',
+                        animation: 'fadeInUp 1s ease-out 0.3s both'
+                      }}>
+                        {/* Reward Icons Around Image */}
+                        {/* Store Icon - Top Left (Gold) */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '-15px',
+                          left: '-20px',
+                          width: '60px',
+                          height: '60px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 12px rgba(255, 215, 0, 0.3)',
+                          animation: 'float 3s ease-in-out infinite',
+                          zIndex: 5,
+                          border: '3px solid #FFD700'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '2rem',
+                            color: '#FFD700'
+                          }}>
+                            store
+                          </span>
+                        </div>
+                        {/* Trending Icon - Top Right (Blue) */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '-10px',
+                          right: '-25px',
+                          width: '55px',
+                          height: '55px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 12px rgba(29, 53, 87, 0.3)',
+                          animation: 'float 3s ease-in-out infinite 0.3s',
+                          zIndex: 5,
+                          border: '3px solid #1D3557'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.75rem',
+                            color: '#1D3557'
+                          }}>
+                            trending_up
+                          </span>
+                        </div>
+                        {/* Group Icon - Bottom Left (Green) */}
+                        <div style={{
+                          position: 'absolute',
+                          bottom: '-10px',
+                          left: '-20px',
+                          width: '55px',
+                          height: '55px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                          animation: 'float 3s ease-in-out infinite 0.6s',
+                          zIndex: 5,
+                          border: '3px solid #10b981'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.75rem',
+                            color: '#10b981'
+                          }}>
+                            groups
+                          </span>
+                        </div>
+                        {/* Star Icon - Bottom Right (Gold) */}
+                        <div style={{
+                          position: 'absolute',
+                          bottom: '-15px',
+                          right: '-25px',
+                          width: '60px',
+                          height: '60px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 12px rgba(255, 215, 0, 0.3)',
+                          animation: 'float 3s ease-in-out infinite 0.9s',
+                          zIndex: 5,
+                          border: '3px solid #FFD700'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '2rem',
+                            color: '#FFD700'
+                          }}>
+                            star
+                          </span>
+                        </div>
+
+                        {/* Ad Image Container */}
+                        <div style={{
+                          position: 'relative',
+                          borderRadius: '1rem',
+                          overflow: 'hidden',
+                          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.2)',
+                          backgroundColor: '#FFFFFF',
+                          padding: '0.5rem',
+                          animation: 'float 4s ease-in-out infinite'
+                        }}>
+                          <img 
+                            src="/assets/images/VendorAD.png" 
+                            alt="GUC Loyalty Partner Program"
+                            style={{
+                              width: '100%',
+                              height: 'auto',
+                              display: 'block',
+                              objectFit: 'contain',
+                              borderRadius: '0.75rem',
+                              transition: 'transform 0.5s ease'
+                            }}
+                            onError={(e) => {
+                              console.error('Failed to load vendor ad image');
+                              e.target.style.display = 'none';
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.transform = 'scale(1)';
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Right Side - Text Content */}
+                      <div style={{
+                        flex: '1',
+                        minWidth: '300px',
+                        color: '#2c2c2c',
+                        animation: 'fadeInUp 1s ease-out 0.5s both'
+                      }}>
+                        {/* Logo/Brand */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          marginBottom: '1.5rem'
+                        }}>
+                          <div style={{
+                            width: '50px',
+                            height: '50px',
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                            border: '2px solid #1D3557'
+                          }}>
+                            <span className="material-symbols-outlined" style={{
+                              fontSize: '2rem',
+                              color: '#1D3557'
+                            }}>
+                              handshake
+                            </span>
+                          </div>
+                          <h3 style={{
+                            fontSize: '1.5rem',
+                            fontWeight: '700',
+                            color: '#2c2c2c',
+                            margin: 0
+                          }}>
+                            GUC Loyalty Partners
+                          </h3>
+                        </div>
+
+                        {/* Main Headline */}
+                        <h2 style={{
+                          fontSize: '2.5rem',
+                          fontWeight: '800',
+                          color: '#2c2c2c',
+                          margin: 0,
+                          marginBottom: '1rem',
+                          lineHeight: '1.2',
+                          animation: 'slideInRight 0.8s ease-out 0.7s both'
+                        }}>
+                          Become a Loyalty Partner<br/>Reach Thousands of Students
+                        </h2>
+
+                        {/* Description */}
+                        <p style={{
+                          fontSize: '1.1rem',
+                          color: '#2c2c2c',
+                          margin: 0,
+                          marginBottom: '2rem',
+                          lineHeight: '1.6',
+                          fontWeight: '500',
+                          opacity: 0.9
+                        }}>
+                          Join GUC's exclusive loyalty program and connect with thousands of students. Offer discounts, build brand loyalty, and grow your business with the GUC community.
+                        </p>
+
+                        {/* CTA Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/vendor/loyalty-program');
+                          }}
+                          style={{
+                            padding: '1rem 2.5rem',
+                            background: 'linear-gradient(135deg, #1D3557 0%, #2c5f8d 100%)',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: '9999px',
+                            fontSize: '1rem',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            boxShadow: '0 4px 12px rgba(29, 53, 87, 0.4)',
+                            animation: 'fadeInUp 1s ease-out 0.9s both'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.background = 'linear-gradient(135deg, #2c5f8d 0%, #1D3557 100%)';
+                            e.target.style.transform = 'translateY(-2px) scale(1.05)';
+                            e.target.style.boxShadow = '0 6px 16px rgba(29, 53, 87, 0.5)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.background = 'linear-gradient(135deg, #1D3557 0%, #2c5f8d 100%)';
+                            e.target.style.transform = 'translateY(0) scale(1)';
+                            e.target.style.boxShadow = '0 4px 12px rgba(29, 53, 87, 0.4)';
+                          }}
+                        >
+                          Apply Now
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Quick Stats */}
                   <div>
                     <h3 style={{
@@ -495,331 +929,179 @@ const VendorDashboard = () => {
                       Quick Stats
                     </h3>
                     <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: '1.5rem'
+                      display: 'flex',
+                      gap: '1.5rem',
+                      alignItems: 'flex-start'
                     }}>
-                      {/* Total Applications Card */}
+                      {/* Quick Stats Rectangle */}
                       <div style={{
                         backgroundColor: '#FFFFFF',
-                        padding: '1.5rem',
+                        padding: '0.75rem 1rem',
                         borderRadius: '0.5rem',
-                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem',
+                        width: 'fit-content'
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        {/* Total Applications Card */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          padding: '0.5rem'
+                        }}>
                           <div style={{
                             backgroundColor: '#dbeafe',
-                            padding: '0.75rem',
+                            padding: '0.375rem',
                             borderRadius: '50%'
                           }}>
-                            <span className="material-symbols-outlined" style={{ color: '#1D3557', fontSize: '1.5rem' }}>
+                            <span className="material-symbols-outlined" style={{ color: '#1D3557', fontSize: '1rem' }}>
                               assignment
                             </span>
                           </div>
-                          <div>
-                            <p style={{
-                              color: 'rgba(29, 53, 87, 0.6)',
-                              fontSize: '0.875rem',
-                              margin: 0
-                            }}>
-                              Total Applications
-                            </p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <p style={{
                               color: '#1D3557',
-                              fontSize: '1.5rem',
+                              fontSize: '1rem',
                               fontWeight: '700',
                               margin: 0
                             }}>
                               {stats.totalApplications}
                             </p>
+                            <p style={{
+                              color: 'rgba(29, 53, 87, 0.6)',
+                              fontSize: '0.75rem',
+                              margin: 0
+                            }}>
+                              Total Applications
+                            </p>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Pending Applications Card */}
-                      <div style={{
-                        backgroundColor: '#FFFFFF',
-                        padding: '1.5rem',
-                        borderRadius: '0.5rem',
-                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        {/* Pending Applications Card */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          padding: '0.5rem'
+                        }}>
                           <div style={{
                             backgroundColor: '#fef3c7',
-                            padding: '0.75rem',
+                            padding: '0.375rem',
                             borderRadius: '50%'
                           }}>
-                            <span className="material-symbols-outlined" style={{ color: '#92400e', fontSize: '1.5rem' }}>
+                            <span className="material-symbols-outlined" style={{ color: '#92400e', fontSize: '1rem' }}>
                               schedule
                             </span>
                           </div>
-                          <div>
-                            <p style={{
-                              color: 'rgba(29, 53, 87, 0.6)',
-                              fontSize: '0.875rem',
-                              margin: 0
-                            }}>
-                              Pending
-                            </p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <p style={{
                               color: '#1D3557',
-                              fontSize: '1.5rem',
+                              fontSize: '1rem',
                               fontWeight: '700',
                               margin: 0
                             }}>
                               {stats.pendingApplications}
                             </p>
+                            <p style={{
+                              color: 'rgba(29, 53, 87, 0.6)',
+                              fontSize: '0.75rem',
+                              margin: 0
+                            }}>
+                              Pending
+                            </p>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Accepted Applications Card */}
-                      <div style={{
-                        backgroundColor: '#FFFFFF',
-                        padding: '1.5rem',
-                        borderRadius: '0.5rem',
-                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        {/* Accepted Applications Card */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          padding: '0.5rem'
+                        }}>
                           <div style={{
                             backgroundColor: '#dcfce7',
-                            padding: '0.75rem',
+                            padding: '0.375rem',
                             borderRadius: '50%'
                           }}>
-                            <span className="material-symbols-outlined" style={{ color: '#065f46', fontSize: '1.5rem' }}>
+                            <span className="material-symbols-outlined" style={{ color: '#065f46', fontSize: '1rem' }}>
                               check_circle
                             </span>
                           </div>
-                          <div>
-                            <p style={{
-                              color: 'rgba(29, 53, 87, 0.6)',
-                              fontSize: '0.875rem',
-                              margin: 0
-                            }}>
-                              Accepted
-                            </p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <p style={{
                               color: '#1D3557',
-                              fontSize: '1.5rem',
+                              fontSize: '1rem',
                               fontWeight: '700',
                               margin: 0
                             }}>
                               {stats.acceptedApplications}
                             </p>
+                            <p style={{
+                              color: 'rgba(29, 53, 87, 0.6)',
+                              fontSize: '0.75rem',
+                              margin: 0
+                            }}>
+                              Accepted
+                            </p>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Validity Status Card */}
-                  <div>
-                    <h3 style={{
-                      fontSize: '1.125rem',
-                      fontWeight: '600',
-                      color: '#1D3557',
-                      marginBottom: '1rem'
-                    }}>
-                      Account Validity
-                    </h3>
-                    <div style={{
-                      backgroundColor: '#FFFFFF',
-                      padding: '1.5rem',
-                      borderRadius: '0.5rem',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                    }}>
-                      {user && (() => {
-                        const hasTaxCard = !!(user.vendorTaxCardPath || user.hasTaxCard);
-                        const hasLogo = !!(user.vendorLogoPath || user.hasLogo);
-                        const isValid = hasTaxCard && hasLogo;
+                      {/* Buttons Outside Rectangle */}
+                      {(() => {
+                        const hasTaxCard = !!(user?.vendorTaxCardPath || user?.hasTaxCard);
+                        const hasLogo = !!(user?.vendorLogoPath || user?.hasLogo);
+                        const isVerified = hasTaxCard && hasLogo;
                         
-                        return (
-                          <>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                <div style={{
-                                  backgroundColor: isValid ? '#dcfce7' : '#fee2e2',
-                                  padding: '0.75rem',
-                                  borderRadius: '50%'
-                                }}>
-                                  <span className="material-symbols-outlined" style={{ 
-                                    color: isValid ? '#065f46' : '#991b1b', 
-                                    fontSize: '1.5rem' 
-                                  }}>
-                                    {isValid ? 'check_circle' : 'error'}
-                                  </span>
-                                </div>
-                                <div>
-                                  <p style={{
-                                    color: 'rgba(29, 53, 87, 0.6)',
-                                    fontSize: '0.875rem',
-                                    margin: 0,
-                                    marginBottom: '0.25rem'
-                                  }}>
-                                    Status
-                                  </p>
-                                  <p style={{
-                                    color: isValid ? '#065f46' : '#991b1b',
-                                    fontSize: '1rem',
-                                    fontWeight: '600',
-                                    margin: 0
-                                  }}>
-                                    {isValid ? 'Valid' : 'Some documents are missing'}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.75rem',
-                              marginBottom: '1rem',
-                              padding: '0.75rem',
-                              backgroundColor: '#f9fafb',
-                              borderRadius: '0.375rem'
-                            }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: '0.875rem', color: '#374151' }}>Tax Card</span>
-                                <span style={{
-                                  fontSize: '0.875rem',
-                                  color: hasTaxCard ? '#065f46' : '#991b1b',
-                                  fontWeight: '500'
-                                }}>
-                                  {hasTaxCard ? '✓ Uploaded' : '✗ Missing'}
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: '0.875rem', color: '#374151' }}>Logo</span>
-                                <span style={{
-                                  fontSize: '0.875rem',
-                                  color: hasLogo ? '#065f46' : '#991b1b',
-                                  fontWeight: '500'
-                                }}>
-                                  {hasLogo ? '✓ Uploaded' : '✗ Missing'}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            {!isValid && (
-                              <button
-                                onClick={() => setShowDocumentsModal(true)}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.75rem 1rem',
-                                  borderRadius: '0.5rem',
-                                  backgroundColor: '#1e40af',
-                                  color: '#FFFFFF',
-                                  border: 'none',
-                                  fontSize: '0.875rem',
-                                  fontWeight: '600',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '0.5rem',
-                                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                                  transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.target.style.backgroundColor = '#1e3a8a';
-                                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.target.style.backgroundColor = '#1e40af';
-                                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                                }}
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-                                  upload_file
-                                </span>
-                                Upload Documents
-                              </button>
-                            )}
-                          </>
-                        );
+                        return !isVerified ? (
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1rem',
+                            minWidth: '250px'
+                          }}>
+                            {/* Verify Account Button - Only show when not verified */}
+                            <button
+                              onClick={() => setShowDocumentsModal(true)}
+                              style={{
+                                backgroundColor: '#FFFFFF',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '0.5rem',
+                                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '1rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                padding: '1.25rem 1.5rem',
+                                textAlign: 'left'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.borderColor = '#1D3557';
+                                e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.borderColor = '#e5e7eb';
+                                e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                              }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem', color: '#1D3557' }}>
+                                verified
+                              </span>
+                              <span style={{
+                                color: '#1D3557',
+                                fontSize: '1rem',
+                                fontWeight: '600'
+                              }}>
+                                Verify Account
+                              </span>
+                            </button>
+                          </div>
+                        ) : null;
                       })()}
-                    </div>
-                  </div>
-
-                  {/* GUC Loyalty Program Card */}
-                  <div style={{
-                    backgroundColor: '#FFFFFF',
-                    padding: '1.5rem',
-                    borderRadius: '0.5rem',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                    border: '2px solid #e5e7eb',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#1e40af';
-                    e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                    e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                  }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{
-                          backgroundColor: '#fef3c7',
-                          padding: '0.75rem',
-                          borderRadius: '50%'
-                        }}>
-                          <span className="material-symbols-outlined" style={{ color: '#92400e', fontSize: '1.5rem' }}>
-                            badge
-                          </span>
-                        </div>
-                        <div>
-                          <h4 style={{
-                            color: '#1D3557',
-                            fontSize: '1rem',
-                            fontWeight: '600',
-                            margin: '0 0 0.25rem 0'
-                          }}>
-                            GUC Loyalty Program
-                          </h4>
-                          <p style={{
-                            color: 'rgba(29, 53, 87, 0.6)',
-                            fontSize: '0.875rem',
-                            margin: 0
-                          }}>
-                            Offer discounts to the campus community
-                          </p>
-                        </div>
-                      </div>
-                      <Link
-                        to="/vendor/loyalty-program"
-                        style={{
-                          padding: '0.75rem 1rem',
-                          borderRadius: '0.5rem',
-                          backgroundColor: '#1e40af',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          textDecoration: 'none',
-                          transition: 'all 0.2s',
-                          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.5rem'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.backgroundColor = '#1e3a8a';
-                          e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.backgroundColor = '#1e40af';
-                          e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                        }}
-                      >
-                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-                          arrow_forward
-                        </span>
-                        Apply Now
-                      </Link>
                     </div>
                   </div>
 
@@ -1157,6 +1439,9 @@ const VendorDashboard = () => {
       {showDocumentsModal && (
         <VendorDocumentsModal
           onClose={() => setShowDocumentsModal(false)}
+          existingTaxCard={user?.vendorTaxCardPath}
+          existingLogo={user?.vendorLogoPath}
+          isVerified={!!(user?.vendorTaxCardPath && user?.vendorLogoPath)}
           onSuccess={(vendorData) => {
             // Update user context with new document paths
             if (vendorData) {

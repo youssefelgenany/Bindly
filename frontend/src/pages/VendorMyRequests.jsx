@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { vendorApi } from '../api/vendorApi';
+import VendorDocumentsModal from '../components/VendorDocumentsModal';
 import axios from 'axios';
 
 const VendorMyRequests = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -243,14 +245,14 @@ const VendorMyRequests = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#FFFFFF'
+        backgroundColor: '#1D3557'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/vendor" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
-              color: '#1D3557',
+              color: '#FFFFFF',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -261,25 +263,176 @@ const VendorMyRequests = () => {
             </h2>
           </Link>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{
+        
+        {/* Centered Navigation Menu */}
+        <nav style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+          gap: '1.25rem'
+        }}>
+          <Link
+            to="/vendor"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
               fontSize: '0.875rem',
-              fontWeight: '600',
-              color: '#1D3557',
-              margin: 0
-            }}>
-              {displayName}
-            </p>
-            <p style={{
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              margin: 0
-            }}>
-              Vendor
-            </p>
-          </div>
-          <div 
+              fontWeight: isActiveRoute('/vendor') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              dashboard
+            </span>
+            Dashboard
+          </Link>
+          <Link
+            to="/vendor/bazaars"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/bazaars') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/bazaars') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/bazaars') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              explore
+            </span>
+            Discover Bazaars
+          </Link>
+          <Link
+            to="/vendor/accepted-events"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/accepted-events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/accepted-events') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/accepted-events') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              event
+            </span>
+            My Participations
+          </Link>
+          <Link
+            to="/vendor/my-requests"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/my-requests') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/my-requests') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/my-requests') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              description
+            </span>
+            My Applications
+          </Link>
+          <Link
+            to="/vendor/loyalty-program"
+            style={{
+              textDecoration: 'none',
+              color: isActiveRoute('/vendor/loyalty-program') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.875rem',
+              fontWeight: isActiveRoute('/vendor/loyalty-program') ? '600' : '500',
+              paddingBottom: '0.5rem',
+              borderBottom: isActiveRoute('/vendor/loyalty-program') ? '2px solid #FFFFFF' : '2px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+              badge
+            </span>
+            Join Loyalty Program
+          </Link>
+        </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {(() => {
+              const hasTaxCard = !!(user?.vendorTaxCardPath || user?.hasTaxCard);
+              const hasLogo = !!(user?.vendorLogoPath || user?.hasLogo);
+              const isVerified = hasTaxCard && hasLogo;
+              
+              return (
+                <div
+                  onClick={!isVerified ? () => setShowDocumentsModal(true) : undefined}
+                  style={{
+                    position: 'relative',
+                    cursor: isVerified ? 'default' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    transition: 'all 0.2s',
+                    alignSelf: 'flex-start',
+                    marginTop: '0.125rem'
+                  }}
+                  onMouseEnter={!isVerified ? (e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  } : undefined}
+                  onMouseLeave={!isVerified ? (e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  } : undefined}
+                  title={!isVerified ? "Verify Account" : undefined}
+                >
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '1.25rem',
+                    color: isVerified ? '#10b981' : 'rgba(255, 255, 255, 0.7)',
+                    fontVariationSettings: isVerified ? "'FILL' 1" : "'FILL' 0"
+                  }}>
+                    verified
+                  </span>
+                  {!isVerified && (
+                    <div style={{
+                      width: '0.25rem',
+                      height: '0.25rem',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(255, 255, 255, 0.5)'
+                    }}></div>
+                  )}
+                </div>
+              );
+            })()}
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#FFFFFF',
+                margin: 0
+              }}>
+                {displayName}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: 'rgba(255, 255, 255, 0.7)',
+                margin: 0
+              }}>
+                Vendor
+              </p>
+            </div>
+            <div 
             data-profile-dropdown
             style={{ position: 'relative', cursor: 'pointer' }}
             onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
@@ -303,7 +456,7 @@ const VendorMyRequests = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: '50%',
-                  backgroundColor: '#1D3557',
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -357,73 +510,10 @@ const VendorMyRequests = () => {
                 </button>
               </div>
             )}
+            </div>
           </div>
         </div>
       </header>
-
-      {/* Horizontal Menu Bar */}
-      <nav style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '1rem 2rem',
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #e2e8f0'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <Link
-            to="/vendor"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/vendor/bazaars"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/bazaars') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/bazaars') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/bazaars') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            Discover Bazaars
-          </Link>
-          <Link
-            to="/vendor/accepted-events"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/accepted-events') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/accepted-events') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/accepted-events') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Participations
-          </Link>
-          <Link
-            to="/vendor/my-requests"
-            style={{
-              textDecoration: 'none',
-              color: isActiveRoute('/vendor/my-requests') ? '#2563eb' : '#6b7280',
-              fontSize: '0.875rem',
-              fontWeight: isActiveRoute('/vendor/my-requests') ? '600' : '500',
-              paddingBottom: '0.5rem',
-              borderBottom: isActiveRoute('/vendor/my-requests') ? '2px solid #2563eb' : '2px solid transparent'
-            }}
-          >
-            My Applications
-          </Link>
-        </div>
-      </nav>
 
       {/* Main Content */}
       <main style={{
@@ -444,15 +534,38 @@ const VendorMyRequests = () => {
             marginLeft: '4rem',
             marginRight: '4rem'
           }}>
-          {/* Page Title Banner */}
+          {/* Page Title Banner - Animated */}
           <div style={{
             position: 'relative',
             height: '140px',
             borderRadius: '0.75rem',
             overflow: 'hidden',
             marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            animation: 'fadeInUp 0.6s ease-out'
           }}>
+            <style>{`
+              @keyframes fadeInUp {
+                from {
+                  opacity: 0;
+                  transform: translateY(20px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+              }
+              @keyframes slideInRight {
+                from {
+                  opacity: 0;
+                  transform: translateX(30px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateX(0);
+                }
+              }
+            `}</style>
             {/* Background Image */}
             <div style={{
               position: 'absolute',
@@ -486,7 +599,8 @@ const VendorMyRequests = () => {
                 fontSize: '1.75rem',
                 fontWeight: '700',
                 margin: 0,
-                marginBottom: '0.5rem'
+                marginBottom: '0.5rem',
+                animation: 'slideInRight 0.8s ease-out'
               }}>
                 My Applications
               </h3>
@@ -494,7 +608,8 @@ const VendorMyRequests = () => {
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '0.875rem',
                 fontWeight: '400',
-                margin: 0
+                margin: 0,
+                animation: 'slideInRight 0.8s ease-out 0.2s both'
               }}>
                 View all requests for upcoming bazaars or booth setups you want to participate in (pending or rejected).
               </p>
@@ -887,6 +1002,26 @@ const VendorMyRequests = () => {
           </div>
         </div>
       </main>
+      {/* Vendor Documents Modal */}
+      {showDocumentsModal && (
+        <VendorDocumentsModal
+          onClose={() => setShowDocumentsModal(false)}
+          onSuccess={(vendorData) => {
+            if (vendorData) {
+              const updatedUser = { ...user };
+              if (vendorData.taxCardPath !== null && vendorData.taxCardPath !== undefined) {
+                updatedUser.vendorTaxCardPath = vendorData.taxCardPath;
+              }
+              if (vendorData.logoPath !== null && vendorData.logoPath !== undefined) {
+                updatedUser.vendorLogoPath = vendorData.logoPath;
+              }
+              updatedUser.hasTaxCard = vendorData.hasTaxCard !== undefined ? vendorData.hasTaxCard : !!vendorData.taxCardPath;
+              updatedUser.hasLogo = vendorData.hasLogo !== undefined ? vendorData.hasLogo : !!vendorData.logoPath;
+              updateUser(updatedUser);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

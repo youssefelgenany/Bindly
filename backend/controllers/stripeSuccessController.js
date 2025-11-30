@@ -104,8 +104,10 @@ module.exports = async (req, res) => {
         console.log('🔍 Registration not found in Registration model, checking StudentRegistration...');
         if (user && user.email) {
           registration = await StudentRegistration.findOne({
-            event: payment.event,
-            studentEmail: user.email.toLowerCase()
+            $or: [
+              { event: payment.event, student: user._id },
+              { event: payment.event, studentEmail: user.email.toLowerCase(), student: { $exists: false } } // Fallback for old records
+            ]
           });
         }
       }
