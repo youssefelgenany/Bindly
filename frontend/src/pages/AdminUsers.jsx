@@ -90,12 +90,19 @@ const AdminUsers = () => {
                            userType === 'Event_Office' || userType === 'event_office' ||
                            userTypeLower === 'event office';
       
-      // Admin and Event Office accounts are always verified, other users follow normal logic
+      // Admin and Event Office accounts are always verified
       if (isAdmin || isEventOffice) {
         verified.push(u);
-      } else if (!isVerified && (['Staff', 'TA', 'Professor'].includes(u.userType) || !u.userType)) {
+      } 
+      // Pending: Only users without userType assigned yet (Staff/TA/Professor waiting for role assignment)
+      // Once role is assigned, they move to "All Users" even if not verified yet
+      else if (!u.userType || u.userType === null || u.userType === '') {
         pending.push(u);
-      } else {
+      } 
+      // All users with assigned userType go to verified (All Users) section
+      // This includes Staff/TA/Professor with role assigned (even if not verified yet)
+      // and all other users (Students, Vendors, verified Staff/TA/Professor)
+      else {
         verified.push(u);
       }
     });
@@ -250,7 +257,16 @@ const AdminUsers = () => {
         console.log('🔍 All users from API:', result.data.users);
         
         // Include all users (including Admin and Event Office accounts)
-        setUsers(result.data.users || []);
+        const loadedUsers = result.data.users || [];
+        setUsers(loadedUsers);
+        
+        // Reset verification status to match actual user data from server
+        const verificationStatus = {};
+        loadedUsers.forEach(u => {
+          const userId = u._id || u.id;
+          verificationStatus[userId] = u.isVerified || false;
+        });
+        setVerificationStatusById(verificationStatus);
       } else {
         setError(result.message);
       }
@@ -296,12 +312,11 @@ const AdminUsers = () => {
         setMessageById(prev => ({ ...prev, [userId]: successMessage }));
         
         // Update the user in the local state
-        // Note: Backend sets isVerified to true when admin assigns role
+        // Note: Backend keeps isVerified as false until user clicks email link
         setUsers(prev => prev.map(u => 
-          u._id === userId || u.id === userId ? { ...u, userType: selectedRole, isVerified: true } : u
+          u._id === userId || u.id === userId ? { ...u, userType: selectedRole } : u
         ));
-        // Update verification status
-        setVerificationStatusById(prev => ({ ...prev, [userId]: true }));
+        // Don't update verification status - user must verify via email link
         
         // Reload users to update the sections
         setTimeout(() => {

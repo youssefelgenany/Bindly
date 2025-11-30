@@ -1,16 +1,18 @@
 const Registration = require('../models/registrationModel');
 const StudentRegistration = require('../models/studentRegistrationModel');
+const GymRegistration = require('../models/gymRegistrationModel');
 
 /**
- * Clean up all registrations for a user
- * @param {String} userId - User ID (for Registration model)
+ * Clean up all registrations for a user when their account is deleted
+ * @param {String} userId - User ID (for Registration and GymRegistration models)
  * @param {String} userEmail - User email (for StudentRegistration model)
- * @returns {Object} - { registrationCount, studentRegistrationCount }
+ * @returns {Object} - { registrationCount, studentRegistrationCount, gymRegistrationCount }
  */
 async function cleanupUserRegistrations(userId, userEmail) {
   const result = {
     registrationCount: 0,
-    studentRegistrationCount: 0
+    studentRegistrationCount: 0,
+    gymRegistrationCount: 0
   };
 
   try {
@@ -33,6 +35,15 @@ async function cleanupUserRegistrations(userId, userEmail) {
       result.studentRegistrationCount = studentRegResult.deletedCount;
       if (result.studentRegistrationCount > 0) {
         console.log('🗑️ Cleaned up', result.studentRegistrationCount, 'registrations from StudentRegistration model for email:', normalizedEmail);
+      }
+    }
+
+    // Delete gym registrations (by user ID)
+    if (userId) {
+      const gymRegResult = await GymRegistration.deleteMany({ user: userId });
+      result.gymRegistrationCount = gymRegResult.deletedCount;
+      if (result.gymRegistrationCount > 0) {
+        console.log('🗑️ Cleaned up', result.gymRegistrationCount, 'gym registrations for user:', userId);
       }
     }
 

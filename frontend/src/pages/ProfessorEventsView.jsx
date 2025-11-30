@@ -523,13 +523,12 @@ const ProfessorEventsView = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit',
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      minute: '2-digit'
     });
   };
 
@@ -1025,6 +1024,7 @@ const ProfessorEventsView = () => {
                           } else if (
                             notification.type === 'new_loyalty_partner' || 
                             notification.type === 'loyalty_partner_added' ||
+                            notification.type === 'loyalty_program_application' ||
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
                             // Navigate to Loyalty Partners page
@@ -2680,7 +2680,7 @@ const ProfessorEventsView = () => {
                 </div>
               )}
 
-              {(selectedEvent.type === 'workshop' || selectedEvent.type === 'trip') && (
+              {(selectedEvent.type === 'workshop' || selectedEvent.type === 'trip' || selectedEvent.type === 'bazaar' || selectedEvent.type === 'conference' || selectedEvent.type === 'booth') && (
                 registeredEventIds.has(String(selectedEvent.id)) ? (
                   <button
                     disabled

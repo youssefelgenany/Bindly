@@ -143,7 +143,7 @@ const StaffMyRegistrations = () => {
       // Also check StudentRegistration by email (for workshops/trips registered through StudentRegistrationForm)
       if (user.email) {
         try {
-          const studentRegResult = await studentRegistrationApi.getMyRegistrations(user.email);
+          const studentRegResult = await studentRegistrationApi.getMyRegistrations();
           if (studentRegResult.success && studentRegResult.data?.registrations) {
             studentRegResult.data.registrations
               .filter(reg => reg.status !== 'cancelled')
@@ -329,13 +329,12 @@ const StaffMyRegistrations = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit',
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      minute: '2-digit'
     });
   };
 
@@ -999,6 +998,7 @@ const StaffMyRegistrations = () => {
                           } else if (
                             notification.type === 'new_loyalty_partner' || 
                             notification.type === 'loyalty_partner_added' ||
+                            notification.type === 'loyalty_program_application' ||
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
                             navigate('/staff/loyalty-vendors');

@@ -16,7 +16,9 @@ const userSchema = new mongoose.Schema({
    firstName: {
     type: String,
     required: function() {
-      return ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
+      // Required for Student, Staff, TA, Professor (even if userType is null during signup)
+      // We check if userType exists and is in the list, or if it's null (pending role assignment)
+      return this.userType && ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
     },
     trim: true,
     default: null
@@ -24,7 +26,8 @@ const userSchema = new mongoose.Schema({
   lastName: {
     type: String,
     required: function() {
-      return ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
+      // Required for Student, Staff, TA, Professor (even if userType is null during signup)
+      return this.userType && ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
     },
     trim: true,
     default: null
@@ -37,14 +40,16 @@ const userSchema = new mongoose.Schema({
   },
   userType: {
     type: String,
-    required: true,
-    enum: ['Student', 'Staff', 'TA', 'Professor', 'Vendor','event_office','Admin']
+    required: false, // Not required for Staff/TA/Professor during signup - admin will assign it
+    enum: ['Student', 'Staff', 'TA', 'Professor', 'Vendor','event_office','Admin'],
+    default: null
   },
   // For GUC users (Student, Staff, TA, Professor)
   gucId: {
     type: String,
     required: function() {
-      return ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
+      // Required for Student, Staff, TA, Professor (even if userType is null during signup)
+      return this.userType && ['Student', 'Staff', 'TA', 'Professor'].includes(this.userType);
     },
     trim: true,
     default: null
@@ -94,12 +99,7 @@ const userSchema = new mongoose.Schema({
    status: {
     type: String,
     enum: ['active', 'blocked'],
-    default: function () {
-      // All users start as blocked until admin verification
-      // This includes admin and event_office accounts too
-      console.log('🔍 User Model - Setting default status to BLOCKED for userType:', this.userType);
-      return 'blocked';
-    }
+    default: 'active' // Default to active - status should not be affected by signup
   },
   // Favorite events list for students/TA/professor/staff
   favoriteEvents: [{
@@ -171,27 +171,26 @@ userSchema.pre('save', function(next) {
   next();
 });
 
-// Auto-set verification/activation for newly created accounts by type
+// Auto-set verification for newly created accounts by type
+// Status is not affected by signup - it defaults to 'active' in schema
 userSchema.pre('save', function(next) {
   try {
     if (this.isNew) {
       if (this.userType === 'Student') {
-        // Students: unverified and blocked until email verification
+        // Students: unverified until email verification
         // Only set if not already explicitly set (to allow manual override)
         if (this.isVerified === undefined) {
           this.isVerified = false;
         }
-        if (this.status === undefined || this.status === 'blocked') {
-          this.status = 'blocked';
-        }
+        // Status not set here - uses default from schema
       } else if (['TA', 'Staff', 'Professor'].includes(this.userType)) {
-        // TA/Staff/Professor: unverified but active
+        // TA/Staff/Professor: unverified until admin assigns role and they verify email
         this.isVerified = false;
-        this.status = 'active';
+        // Status not set here - uses default from schema
       } else if (this.userType === 'Vendor') {
-        // Keep previous behavior for vendors: verified and active
+        // Vendors: verified and active
         this.isVerified = true;
-        this.status = 'active';
+        // Status not set here - uses default from schema
       }
     }
     next();

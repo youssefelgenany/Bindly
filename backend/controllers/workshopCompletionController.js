@@ -7,40 +7,26 @@ const { sendWorkshopCompletionEmail } = require('../utils/sendWorkshopCompletion
 // Send completion emails for workshops that ended (checks for workshops whose endDate is today or earlier)
 exports.sendWorkshopCompletionEmails = async (req, res) => {
   try {
-    // Get current date/time to check if workshop has actually ended
-    const now = new Date();
-
-    // Find workshops that have ended (endDate is in the past) and haven't sent completion emails yet
-    console.log(`🔍 Checking for ended workshops at ${now.toISOString()}`);
+    // Get today's date (start of day)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
+    // Get tomorrow's date (to use as upper bound)
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Find workshops that ended today (or earlier) and haven't sent completion emails yet
+    // This catches workshops whose endDate is today or any previous day
     const endedWorkshops = await Event.find({
       type: 'workshop',
       endDate: {
-        $lt: now  // End date is before current time (workshop has actually ended)
+        $lt: tomorrow  // End date is before tomorrow (i.e., today or earlier)
       },
       completionEmailSent: { $ne: true },
       status: 'approved'
     });
 
-    console.log(`📋 Found ${endedWorkshops.length} workshop(s) that ended and need completion emails`);
-
     if (endedWorkshops.length === 0) {
-      // Check if there are workshops that ended but might have other issues
-      const allEndedWorkshops = await Event.find({
-        type: 'workshop',
-        endDate: { $lt: now }
-      });
-      
-      if (allEndedWorkshops.length > 0) {
-        console.log(`ℹ️  Found ${allEndedWorkshops.length} ended workshop(s), but:`);
-        allEndedWorkshops.forEach(w => {
-          const reasons = [];
-          if (w.completionEmailSent) reasons.push('completionEmailSent=true');
-          if (w.status !== 'approved') reasons.push(`status=${w.status}`);
-          console.log(`   - "${w.title}" (ID: ${w._id}): ${reasons.join(', ') || 'no issues found'}`);
-        });
-      }
-      
       return res.json({
         success: true,
         message: 'No workshops ended that need completion emails',
@@ -56,65 +42,23 @@ exports.sendWorkshopCompletionEmails = async (req, res) => {
 
     for (const workshop of endedWorkshops) {
       console.log(`\n📚 Processing workshop: ${workshop.title}`);
-      console.log(`   Workshop ID: ${workshop._id}`);
-      console.log(`   End Date: ${workshop.endDate}`);
-      console.log(`   Status: ${workshop.status}`);
-      console.log(`   Completion Email Sent: ${workshop.completionEmailSent}`);
 
-      // Get all registered users
-      // Note: Staff/TA/Professor also register via StudentRegistrationForm, so they're in StudentRegistration model
+      // Get all registered users (both regular registrations and student registrations)
+      const regularRegistrations = await Registration.find({
+        event: workshop._id,
+        status: { $in: ['approved', 'registered'] }
+      }).populate('user', 'email firstName lastName userType');
+
       const studentRegistrations = await StudentRegistration.find({
         event: workshop._id,
         eventType: 'workshop',
         status: { $in: ['approved', 'registered'] }
       });
 
-      console.log(`   Found ${studentRegistrations.length} registrations (StudentRegistration model)`);
-
-      // Also check Registration model for any registrations (backwards compatibility)
-      const regularRegistrations = await Registration.find({
-        event: workshop._id,
-        status: { $in: ['approved', 'registered'] }
-      }).populate('user', 'email firstName lastName userType');
-
-      console.log(`   Found ${regularRegistrations.length} registrations (Registration model)`);
-
       // Combine all registrations
       const allRegistrations = [];
 
-      // Batch lookup users by email for student registrations
-      const studentEmails = studentRegistrations
-        .map(reg => reg.studentEmail?.toLowerCase())
-        .filter(email => email);
-      
-      const users = await User.find({ 
-        email: { $in: studentEmails } 
-      }).select('email userType');
-      
-      // Create a map of email -> userType for quick lookup
-      const userTypeMap = new Map();
-      users.forEach(user => {
-        userTypeMap.set(user.email.toLowerCase(), user.userType);
-      });
-
-      // Add student registrations (includes Students, Staff, TA, Professors who registered via StudentRegistrationForm)
-      for (const reg of studentRegistrations) {
-        if (reg.studentEmail) {
-          // Look up userType from the map
-          const userType = userTypeMap.get(reg.studentEmail.toLowerCase()) || 'Student'; // Default to Student if user not found
-          
-          // Only send to students, staff, TA, professors
-          if (['Student', 'Staff', 'TA', 'Professor'].includes(userType)) {
-            allRegistrations.push({
-              email: reg.studentEmail,
-              name: reg.studentName || reg.studentEmail,
-              userType: userType
-            });
-          }
-        }
-      }
-
-      // Add regular registrations (for backwards compatibility - if any exist)
+      // Add regular registrations (staff, TA, professors)
       for (const reg of regularRegistrations) {
         if (reg.user && reg.user.email) {
           const userType = reg.user.userType || reg.role;
@@ -128,6 +72,17 @@ exports.sendWorkshopCompletionEmails = async (req, res) => {
               userType: userType
             });
           }
+        }
+      }
+
+      // Add student registrations
+      for (const reg of studentRegistrations) {
+        if (reg.studentEmail) {
+          allRegistrations.push({
+            email: reg.studentEmail,
+            name: reg.studentName || reg.studentEmail,
+            userType: 'Student'
+          });
         }
       }
 

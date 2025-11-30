@@ -306,6 +306,35 @@ const StaffFavorites = () => {
   const userRole = user?.userType === 'TA' ? 'TA' : 'Staff';
 
   return (
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideInRight {
+          from {
+            opacity: 0;
+            transform: translateX(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        .banner-animate {
+          animation: fadeInUp 0.8s ease-out;
+        }
+        .banner-content-animate {
+          animation: slideInRight 1s ease-out 0.2s both;
+        }
+      `}</style>
     <div style={{
       display: 'flex',
       flexDirection: 'column',
@@ -630,6 +659,7 @@ const StaffFavorites = () => {
                           } else if (
                             notification.type === 'new_loyalty_partner' || 
                             notification.type === 'loyalty_partner_added' ||
+                            notification.type === 'loyalty_program_application' ||
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
                             navigate('/staff/loyalty-vendors');
@@ -728,14 +758,14 @@ const StaffFavorites = () => {
             <p style={{
               fontSize: '0.875rem',
               fontWeight: '600',
-              color: '#1D3557',
+              color: '#FFFFFF',
               margin: 0
             }}>
               {displayName}
             </p>
             <p style={{
               fontSize: '0.75rem',
-              color: '#6b7280',
+              color: 'rgba(255, 255, 255, 0.7)',
               margin: 0
             }}>
               {userRole}
@@ -762,12 +792,11 @@ const StaffFavorites = () => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#1D3557',
+                backgroundColor: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
-                fontSize: '0.875rem',
+                color: '#1D3557',
                 fontWeight: '600'
               }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'S').toUpperCase()}
@@ -867,15 +896,27 @@ const StaffFavorites = () => {
             marginLeft: '4rem',
             marginRight: '4rem'
           }}>
-            {/* Page Title Banner */}
-            <div style={{
-              position: 'relative',
-              height: '140px',
-              borderRadius: '0.75rem',
-              overflow: 'hidden',
-              marginBottom: '1.5rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-            }}>
+            {/* Page Title Banner - Animated */}
+            <div 
+              className="banner-animate"
+              style={{
+                position: 'relative',
+                height: '140px',
+                borderRadius: '0.75rem',
+                overflow: 'hidden',
+                marginBottom: '1.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 8px 12px -2px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+              }}
+            >
               <div style={{
                 position: 'absolute',
                 inset: 0,
@@ -883,24 +924,29 @@ const StaffFavorites = () => {
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 backgroundSize: 'cover',
-                filter: 'blur(2px)'
+                filter: 'blur(2px)',
+                transition: 'transform 0.5s ease, filter 0.5s ease'
               }}></div>
               <div style={{
                 position: 'absolute',
                 inset: 0,
-                backgroundColor: 'rgba(29, 53, 87, 0.75)'
+                backgroundColor: 'rgba(29, 53, 87, 0.75)',
+                transition: 'background-color 0.3s ease'
               }}></div>
-              <div style={{
-                position: 'relative',
-                zIndex: 10,
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'flex-start',
-                padding: '2rem 2.5rem',
-                color: '#FFFFFF'
-              }}>
+              <div 
+                className="banner-content-animate"
+                style={{
+                  position: 'relative',
+                  zIndex: 10,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'flex-start',
+                  padding: '2rem 2.5rem',
+                  color: '#FFFFFF'
+                }}
+              >
                 <h3 style={{
                   color: '#FFFFFF',
                   fontSize: '1.75rem',
@@ -1526,6 +1572,7 @@ const StaffFavorites = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 

@@ -104,8 +104,10 @@ module.exports = async (req, res) => {
         console.log('🔍 Registration not found in Registration model, checking StudentRegistration...');
         if (user && user.email) {
           registration = await StudentRegistration.findOne({
-            event: payment.event,
-            studentEmail: user.email.toLowerCase()
+            $or: [
+              { event: payment.event, student: user._id },
+              { event: payment.event, studentEmail: user.email.toLowerCase(), student: { $exists: false } } // Fallback for old records
+            ]
           });
         }
       }
@@ -182,9 +184,8 @@ module.exports = async (req, res) => {
     // Send receipt email
     console.log('📧 Sending receipt email...');
     if (user) {
-      // Get user's name for greeting (works for all user types: Student, Staff, TA, Professor, Vendor)
-      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.companyName || user.email;
-      console.log('📧 User type:', user.userType || 'Unknown', 'Email:', user.email);
+      // Get vendor's personal name for greeting
+      const vendorPersonalName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.companyName || user.email;
       let receiptDetails = {};
       
       if (payment.vendorRequest) {
@@ -203,7 +204,7 @@ module.exports = async (req, res) => {
       try {
         const emailResult = await sendReceiptEmail(
           user.email,
-          userName,
+          vendorPersonalName,
           eventTitle,
           payment.amount,
           'card',

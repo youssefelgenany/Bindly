@@ -27,9 +27,7 @@ exports.createAdminOrEventOffice = async (req, res) => {
         message: "Invalid role. Must be Admin or Event Office"
       });
 
-    // Normalize email to lowercase (emails are stored in lowercase)
-    const normalizedEmail = email.toLowerCase().trim();
-    const exists = await User.findOne({ email: normalizedEmail });
+    const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({
       success: false,
       message: "Email already exists"
@@ -42,7 +40,7 @@ exports.createAdminOrEventOffice = async (req, res) => {
     const fullName = `${firstName} ${lastName}`.trim();
     const payload = {
       name: fullName || role,
-      email: normalizedEmail, // Use normalized email (lowercase)
+      email,
       password,
       userType: mappedUserType,
       isVerified: true, // All admin and event office accounts are auto-verified
@@ -104,10 +102,11 @@ exports.deleteAdminOrEventOffice = async (req, res) => {
     console.log('🗑️ Deleting user account:', userId, 'email:', userEmail);
     
     // Explicitly delete all related registrations BEFORE deleting the user
+    // (The pre-delete hook will also run, but we do it explicitly here for clarity and error handling)
     const cleanupResult = await cleanupUserRegistrations(userId, userEmail);
     console.log('🗑️ Cleanup result:', cleanupResult);
     
-    // Now delete the user
+    // Now delete the user (pre-delete hook will also run as a safety net)
     await user.deleteOne();
     
     console.log('✅ User account and all related registrations deleted successfully:', req.params.id);

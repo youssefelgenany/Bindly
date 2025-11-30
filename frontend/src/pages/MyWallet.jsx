@@ -48,7 +48,7 @@ const MyWallet = () => {
       document.removeEventListener('click', handleClickOutside);
       window.removeEventListener('walletRefresh', handleWalletRefresh);
     };
-  }, []); // Remove user dependency to prevent unnecessary re-renders
+  }, [user]); // Add user dependency for student notifications
 
   const loadWalletData = async () => {
     try {
@@ -261,10 +261,646 @@ const MyWallet = () => {
     return currentPath.startsWith(path);
   };
 
+  const isStudent = user?.userType === 'Student';
+
+  // Load notifications for students
+  const loadStudentNotifications = useCallback(async () => {
+    if (!isStudent) return;
+    try {
+      setLoadingNotifications(true);
+      const [notificationsResult, countResult] = await Promise.all([
+        notificationApiService.getUserNotifications({ limit: 20, unreadOnly: false }),
+        notificationApiService.getUnreadCount()
+      ]);
+
+      if (notificationsResult.success && notificationsResult.data?.data) {
+        setNotifications(
+          notificationsResult.data.data.notifications ||
+          notificationsResult.data.data ||
+          []
+        );
+      }
+
+      if (countResult.success) {
+        setUnreadCount(countResult.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, [isStudent]);
+
+  useEffect(() => {
+    if (!isStudent) return;
+    loadStudentNotifications();
+    const interval = setInterval(() => {
+      loadStudentNotifications();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadStudentNotifications, isStudent]);
+
+  const handleStudentMarkAsRead = async (notificationId) => {
+    try {
+      const result = await notificationApiService.markAsRead(notificationId);
+      if (result.success) {
+        setNotifications(prev =>
+          prev.map(n => (n._id === notificationId ? { ...n, isRead: true } : n))
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const handleStudentMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#f6f7f8' }}>
       {/* Header */}
-      {isProfessor || isStaff || isTA ? (
+      {isStudent ? (
+        <header style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+          padding: '1rem 2.5rem',
+          backgroundColor: '#1D3557'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
+            <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h2 style={{
+                color: '#FFFFFF',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                lineHeight: '1.25',
+                margin: 0,
+                cursor: 'pointer'
+              }}>
+                Bindly
+              </h2>
+            </Link>
+          </div>
+
+          {/* Centered Navigation Menu */}
+          <nav style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flex: 1,
+            gap: '1.25rem'
+          }}>
+            <Link
+              to="/dashboard"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/dashboard') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/dashboard') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/dashboard') ? '2px solid #FFFFFF' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                dashboard
+              </span>
+              Dashboard
+            </Link>
+            <Link
+              to="/student/events"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/student/events') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/student/events') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/student/events') ? '2px solid #FFFFFF' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                explore
+              </span>
+              Discover Events
+            </Link>
+            <Link
+              to="/student/my-registrations"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/student/my-registrations') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/student/my-registrations') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/student/my-registrations') ? '2px solid #FFFFFF' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                event
+              </span>
+              My Events
+            </Link>
+            <Link
+              to="/student/courts"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/student/courts') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/student/courts') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/student/courts') ? '2px solid #FFFFFF' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                sports_tennis
+              </span>
+              Campus Courts
+            </Link>
+            <Link
+              to="/gym"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/gym') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/gym') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/gym') ? '2px solid #FFFFFF' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                fitness_center
+              </span>
+              Gym Sessions
+            </Link>
+            <Link
+              to="/booth-polls"
+              style={{
+                textDecoration: 'none',
+                color: isActiveRoute('/booth-polls') ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.875rem',
+                fontWeight: isActiveRoute('/booth-polls') ? '600' : '500',
+                paddingBottom: '0.5rem',
+                borderBottom: isActiveRoute('/booth-polls') ? '2px solid #FFFFFF' : '2px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                poll
+              </span>
+              Vendor Polls
+            </Link>
+          </nav>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+            {/* Heart Icon - Favorites */}
+            <Link
+              to="/student/favorites"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s',
+                textDecoration: 'none',
+                color: 'inherit'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span className="material-symbols-outlined" style={{
+                fontSize: '1.5rem',
+                color: '#FFFFFF'
+              }}>
+                favorite
+              </span>
+            </Link>
+
+            {/* Notifications Bell */}
+            <div style={{ position: 'relative' }} data-notifications-dropdown>
+              <button
+                onClick={() => {
+                  setShowNotificationsDropdown(!showNotificationsDropdown);
+                  setShowLogoutDropdown(false);
+                  if (!showNotificationsDropdown) {
+                    loadStudentNotifications();
+                  }
+                }}
+                style={{
+                  position: 'relative',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{
+                  fontSize: '1.5rem',
+                  color: '#FFFFFF'
+                }}>
+                  notifications
+                </span>
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '0.25rem',
+                    right: '0.25rem',
+                    backgroundColor: '#ef4444',
+                    color: '#FFFFFF',
+                    borderRadius: '50%',
+                    width: '1.125rem',
+                    height: '1.125rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.625rem',
+                    fontWeight: '700',
+                    border: '2px solid #FFFFFF'
+                  }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              {showNotificationsDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '0.5rem',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  zIndex: 1001,
+                  width: '360px',
+                  maxHeight: '500px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    padding: '1rem',
+                    borderBottom: '1px solid #e2e8f0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <h3 style={{
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      color: '#1D3557',
+                      margin: 0
+                    }}>
+                      Notifications
+                    </h3>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={handleStudentMarkAllAsRead}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#1e40af',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          padding: '0.25rem 0.5rem'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.textDecoration = 'underline';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.textDecoration = 'none';
+                        }}
+                      >
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+                  <div style={{
+                    overflowY: 'auto',
+                    maxHeight: '400px'
+                  }}>
+                    {loadingNotifications ? (
+                      <div style={{
+                        padding: '2rem',
+                        textAlign: 'center',
+                        color: '#6b7280',
+                        fontSize: '0.875rem'
+                      }}>
+                        Loading...
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div style={{
+                        padding: '2rem',
+                        textAlign: 'center',
+                        color: '#6b7280',
+                        fontSize: '0.875rem'
+                      }}>
+                        No notifications
+                      </div>
+                    ) : (
+                      notifications.map((notification) => (
+                        <div
+                          key={notification._id}
+                          onClick={() => {
+                            if (!notification.isRead) {
+                              handleStudentMarkAsRead(notification._id);
+                            }
+                            // Handle notification redirects
+                            if ((notification.type === 'event_announcement' || notification.type === 'new_event') && notification.metadata?.eventId) {
+                              navigate('/student/events');
+                              setShowNotificationsDropdown(false);
+                            } else if (
+                              (notification.type === 'event_reminder' ||
+                                notification.type === 'workshop_reminder' ||
+                                notification.type === 'trip_reminder' ||
+                                notification.type === 'gym_session_reminder') &&
+                              (notification.metadata?.eventId ||
+                                notification.metadata?.workshopId ||
+                                notification.metadata?.tripId ||
+                                notification.metadata?.gymSessionId)
+                            ) {
+                              navigate('/student/my-registrations');
+                              setShowNotificationsDropdown(false);
+                            } else if (
+                              notification.type === 'new_loyalty_partner' ||
+                              notification.type === 'loyalty_partner_added' ||
+                              notification.type === 'loyalty_program_application' ||
+                              (notification.type === 'system' && notification.metadata?.vendorId)
+                            ) {
+                              navigate('/student/loyalty-vendors');
+                              setShowNotificationsDropdown(false);
+                            }
+                          }}
+                          style={{
+                            padding: '1rem',
+                            borderBottom: '1px solid #f3f4f6',
+                            cursor: 'pointer',
+                            backgroundColor: notification.isRead
+                              ? '#FFFFFF'
+                              : (notification.priority === 'high' &&
+                                (notification.type === 'event_reminder' ||
+                                  notification.type === 'workshop_reminder' ||
+                                  notification.type === 'trip_reminder' ||
+                                  notification.type === 'gym_session_reminder'))
+                                ? '#fef2f2'
+                                : '#eff6ff',
+                            borderLeft: notification.priority === 'high' &&
+                              (notification.type === 'event_reminder' ||
+                                notification.type === 'workshop_reminder' ||
+                                notification.type === 'trip_reminder' ||
+                                notification.type === 'gym_session_reminder') &&
+                              !notification.isRead
+                              ? '3px solid #ef4444'
+                              : 'none',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = notification.isRead
+                              ? '#f9fafb'
+                              : (notification.priority === 'high' &&
+                                (notification.type === 'event_reminder' ||
+                                  notification.type === 'workshop_reminder' ||
+                                  notification.type === 'trip_reminder' ||
+                                  notification.type === 'gym_session_reminder'))
+                                ? '#fee2e2'
+                                : '#dbeafe';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = notification.isRead
+                              ? '#FFFFFF'
+                              : (notification.priority === 'high' &&
+                                (notification.type === 'event_reminder' ||
+                                  notification.type === 'workshop_reminder' ||
+                                  notification.type === 'trip_reminder' ||
+                                  notification.type === 'gym_session_reminder'))
+                                ? '#fef2f2'
+                                : '#eff6ff';
+                          }}
+                        >
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            gap: '0.5rem'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <p style={{
+                                fontSize: '0.875rem',
+                                fontWeight: notification.isRead ? '400' : '600',
+                                color: '#1D3557',
+                                margin: 0,
+                                marginBottom: '0.25rem'
+                              }}>
+                                {notification.title || notification.message}
+                              </p>
+                              {notification.message && notification.message !== notification.title && (
+                                <p style={{
+                                  fontSize: '0.75rem',
+                                  color: '#6b7280',
+                                  margin: 0
+                                }}>
+                                  {notification.message}
+                                </p>
+                              )}
+                              <p style={{
+                                fontSize: '0.625rem',
+                                color: '#9ca3af',
+                                margin: '0.5rem 0 0 0'
+                              }}>
+                                {formatNotificationDate(notification.createdAt)}
+                              </p>
+                            </div>
+                            {!notification.isRead && (
+                              <div style={{
+                                width: '0.5rem',
+                                height: '0.5rem',
+                                borderRadius: '50%',
+                                backgroundColor: '#1e40af',
+                                flexShrink: 0,
+                                marginTop: '0.25rem'
+                              }} />
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ textAlign: 'right' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#FFFFFF',
+                margin: 0
+              }}>
+                {displayName}
+              </p>
+              <p style={{
+                fontSize: '0.75rem',
+                color: 'rgba(255, 255, 255, 0.7)',
+                margin: 0
+              }}>
+                Student
+              </p>
+            </div>
+
+            <div 
+              data-profile-dropdown
+              style={{ position: 'relative', cursor: 'pointer' }}
+              onClick={() => {
+                setShowLogoutDropdown(!showLogoutDropdown);
+                setShowNotificationsDropdown(false);
+              }}
+            >
+              {user?.profilePicturePath ? (
+                <img
+                  src={`http://localhost:5000${user.profilePicturePath}`}
+                  alt="User profile"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: '50%',
+                    objectFit: 'cover'
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  backgroundColor: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#1D3557',
+                  fontWeight: '600'
+                }}>
+                  {(user?.firstName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
+                </div>
+              )}
+              {showLogoutDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '0.5rem',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                  zIndex: 1000,
+                  minWidth: '150px'
+                }}>
+                  <Link
+                    to="/wallet"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#1D3557',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                    }}
+                    onClick={() => setShowLogoutDropdown(false)}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      account_balance_wallet
+                    </span>
+                    My Wallet
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#1D3557',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                      logout
+                    </span>
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+      ) : isProfessor || isStaff || isTA ? (
         <header style={{
           display: 'flex',
           alignItems: 'center',
@@ -751,6 +1387,7 @@ const MyWallet = () => {
                               } else if (
                                 notification.type === 'new_loyalty_partner' || 
                                 notification.type === 'loyalty_partner_added' ||
+                                notification.type === 'loyalty_program_application' ||
                                 (notification.type === 'system' && notification.metadata?.vendorId)
                               ) {
                                 navigate('/ta/loyalty-vendors');

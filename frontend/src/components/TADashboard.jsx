@@ -145,18 +145,18 @@ const TADashboard = () => {
             // Still fetch registrations for stats
             if (user?.email) {
                 try {
-                const registrationsRes = await studentRegistrationApi.getMyRegistrations(user.email);
-                
-                // Handle different response formats
-                let registrations = [];
-                if (registrationsRes.success) {
-                    registrations = registrationsRes.data?.registrations || 
-                                   registrationsRes.data?.data?.registrations ||
-                                   (Array.isArray(registrationsRes.data) ? registrationsRes.data : []) ||
-                                   [];
-                } else {
-                    console.error('Failed to fetch registrations:', registrationsRes.message);
-                }
+                    const registrationsRes = await studentRegistrationApi.getMyRegistrations();
+                    
+                    // Handle different response formats
+                    let registrations = [];
+                    if (registrationsRes.success) {
+                        registrations = registrationsRes.data?.registrations || 
+                                       registrationsRes.data?.data?.registrations ||
+                                       (Array.isArray(registrationsRes.data) ? registrationsRes.data : []) ||
+                                       [];
+                    } else {
+                        console.error('Failed to fetch registrations:', registrationsRes.message);
+                    }
 
                 const now = new Date();
                 
@@ -787,6 +787,7 @@ const TADashboard = () => {
                                                     } else if (
                                                         notification.type === 'new_loyalty_partner' ||
                                                         notification.type === 'loyalty_partner_added' ||
+                                                        notification.type === 'loyalty_program_application' ||
                                                         (notification.type === 'system' && notification.metadata?.vendorId)
                                                     ) {
                                                         navigate('/ta/loyalty-vendors');

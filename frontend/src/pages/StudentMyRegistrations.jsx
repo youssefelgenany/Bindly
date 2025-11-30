@@ -208,11 +208,21 @@ const StudentMyRegistrations = () => {
     setError('');
 
     try {
-      const result = await studentRegistrationApi.getMyRegistrations(user.email);
+      const result = await studentRegistrationApi.getMyRegistrations();
       
       if (result.success) {
         const regs = result.data.registrations || [];
-        setRegistrations(regs);
+        // Additional frontend filter: For workshops/trips, only show paid registrations
+        // (Backend should already filter, but this is a safety measure)
+        const filteredRegs = regs.filter(reg => {
+          const eventType = reg.eventType?.toLowerCase();
+          // For workshops and trips, only show if paid
+          if ((eventType === 'workshop' || eventType === 'trip') && !reg.paid) {
+            return false;
+          }
+          return true;
+        });
+        setRegistrations(filteredRegs);
         
         // Load ratings for all events
         const ratingsMap = {};
@@ -248,13 +258,12 @@ const StudentMyRegistrations = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit',
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      minute: '2-digit'
     });
   };
 
@@ -970,6 +979,7 @@ const StudentMyRegistrations = () => {
                           } else if (
                             notification.type === 'new_loyalty_partner' || 
                             notification.type === 'loyalty_partner_added' ||
+                            notification.type === 'loyalty_program_application' ||
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
                             // Navigate to Loyalty Partners page

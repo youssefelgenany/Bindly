@@ -73,8 +73,10 @@ exports.verifyPayment = async (req, res) => {
         const user = await User.findById(payment.user);
         if (user && user.email) {
           registration = await StudentRegistration.findOne({
-            event: payment.event,
-            studentEmail: user.email.toLowerCase()
+            $or: [
+              { event: payment.event, student: user._id },
+              { event: payment.event, studentEmail: user.email.toLowerCase(), student: { $exists: false } } // Fallback for old records
+            ]
           });
         }
       }

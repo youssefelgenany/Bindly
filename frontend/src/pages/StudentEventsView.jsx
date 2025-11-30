@@ -324,7 +324,7 @@ const StudentEventsView = () => {
         // Load student registrations (StudentRegistration model) - only for workshops/trips
         if (user.email) {
           try {
-            const studentRegResult = await studentRegistrationApi.getMyRegistrations(user.email);
+            const studentRegResult = await studentRegistrationApi.getMyRegistrations();
             if (studentRegResult.success && studentRegResult.data?.registrations) {
               studentRegResult.data.registrations.forEach(reg => {
                 // Only include paid registrations
@@ -509,7 +509,7 @@ const StudentEventsView = () => {
     const loadUserRegistrations = async () => {
       if (!user?.email) return;
       try {
-        const result = await studentRegistrationApi.getMyRegistrations(user.email);
+        const result = await studentRegistrationApi.getMyRegistrations();
         if (result.success && result.data.registrations) {
           const registeredIds = new Set();
           result.data.registrations.forEach(reg => {
@@ -549,13 +549,12 @@ const StudentEventsView = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit',
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      minute: '2-digit'
     });
   };
 
@@ -1186,6 +1185,7 @@ const StudentEventsView = () => {
                           } else if (
                             notification.type === 'new_loyalty_partner' || 
                             notification.type === 'loyalty_partner_added' ||
+                            notification.type === 'loyalty_program_application' ||
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
                             // Navigate to Loyalty Partners page
@@ -2089,7 +2089,7 @@ const StudentEventsView = () => {
                       </button>
                     </div>
 
-                    {(event.type === 'workshop' || event.type === 'trip') && (
+                    {(event.type === 'workshop' || event.type === 'trip' || event.type === 'bazaar' || event.type === 'conference' || event.type === 'booth') && (
                           isRegistered ? (
                         <button
                           disabled
@@ -2577,7 +2577,7 @@ const StudentEventsView = () => {
                 </div>
               )}
 
-              {(selectedEvent.type === 'workshop' || selectedEvent.type === 'trip') && (
+              {(selectedEvent.type === 'workshop' || selectedEvent.type === 'trip' || selectedEvent.type === 'bazaar' || selectedEvent.type === 'conference' || selectedEvent.type === 'booth') && (
                 registeredEventIds.has(String(selectedEvent.id)) ? (
                   <button
                     disabled
