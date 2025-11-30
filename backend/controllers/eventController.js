@@ -2145,19 +2145,25 @@ exports.exportRegistrations = async (req, res) => {
     const payments = await Payment.find({
       event: eventId,
       status: 'success'
-    }).populate('user', 'email');
+    }).populate('user', 'email _id');
     
     // Create maps for payment verification
     const paymentByUserId = new Map();
     const paymentByEmail = new Map();
     payments.forEach(payment => {
-      if (payment.user && payment.user._id) {
-        paymentByUserId.set(payment.user._id.toString(), true);
-      }
-      if (payment.user && payment.user.email) {
-        paymentByEmail.set(payment.user.email.toLowerCase(), true);
+      if (payment.user) {
+        if (payment.user._id) {
+          paymentByUserId.set(payment.user._id.toString(), true);
+        }
+        if (payment.user.email) {
+          paymentByEmail.set(payment.user.email.toLowerCase(), true);
+        }
       }
     });
+    
+    // Get event price to determine if event is free
+    const eventPrice = event.price || 0;
+    const isFreeEvent = eventPrice <= 0;
     
     // Combine and format data for Excel
     const data = [];
@@ -2165,9 +2171,23 @@ exports.exportRegistrations = async (req, res) => {
     // Add registrations from Registration model
     registrations.forEach(reg => {
       if (reg.user) {
-        // Verify paid status: check both reg.paid and Payment model
-        const hasPayment = paymentByUserId.get(reg.user._id?.toString()) || false;
-        const isPaid = reg.paid === true || hasPayment || (event.price || 0) <= 0;
+        // Determine paid status:
+        // 1. If event is free, always paid
+        // 2. Otherwise, check reg.paid field first (source of truth)
+        // 3. If reg.paid is false, check Payment model as fallback
+        let isPaid = false;
+        if (isFreeEvent) {
+          isPaid = true;
+        } else if (reg.paid === true) {
+          isPaid = true;
+        } else {
+          // Check Payment model as fallback
+          const userId = reg.user._id?.toString();
+          const userEmail = reg.user.email?.toLowerCase();
+          isPaid = (userId && paymentByUserId.get(userId)) || 
+                   (userEmail && paymentByEmail.get(userEmail)) || 
+                   false;
+        }
         
         data.push({
           'Name': `${reg.user.firstName || ''} ${reg.user.lastName || ''}`.trim() || 'N/A',
@@ -2186,9 +2206,19 @@ exports.exportRegistrations = async (req, res) => {
       const email = reg.studentEmail?.toLowerCase();
       const userType = email ? (userTypeMap.get(email) || 'Student') : 'Student';
       
-      // Verify paid status: check both reg.paid and Payment model
-      const hasPayment = email ? paymentByEmail.get(email) || false : false;
-      const isPaid = reg.paid === true || hasPayment || (event.price || 0) <= 0;
+      // Determine paid status:
+      // 1. If event is free, always paid
+      // 2. Otherwise, check reg.paid field first (source of truth)
+      // 3. If reg.paid is false, check Payment model as fallback
+      let isPaid = false;
+      if (isFreeEvent) {
+        isPaid = true;
+      } else if (reg.paid === true) {
+        isPaid = true;
+      } else if (email) {
+        // Check Payment model as fallback
+        isPaid = paymentByEmail.get(email) || false;
+      }
       
       data.push({
         'Name': reg.studentName || 'N/A',
