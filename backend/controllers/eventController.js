@@ -42,7 +42,7 @@ exports.createEvent = async (req, res) => {
       allowedUserTypes
     } = req.body;
 
-    if (!title || !type || !startDate || !endDate || !location || !description) {
+    if (!title || !type || !startDate || !endDate || !location) {
       return res.status(400).json({ msg: "Missing required fields" });
     }
 
@@ -52,9 +52,9 @@ exports.createEvent = async (req, res) => {
       return res.status(400).json({ msg: `Invalid event type. Allowed types: ${validTypes.join(', ')}` });
     }
 
-    // Validate that title, location, and description are not empty
-    if (!title.trim() || !location.trim() || !description.trim()) {
-      return res.status(400).json({ msg: "Title, location, and description cannot be empty" });
+    // Validate that title and location are not empty
+    if (!title.trim() || !location.trim()) {
+      return res.status(400).json({ msg: "Title and location cannot be empty" });
     }
 
     // Filter out Admin and Events Office from allowedUserTypes (they can always see all events)
@@ -122,16 +122,11 @@ exports.createEvent = async (req, res) => {
 exports.createConference = async (req, res) => {
   try {
     const {
-      title, startDate, endDate, location, agenda, website, budget, fundingSource, description
+      title, startDate, endDate, location, agenda, website, budget, fundingSource
     } = req.body || {};
 
-    if (!title || !startDate || !endDate || !location || !agenda || !website || budget == null || !fundingSource || !description) {
+    if (!title || !startDate || !endDate || !location || !agenda || !website || budget == null || !fundingSource) {
       return res.status(400).json({ msg: "Missing required conference fields" });
-    }
-
-    // Validate that description is not empty
-    if (!description.trim()) {
-      return res.status(400).json({ msg: "Description cannot be empty" });
     }
 
     const { allowedUserTypes, ...otherFields } = req.body;
@@ -281,12 +276,11 @@ exports.getSalesReport = async (req, res) => {
 // 📅 Get all approved/upcoming events
 exports.getAllEvents = async (req, res) => {
   try {
-    const { q, name, type, status, minimal } = req.query;
+    const { q, name, type, status } = req.query;
     const search = (q || name || '').toString().trim();
-    const isMinimal = minimal === 'true' || minimal === true; // Skip vendor details for dashboard
 
     // Base match (type/status) - only allow valid event types
-    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth', 'platformBooth'];
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
     const baseMatch = {
       type: { $in: validTypes }, // Only include valid event types
       $and: [
@@ -626,183 +620,91 @@ exports.getAllEvents = async (req, res) => {
     
     // For bazaars and booths, get vendor information
     // Also recalculate registeredCount from actual registrations for accuracy
-    // OPTIMIZATION: Batch all queries instead of doing them one by one
-    // If minimal=true, skip vendor details to speed up dashboard loading
     const Registration = require('../models/registrationModel');
-    const StudentRegistration = require('../models/studentRegistrationModel');
-    const VendorRequest = require('../models/vendorRequest');
     const mongoose = require('mongoose');
-    
-    // Batch fetch all counts at once
-    const eventIds = events.map(e => {
-      if (mongoose.Types.ObjectId.isValid(e._id)) {
-        return typeof e._id === 'string' ? new mongoose.Types.ObjectId(e._id) : e._id;
-      }
-      return e._id;
-    }).filter(id => id);
-    
-    // Get all vendor counts for bazaar/booth events in one query
-    const bazaarBoothEventIds = events
-      .filter(e => e.type === 'bazaar' || e.type === 'booth' || e.type === 'platformBooth')
-      .map(e => {
-        if (mongoose.Types.ObjectId.isValid(e._id)) {
-          return typeof e._id === 'string' ? new mongoose.Types.ObjectId(e._id) : e._id;
-        }
-        return e._id;
-      })
-      .filter(id => id);
-    
-    const vendorCountsMap = new Map();
-    if (bazaarBoothEventIds.length > 0 && !isMinimal) {
-      try {
-        const vendorCounts = await VendorRequest.aggregate([
-          {
-            $match: {
-              status: 'accepted',
-              $or: [
-                { bazaar: { $in: bazaarBoothEventIds } },
-                { booth: { $in: bazaarBoothEventIds } },
-                { standaloneBooth: { $in: bazaarBoothEventIds } }
-              ]
-            }
-          },
-          {
-            $group: {
-              _id: {
-                $cond: [
-                  { $ne: ['$bazaar', null] },
-                  '$bazaar',
-                  { $cond: [{ $ne: ['$booth', null] }, '$booth', '$standaloneBooth'] }
-                ]
-              },
-              count: { $sum: 1 }
-            }
-          }
-        ]);
-        
-        vendorCounts.forEach(vc => {
-          const eventIdStr = String(vc._id);
-          vendorCountsMap.set(eventIdStr, vc.count);
-        });
-      } catch (vendorCountError) {
-        console.error('Error fetching vendor counts:', vendorCountError);
-      }
-    }
-    
-    // Get all registration counts for non-bazaar/booth events in one query
-    const otherEventIds = events
-      .filter(e => e.type !== 'bazaar' && e.type !== 'booth' && e.type !== 'platformBooth')
-      .map(e => {
-        if (mongoose.Types.ObjectId.isValid(e._id)) {
-          return typeof e._id === 'string' ? new mongoose.Types.ObjectId(e._id) : e._id;
-        }
-        return e._id;
-      })
-      .filter(id => id);
-    
-    const registrationCountsMap = new Map();
-    const studentRegistrationCountsMap = new Map();
-    
-    if (otherEventIds.length > 0 && !isMinimal) {
-      try {
-        // Batch count registrations
-        const regCounts = await Registration.aggregate([
-          {
-            $match: {
-              event: { $in: otherEventIds },
-              status: { $ne: 'cancelled' }
-            }
-          },
-          {
-            $group: {
-              _id: '$event',
-              count: { $sum: 1 }
-            }
-          }
-        ]);
-        
-        regCounts.forEach(rc => {
-          const eventIdStr = String(rc._id);
-          registrationCountsMap.set(eventIdStr, rc.count);
-        });
-        
-        // Batch count student registrations
-        const studentRegCounts = await StudentRegistration.aggregate([
-          {
-            $match: {
-              event: { $in: otherEventIds },
-              status: { $ne: 'cancelled' }
-            }
-          },
-          {
-            $group: {
-              _id: '$event',
-              count: { $sum: 1 }
-            }
-          }
-        ]);
-        
-        studentRegCounts.forEach(src => {
-          const eventIdStr = String(src._id);
-          const currentCount = studentRegistrationCountsMap.get(eventIdStr) || 0;
-          studentRegistrationCountsMap.set(eventIdStr, currentCount + src.count);
-        });
-      } catch (regCountError) {
-        console.error('Error fetching registration counts:', regCountError);
-      }
-    }
-    
-    // Batch fetch all vendor requests for bazaar/booth events (only if not minimal)
-    const vendorRequestsMap = new Map();
-    if (bazaarBoothEventIds.length > 0 && !isMinimal) {
-      try {
-        const allVendorRequests = await VendorRequest.find({
-          status: 'accepted',
-          $or: [
-            { bazaar: { $in: bazaarBoothEventIds } },
-            { booth: { $in: bazaarBoothEventIds } },
-            { standaloneBooth: { $in: bazaarBoothEventIds } }
-          ]
-        })
-        .populate('vendor', 'firstName lastName companyName email')
-        .lean();
-        
-        allVendorRequests.forEach(vr => {
-          const eventId = vr.bazaar || vr.booth || vr.standaloneBooth;
-          if (eventId) {
-            const eventIdStr = String(eventId);
-            if (!vendorRequestsMap.has(eventIdStr)) {
-              vendorRequestsMap.set(eventIdStr, []);
-            }
-            vendorRequestsMap.get(eventIdStr).push(vr);
-          }
-        });
-      } catch (vendorReqError) {
-        console.error('Error fetching vendor requests:', vendorReqError);
-      }
-    }
-    
-    // Now process events with pre-fetched data
-    const eventsWithVendors = events.map((e) => {
+    const eventsWithVendors = await Promise.all(events.map(async (e) => {
       const creatorFullName = e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null;
-      const eventIdStr = String(e._id);
       
-      // Get registeredCount from pre-fetched maps (or use existing if minimal)
+      // For bazaars and booths, registeredCount = number of accepted vendor requests (participating vendors)
+      // For other events, registeredCount = number of event participants
       let finalCount = e.registeredCount || 0;
       
-      if (!isMinimal) {
-        if (e.type === 'bazaar' || e.type === 'booth' || e.type === 'platformBooth') {
-          finalCount = vendorCountsMap.get(eventIdStr) || 0;
-        } else {
-          const regCount = registrationCountsMap.get(eventIdStr) || 0;
-          const studentRegCount = studentRegistrationCountsMap.get(eventIdStr) || 0;
-          finalCount = regCount + studentRegCount;
+      if (e.type === 'bazaar' || e.type === 'booth') {
+        // Count accepted vendor requests (participating vendors)
+        const VendorRequest = require('../models/vendorRequest');
+        let eventIdForQuery = e._id;
+        if (mongoose.Types.ObjectId.isValid(e._id)) {
+          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
+        } else if (typeof e._id === 'string' && mongoose.Types.ObjectId.isValid(e._id)) {
+          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
         }
+        
+        const vendorCount = await VendorRequest.countDocuments({
+          $or: [
+            { bazaar: eventIdForQuery, status: 'accepted' },
+            { booth: eventIdForQuery, status: 'accepted' },
+            { standaloneBooth: eventIdForQuery, status: 'accepted' }
+          ]
+        });
+        
+        // Try string format if ObjectId didn't work
+        if (vendorCount === 0 && typeof e._id === 'string') {
+          const stringVendorCount = await VendorRequest.countDocuments({
+            $or: [
+              { bazaar: e._id, status: 'accepted' },
+              { booth: e._id, status: 'accepted' },
+              { standaloneBooth: e._id, status: 'accepted' }
+            ]
+          });
+          finalCount = stringVendorCount;
+        } else {
+          finalCount = vendorCount;
+        }
+        
+        console.log(`🔍 Event ${String(e._id)} (${e.title || e.name}) - Bazaar/Booth: Found ${finalCount} accepted vendor(s)`);
+      } else {
+        // For other events, count actual event participants
+        let eventIdForQuery = e._id;
+        if (mongoose.Types.ObjectId.isValid(e._id)) {
+          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
+        } else if (typeof e._id === 'string' && mongoose.Types.ObjectId.isValid(e._id)) {
+          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
+        }
+        
+        // Count from Registration model
+        const regCount = await Registration.countDocuments({ 
+          event: eventIdForQuery,
+          status: { $ne: 'cancelled' }
+        });
+        
+        // Also check StudentRegistration (for workshops and trips)
+        const StudentRegistration = require('../models/studentRegistrationModel');
+        const studentRegCount = await StudentRegistration.countDocuments({ 
+          event: eventIdForQuery,
+          status: { $ne: 'cancelled' }
+        });
+        
+        finalCount = regCount + studentRegCount;
+        
+        // If still 0, try with string format
+        if (finalCount === 0 && typeof e._id === 'string') {
+          const stringRegCount = await Registration.countDocuments({ 
+            event: e._id,
+            status: { $ne: 'cancelled' }
+          });
+          const stringStudentCount = await StudentRegistration.countDocuments({ 
+            event: e._id,
+            status: { $ne: 'cancelled' }
+          });
+          finalCount = stringRegCount + stringStudentCount;
+        }
+        
+        console.log(`🔍 Event ${String(e._id)} (${e.title || e.name}): Registration=${regCount}, StudentRegistration=${studentRegCount}, Total=${finalCount}`);
       }
       
       const baseEvent = {
         ...e,
-        registeredCount: finalCount,
+        registeredCount: finalCount, // Use actual count from registrations
         creatorName: creatorFullName,
         professorName: creatorFullName,
         createdByName: creatorFullName,
@@ -811,21 +713,25 @@ exports.getAllEvents = async (req, res) => {
         creatorLastName: e.createdBy?.lastName || null,
       };
 
-      // Add vendor information for bazaars and booths (only if not minimal)
-      if ((e.type === 'bazaar' || e.type === 'booth' || e.type === 'platformBooth') && !isMinimal) {
+      // Add vendor information for bazaars and booths
+      if (e.type === 'bazaar' || e.type === 'booth') {
         try {
-          const vendorRequests = vendorRequestsMap.get(eventIdStr) || [];
+          const VendorRequest = require('../models/vendorRequest');
+          const vendorRequests = await VendorRequest.find({
+            [e.type]: e._id,
+            status: 'accepted'
+          }).populate('vendor', 'firstName lastName companyName email').lean();
 
           // For booth events, include full vendor request details
-          if (e.type === 'booth' || e.type === 'platformBooth') {
+          if (e.type === 'booth') {
             baseEvent.vendorRequests = vendorRequests.map(vr => ({
               _id: vr._id,
               vendor: {
-                _id: vr.vendor?._id,
-                name: vr.vendor?.companyName || `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
-                companyName: vr.vendor?.companyName,
-                contactName: `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
-                email: vr.vendor?.email,
+                _id: vr.vendor._id,
+                name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+                companyName: vr.vendor.companyName,
+                contactName: `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+                email: vr.vendor.email,
               },
               boothSize: vr.boothSize,
               durationWeeks: vr.durationWeeks,
@@ -841,28 +747,46 @@ exports.getAllEvents = async (req, res) => {
 
           // Keep the original vendors array for backward compatibility
           baseEvent.vendors = vendorRequests.map(vr => ({
-            _id: vr.vendor?._id,
-            name: vr.vendor?.companyName || `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
-            companyName: vr.vendor?.companyName,
-            contactName: `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
-            email: vr.vendor?.email,
+            _id: vr.vendor._id,
+            name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+            companyName: vr.vendor.companyName,
+            contactName: `${vr.vendor.firstName} ${vr.vendor.lastName}`,
+            email: vr.vendor.email,
             boothSize: vr.boothSize,
             durationWeeks: vr.durationWeeks,
             boothLocation: vr.boothLocation,
             attendees: vr.attendees || []
           }));
+
+          // For bazaars, also get related booth events
+          if (e.type === 'bazaar') {
+            const boothEvents = await Event.find({
+              type: 'booth',
+              location: e.location,
+              startDate: { $gte: e.startDate },
+              endDate: { $lte: e.endDate },
+              status: 'approved'
+            }).lean();
+
+            baseEvent.booths = boothEvents.map(booth => ({
+              _id: booth._id,
+              title: booth.title,
+              description: booth.description,
+              startDate: booth.startDate,
+              endDate: booth.endDate,
+              location: booth.location,
+              capacity: booth.capacity,
+              price: booth.price
+            }));
+          }
         } catch (vendorError) {
-          console.error('Error processing vendor info for event:', e._id, vendorError);
+          console.error('Error fetching vendor info for event:', e._id, vendorError);
           baseEvent.vendors = [];
         }
-      } else if ((e.type === 'bazaar' || e.type === 'booth' || e.type === 'platformBooth') && isMinimal) {
-        // For minimal mode, just set empty arrays
-        baseEvent.vendors = [];
-        baseEvent.vendorRequests = [];
       }
 
       return baseEvent;
-    });
+    }));
 
     res.json(eventsWithVendors);
   } catch (err) {
@@ -982,52 +906,14 @@ exports.getAllEventsForStudents = async (req, res) => {
                          req.user.userType === 'event office' ||
                          req.user.role === 'event office';
     
-    // Build date filter: For non-admin/event-office users, exclude past events
-    // Admin and Events Office users should see ALL events (including past ones)
+    // Build date filter: ALL users should see ALL events (including past ones)
+    // No date filter - show all events regardless of date
     const now = new Date();
     console.log('🔍 Date filter - Current time:', now.toISOString());
     console.log('🔍 isEventOffice:', isEventOffice);
+    console.log('🔍 Showing ALL events (including past events) for all users');
     
-    // Check if user is Admin or Events Office (they should see ALL events including past ones)
-    const userTypeLower = req.user?.userType?.toLowerCase();
-    const roleLower = req.user?.role?.toLowerCase();
-    const isAdminOrEventOffice = req.user && (
-      userTypeLower === 'admin' ||
-      req.user.userType === 'Admin' ||
-      isEventOffice ||
-      roleLower === 'admin' ||
-      req.user.role === 'admin' ||
-      req.user.role === 'Event Office'
-    );
-    
-    let dateFilter = {}; // Default: no date restrictions (for admin/event office)
-    
-    // For non-admin/event-office users, filter out past events
-    if (!isAdminOrEventOffice) {
-      dateFilter = {
-        $or: [
-          // Case 1: Event has endDate and it's in the future
-          {
-            endDate: { $gt: now }
-          },
-          // Case 2: Event has no endDate but has startDate in the future
-          {
-            $and: [
-              {
-                $or: [
-                  { endDate: { $exists: false } },
-                  { endDate: null }
-                ]
-              },
-              { startDate: { $gt: now } }
-            ]
-          }
-        ]
-      };
-      console.log('🔍 Non-admin/event-office user - WILL EXCLUDE events where endDate <=', now.toISOString(), 'OR (no endDate AND startDate <=', now.toISOString(), ')');
-    } else {
-      console.log('🔍 Admin/Events Office user - Showing ALL events (including past events)');
-    }
+    let dateFilter = {}; // Empty date filter - no date restrictions
     
     // Base filter conditions
     const baseFilter = {
@@ -1076,16 +962,16 @@ exports.getAllEventsForStudents = async (req, res) => {
       console.log('🔍 No type filter or type is "all", showing all valid types');
     }
     
-    // Build filter - conditionally include dateFilter for non-admin/event-office users
+    // Build filter - conditionally include dateFilter only for non-Events Office users
     // Combine baseFilter (which has $and) with typeFilter and conditionally dateFilter
     let filter = {
       ...baseFilter,
       ...typeFilter
     };
     
-    // Only add dateFilter if it's not empty (i.e., for non-admin/event-office users)
-    // For Admin/Events Office users, dateFilter will be empty {}, so we don't add it
-    if (!isAdminOrEventOffice && dateFilter && Object.keys(dateFilter).length > 0) {
+    // Only add dateFilter if it's not empty (i.e., for non-Events Office users)
+    // For Events Office users, dateFilter will be empty {}, so we don't add it
+    if (!isEventOffice && dateFilter && Object.keys(dateFilter).length > 0) {
       // Merge dateFilter into the existing filter
       // Since dateFilter has $or, we can add it at the root level alongside $and
       filter = {
@@ -1288,42 +1174,20 @@ exports.getAllEventsForStudents = async (req, res) => {
       throw aggError; // Re-throw to be caught by outer catch
     }
 
-    // POST-FILTER: Remove past events for non-admin/event-office users
-    // Students, TA, Staff, and Professors should NOT see past events in Discover Events
-    // Admin and Events Office users should see ALL events (including past ones)
-    // Note: isAdminOrEventOffice, userTypeLower, and roleLower are already defined earlier in the function for the date filter
+    // POST-FILTER: Removed - All users should see ALL events (including past ones)
+    console.log('🔍 All users - Showing ALL events (including past events)');
 
-    if (!isAdminOrEventOffice) {
-      const nowPostFilter = new Date();
-      const initialCount = events.length;
-      events = events.filter(event => {
-        // If event has endDate, check if it's in the future
-        if (event.endDate) {
-          const endDate = new Date(event.endDate);
-          if (endDate <= nowPostFilter) {
-            console.log('🚫 getAllEventsForStudents POST-FILTER: Removing past event:', event.title, 'endDate:', event.endDate, 'now:', nowPostFilter.toISOString());
-            return false;
-          }
-        } else if (event.startDate) {
-          // If no endDate, check startDate
-          const startDate = new Date(event.startDate);
-          if (startDate <= nowPostFilter) {
-            console.log('🚫 getAllEventsForStudents POST-FILTER: Removing past event (no endDate):', event.title, 'startDate:', event.startDate, 'now:', nowPostFilter.toISOString());
-            return false;
-          }
-        } else {
-          // No dates at all - exclude it
-          console.log('🚫 getAllEventsForStudents POST-FILTER: Removing event with no dates:', event.title);
-          return false;
-        }
-        return true;
-      });
-      if (events.length < initialCount) {
-        console.log('🚫 getAllEventsForStudents POST-FILTER: Removed', (initialCount - events.length), 'past events');
-      }
-    } else {
-      console.log('🔍 Admin/Events Office user - Skipping post-filter, showing ALL events (including past)');
-    }
+    // Check if user is Admin or Events Office (they should see ALL events including restricted ones)
+    const userTypeLower = req.user?.userType?.toLowerCase();
+    const roleLower = req.user?.role?.toLowerCase();
+    const isAdminOrEventOffice = req.user && (
+      userTypeLower === 'admin' ||
+      req.user.userType === 'Admin' ||
+      isEventOffice ||
+      roleLower === 'admin' ||
+      req.user.role === 'admin' ||
+      req.user.role === 'Event Office'
+    );
 
     // Filter by user type restrictions
     // Admin and Events Office users should see ALL events (including restricted ones)
@@ -2260,7 +2124,6 @@ exports.sendQRCodesToVendors = async (req, res) => {
     }
 
     // Find all accepted vendor requests for this event (use actual event ID)
-    // Platform booths store the event in the 'booth' field, so they're included in the booth query
     const vendorRequests = await VendorRequest.find({
       $or: [
         { bazaar: actualEventId, status: 'accepted' },
@@ -2268,24 +2131,8 @@ exports.sendQRCodesToVendors = async (req, res) => {
         { standaloneBooth: actualEventId, status: 'accepted' }
       ]
     }).populate('vendor', 'email firstName lastName companyName');
-    
-    console.log(`🔍 Found ${vendorRequests.length} vendor request(s) for event ${actualEventId}`);
-    vendorRequests.forEach((vr, idx) => {
-      console.log(`  Vendor Request ${idx + 1}:`, {
-        id: vr._id,
-        eventType: vr.eventType,
-        status: vr.status,
-        vendorEmail: vr.vendor?.email,
-        hasAttendees: !!(vr.attendees && vr.attendees.length > 0),
-        attendeesCount: vr.attendees?.length || 0
-      });
-    });
-    
-    // Use all vendor requests (platform booths are already included via the booth field)
-    const filteredVendorRequests = vendorRequests;
 
-    if (filteredVendorRequests.length === 0) {
-      console.error('❌ No accepted vendor requests found for event:', actualEventId);
+    if (vendorRequests.length === 0) {
       return res.status(400).json({ 
         success: false, 
         message: 'No accepted vendor requests found for this event' 
@@ -2296,20 +2143,13 @@ exports.sendQRCodesToVendors = async (req, res) => {
     const { generateQRCode } = require('../utils/generateQRCode');
     const vendorsWithQRCodes = [];
     
-    for (const vendorRequest of filteredVendorRequests) {
+    for (const vendorRequest of vendorRequests) {
       const vendor = vendorRequest.vendor;
-      if (!vendor || !vendor.email) {
-        console.warn(`⚠️ Skipping vendor request ${vendorRequest._id}: vendor or email missing`, {
-          hasVendor: !!vendor,
-          vendorEmail: vendor?.email
-        });
-        continue;
-      }
+      if (!vendor || !vendor.email) continue;
       
       try {
         // Generate QR code for this vendor
         const vendorName = vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim();
-        console.log(`🔍 Generating QR code for vendor: ${vendorName} (${vendor.email})`);
         const qrResult = await generateQRCode(
           vendorRequest._id.toString(),
           {
@@ -2343,58 +2183,10 @@ exports.sendQRCodesToVendors = async (req, res) => {
             console.error(`❌ QR code data URL format is invalid for vendor ${vendorName}. Expected 'data:image/...', got: ${qrResult.qrCodeDataUrl.substring(0, 50)}`);
           }
           
-          // For platform booths and bazaars, generate QR codes for attendees
-          let attendeeQRCodes = [];
-          if ((vendorRequest.eventType === 'platformBooth' || vendorRequest.eventType === 'bazaar') && vendorRequest.attendees && vendorRequest.attendees.length > 0) {
-            const eventTypeLabel = vendorRequest.eventType === 'platformBooth' ? 'platform booth' : 'bazaar';
-            console.log(`🔍 Generating QR codes for ${vendorRequest.attendees.length} ${eventTypeLabel} attendees`);
-            for (const attendee of vendorRequest.attendees) {
-              if (!attendee.name || !attendee.email) {
-                console.warn(`⚠️ Skipping attendee: missing name or email`, { name: attendee.name, email: attendee.email });
-                continue;
-              }
-              
-              try {
-                const attendeeType = vendorRequest.eventType === 'platformBooth' ? 'platform_booth_attendee' : 'bazaar_attendee';
-                const attendeeQRResult = await generateQRCode(
-                  `${vendorRequest._id}_${attendee.email}`,
-                  {
-                    attendeeName: attendee.name,
-                    attendeeEmail: attendee.email,
-                    vendorRequestId: vendorRequest._id.toString(),
-                    eventId: actualEventId.toString(),
-                    eventName: event.title || event.name,
-                    vendorName: vendorName,
-                    attendeeType: attendeeType
-                  }
-                );
-                
-                if (attendeeQRResult.success && attendeeQRResult.qrCodeDataUrl) {
-                  attendeeQRCodes.push({
-                    attendeeName: attendee.name,
-                    attendeeEmail: attendee.email,
-                    qrCode: attendeeQRResult.qrCodeDataUrl,
-                    qrCodeData: attendeeQRResult.qrDataString
-                  });
-                  console.log(`✅ Generated QR code for attendee: ${attendee.name} (${attendee.email})`);
-                } else {
-                  console.error(`❌ Failed to generate QR code for attendee ${attendee.email}:`, attendeeQRResult.error);
-                }
-              } catch (attendeeError) {
-                console.error(`❌ Error generating QR code for attendee ${attendee.email}:`, attendeeError);
-                console.error('Attendee error stack:', attendeeError.stack);
-              }
-            }
-            console.log(`✅ Generated ${attendeeQRCodes.length} attendee QR codes out of ${vendorRequest.attendees.length} attendees`);
-          }
-          
           // Store QR code in vendorRequest
           try {
             vendorRequest.qrCode = qrResult.qrCodeDataUrl;
             vendorRequest.qrCodeData = qrResult.qrDataString;
-            if (attendeeQRCodes.length > 0) {
-              vendorRequest.attendeeQRCodes = attendeeQRCodes;
-            }
             await vendorRequest.save();
             console.log(`✅ Saved QR code to vendorRequest ${vendorRequest._id}`);
             
@@ -2402,8 +2194,7 @@ exports.sendQRCodesToVendors = async (req, res) => {
               vendor: vendor,
               vendorRequest: vendorRequest,
               qrCode: qrResult.qrCodeDataUrl,
-              qrCodeData: qrResult.qrDataString,
-              attendeeQRCodes: attendeeQRCodes
+              qrCodeData: qrResult.qrDataString
             });
             console.log(`✅ Generated and stored QR code for vendor: ${vendorName} (${vendor.email})`);
           } catch (saveError) {
@@ -2419,8 +2210,7 @@ exports.sendQRCodesToVendors = async (req, res) => {
               vendor: vendor,
               vendorRequest: vendorRequest,
               qrCode: qrResult.qrCodeDataUrl,
-              qrCodeData: qrResult.qrDataString,
-              attendeeQRCodes: attendeeQRCodes
+              qrCodeData: qrResult.qrDataString
             });
             console.log(`⚠️ Continuing without saving QR code to database for vendor: ${vendorName}`);
           }
@@ -2501,7 +2291,7 @@ exports.sendQRCodesToVendors = async (req, res) => {
     const uniqueVendors = [];
     const results = [];
 
-    for (const vr of filteredVendorRequests) {
+    for (const vr of vendorRequests) {
       const v = vr.vendor;
       if (!v) continue;
       const emailKey = v.email ? String(v.email).toLowerCase().trim() : null;
@@ -2525,21 +2315,7 @@ exports.sendQRCodesToVendors = async (req, res) => {
             qrCodeData: vendorQRData.qrCodeData
           };
           
-          // For platform booths, include attendee QR codes
-          const attendeeQRCodes = vendorQRData.attendeeQRCodes || [];
-          
-          console.log(`📧 Sending QR codes to vendor ${vendor.email}...`);
-          console.log(`  - Has vendor QR: ${!!vendorQRCode.qrCode}`);
-          console.log(`  - Has attendee QR codes: ${attendeeQRCodes.length > 0} (${attendeeQRCodes.length} codes)`);
-          
-          // Vendors should NOT receive participant registrations - only their own QR code and their attendees' QR codes
-          const result = await sendQRCodesToVendor(vendor, event, [], vendorQRCode, attendeeQRCodes);
-          console.log(`📧 Email send result for ${vendor.email}:`, {
-            sent: result.sent,
-            stored: result.stored,
-            error: result.error || result.reason
-          });
-          
+          const result = await sendQRCodesToVendor(vendor, event, registrationsWithQR, vendorQRCode);
           results.push({
             vendorEmail: vendor.email,
             vendorName: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim(),
@@ -2550,11 +2326,6 @@ exports.sendQRCodesToVendors = async (req, res) => {
         } catch (error) {
           console.error(`❌ Error sending QR codes to vendor ${vendor.email}:`, error);
           console.error('Error stack:', error.stack);
-          console.error('Error details:', {
-            message: error.message,
-            name: error.name,
-            code: error.code
-          });
           results.push({
             vendorEmail: vendor.email,
             vendorName: vendor.companyName || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim(),
@@ -2787,10 +2558,9 @@ exports.payForEvent = async (req, res) => {
       }
 
         // Send receipt email
-      console.log('📧 Sending receipt email for wallet payment...');
       try {
         const userName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
-        const emailResult = await sendReceiptEmail(
+        await sendReceiptEmail(
           user.email,
           userName,
           event.title,
@@ -2798,18 +2568,8 @@ exports.payForEvent = async (req, res) => {
           'wallet',
           new Date()
         );
-        if (emailResult.sent) {
-          console.log('✅ Receipt email sent successfully to:', user.email);
-        } else {
-          console.error('❌ Receipt email not sent:', emailResult.reason || emailResult.error);
-          if (emailResult.reason === 'SMTP not configured') {
-            console.error('   ⚠️  Please configure SMTP settings in .env file');
-          }
-        }
       } catch (emailError) {
-        console.error('❌ Exception while sending receipt email:', emailError);
-        console.error('   Error details:', emailError.message);
-        // Don't fail the whole process if email fails
+        console.error('❌ Failed to send receipt email:', emailError);
       }
 
         return res.status(200).json({
@@ -2947,21 +2707,6 @@ exports.cancelRegistration = async (req, res) => {
         success: false,
         msg: "Cannot cancel registration for an event that has already started"
       });
-    }
-
-    // Check if less than 2 weeks remain until event start
-    if (event.startDate) {
-      const eventStartDate = new Date(event.startDate);
-      const now = new Date();
-      const twoWeeksInMs = 14 * 24 * 60 * 60 * 1000; // 14 days in milliseconds
-      const timeUntilEvent = eventStartDate.getTime() - now.getTime();
-      
-      if (timeUntilEvent < twoWeeksInMs && timeUntilEvent > 0) {
-        return res.status(400).json({ 
-          success: false,
-          msg: "Cannot cancel registration. Less than 2 weeks remain until the event starts."
-        });
-      }
     }
 
     // Find payment if exists - try multiple ways

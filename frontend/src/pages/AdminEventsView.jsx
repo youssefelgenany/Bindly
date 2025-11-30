@@ -276,27 +276,11 @@ const AdminEventsView = () => {
   }, [events]);
 
   // Get unique professors from workshops and conferences
-  // Includes both creatorName and professors from the professors array
   const availableProfessors = React.useMemo(() => {
     const profs = new Set();
     events.forEach(event => {
-      if (event.type === 'workshop' || event.type === 'conference') {
-        // Add creator name if available
-        if (event.creatorName && event.creatorName.trim()) {
-          profs.add(event.creatorName.trim());
-        }
-        // Add professors from the professors array
-        if (event.professors) {
-          if (Array.isArray(event.professors)) {
-            event.professors.forEach(prof => {
-              if (prof && typeof prof === 'string' && prof.trim()) {
-                profs.add(prof.trim());
-              }
-            });
-          } else if (typeof event.professors === 'string' && event.professors.trim()) {
-            profs.add(event.professors.trim());
-          }
-        }
+      if ((event.type === 'workshop' || event.type === 'conference') && event.creatorName) {
+        profs.add(event.creatorName);
       }
     });
     return Array.from(profs).sort();
@@ -339,26 +323,10 @@ const AdminEventsView = () => {
     if (!typeMatch) return false;
     
     // Filter by professor name (for workshops and conferences)
-    // Checks both creatorName and professors array
     if (professorNameFilter.trim()) {
       const profFilter = professorNameFilter.trim().toLowerCase();
       const creatorName = (event.creatorName || event.professorName || '').toLowerCase();
-      
-      // Check if creator name matches
-      let matches = creatorName.includes(profFilter);
-      
-      // If not matched, check professors array
-      if (!matches && event.professors) {
-        if (Array.isArray(event.professors)) {
-          matches = event.professors.some(prof => 
-            prof && typeof prof === 'string' && prof.toLowerCase().includes(profFilter)
-          );
-        } else if (typeof event.professors === 'string') {
-          matches = event.professors.toLowerCase().includes(profFilter);
-        }
-      }
-      
-      if (!matches) return false;
+      if (!creatorName.includes(profFilter)) return false;
     }
     
     // Filter by location
@@ -1179,11 +1147,11 @@ const AdminEventsView = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+          borderBottom: '1px solid #e2e8f0',
           padding: '1rem 2.5rem',
-          backgroundColor: '#1D3557'
+          backgroundColor: '#FFFFFF'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               style={{
@@ -1194,7 +1162,7 @@ const AdminEventsView = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF'
+                color: '#1D3557'
               }}
               aria-label="Toggle sidebar"
             >
@@ -1203,7 +1171,7 @@ const AdminEventsView = () => {
               </span>
             </button>
             <h2 style={{
-              color: '#FFFFFF',
+              color: '#1D3557',
               fontSize: '1.5rem',
               fontWeight: '700',
               lineHeight: '1.25',
@@ -1218,14 +1186,14 @@ const AdminEventsView = () => {
               <p style={{
                 fontSize: '0.875rem',
                 fontWeight: '600',
-                color: '#FFFFFF',
+                color: '#1D3557',
                 margin: 0
               }}>
                 {displayName}
               </p>
               <p style={{
                 fontSize: '0.75rem',
-                color: 'rgba(255, 255, 255, 0.7)',
+                color: '#6b7280',
                 margin: 0
               }}>
                 Admin
@@ -1247,11 +1215,11 @@ const AdminEventsView = () => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#FFFFFF',
+                backgroundColor: '#1D3557',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#1D3557',
+                color: '#FFFFFF',
                 fontWeight: '600'
               }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'E').toUpperCase()}
@@ -1268,32 +1236,13 @@ const AdminEventsView = () => {
           backgroundColor: '#f6f7f8'
         }}>
           {/* Page Title Banner */}
-          <style>{`
-            @keyframes fadeInUp {
-              from { opacity: 0; transform: translateY(20px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-            @keyframes float {
-              0%, 100% { transform: translateY(0px); }
-              50% { transform: translateY(-10px); }
-            }
-            @keyframes pulse {
-              0%, 100% { transform: scale(1); opacity: 1; }
-              50% { transform: scale(1.05); opacity: 0.9; }
-            }
-            @keyframes slideInRight {
-              from { opacity: 0; transform: translateX(30px); }
-              to { opacity: 1; transform: translateX(0); }
-            }
-          `}</style>
           <div style={{
             position: 'relative',
             height: '140px',
             borderRadius: '0.75rem',
             overflow: 'hidden',
             marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-            animation: 'fadeInUp 0.6s ease-out'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
           }}>
             {/* Background Image */}
             <div style={{
@@ -1303,37 +1252,13 @@ const AdminEventsView = () => {
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
-              filter: 'blur(2px)',
-              animation: 'pulse 4s ease-in-out infinite'
+              filter: 'blur(2px)'
             }}></div>
             {/* Blue Overlay */}
             <div style={{
               position: 'absolute',
               inset: 0,
               backgroundColor: 'rgba(29, 53, 87, 0.75)'
-            }}></div>
-            {/* Floating Decorative Elements */}
-            <div style={{
-              position: 'absolute',
-              top: '20px',
-              right: '50px',
-              width: '60px',
-              height: '60px',
-              borderRadius: '50%',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              animation: 'float 3s ease-in-out infinite',
-              zIndex: 5
-            }}></div>
-            <div style={{
-              position: 'absolute',
-              bottom: '30px',
-              right: '100px',
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              backgroundColor: 'rgba(255, 255, 255, 0.15)',
-              animation: 'float 2.5s ease-in-out infinite 0.5s',
-              zIndex: 5
             }}></div>
             {/* Content */}
             <div style={{
@@ -1352,8 +1277,7 @@ const AdminEventsView = () => {
                 fontSize: '1.75rem',
                 fontWeight: '700',
                 margin: 0,
-                marginBottom: '0.5rem',
-                animation: 'slideInRight 0.8s ease-out'
+                marginBottom: '0.5rem'
               }}>
                 All Events
               </h3>
@@ -1361,7 +1285,6 @@ const AdminEventsView = () => {
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '0.875rem',
                 fontWeight: '400',
-                animation: 'slideInRight 0.8s ease-out 0.2s both',
                 margin: 0
               }}>
                 View, manage, and track all scheduled university events.
@@ -1970,17 +1893,14 @@ const AdminEventsView = () => {
                                     </div>
                                   )}
 
-                                  {/* Professor(s) participating (for workshops) */}
-                                  {event.type === 'workshop' && (event.professors || event.creatorName) && (
+                                  {/* Professor (for workshops) */}
+                                  {event.type === 'workshop' && (event.creatorName || event.professors) && (
                                     <div>
                                       <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Professor(s) participating
+                                        Professor
                                       </h4>
                                       <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {event.professors 
-                                          ? (Array.isArray(event.professors) ? event.professors.join(', ') : event.professors)
-                                          : event.creatorName
-                                        }
+                                        {event.creatorName || event.professors}
                                       </p>
                                     </div>
                                   )}
@@ -2750,6 +2670,70 @@ const AdminEventsView = () => {
             }}>
               This action cannot be undone.
             </p>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#1F2937',
+                marginBottom: '0.75rem'
+              }}>
+                Reason for removing this comment
+              </p>
+              <label style={{
+                display: 'flex',
+                gap: '0.5rem',
+                alignItems: 'flex-start',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                border: commentDeleteReason === 'inappropriate' ? '1px solid #1D3557' : '1px solid #E5E7EB',
+                marginBottom: '0.75rem',
+                cursor: 'pointer',
+                backgroundColor: commentDeleteReason === 'inappropriate' ? '#F8FAFC' : '#FFFFFF'
+              }}>
+                <input
+                  type="radio"
+                  name="comment-delete-reason"
+                  value="inappropriate"
+                  checked={commentDeleteReason === 'inappropriate'}
+                  onChange={() => setCommentDeleteReason('inappropriate')}
+                  style={{ marginTop: '0.25rem' }}
+                />
+                <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+                  Inappropriate / violates community guidelines
+                  <br />
+                  <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
+                    Sends a warning email to the attendee (Student, Staff, TA, Professor)
+                  </span>
+                </span>
+              </label>
+              <label style={{
+                display: 'flex',
+                gap: '0.5rem',
+                alignItems: 'flex-start',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                border: commentDeleteReason === 'general' ? '1px solid #1D3557' : '1px solid #E5E7EB',
+                cursor: 'pointer',
+                backgroundColor: commentDeleteReason === 'general' ? '#F8FAFC' : '#FFFFFF'
+              }}>
+                <input
+                  type="radio"
+                  name="comment-delete-reason"
+                  value="general"
+                  checked={commentDeleteReason === 'general'}
+                  onChange={() => setCommentDeleteReason('general')}
+                  style={{ marginTop: '0.25rem' }}
+                />
+                <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+                  General cleanup (spam, duplicates, admin request)
+                  <br />
+                  <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
+                    Removes the comment without emailing the participant
+                  </span>
+                </span>
+              </label>
+            </div>
 
             {/* Buttons */}
             <div style={{

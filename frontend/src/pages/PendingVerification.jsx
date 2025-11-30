@@ -1,163 +1,182 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const PendingVerification = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [isChecking, setIsChecking] = useState(false);
-  const hasChecked = useRef(false);
 
-  // Check verification status manually
-  const checkVerificationStatus = async () => {
-    if (!user) return;
-    
-    setIsChecking(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/auth/me', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const userData = await response.json();
-        if (userData.user.isVerified) {
-          // User is now verified, redirect based on user type
-          if (userData.user.userType === 'Vendor') {
-            navigate('/vendor');
-          } else {
-            navigate('/dashboard');
-          }
-        }
-      } else if (response.status === 401) {
-        // Token expired or invalid, redirect to login
-        navigate('/login');
-      }
-    } catch (error) {
-      console.error('Error checking verification status:', error);
-    } finally {
-      setIsChecking(false);
-    }
-  };
-
-  // Check status only once on mount
+  // Redirect if already verified
   useEffect(() => {
-    // Prevent multiple calls
-    if (hasChecked.current) return;
-    hasChecked.current = true;
-
-    // Immediate redirect if already verified and active in current context
     if (user && user.isVerified && (user.status === 'active' || !user.status)) {
       if (user.userType === 'Vendor') {
         navigate('/vendor');
       } else {
         navigate('/dashboard');
       }
-      return;
     }
-
-    // Check once on mount
-    checkVerificationStatus();
   }, [user, navigate]);
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, var(--light-gray) 0%, #E9ECEF 100%)',
-      padding: '2rem',
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      overflow: 'auto'
+    <div style={{
+      position: 'relative',
+      display: 'flex',
+      height: '100vh',
+      width: '100%',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      backgroundColor: '#FFFFFF',
+      fontFamily: 'Manrope, sans-serif'
     }}>
-      <div className="card" style={{
-        maxWidth: '500px',
+      <div style={{
+        display: 'flex',
+        height: '100vh',
         width: '100%',
-        textAlign: 'center'
+        flexDirection: 'column',
+        overflow: 'hidden'
       }}>
-        <div className="card-header">
-          {/* Title */}
-          <h1 className="card-title">
-            Account Pending Verification
-          </h1>
-
-          {/* Message */}
-          <p className="card-subtitle" style={{
-            fontSize: '1.1rem',
-            lineHeight: '1.6',
-            marginBottom: '2rem'
+        {/* Main Content */}
+        <div style={{
+          display: 'flex',
+          width: '100%',
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#FFFFFF',
+          padding: '1.5rem',
+          overflowY: 'auto',
+          overflowX: 'hidden'
+        }}>
+          <div style={{
+            display: 'flex',
+            width: '100%',
+            maxWidth: '28rem',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '1.25rem',
+            textAlign: 'center'
           }}>
-            Hello <strong>{user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.name || 'User'}</strong>!<br/>
-            Your account has been created successfully, but it's currently pending verification by an administrator.
-          </p>
-        </div>
+            {/* Bindly Logo */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0.75rem'
+            }}>
+              <svg 
+                style={{ height: '2.5rem', width: '2.5rem', color: '#1D3557' }}
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="1.5" 
+                viewBox="0 0 24 24" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path 
+                  d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <p style={{
+                fontFamily: 'Manrope, sans-serif',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                letterSpacing: '-0.025em',
+                color: '#1D3557',
+                margin: 0
+              }}>
+                Bindly
+              </p>
+            </div>
+            
+            {/* Envelope Icon */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '4rem',
+              height: '4rem',
+              borderRadius: '50%',
+              backgroundColor: '#E8F4F8',
+              border: '2px solid #457B9D',
+              marginTop: '0.5rem'
+            }}>
+              <svg 
+                style={{ width: '2rem', height: '2rem', color: '#1D3557' }}
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" 
+                />
+              </svg>
+            </div>
 
-        {/* Check Status Button */}
-        <div style={{
-          textAlign: 'center',
-          marginTop: '2rem'
-        }}>
-          <button
-            onClick={checkVerificationStatus}
-            disabled={isChecking}
-            className="btn btn-primary"
-            style={{
-              marginRight: '1rem',
-              padding: '12px 24px',
-              fontSize: '1rem',
-              fontWeight: '500'
-            }}
-          >
-            {isChecking ? 'Checking...' : 'Check Verification Status'}
-          </button>
-        </div>
+            {/* Title */}
+            <h1 style={{
+              fontFamily: 'Manrope, sans-serif',
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              letterSpacing: '-0.025em',
+              color: '#1D3557',
+              margin: 0
+            }}>
+              Account Pending Verification
+            </h1>
 
-        {/* Login Link */}
-        <div style={{
-          textAlign: 'center',
-          marginTop: '1rem'
-        }}>
-          <a 
-            href="/login" 
-            style={{
-              color: 'var(--guc-red)',
-              textDecoration: 'none',
-              fontSize: '1.1rem',
-              fontWeight: '500',
-              borderBottom: '2px solid var(--guc-red)',
-              paddingBottom: '2px',
-              transition: 'all 0.3s ease'
-            }}
-            onMouseOver={(e) => {
-              e.target.style.color = 'var(--charcoal-black)';
-              e.target.style.borderBottomColor = 'var(--charcoal-black)';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.color = 'var(--guc-red)';
-              e.target.style.borderBottomColor = 'var(--guc-red)';
-            }}
-          >
-            Go to Login Page
-          </a>
-        </div>
+            {/* Instructional Text */}
+            <p style={{
+              fontSize: '0.9375rem',
+              color: '#4B5563',
+              margin: 0,
+              lineHeight: '1.5',
+              maxWidth: '24rem',
+              padding: '0 0.5rem'
+            }}>
+              Account pending verification. Check your email within the next 24 hours.
+            </p>
 
-        {/* Manual check notice */}
-        <p style={{
-          color: 'var(--text-light)',
-          fontSize: '0.9rem',
-          marginTop: '2rem',
-          fontStyle: 'italic'
-        }}>
-          Click "Check Verification Status" to see if your account has been verified
-        </p>
+            {/* Information Alert Box */}
+            <div style={{
+              width: '100%',
+              backgroundColor: '#E8F4F8',
+              border: '1px solid #457B9D',
+              borderRadius: '0.5rem',
+              padding: '0.875rem',
+              display: 'flex',
+              gap: '0.75rem',
+              alignItems: 'flex-start',
+              textAlign: 'left'
+            }}>
+              <svg 
+                style={{ width: '1.125rem', height: '1.125rem', color: '#1D3557', flexShrink: 0, marginTop: '0.125rem' }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <p style={{
+                fontSize: '0.8125rem',
+                color: '#1D3557',
+                margin: 0,
+                lineHeight: '1.4'
+              }}>
+                Your account is pending admin verification. Once verified, you will receive an email with a verification link. Check your email within the next 24 hours.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

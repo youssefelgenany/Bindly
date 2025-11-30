@@ -62,6 +62,9 @@ const signup = async (req, res) => {
       });
     }
 
+    // Force email to lowercase
+    const normalizedEmail = String(email).toLowerCase().trim();
+
     // First name and last name are only required for non-vendors
     if (userType !== 'Vendor' && (!firstName || !lastName)) {
       return res.status(400).json({
@@ -70,25 +73,9 @@ const signup = async (req, res) => {
       });
     }
 
-    // Normalize email to lowercase for case-insensitive handling
-    const normalizedEmail = email.toLowerCase().trim();
-    
-    // Check for existing user with normalized email (now stored in lowercase)
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(409).json({ success: false, message: 'User with this email already exists' });
-    }
-
-    // Clean up any orphaned registrations for this email (in case old account was deleted)
-    // This ensures a fresh start for new accounts with the same email
-    try {
-      const { cleanupUserRegistrations } = require('../utils/cleanupUserRegistrations');
-      // Pass null for userId since user doesn't exist yet, but clean up by email
-      await cleanupUserRegistrations(null, normalizedEmail);
-      console.log('🧹 Cleaned up any orphaned registrations for email:', normalizedEmail);
-    } catch (cleanupError) {
-      // Don't fail signup if cleanup fails, just log it
-      console.warn('⚠️ Warning: Could not clean up orphaned registrations during signup:', cleanupError.message);
     }
 
     // GUC email validation for academic users
@@ -105,20 +92,26 @@ const signup = async (req, res) => {
     const userData = {
       email: normalizedEmail,
       password,
-      userType,
       // Do not auto-verify users on signup. Users must click the verification
       // link sent to their email to be marked verified. This ensures login
       // fails for unverified accounts until email confirmation.
-      isVerified: false,
-      status: 'blocked'
+      isVerified: false
     };
 
-    // Students still get a verification token so we can email them a confirmation link
-    if (userType === 'Student') {
-      userData.verificationToken = crypto.randomBytes(32).toString('hex');
-      userData.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      console.log('🔑 Generated verification token for student:', userData.verificationToken);
-      console.log('📧 Email for token:', email);
+    // For Staff/TA/Professor: Don't set userType on signup - admin will assign it later
+    // This keeps them in "Pending Verification" until admin assigns role
+    if (['Staff', 'TA', 'Professor'].includes(userType)) {
+      // Don't set userType - will be set when admin assigns role
+      // No verification token - will be created when admin assigns role
+    } else {
+      // For Students and Vendors: set userType immediately
+      userData.userType = userType;
+      
+      // Generate verification token only for Students during signup
+      if (userType === 'Student') {
+        userData.verificationToken = crypto.randomBytes(32).toString('hex');
+        userData.verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      }
     }
 
     // Add first and last name only for non-vendors
@@ -128,7 +121,7 @@ const signup = async (req, res) => {
       userData.lastName = lastName;
     }
 
-    // Add GUC ID for academic users
+    // Add GUC ID for academic users (including Staff/TA/Professor even though userType not set yet)
     if (['Student', 'Staff', 'TA', 'Professor'].includes(userType)) {
       if (!gucId) {
         return res.status(400).json({
@@ -166,11 +159,6 @@ const signup = async (req, res) => {
     await newUser.save();
 
     console.log('User created successfully:', newUser._id);
-    console.log('📝 Saved user email:', newUser.email);
-    if (newUser.verificationToken) {
-      console.log('📝 Saved verification token:', newUser.verificationToken);
-      console.log('📝 Token expires at:', newUser.verificationExpiresAt);
-    }
 
     const userResponse = {
       id: newUser._id,
@@ -205,9 +193,15 @@ const signup = async (req, res) => {
 
     // Determine response message based on user type
     const isReady = Boolean(newUser.isVerified && String(newUser.status) === 'active');
-    let responseMessage = isReady
-      ? 'Account created successfully.'
-      : 'Account created successfully. Your account is pending admin verification. You will receive an email once verified.';
+    let responseMessage;
+    if (['Staff', 'TA', 'Professor'].includes(userType)) {
+      // Staff/TA/Professor: waiting for admin to assign role
+      responseMessage = 'Account created successfully. Your account is pending admin verification. You will receive an email once your role is assigned.';
+    } else if (isReady) {
+      responseMessage = 'Account created successfully.';
+    } else {
+      responseMessage = 'Account created successfully. Please check your email to verify your account.';
+    }
 
     const responseBody = {
       success: true,
@@ -217,18 +211,17 @@ const signup = async (req, res) => {
       requiresVerification: !isReady
     };
 
-    // Fire off the verification email for students so they still confirm their inbox
-    if (newUser.userType === 'Student') {
-      const studentName = `${newUser.firstName} ${newUser.lastName || ''}`.trim() || newUser.email;
-      console.log('📧 Sending verification email to student:', newUser.email);
-      console.log('🔑 Using verification token:', newUser.verificationToken);
-      const emailResult = await sendVerificationEmail(newUser.email, newUser.verificationToken, studentName);
+    // Send verification email only for Students during signup
+    // Staff/TA/Professor will receive email when admin assigns their role
+    if (userType === 'Student' && newUser.verificationToken) {
+      const userName = `${newUser.firstName} ${newUser.lastName || ''}`.trim() || newUser.email;
+      const emailResult = await sendVerificationEmail(newUser.email, newUser.verificationToken, userName);
       responseBody.verificationEmailSent = emailResult.sent;
       responseBody.verificationLink = emailResult.verificationUrl || emailResult.verifyUrl || null;
       if (!emailResult.sent) {
-        console.warn('Student verification email failed to send:', newUser.email);
+        console.warn(`Verification email failed to send for Student:`, newUser.email);
       } else {
-        console.log('✅ Verification email sent with token:', newUser.verificationToken);
+        console.log(`✅ Verification email sent to Student:`, newUser.email);
       }
     }
 
@@ -269,16 +262,13 @@ const login = async (req, res) => {
 
     console.log("Login attempt for email:", email);
 
-    // Normalize email to lowercase for case-insensitive lookup (emails are stored in lowercase)
-    const normalizedEmail = email.toLowerCase().trim();
-    let user = await User.findOne({ email: normalizedEmail });
+    // Try to find user in User model first
+    let user = await User.findOne({ email });
     console.log("User found in User model:", user ? 'Yes' : 'No');
 
-    // If not found in User model, try Admin model (case-insensitive)
+    // If not found in User model, try Admin model
     if (!user) {
-      user = await Admin.findOne({ 
-        email: { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
-      });
+      user = await Admin.findOne({ email });
       console.log("User found in Admin model:", user ? 'Yes' : 'No');
     }
 
@@ -325,7 +315,7 @@ const login = async (req, res) => {
 
       // Different message for students (email verification) vs other users (admin verification)
       const message = user.userType === 'Student'
-        ? 'Account pending verification. Kindly check your email.'
+        ? 'Please verify your email address to login. Check your inbox for the verification link.'
         : 'Your account is pending admin verification. You will receive an email once verified.';
 
       return res.status(403).json({
@@ -377,130 +367,23 @@ const login = async (req, res) => {
 // ==================== VERIFY EMAIL ====================
 async function verifyEmail(req, res) {
   try {
-    let { token } = req.query;
-    const redirectParam = String(req.query.redirect || 'true').toLowerCase();
-    const isJsonResponse = redirectParam === 'false' || redirectParam === '0';
-    
-    if (!token) {
-      const errorMessage = 'Invalid verification link';
-      if (isJsonResponse) {
-        return res.status(400).json({ success: false, message: errorMessage });
-      }
-      return res.status(400).send(errorMessage);
-    }
-    
-    // Ensure token is a string and trim any whitespace
-    token = String(token).trim();
+    const { token } = req.query;
+    if (!token) return res.status(400).send('Invalid verification link');
     console.log('🔍 verifyEmail called with token:', token);
-    console.log('🔍 Token length:', token?.length);
-    console.log('🔍 Token type:', typeof token);
 
-    // Check if token exists and is not expired
-    let user = await User.findOne({ verificationToken: token, verificationExpiresAt: { $gt: new Date() } });
-    
+    const user = await User.findOne({ verificationToken: token, verificationExpiresAt: { $gt: new Date() } });
     if (!user) {
-      // Check if token exists but is expired
-      const expiredUser = await User.findOne({ verificationToken: token });
-      if (expiredUser) {
-        console.warn('⚠️ verifyEmail: Token expired for user:', expiredUser.email);
-        console.warn('⚠️ Token in DB:', expiredUser.verificationToken);
-        console.warn('⚠️ Expires at:', expiredUser.verificationExpiresAt);
-        const errorMessage = 'Verification link has expired. Please request a new verification email.';
-        if (isJsonResponse) {
-          return res.status(400).json({ success: false, message: errorMessage });
-        }
-        return res.status(400).send(errorMessage);
-      }
-      
-      // Debug: Check all users with similar emails to see if there's a case mismatch
-      const normalizedToken = token.toLowerCase();
-      const userWithSimilarToken = await User.findOne({ 
-        verificationToken: { $regex: new RegExp(normalizedToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }
-      });
-      if (userWithSimilarToken) {
-        console.warn('⚠️ Found user with case-different token:', userWithSimilarToken.email);
-        console.warn('⚠️ DB token:', userWithSimilarToken.verificationToken);
-        console.warn('⚠️ Provided token:', token);
-      }
-      // Debug: List all unverified students to see what tokens exist
-      const allUnverifiedStudents = await User.find({ 
-        userType: 'Student', 
-        isVerified: false,
-        verificationToken: { $exists: true, $ne: null }
-      }).select('email verificationToken verificationExpiresAt').limit(5);
-      console.warn('⚠️ Recent unverified students:', allUnverifiedStudents.map(u => ({
-        email: u.email,
-        token: u.verificationToken?.substring(0, 20) + '...',
-        expires: u.verificationExpiresAt
-      })));
-      
-      // Check if there's a user with this email who might need a new verification email
-      // Extract email from query if available, or check all recent unverified students
-      const emailFromQuery = req.query.email;
-      if (emailFromQuery) {
-        // Normalize email to lowercase (emails are stored in lowercase)
-        const normalizedQueryEmail = emailFromQuery.toLowerCase().trim();
-        const userByEmail = await User.findOne({ 
-          email: normalizedQueryEmail,
-          userType: 'Student'
-        });
-        if (userByEmail) {
-          if (userByEmail.isVerified) {
-            // User is already verified, return success instead of error
-            console.log('✅ User already verified:', userByEmail.email);
-            const determineFrontendOrigin = async () => {
-              if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL.replace(/\/+$/, '');
-              const referer = req.get('Referer') || req.get('Origin');
-              if (referer) {
-                try {
-                  const urlObj = new URL(referer);
-                  return urlObj.origin;
-                } catch (e) {}
-              }
-              return 'http://localhost:3000';
-            };
-            const frontendOrigin = await determineFrontendOrigin();
-            const loginUrl = frontendOrigin + '/login';
-            if (isJsonResponse) {
-              return res.json({ success: true, message: 'Email already verified', alreadyVerified: true, loginUrl });
-            }
-            return res.redirect(loginUrl);
-          } else {
-            console.warn('⚠️ Found unverified student with this email:', userByEmail.email);
-            console.warn('⚠️ Their current token:', userByEmail.verificationToken?.substring(0, 20) + '...');
-            const errorMessage = 'This verification link is invalid or expired. Please sign up again to receive a new verification email.';
-            if (isJsonResponse) {
-              return res.status(400).json({ success: false, message: errorMessage });
-            }
-            return res.status(400).send(errorMessage);
-          }
-        }
-      }
-      
-      console.warn('⚠️ verifyEmail: No user found matching token (invalid)');
-      const errorMessage = 'Verification link is invalid or expired. Please sign up again to receive a new verification email.';
-      if (isJsonResponse) {
-        return res.status(400).json({ success: false, message: errorMessage });
-      }
-      return res.status(400).send(errorMessage);
+      console.warn('⚠️ verifyEmail: No user found matching token (invalid/expired)');
+      return res.status(400).send('Verification link is invalid or expired');
     }
 
-    console.log(`🔐 verifyEmail: Found user ${user.email} (isVerified=${user.isVerified}, status=${user.status}) - verifying now`);
+    console.log(`🔐 verifyEmail: Found user ${user.email} (isVerified=${user.isVerified}) - verifying now`);
 
     user.isVerified = true;
     user.verificationToken = null;
     user.verificationExpiresAt = null;
 
-    // Set status to active after verification for students and Staff/TA/Professor
-    if (user.status === 'blocked') {
-      if (user.userType === 'Student' || ['Staff', 'TA', 'Professor'].includes(user.userType)) {
-        user.status = 'active';
-        console.log(`✅ verifyEmail: Setting status to 'active' for ${user.userType}`);
-      }
-    }
-
     await user.save();
-    console.log(`✅ verifyEmail: User ${user.email} verified successfully (isVerified=${user.isVerified}, status=${user.status})`);
 
     // Determine the frontend login URL to redirect to.
     // Priority:
@@ -556,7 +439,8 @@ async function verifyEmail(req, res) {
     // If the client requested no redirect (e.g., frontend calling via XHR),
     // return JSON indicating success and include the login URL. Otherwise,
     // perform the existing redirect so email clicks still work.
-    if (isJsonResponse) {
+    const redirectParam = String(req.query.redirect || 'true').toLowerCase();
+    if (redirectParam === 'false' || redirectParam === '0') {
       return res.json({ success: true, message: 'User verified', loginUrl });
     }
 
@@ -601,9 +485,7 @@ async function resendVerification(req, res) {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
-    // Normalize email to lowercase (emails are stored in lowercase)
-    const normalizedEmail = email.toLowerCase().trim();
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     
     // Allow resending for all user types that need verification (Student, Staff, TA, Professor)
@@ -675,17 +557,14 @@ const updateProfile = async (req, res) => {
       });
     }
 
-    // Check if email is already taken by another user (normalize to lowercase)
-    if (email) {
-      const normalizedNewEmail = email.toLowerCase().trim();
-      if (normalizedNewEmail !== user.email) {
-        const existingUser = await User.findOne({ email: normalizedNewEmail });
-        if (existingUser) {
-          return res.status(400).json({
-            success: false,
-            message: 'Email is already taken by another user'
-          });
-        }
+    // Check if email is already taken by another user
+    if (email !== user.email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email is already taken by another user'
+        });
       }
     }
 

@@ -18,66 +18,53 @@ async function sendGymCancellationEmail(email, name, sessionType, sessionDate, s
   });
 
   const html = `
-    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; background-color: #f6f7f8;">
-      <!-- Header -->
-      <div style="background-color: #1D3557; padding: 30px 20px; text-align: center;">
-        <h1 style="color: #FFFFFF; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Bindly</h1>
-        <p style="color: rgba(255, 255, 255, 0.8); margin: 8px 0 0 0; font-size: 14px;">GUC Events Platform</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #d32f2f; margin: 0;">Bindly</h1>
+        <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
       </div>
       
-      <!-- Content Container -->
-      <div style="background-color: #FFFFFF; margin: 20px; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
-        <!-- Alert Box -->
-        <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-          <h2 style="color: #1D3557; margin: 0 0 10px 0; font-size: 20px; font-weight: 600;">Gym Session Cancelled</h2>
-          <p style="color: #1D3557; margin: 8px 0; font-size: 14px; line-height: 1.6;">Hi ${name || 'there'},</p>
-          <p style="color: #1D3557; margin: 8px 0 0 0; font-size: 14px; line-height: 1.6;">We regret to inform you that a gym session you registered for has been cancelled.</p>
-        </div>
+      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <h2 style="color: #333; margin-top: 0;">Gym Session Cancelled</h2>
+        <p>Hi ${name || 'there'},</p>
+        <p>We regret to inform you that a gym session you registered for has been cancelled.</p>
+      </div>
 
-        <!-- Session Details Table -->
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
-          <tr>
-            <td style="padding: 14px 16px; background: #1D3557; color: #FFFFFF; font-weight: 600; font-size: 14px; border: none;">Session Type</td>
-            <td style="padding: 14px 16px; background: #f6f7f8; color: #1D3557; font-size: 14px; border: none;">${sessionType ? sessionType.charAt(0).toUpperCase() + sessionType.slice(1) : 'Gym Session'}</td>
-          </tr>
-          <tr>
-            <td style="padding: 14px 16px; background: #1D3557; color: #FFFFFF; font-weight: 600; font-size: 14px; border: none;">Date</td>
-            <td style="padding: 14px 16px; background: #f6f7f8; color: #1D3557; font-size: 14px; border: none;">${formattedDate}</td>
-          </tr>
-          <tr>
-            <td style="padding: 14px 16px; background: #1D3557; color: #FFFFFF; font-weight: 600; font-size: 14px; border: none;">Time</td>
-            <td style="padding: 14px 16px; background: #f6f7f8; color: #1D3557; font-size: 14px; border: none;">${sessionTime}</td>
-          </tr>
-          ${location ? `
-          <tr>
-            <td style="padding: 14px 16px; background: #1D3557; color: #FFFFFF; font-weight: 600; font-size: 14px; border: none;">Location</td>
-            <td style="padding: 14px 16px; background: #f6f7f8; color: #1D3557; font-size: 14px; border: none;">${location}</td>
-          </tr>
-          ` : ''}
-        </table>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background: white; border: 1px solid #e9ecef;">
+        <tr>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Session Type</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef;">${sessionType}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Date</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef;">${formattedDate}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Time</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef;">${sessionTime}</td>
+        </tr>
+        ${location ? `
+        <tr>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Location</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef;">${location}</td>
+        </tr>
+        ` : ''}
+      </table>
 
-        <!-- Cancellation Notice -->
-        <div style="background-color: #FFFFFF; border: 2px solid #1D3557; padding: 18px; border-radius: 8px; margin-bottom: 25px;">
-          <p style="margin: 0; color: #1D3557; font-size: 14px; line-height: 1.6;">
-            <strong style="font-size: 15px; color: #1D3557;">⚠️ Session Cancelled</strong><br>
-            Your registration for this gym session has been automatically cancelled. We apologize for any inconvenience this may cause.
-          </p>
-        </div>
-        
-        <!-- Footer -->
-        <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f6f7f8; color: #666; font-size: 14px; line-height: 1.6;">
-          <p style="margin: 0 0 15px 0;">You can browse other available gym sessions on the Bindly platform.</p>
-          <p style="margin: 0 0 15px 0;">If you have any questions, please contact the gym administration.</p>
-          <p style="margin: 20px 0 0 0; color: #1D3557;">
-            Best regards,<br>
-            <strong style="color: #1D3557; font-size: 15px;">The Bindly Team</strong>
-          </p>
-        </div>
+      <div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin-bottom: 20px;">
+        <p style="margin: 0; color: #856404;">
+          <strong>⚠️ Session Cancelled</strong><br>
+          Your registration for this gym session has been automatically cancelled. We apologize for any inconvenience this may cause.
+        </p>
       </div>
       
-      <!-- Bottom Spacer -->
-      <div style="padding: 20px; text-align: center; color: #999; font-size: 12px;">
-        <p style="margin: 0;">© ${new Date().getFullYear()} Bindly. All rights reserved.</p>
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+        <p>You can browse other available gym sessions on the Bindly platform.</p>
+        <p>If you have any questions, please contact the gym administration.</p>
+        <p style="margin-top: 20px;">
+          Best regards,<br>
+          <strong>The Bindly Team</strong>
+        </p>
       </div>
     </div>
   `;
@@ -107,7 +94,7 @@ async function sendGymCancellationEmail(email, name, sessionType, sessionDate, s
     console.log('✅ SMTP connection verified');
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || `Bindly <${process.env.SMTP_USER}>`,
+      from: process.env.SMTP_FROM || `Bindly <salma.husseinhassan@student.guc.edu.eg>`,
       to: email,
       subject: `Gym Session Cancelled - ${sessionType}`,
       html: html

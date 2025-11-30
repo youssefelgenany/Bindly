@@ -5,14 +5,9 @@ import axios from 'axios';
 const VerifyEmail = () => {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
-  const [userType, setUserType] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); // 'success' or 'error'
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  
-  // Check if user is Staff/TA/Professor (pending admin verification)
-  const isPendingAdminVerification = ['Staff', 'TA', 'Professor'].includes(userType);
 
   // Get email from URL params or localStorage
   useEffect(() => {
@@ -33,87 +28,21 @@ const VerifyEmail = () => {
           const verifyUrl = `${backendBase.replace(/\/+$/, '')}/api/auth/verify-email?token=${encodeURIComponent(tokenFromUrl)}&redirect=false`;
           const res = await axios.get(verifyUrl, { timeout: 10000 });
           if (res.data && res.data.success) {
-            // Check if already verified or just verified
-            if (res.data.alreadyVerified) {
-              setMessage('Email already verified! Redirecting to login...');
-            } else {
-              setMessage('Email verified successfully! Redirecting to login...');
-            }
+            setMessage('Email verified successfully! Redirecting to login...');
             setMessageType('success');
-            // Clear any previous error messages and success message
-            setShowSuccessMessage(false);
             // Small delay to let user read the message, then go to login
             setTimeout(() => {
-              window.location.href = res.data.loginUrl || (process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000') + '/login';
+              window.location.href = (process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000') + '/login';
             }, 900);
             return;
           } else {
-            // For any error response, redirect silently without showing error box
-            const errorMsg = res.data?.message || 'Verification failed.';
-            // Don't show error box, just redirect silently
-            setMessage('');
-            setMessageType('');
-            setShowSuccessMessage(false);
-            setTimeout(() => {
-              window.location.href = (process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000') + '/login';
-            }, 500);
-            return;
+            setMessage(res.data?.message || 'Verification failed.');
+            setMessageType('error');
           }
         } catch (err) {
-          let errMsg = 'Verification request failed';
-          
-          // Extract error message from response
-          if (err.response?.data) {
-            const data = err.response.data;
-            if (typeof data === 'string') {
-              errMsg = data;
-            } else if (data.message) {
-              errMsg = data.message;
-            } else {
-              errMsg = JSON.stringify(data);
-            }
-          } else if (err.message) {
-            errMsg = err.message;
-          }
-          
-          // Check if it's an expired token error - redirect silently without showing error
-          if (errMsg.toLowerCase().includes('expired')) {
-            // Don't show error, just redirect silently
-            setMessage('');
-            setMessageType('');
-            setShowSuccessMessage(false);
-            setTimeout(() => {
-              window.location.href = (process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000') + '/login';
-            }, 500);
-            return;
-          } else if (errMsg.toLowerCase().includes('already verified')) {
-            // User is already verified, show success and redirect
-            setMessage('Email already verified! Redirecting to login...');
-            setMessageType('success');
-            setTimeout(() => {
-              window.location.href = (process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000') + '/login';
-            }, 900);
-            return;
-          } else if (errMsg.toLowerCase().includes('invalid') && !errMsg.toLowerCase().includes('expired')) {
-            // For invalid links (but not expired), don't show error box - just redirect silently
-            // This prevents showing error when user clicks link after already verifying
-            setMessage('');
-            setMessageType('');
-            setShowSuccessMessage(false);
-            setTimeout(() => {
-              window.location.href = (process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000') + '/login';
-            }, 500);
-            return;
-          } else {
-            // For any other errors, redirect silently without showing error box
-            setMessage('');
-            setMessageType('');
-            setShowSuccessMessage(false);
-            setTimeout(() => {
-              window.location.href = (process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000') + '/login';
-            }, 500);
-            return;
-          }
+          const errMsg = err.response?.data || err.message || 'Verification request failed';
+          setMessage(typeof errMsg === 'string' ? errMsg : (errMsg.message || JSON.stringify(errMsg)));
+          setMessageType('error');
         } finally {
           setLoading(false);
         }
@@ -122,26 +51,54 @@ const VerifyEmail = () => {
       return; // don't continue with the rest of the effect
     }
     const emailFromStorage = localStorage.getItem('pendingVerificationEmail');
-    const userTypeFromUrl = searchParams.get('userType');
-    const userTypeFromStorage = localStorage.getItem('pendingVerificationUserType');
     
     if (emailFromUrl) {
       setEmail(emailFromUrl);
       localStorage.setItem('pendingVerificationEmail', emailFromUrl);
-      // Show success message if coming from signup (email in URL means fresh signup)
-      setShowSuccessMessage(true);
     } else if (emailFromStorage) {
       setEmail(emailFromStorage);
     }
-    
-    if (userTypeFromUrl) {
-      setUserType(userTypeFromUrl);
-      localStorage.setItem('pendingVerificationUserType', userTypeFromUrl);
-    } else if (userTypeFromStorage) {
-      setUserType(userTypeFromStorage);
-    }
   }, [searchParams]);
 
+  const handleResendEmail = async () => {
+    const emailToUse = email || localStorage.getItem('pendingVerificationEmail');
+    
+    if (!emailToUse) {
+      const userEmail = prompt('Please enter your email address:');
+      if (!userEmail) {
+        setMessage('Email is required to resend verification email.');
+        setMessageType('error');
+        return;
+      }
+      setEmail(userEmail);
+      localStorage.setItem('pendingVerificationEmail', userEmail);
+    }
+
+    setLoading(true);
+    setMessage('');
+    setMessageType('');
+
+    try {
+      const emailForRequest = email || localStorage.getItem('pendingVerificationEmail');
+      const response = await axios.post('http://localhost:5000/api/auth/resend-verification', {
+        email: emailForRequest
+      });
+
+      if (response.data.success) {
+        setMessage('Verification email sent successfully! Please check your inbox.');
+        setMessageType('success');
+      } else {
+        setMessage(response.data.message || 'Failed to send verification email.');
+        setMessageType('error');
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to send verification email. Please try again.';
+      setMessage(errorMessage);
+      setMessageType('error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={{
@@ -252,7 +209,7 @@ const VerifyEmail = () => {
               color: '#1D3557',
               margin: 0
             }}>
-              {isPendingAdminVerification ? 'Account Pending Verification' : 'Check Your Email'}
+              Check Your Email
             </h1>
 
             {/* Instructional Text */}
@@ -264,9 +221,7 @@ const VerifyEmail = () => {
               maxWidth: '24rem',
               padding: '0 0.5rem'
             }}>
-              {isPendingAdminVerification 
-                ? 'Account pending verification. Check your email within the next 24 hours.'
-                : "We've sent a verification link to your email. Click the link to verify your account and you'll be redirected to the login page."}
+              We've sent a verification link to your email. Click the link to verify your account and you'll be redirected to the login page.
             </p>
 
             {/* Information Alert Box */}
@@ -300,18 +255,16 @@ const VerifyEmail = () => {
                 margin: 0,
                 lineHeight: '1.4'
               }}>
-                {isPendingAdminVerification 
-                  ? 'Your account is pending admin verification. Once verified, you will receive an email with a verification link. Check your email within the next 24 hours.'
-                  : "You must verify your email before you can log in. Login will fail if you haven't clicked the verification link."}
+                You must verify your email before you can log in. Login will fail if you haven't clicked the verification link.
               </p>
             </div>
 
-            {/* Success Message - Shown when coming from signup (only for Students, not Staff/TA/Professor) */}
-            {showSuccessMessage && !isPendingAdminVerification && (
+            {/* Success/Error Message */}
+            {message && (
               <div style={{
                 width: '100%',
-                backgroundColor: '#D4EDDA',
-                border: '1px solid #28A745',
+                backgroundColor: messageType === 'success' ? '#D4EDDA' : '#F8D7DA',
+                border: `1px solid ${messageType === 'success' ? '#28A745' : '#DC3545'}`,
                 borderRadius: '0.5rem',
                 padding: '0.875rem',
                 display: 'flex',
@@ -323,7 +276,7 @@ const VerifyEmail = () => {
                   style={{ 
                     width: '1.125rem', 
                     height: '1.125rem', 
-                    color: '#28A745', 
+                    color: messageType === 'success' ? '#28A745' : '#DC3545', 
                     flexShrink: 0, 
                     marginTop: '0.125rem' 
                   }}
@@ -331,59 +284,25 @@ const VerifyEmail = () => {
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path 
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M5 13l4 4L19 7"
-                  />
+                  {messageType === 'success' ? (
+                    <path 
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  ) : (
+                    <path 
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  )}
                 </svg>
                 <p style={{
                   fontSize: '0.8125rem',
-                  color: '#155724',
-                  margin: 0,
-                  lineHeight: '1.4'
-                }}>
-                  Verification email sent successfully
-                </p>
-              </div>
-            )}
-
-            {/* Success Message from Verification */}
-            {message && messageType === 'success' && (
-              <div style={{
-                width: '100%',
-                backgroundColor: '#D4EDDA',
-                border: '1px solid #28A745',
-                borderRadius: '0.5rem',
-                padding: '0.875rem',
-                display: 'flex',
-                gap: '0.75rem',
-                alignItems: 'flex-start',
-                textAlign: 'left'
-              }}>
-                <svg 
-                  style={{ 
-                    width: '1.125rem', 
-                    height: '1.125rem', 
-                    color: '#28A745', 
-                    flexShrink: 0, 
-                    marginTop: '0.125rem' 
-                  }}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path 
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                <p style={{
-                  fontSize: '0.8125rem',
-                  color: '#155724',
+                  color: messageType === 'success' ? '#155724' : '#721C24',
                   margin: 0,
                   lineHeight: '1.4'
                 }}>
@@ -392,48 +311,42 @@ const VerifyEmail = () => {
               </div>
             )}
 
-            {/* Error Message - Only show for actual errors, not after successful verification */}
-            {message && messageType === 'error' && !loading && (
-              <div style={{
-                width: '100%',
-                backgroundColor: '#F8D7DA',
-                border: '1px solid #DC3545',
-                borderRadius: '0.5rem',
-                padding: '0.875rem',
+            {/* Resend Verification Email Button */}
+            <button
+              onClick={handleResendEmail}
+              disabled={loading}
+              style={{
                 display: 'flex',
-                gap: '0.75rem',
-                alignItems: 'flex-start',
-                textAlign: 'left'
-              }}>
-                <svg 
-                  style={{ 
-                    width: '1.125rem', 
-                    height: '1.125rem', 
-                    color: '#DC3545', 
-                    flexShrink: 0, 
-                    marginTop: '0.125rem' 
-                  }}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path 
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-                <p style={{
-                  fontSize: '0.8125rem',
-                  color: '#721C24',
-                  margin: 0,
-                  lineHeight: '1.4'
-                }}>
-                  {message}
-                </p>
-              </div>
-            )}
+                height: '2.75rem',
+                width: '100%',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '0.375rem',
+                backgroundColor: loading ? '#94A3B8' : '#1D3557',
+                padding: '0 1.5rem',
+                fontSize: '0.9375rem',
+                fontWeight: '600',
+                color: '#FFFFFF',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                border: 'none',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.2s',
+                marginTop: '0.25rem',
+                opacity: loading ? 0.7 : 1
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.target.style.backgroundColor = 'rgba(29, 53, 87, 0.9)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) {
+                  e.target.style.backgroundColor = '#1D3557';
+                }
+              }}
+            >
+              {loading ? 'Sending...' : 'Resend Verification Email'}
+            </button>
           </div>
         </div>
       </div>

@@ -211,7 +211,7 @@ async function sendVerificationEmail(to, token, name) {
     console.log('✅ SMTP connection verified');
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || `Bindly <${process.env.SMTP_USER}>`,
+      from: process.env.SMTP_FROM || `Bindly <salma.husseinhassan@student.guc.edu.eg>`,
       to,
       subject: "GUC Events — Verify your account",
       text: textBody,
