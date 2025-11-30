@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const EventsOfficeNotificationBell = () => {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+  const handledNotificationIdsRef = useRef(new Set());
   // Use ref instead of state so it's immediately available (not async)
   // Load from localStorage on mount to persist across page refreshes
   const getInitialMarkedVendorRequests = () => {
@@ -359,18 +362,23 @@ const EventsOfficeNotificationBell = () => {
                   <li
                     key={notif._id || notif.id || `notif-${idx}`}
                     onClick={async () => {
-                      const notifId = notif._id || notif.id;
-                      if (!notif.isRead && notifId) {
+                      const notifId = notif._id || notif.id || `notif-${idx}`;
+
+                      const alreadyHandled = handledNotificationIdsRef.current.has(notifId);
+                      if (!alreadyHandled) handledNotificationIdsRef.current.add(notifId);
+
+                      // Only attempt to mark-as-read / call API if we haven't handled this notif yet
+                      if (!alreadyHandled && !notif.isRead && notifId) {
                         try {
                           const token = localStorage.getItem('token');
-                          
+
                           // If this is a pending vendor notification, track it as read (using ref for immediate access)
                           if (notif.type === 'vendor_request' && notif._id?.startsWith('vendor_req_') && notif.metadata?.requestId) {
                             markedAsReadVendorRequestsRef.current.add(notif.metadata.requestId);
                             // Persist to localStorage so it survives page refresh
                             saveMarkedVendorRequests(markedAsReadVendorRequestsRef.current);
                           }
-                          
+
                           // Only call API if it's a real notification (not a pending vendor notification)
                           if (!notif._id?.startsWith('vendor_req_')) {
                             await axios.put(
@@ -379,13 +387,33 @@ const EventsOfficeNotificationBell = () => {
                               { headers: { Authorization: `Bearer ${token}` } }
                             );
                           }
-                          
+
                           setNotifications(prev => prev.map(n => 
                             (n._id === notifId || n.id === notifId) ? { ...n, isRead: true } : n
                           ));
                           setUnreadCount(prev => Math.max(0, prev - 1));
                         } catch (err) {
                           console.error('Error marking notification as read:', err);
+                        }
+                      }
+
+                      // Always navigate for event-related notifications, even if already read/handled
+                      if (notif.type === 'new_event' || notif.type === 'event_announcement') {
+                        try {
+                          setNotificationPanelOpen(false);
+                          navigate('/event-office/events');
+                        } catch (navErr) {
+                          console.error('Navigation error after clicking notification:', navErr);
+                        }
+                      }
+
+                      // Navigate to workshops page for professor workshop submissions
+                      if (notif.type === 'workshop_submission') {
+                        try {
+                          setNotificationPanelOpen(false);
+                          navigate('/event-office/workshops');
+                        } catch (navErr) {
+                          console.error('Navigation error after clicking notification:', navErr);
                         }
                       }
                     }}

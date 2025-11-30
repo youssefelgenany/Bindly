@@ -1548,11 +1548,17 @@ const EventsOfficeEventsView = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem 2.5rem',
-          backgroundColor: '#FFFFFF'
+          backgroundColor: '#1D3557',
+          position: 'fixed',
+          top: 0,
+          left: sidebarOpen ? '16rem' : '0',
+          width: sidebarOpen ? 'calc(100% - 16rem)' : '100%',
+          zIndex: 100,
+          transition: 'left 0.3s ease, width 0.3s ease'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF' }}>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               style={{
@@ -1563,7 +1569,7 @@ const EventsOfficeEventsView = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#1D3557'
+                color: '#FFFFFF'
               }}
               aria-label="Toggle sidebar"
             >
@@ -1571,15 +1577,18 @@ const EventsOfficeEventsView = () => {
                 menu
               </span>
             </button>
-            <h2 style={{
-              color: '#1D3557',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              lineHeight: '1.25',
-              margin: 0
-            }}>
-              Bindly
-            </h2>
+            <Link to="/event-office" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h2 style={{
+                color: '#FFFFFF',
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                lineHeight: '1.25',
+                margin: 0,
+                cursor: 'pointer'
+              }}>
+                Bindly
+              </h2>
+            </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
             {/* Notification Icon */}
@@ -1797,14 +1806,14 @@ const EventsOfficeEventsView = () => {
               <p style={{
                 fontSize: '0.875rem',
                 fontWeight: '600',
-                color: '#1D3557',
+                color: '#FFFFFF',
                 margin: 0
               }}>
                 {displayName}
               </p>
               <p style={{
                 fontSize: '0.75rem',
-                color: '#6b7280',
+                color: 'rgba(255, 255, 255, 0.7)',
                 margin: 0
               }}>
                 Events Office
@@ -1826,11 +1835,11 @@ const EventsOfficeEventsView = () => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#1D3557',
+                backgroundColor: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
+                color: '#1D3557',
                 fontWeight: '600'
               }}>
                 {(user?.firstName?.[0] || user?.name?.[0] || 'E').toUpperCase()}
@@ -1846,16 +1855,36 @@ const EventsOfficeEventsView = () => {
           paddingLeft: '6rem',
           paddingRight: '6rem',
           overflowY: 'auto',
-          backgroundColor: '#f6f7f8'
+          backgroundColor: '#f6f7f8',
+          marginTop: '73px'
         }}>
           {/* Page Title Banner */}
+          <style>{`
+            @keyframes fadeInUp {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes float {
+              0%, 100% { transform: translateY(0px); }
+              50% { transform: translateY(-10px); }
+            }
+            @keyframes pulse {
+              0%, 100% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.05); opacity: 0.9; }
+            }
+            @keyframes slideInRight {
+              from { opacity: 0; transform: translateX(30px); }
+              to { opacity: 1; transform: translateX(0); }
+            }
+          `}</style>
           <div style={{
             position: 'relative',
             height: '140px',
             borderRadius: '0.75rem',
             overflow: 'hidden',
             marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            animation: 'fadeInUp 0.6s ease-out'
           }}>
             {/* Background Image */}
             <div style={{
@@ -1865,13 +1894,37 @@ const EventsOfficeEventsView = () => {
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
-              filter: 'blur(2px)'
+              filter: 'blur(2px)',
+              animation: 'pulse 4s ease-in-out infinite'
             }}></div>
             {/* Blue Overlay */}
             <div style={{
               position: 'absolute',
               inset: 0,
               backgroundColor: 'rgba(29, 53, 87, 0.75)'
+            }}></div>
+            {/* Floating Decorative Elements */}
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              right: '50px',
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              animation: 'float 3s ease-in-out infinite',
+              zIndex: 5
+            }}></div>
+            <div style={{
+              position: 'absolute',
+              bottom: '30px',
+              right: '100px',
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+              animation: 'float 2.5s ease-in-out infinite 0.5s',
+              zIndex: 5
             }}></div>
             {/* Content */}
             <div style={{
@@ -1891,7 +1944,8 @@ const EventsOfficeEventsView = () => {
                   fontSize: '1.75rem',
                   fontWeight: '700',
                   margin: 0,
-                  marginBottom: '0.5rem'
+                  marginBottom: '0.5rem',
+                  animation: 'slideInRight 0.8s ease-out'
                 }}>
                   All Upcoming Events
                 </h3>
@@ -1899,7 +1953,8 @@ const EventsOfficeEventsView = () => {
                   color: 'rgba(255, 255, 255, 0.9)',
                   fontSize: '0.875rem',
                   fontWeight: '400',
-                  margin: 0
+                  margin: 0,
+                  animation: 'slideInRight 0.8s ease-out 0.2s both'
                 }}>
                   Create, view, manage, and track all scheduled university events.
                 </p>
@@ -1931,7 +1986,7 @@ const EventsOfficeEventsView = () => {
                 <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
                   add
                 </span>
-                Create
+                Create Event
               </button>
             </div>
           </div>
@@ -2366,64 +2421,6 @@ const EventsOfficeEventsView = () => {
                             textAlign: 'right'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                              {/* Workshop Accept/Reject buttons */}
-                              {event.type === 'workshop' && event.status === 'pending' && (
-                                <>
-                                  <button
-                                    onClick={() => handleEventStatusChange(event.id, 'approved')}
-                                    disabled={!!processingIds[event.id]}
-                                    style={{
-                                      padding: '0.5rem',
-                                      borderRadius: '0.5rem',
-                                      border: 'none',
-                                      backgroundColor: 'transparent',
-                                      color: canEdit ? '#137fec' : '#d1d5db',
-                                      cursor: canEdit ? 'pointer' : 'not-allowed',
-                                      opacity: canEdit ? 1 : 0.5
-                                    }}
-                                    title={canEdit ? 'Accept Workshop' : 'Workshop already accepted'}
-                                    onMouseEnter={(e) => {
-                                      if (canEdit) {
-                                        e.target.style.backgroundColor = '#f3f4f6';
-                                        e.target.style.color = '#137fec';
-                                      }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      if (canEdit) {
-                                        e.target.style.backgroundColor = 'transparent';
-                                        e.target.style.color = '#137fec';
-                                      }
-                                    }}
-                                  >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                      check_circle
-                                    </span>
-                                  </button>
-                                  <button
-                                    onClick={() => handleEventStatusChange(event.id, 'rejected')}
-                                    disabled={!!processingIds[event.id]}
-                                    style={{
-                                      padding: '0.5rem',
-                                      borderRadius: '0.5rem',
-                                      border: 'none',
-                                      backgroundColor: 'transparent',
-                                      color: '#ef4444',
-                                      cursor: 'pointer'
-                                    }}
-                                    title="Reject Workshop"
-                                    onMouseEnter={(e) => {
-                                      e.target.style.backgroundColor = '#fee2e2';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.target.style.backgroundColor = 'transparent';
-                                    }}
-                                  >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                      cancel
-                                    </span>
-                                  </button>
-                                </>
-                              )}
                               
                               {/* Edit Button */}
               <button

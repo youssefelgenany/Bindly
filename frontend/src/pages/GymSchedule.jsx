@@ -795,7 +795,7 @@ const GymSchedule = () => {
         position: 'fixed',
         top: 0,
         left: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '0' : (sidebarOpen ? '16rem' : '0'),
-        right: 0,
+        width: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '100%' : (sidebarOpen ? 'calc(100% - 16rem)' : '100%'),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -803,7 +803,7 @@ const GymSchedule = () => {
         padding: '1rem 2.5rem',
         backgroundColor: '#1D3557',
         zIndex: useFixedHeader ? 100 : 'auto',
-        transition: useFixedHeader ? 'left 0.3s ease' : 'none'
+        transition: useFixedHeader ? 'left 0.3s ease, width 0.3s ease' : 'none'
       }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
             {user?.userType !== 'Student' && user?.userType !== 'TA' && user?.userType !== 'Staff' && user?.userType !== 'Professor' && (
@@ -826,7 +826,7 @@ const GymSchedule = () => {
               </span>
             </button>
             )}
-            <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <Link to={(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '/dashboard' : '/event-office'} style={{ textDecoration: 'none', color: 'inherit' }}>
             <h2 style={{
               color: '#FFFFFF',
               fontSize: '1.5rem',
@@ -1763,13 +1763,11 @@ const GymSchedule = () => {
 
       {/* Main Content */}
       <main style={{
-        marginLeft: (user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '0' : (sidebarOpen ? '16rem' : '0'),
         marginTop: '73px',
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
-        transition: 'margin-left 0.3s ease'
+        overflow: 'hidden'
       }}>
 
         {/* Content Area */}
@@ -2622,7 +2620,7 @@ const GymSchedule = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Date *
+                    Date <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="date"
@@ -2648,7 +2646,7 @@ const GymSchedule = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Time *
+                    Time <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="time"
@@ -2674,7 +2672,7 @@ const GymSchedule = () => {
                     color: '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Duration (minutes) *
+                    Duration (minutes) <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="number"

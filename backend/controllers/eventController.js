@@ -1987,12 +1987,52 @@ exports.exportRegistrations = async (req, res) => {
       .sort({ createdAt: 1 });
     console.log('📊 Found', studentRegistrations.length, 'registrations from StudentRegistration model');
     
+    // Look up user types for StudentRegistration entries by email
+    const User = require('../models/userModel');
+    const Payment = require('../models/paymentModel');
+    
+    const studentEmails = studentRegistrations
+      .map(reg => reg.studentEmail?.toLowerCase())
+      .filter(email => email);
+    
+    const users = await User.find({ 
+      email: { $in: studentEmails } 
+    }).select('email userType');
+    
+    // Create a map of email -> userType for quick lookup
+    const userTypeMap = new Map();
+    users.forEach(user => {
+      userTypeMap.set(user.email.toLowerCase(), user.userType);
+    });
+    
+    // Get all successful payments for this event to verify paid status
+    const payments = await Payment.find({
+      event: eventId,
+      status: 'success'
+    }).populate('user', 'email');
+    
+    // Create maps for payment verification
+    const paymentByUserId = new Map();
+    const paymentByEmail = new Map();
+    payments.forEach(payment => {
+      if (payment.user && payment.user._id) {
+        paymentByUserId.set(payment.user._id.toString(), true);
+      }
+      if (payment.user && payment.user.email) {
+        paymentByEmail.set(payment.user.email.toLowerCase(), true);
+      }
+    });
+    
     // Combine and format data for Excel
     const data = [];
     
     // Add registrations from Registration model
     registrations.forEach(reg => {
       if (reg.user) {
+        // Verify paid status: check both reg.paid and Payment model
+        const hasPayment = paymentByUserId.get(reg.user._id?.toString()) || false;
+        const isPaid = reg.paid === true || hasPayment || (event.price || 0) <= 0;
+        
         data.push({
           'Name': `${reg.user.firstName || ''} ${reg.user.lastName || ''}`.trim() || 'N/A',
           'Email': reg.user.email || 'N/A',
@@ -2000,21 +2040,28 @@ exports.exportRegistrations = async (req, res) => {
           'User Type': reg.user.userType || 'N/A',
           'Registration Date': reg.createdAt ? new Date(reg.createdAt).toLocaleDateString() : 'N/A',
           'Status': reg.status || 'N/A',
-          'Paid': reg.paid ? 'Yes' : 'No'
+          'Paid': isPaid ? 'Yes' : 'No'
         });
       }
     });
     
     // Add registrations from StudentRegistration model
     studentRegistrations.forEach(reg => {
+      const email = reg.studentEmail?.toLowerCase();
+      const userType = email ? (userTypeMap.get(email) || 'Student') : 'Student';
+      
+      // Verify paid status: check both reg.paid and Payment model
+      const hasPayment = email ? paymentByEmail.get(email) || false : false;
+      const isPaid = reg.paid === true || hasPayment || (event.price || 0) <= 0;
+      
       data.push({
         'Name': reg.studentName || 'N/A',
         'Email': reg.studentEmail || 'N/A',
         'Student ID': reg.studentId || 'N/A',
-        'User Type': 'Student',
+        'User Type': userType,
         'Registration Date': reg.createdAt ? new Date(reg.createdAt).toLocaleDateString() : 'N/A',
         'Status': reg.status || 'N/A',
-        'Paid': reg.paid ? 'Yes' : 'No'
+        'Paid': isPaid ? 'Yes' : 'No'
       });
     });
     
