@@ -74,10 +74,16 @@ const userSchema = new mongoose.Schema({
   },
   vendorLogoPath: {
     type: String,
+    required: function() {
+      return this.userType === 'Vendor';
+    },
     default: null
   },
   vendorTaxCardPath: {
     type: String,
+    required: function() {
+      return this.userType === 'Vendor';
+    },
     default: null
   },
   isVerified: {

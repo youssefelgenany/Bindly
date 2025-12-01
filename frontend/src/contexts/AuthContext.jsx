@@ -116,6 +116,8 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (userData) => {
     try {
+      // Axios automatically sets Content-Type for FormData with boundary
+      // Don't set it explicitly as it needs to include the boundary parameter
       const response = await axios.post('http://localhost:5000/api/auth/signup', userData);
       
       const { user: newUser, token, requiresVerification } = response.data;
@@ -131,6 +133,8 @@ export const AuthProvider = ({ children }) => {
       };
     } catch (error) {
       console.error('Signup error:', error);
+      console.error('Signup error response:', error.response?.data);
+      console.error('Signup error status:', error.response?.status);
       
       // Handle different types of errors
       if (error.response?.data?.errors) {
@@ -141,12 +145,16 @@ export const AuthProvider = ({ children }) => {
       } else if (error.response?.data?.message) {
         // Custom error message from backend
         return { success: false, message: error.response.data.message };
+      } else if (error.response?.data?.error) {
+        // Error field from backend
+        return { success: false, message: error.response.data.error };
       } else if (error.code === 'NETWORK_ERROR' || !error.response) {
         // Network error
         return { success: false, message: 'Network error. Please check your connection and ensure the backend server is running.' };
       } else {
-        // Generic error
-        return { success: false, message: `Signup failed: ${error.message}` };
+        // Generic error - show status code if available
+        const statusMsg = error.response?.status ? ` (Status: ${error.response.status})` : '';
+        return { success: false, message: `Signup failed: ${error.message}${statusMsg}` };
       }
     }
   };

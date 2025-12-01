@@ -439,6 +439,37 @@ const StudentLoyaltyVendorsView = () => {
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          {/* Heart Icon - Favorites */}
+          <Link
+            to="/student/favorites"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              textDecoration: 'none',
+              color: 'inherit'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{
+              fontSize: '1.5rem',
+              color: '#FFFFFF'
+            }}>
+              favorite
+            </span>
+          </Link>
+
           {/* Notifications Bell */}
           <div style={{ position: 'relative' }} data-notifications-dropdown>
             <button
@@ -667,37 +698,6 @@ const StudentLoyaltyVendorsView = () => {
               </div>
             )}
           </div>
-          
-          {/* Heart Icon - Favorites */}
-          <Link
-            to="/student/favorites"
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.5rem',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s',
-              textDecoration: 'none',
-              color: 'inherit'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{
-              fontSize: '1.5rem',
-              color: '#FFFFFF'
-            }}>
-              favorite
-            </span>
-          </Link>
 
           <div style={{ textAlign: 'right' }}>
             <p style={{
