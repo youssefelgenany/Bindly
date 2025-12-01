@@ -157,10 +157,10 @@ const TAEventsView = () => {
           }))
         });
         
-        // Extract unique professors from workshop/conference events
+        // Extract unique professors from workshop events
         const professorsSet = new Set();
         mapped.forEach(ev => {
-          if (ev.type === 'workshop' || ev.type === 'conference') {
+          if (ev.type === 'workshop') {
             if (ev.professors) {
               if (Array.isArray(ev.professors)) {
                 ev.professors.forEach(p => {
@@ -194,9 +194,9 @@ const TAEventsView = () => {
         let filteredEvents = mapped;
         
         // Apply professor filter if workshop/conference is selected
-        if ((filter === 'workshop' || filter === 'conference') && professorFilter !== 'all') {
+        if (filter === 'workshop' && professorFilter !== 'all') {
           filteredEvents = filteredEvents.filter(ev => {
-            if (ev.type !== 'workshop' && ev.type !== 'conference') return false;
+            if (ev.type !== 'workshop') return false;
             const eventProfessors = [];
             if (ev.professors) {
               if (Array.isArray(ev.professors)) {
@@ -272,9 +272,9 @@ const TAEventsView = () => {
     loadEvents();
   }, [filter, professorFilter, locationFilter, dateFilter, sortBy, loadEvents]);
   
-  // Reset professor filter when filter changes away from workshop/conference
+  // Reset professor filter when filter changes away from workshop
   useEffect(() => {
-    if (filter !== 'workshop' && filter !== 'conference') {
+    if (filter !== 'workshop') {
       setProfessorFilter('all');
     }
   }, [filter]);
@@ -3331,8 +3331,8 @@ const TAEventsView = () => {
                 </select>
               </div>
 
-              {/* Professor Filter - Only show for workshop/conference */}
-              {(filter === 'workshop' || filter === 'conference') && (
+              {/* Professor Filter - Only show for workshop */}
+              {filter === 'workshop' && (
                 <div>
                   <h5 style={{
                     fontSize: '0.8125rem',

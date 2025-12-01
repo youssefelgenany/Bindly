@@ -190,6 +190,33 @@ const StaffLoyaltyVendorsView = () => {
     }
   };
 
+  const API_BASE_URL = 'http://localhost:5000';
+  const getVendorLogoSrc = (vendor) => {
+    if (!vendor) return null;
+    const candidates = [
+      vendor.logoUrl,
+      vendor.logo?.url,
+      vendor.logo?.path,
+      typeof vendor.logo === 'string' ? vendor.logo : null,
+      vendor.logoPath,
+      vendor.companyLogo,
+      vendor.vendorLogoPath,
+      vendor.logo?.url,
+      vendor.logo?.path
+    ].filter(Boolean);
+
+    if (candidates.length === 0) return null;
+    const raw = candidates.find((src) => typeof src === 'string' && src.trim().length > 0) || null;
+    if (!raw) return null;
+
+    const cleaned = raw.trim().replace(/\\/g, '/');
+    if (cleaned.startsWith('http://') || cleaned.startsWith('https://') || cleaned.startsWith('data:')) {
+      return cleaned;
+    }
+    const normalized = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+    return `${API_BASE_URL}${normalized}`;
+  };
+
   const handleViewVendor = (vendor) => {
     setSelectedVendor(vendor);
     setShowVendorModal(true);
@@ -434,14 +461,16 @@ const StaffLoyaltyVendorsView = () => {
                 top: '100%',
                 right: 0,
                 marginTop: '0.5rem',
-                width: '22rem',
                 backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
                 borderRadius: '0.5rem',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                border: '1px solid #e5e7eb',
-                zIndex: 1000,
-                maxHeight: '32rem',
-                overflowY: 'auto'
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 1001,
+                width: '360px',
+                maxHeight: '500px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
               }}>
                 <div style={{
                   padding: '1rem',
@@ -464,17 +493,17 @@ const StaffLoyaltyVendorsView = () => {
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#2563eb',
-                        fontSize: '0.75rem',
+                        color: '#1e40af',
                         cursor: 'pointer',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '0.25rem'
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        padding: '0.25rem 0.5rem'
                       }}
                       onMouseEnter={(e) => {
-                        e.target.style.backgroundColor = '#eff6ff';
+                        e.target.style.textDecoration = 'underline';
                       }}
                       onMouseLeave={(e) => {
-                        e.target.style.backgroundColor = 'transparent';
+                        e.target.style.textDecoration = 'none';
                       }}
                     >
                       Mark all as read
@@ -490,7 +519,10 @@ const StaffLoyaltyVendorsView = () => {
                     No notifications
                   </div>
                 ) : (
-                  <div>
+                  <div style={{
+                    overflowY: 'auto',
+                    maxHeight: '400px'
+                  }}>
                     {notifications.map((notification) => (
                       <div
                         key={notification._id}
@@ -521,78 +553,87 @@ const StaffLoyaltyVendorsView = () => {
                           }
                         }}
                         style={{
-                          padding: '1rem',
-                          borderBottom: '1px solid #f3f4f6',
-                          cursor: 'pointer',
+                          padding: '0.75rem 1rem',
+                          borderBottom: '1px solid #f1f5f9',
                           backgroundColor: notification.isRead 
                             ? '#FFFFFF' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                              ? '#fef2f2'
-                              : '#eff6ff',
-                          borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
-                            ? '3px solid #ef4444'
-                            : 'none',
-                          transition: 'background-color 0.2s'
+                              ? '#fff7ed'
+                              : '#f8fafc',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          gap: '0.75rem'
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = notification.isRead 
-                            ? '#f9fafb' 
+                            ? '#f8fafc' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                              ? '#fee2e2'
-                              : '#dbeafe';
+                              ? '#ffedd5'
+                              : '#edf2ff';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = notification.isRead 
                             ? '#FFFFFF' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                              ? '#fef2f2'
-                              : '#eff6ff';
+                              ? '#fff7ed'
+                              : '#f8fafc';
                         }}
                       >
                         <div style={{
+                          width: '2.5rem',
+                          height: '2.5rem',
+                          borderRadius: '0.75rem',
+                          backgroundColor: notification.priority === 'high' ? '#fef3c7' : '#e0e7ff',
                           display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start',
-                          gap: '0.5rem'
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
                         }}>
-                          <div style={{ flex: 1 }}>
-                            <p style={{
-                              fontSize: '0.875rem',
-                              fontWeight: notification.isRead ? '400' : '600',
-                              color: '#1D3557',
-                              margin: 0,
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.25rem',
+                            color: notification.priority === 'high' ? '#b45309' : '#4338ca'
+                          }}>
+                            {notification.type === 'event_announcement' || notification.type === 'new_event' ? 'campaign'
+                              : notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder' ? 'event'
+                              : 'notifications'}
+                          </span>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{
+                            fontWeight: notification.isRead ? '400' : '600',
+                            color: '#1D3557',
+                            fontSize: '0.875rem',
+                            marginBottom: '0.25rem'
+                          }}>
+                            {notification.title || notification.message}
+                          </div>
+                          {notification.message && notification.message !== notification.title && (
+                            <div style={{
+                              fontSize: '0.8125rem',
+                              color: '#475569',
                               marginBottom: '0.25rem'
                             }}>
-                              {notification.title || notification.message}
-                            </p>
-                            {notification.message && notification.message !== notification.title && (
-                              <p style={{
-                                fontSize: '0.75rem',
-                                color: '#6b7280',
-                                margin: 0
-                              }}>
-                                {notification.message}
-                              </p>
-                            )}
-                            <p style={{
-                              fontSize: '0.625rem',
-                              color: '#9ca3af',
-                              margin: '0.5rem 0 0 0'
-                            }}>
-                              {formatNotificationDate(notification.createdAt)}
-                            </p>
-                          </div>
-                          {!notification.isRead && (
-                            <div style={{
-                              width: '0.5rem',
-                              height: '0.5rem',
-                              borderRadius: '50%',
-                              backgroundColor: '#1e40af',
-                              flexShrink: 0,
-                              marginTop: '0.25rem'
-                            }} />
+                              {notification.message}
+                            </div>
                           )}
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#9ca3af'
+                          }}>
+                            {formatNotificationDate(notification.createdAt)}
+                          </div>
                         </div>
+                        {!notification.isRead && (
+                          <div style={{
+                            width: '0.5rem',
+                            height: '0.5rem',
+                            borderRadius: '50%',
+                            backgroundColor: '#1e40af',
+                            flexShrink: 0,
+                            marginTop: '0.25rem'
+                          }} />
+                        )}
                       </div>
                     ))}
                   </div>
@@ -601,14 +642,23 @@ const StaffLoyaltyVendorsView = () => {
             )}
           </div>
 
-          {/* Staff Name */}
-          <span style={{
-            color: '#1D3557',
-            fontSize: '0.875rem',
-            fontWeight: '500'
-          }}>
-            {displayName}
-          </span>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#FFFFFF',
+              margin: 0
+            }}>
+              {displayName}
+            </p>
+            <p style={{
+              fontSize: '0.75rem',
+              color: 'rgba(255, 255, 255, 0.7)',
+              margin: 0
+            }}>
+              Staff
+            </p>
+          </div>
 
           {/* Profile Icon */}
           <div
@@ -627,8 +677,7 @@ const StaffLoyaltyVendorsView = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: '50%',
-                  objectFit: 'cover',
-                  border: '2px solid #e5e7eb'
+                  objectFit: 'cover'
                 }}
               />
             ) : (
@@ -636,15 +685,14 @@ const StaffLoyaltyVendorsView = () => {
                 width: '2.5rem',
                 height: '2.5rem',
                 borderRadius: '50%',
-                backgroundColor: '#1D3557',
+                backgroundColor: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
-                fontSize: '1rem',
+                color: '#1D3557',
                 fontWeight: '600'
               }}>
-                {displayName.charAt(0).toUpperCase()}
+                {(user?.firstName?.[0] || user?.name?.[0] || 'S').toUpperCase()}
               </div>
             )}
             {showLogoutDropdown && (
@@ -725,6 +773,40 @@ const StaffLoyaltyVendorsView = () => {
         </div>
       </header>
 
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        .banner-animate {
+          animation: fadeInUp 0.8s ease-out;
+        }
+        .banner-content-animate {
+          animation: slideInLeft 1s ease-out 0.2s both;
+        }
+        .search-container-animate {
+          animation: fadeInUp 0.6s ease-out 0.3s both;
+        }
+        .search-input-animate {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+      `}</style>
       {/* Main Content */}
       <main style={{
         flex: 1,
@@ -738,14 +820,26 @@ const StaffLoyaltyVendorsView = () => {
           marginRight: '0'
         }}>
           {/* Loyalty Program Banner with Background Image */}
-          <div style={{
-            position: 'relative',
-            height: '140px',
-            borderRadius: '0.75rem',
-            overflow: 'hidden',
-            marginBottom: '1.5rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-          }}>
+          <div 
+            className="banner-animate"
+            style={{
+              position: 'relative',
+              height: '140px',
+              borderRadius: '0.75rem',
+              overflow: 'hidden',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 12px -2px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+            }}
+          >
             {/* Background Image */}
             <div style={{
               position: 'absolute',
@@ -754,26 +848,31 @@ const StaffLoyaltyVendorsView = () => {
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundSize: 'cover',
-              filter: 'blur(2px)'
+              filter: 'blur(2px)',
+              transition: 'transform 0.5s ease, filter 0.5s ease'
             }}></div>
             {/* Blue Overlay */}
             <div style={{
               position: 'absolute',
               inset: 0,
-              backgroundColor: 'rgba(29, 53, 87, 0.75)'
+              backgroundColor: 'rgba(29, 53, 87, 0.75)',
+              transition: 'background-color 0.3s ease'
             }}></div>
             {/* Content */}
-            <div style={{
-              position: 'relative',
-              zIndex: 10,
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'flex-start',
-              padding: '2rem 2.5rem',
-              color: '#FFFFFF'
-            }}>
+            <div 
+              className="banner-content-animate"
+              style={{
+                position: 'relative',
+                zIndex: 10,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+                padding: '2rem 2.5rem',
+                color: '#FFFFFF'
+              }}
+            >
               <h3 style={{
                 color: '#FFFFFF',
                 fontSize: '1.75rem',
@@ -799,12 +898,15 @@ const StaffLoyaltyVendorsView = () => {
             padding: '0 0 2rem 0'
           }}>
             {/* Search Bar */}
-            <div style={{
-              marginBottom: '2rem',
-              display: 'flex',
-              gap: '1rem',
-              alignItems: 'center'
-            }}>
+            <div 
+              className="search-container-animate"
+              style={{
+                marginBottom: '2rem',
+                display: 'flex',
+                gap: '1rem',
+                alignItems: 'center'
+              }}
+            >
           <div style={{
             flex: 1,
             maxWidth: '520px',
@@ -817,7 +919,8 @@ const StaffLoyaltyVendorsView = () => {
               transform: 'translateY(-50%)',
               color: '#9ca3af',
               fontSize: '1.25rem',
-              pointerEvents: 'none'
+              pointerEvents: 'none',
+              transition: 'color 0.3s ease'
             }}>
               search
             </span>
@@ -826,6 +929,7 @@ const StaffLoyaltyVendorsView = () => {
               placeholder="Search vendors, categories, or promo codes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input-animate"
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem 0.75rem 3rem',
@@ -833,13 +937,17 @@ const StaffLoyaltyVendorsView = () => {
                 borderRadius: '0.5rem',
                 fontSize: '0.875rem',
                 outline: 'none',
-                transition: 'border-color 0.2s'
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
               }}
               onFocus={(e) => {
                 e.target.style.borderColor = '#2563eb';
+                e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                e.target.style.transform = 'scale(1.01)';
               }}
               onBlur={(e) => {
                 e.target.style.borderColor = '#d1d5db';
+                e.target.style.boxShadow = 'none';
+                e.target.style.transform = 'scale(1)';
               }}
             />
             </div>
@@ -885,98 +993,126 @@ const StaffLoyaltyVendorsView = () => {
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                gap: '1.5rem'
+                gap: '1.75rem'
               }}>
                 {vendors.map((vendor) => (
                   <div
                     key={vendor.id}
                     onClick={() => handleViewVendor(vendor)}
                     style={{
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '0.75rem',
-                      padding: '1.5rem',
-                      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                      background: 'linear-gradient(135deg, #fbf7ef 0%, #ffffff 80%)',
+                      borderRadius: '1.1rem',
+                      padding: '1.75rem',
+                      boxShadow: '0 15px 25px -12px rgba(15, 23, 42, 0.25)',
                       cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      border: '1px solid #e5e7eb'
+                      transition: 'all 0.25s ease',
+                      border: '1px solid rgba(214, 188, 138, 0.4)',
+                      animation: 'fadeInUp 0.5s ease'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 25px 35px -15px rgba(15, 23, 42, 0.3)';
+                      e.currentTarget.style.transform = 'translateY(-4px) scale(1.01)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
-                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 15px 25px -12px rgba(15, 23, 42, 0.25)';
+                      e.currentTarget.style.transform = 'translateY(0) scale(1)';
                     }}
                   >
-                    {/* Vendor Logo/Icon */}
-                    {vendor.logoUrl ? (
-                      <img
-                        src={vendor.logoUrl}
-                        alt={vendor.vendorName}
-                        style={{
+                    {/* Vendor Header */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      marginBottom: '1rem'
+                    }}>
+                      {(() => {
+                        const logoSrc = getVendorLogoSrc(vendor);
+                        const baseCircleStyle = {
                           width: '4rem',
                           height: '4rem',
-                          borderRadius: '0.5rem',
-                          objectFit: 'cover',
-                          marginBottom: '1rem'
-                        }}
-                      />
-                    ) : (
-                      <div style={{
-                        width: '4rem',
-                        height: '4rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: '#1D3557',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#FFFFFF',
-                        fontSize: '1.5rem',
-                        fontWeight: '700',
-                        marginBottom: '1rem'
-                      }}>
-                        {vendor.vendorName.charAt(0).toUpperCase()}
+                          borderRadius: '9999px',
+                          border: '2px solid rgba(212, 188, 138, 0.8)',
+                          backgroundColor: '#fefaf1',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '0.15rem',
+                          boxShadow: 'inset 0 0 12px rgba(212, 188, 138, 0.35)'
+                        };
+                        if (logoSrc) {
+                          return (
+                            <div style={baseCircleStyle}>
+                              <div style={{
+                                width: '100%',
+                                height: '100%',
+                                borderRadius: '9999px',
+                                overflow: 'hidden'
+                              }}>
+                                <img
+                                  src={logoSrc}
+                                  alt={vendor.vendorName}
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    objectPosition: 'center',
+                                    display: 'block'
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div style={{
+                            ...baseCircleStyle,
+                            border: '2px solid rgba(15, 23, 42, 0.15)',
+                            backgroundColor: '#1D3557',
+                            color: '#FFFFFF'
+                          }}>
+                            <span style={{ fontSize: '1.35rem', fontWeight: '700' }}>
+                              {vendor.vendorName?.charAt(0)?.toUpperCase() || 'V'}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                      <div>
+                        <h3 style={{
+                          color: '#1D3557',
+                          fontSize: '1.125rem',
+                          fontWeight: '600',
+                          margin: 0,
+                          marginBottom: '0.25rem'
+                        }}>
+                          {vendor.vendorName}
+                        </h3>
+                        {vendor.category && (
+                          <p style={{
+                            color: '#475569',
+                            fontSize: '0.8rem',
+                            margin: 0,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                          }}>
+                            {vendor.category}
+                          </p>
+                        )}
                       </div>
-                    )}
-
-                    {/* Vendor Name */}
-                    <h3 style={{
-                      color: '#1D3557',
-                      fontSize: '1.125rem',
-                      fontWeight: '600',
-                      margin: 0,
-                      marginBottom: '0.5rem'
-                    }}>
-                      {vendor.vendorName}
-                    </h3>
-
-                    {/* Category */}
-                    {vendor.category && (
-                      <p style={{
-                        color: '#6b7280',
-                        fontSize: '0.75rem',
-                        margin: 0,
-                        marginBottom: '0.75rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}>
-                        {vendor.category}
-                      </p>
-                    )}
+                    </div>
 
                     {/* Discount Badge */}
                     <div style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      backgroundColor: '#dbeafe',
-                      color: '#1e40af',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      marginBottom: '0.75rem'
+                      gap: '0.6rem',
+                      background: 'linear-gradient(135deg, #e5d5b9, #c9a86a)',
+                      color: '#0f172a',
+                      padding: '0.6rem 1.4rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.9rem',
+                      fontWeight: '700',
+                      marginBottom: '0.9rem',
+                      boxShadow: '0 6px 12px -5px rgba(201, 168, 106, 0.65)'
                     }}>
                       <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
                         local_offer
@@ -989,23 +1125,25 @@ const StaffLoyaltyVendorsView = () => {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem',
-                      marginBottom: '0.75rem'
+                      marginBottom: '0.9rem'
                     }}>
                       <span style={{
-                        color: '#6b7280',
-                        fontSize: '0.75rem',
-                        fontWeight: '500'
+                        color: '#475569',
+                        fontSize: '0.8rem',
+                        fontWeight: '600'
                       }}>
-                        Promo Code:
+                        Promo Code
                       </span>
                       <span style={{
-                        color: '#1D3557',
-                        fontSize: '0.875rem',
+                        color: '#0f172a',
+                        fontSize: '0.95rem',
                         fontWeight: '700',
-                        fontFamily: 'monospace',
-                        backgroundColor: '#f3f4f6',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '0.25rem'
+                        letterSpacing: '0.15em',
+                        background: 'linear-gradient(135deg, #fef6e4, #f1d8a7)',
+                        padding: '0.45rem 0.9rem',
+                        borderRadius: '0.4rem',
+                        border: '1px solid rgba(201, 168, 106, 0.6)',
+                        boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.8)'
                       }}>
                         {vendor.promoCode}
                       </span>
@@ -1029,13 +1167,13 @@ const StaffLoyaltyVendorsView = () => {
 
                     {/* View Details Link */}
                     <div style={{
-                      color: '#2563eb',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
+                      color: '#1d4ed8',
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.25rem',
-                      marginTop: '0.5rem'
+                      gap: '0.35rem',
+                      marginTop: '0.75rem'
                     }}>
                       View Details
                       <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>

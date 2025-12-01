@@ -161,13 +161,25 @@ const ProfessorEventsView = () => {
     try {
       setError('');
       setLoading(true);
-      const result = await professorApiService.getAllEvents({
+      const typeParam = filter && filter !== 'all' && filter.trim() !== '' ? filter.trim().toLowerCase() : undefined;
+      console.log('🔍 Professor Events View - Filter state:', filter, '-> Sending type param:', typeParam);
+      
+      const result = await eventsApiService.getStudentEvents({
         q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
-        type: filter !== 'all' ? filter : undefined
+        type: typeParam
       });
       
       if (result.success) {
-        const eventsList = Array.isArray(result.data) ? result.data : (result.data.events || []);
+        // Handle different response structures
+        let eventsList = [];
+        if (Array.isArray(result.data)) {
+          eventsList = result.data;
+        } else if (result.data?.events && Array.isArray(result.data.events)) {
+          eventsList = result.data.events;
+        } else if (result.data && typeof result.data === 'object') {
+          // Try to find any array in the response
+          eventsList = Object.values(result.data).find(val => Array.isArray(val)) || [];
+        }
         const mapped = eventsList.map(ev => ({
           id: ev._id || ev.id,
           title: ev.title,
@@ -214,10 +226,10 @@ const ProfessorEventsView = () => {
           return true;
         });
         
-        // Extract unique professors from workshop/conference events
+        // Extract unique professors from workshop events
         const professorsSet = new Set();
         mapped.forEach(ev => {
-          if (ev.type === 'workshop' || ev.type === 'conference') {
+          if (ev.type === 'workshop') {
             if (ev.professors) {
               if (Array.isArray(ev.professors)) {
                 ev.professors.forEach(p => {
@@ -251,9 +263,9 @@ const ProfessorEventsView = () => {
         let filteredEvents = mapped;
         
         // Apply professor filter if workshop/conference is selected
-        if ((filter === 'workshop' || filter === 'conference') && professorFilter !== 'all') {
+        if (filter === 'workshop' && professorFilter !== 'all') {
           filteredEvents = filteredEvents.filter(ev => {
-            if (ev.type !== 'workshop' && ev.type !== 'conference') return false;
+            if (ev.type !== 'workshop') return false;
             const eventProfessors = [];
             if (ev.professors) {
               if (Array.isArray(ev.professors)) {
@@ -313,13 +325,22 @@ const ProfessorEventsView = () => {
           }
         }));
         setEventRatings(ratingsMap);
+        
+        console.log('🔍 Professor Events View - Events loaded:', {
+          totalEvents: mapped.length,
+          workshopEvents: mapped.filter(e => e.type === 'workshop').length,
+          eventTypes: mapped.map(e => e.type)
+        });
       } else {
         setEvents([]);
         const msg = result.message || (typeof result.error === 'string' ? result.error : 'Failed to fetch events');
         setError(msg);
+        console.error('🔍 Professor Events View - Failed to fetch events:', msg);
       }
     } catch (error) {
+      console.error('🔍 Professor Events View - Error loading events:', error);
       setError(error?.message || 'Error loading events');
+      setEvents([]);
     } finally {
       setLoading(false);
     }
@@ -329,9 +350,9 @@ const ProfessorEventsView = () => {
     loadEvents();
   }, [filter, professorFilter, locationFilter, dateFilter, sortBy, loadEvents]);
 
-  // Reset professor filter when filter changes away from workshop/conference
+  // Reset professor filter when filter changes away from workshop
   useEffect(() => {
-    if (filter !== 'workshop' && filter !== 'conference') {
+    if (filter !== 'workshop') {
       setProfessorFilter('all');
     }
   }, [filter]);
@@ -1038,78 +1059,87 @@ const ProfessorEventsView = () => {
                           }
                         }}
                         style={{
-                          padding: '1rem',
-                          borderBottom: '1px solid #f3f4f6',
-                          cursor: 'pointer',
+                          padding: '0.75rem 1rem',
+                          borderBottom: '1px solid #f1f5f9',
                           backgroundColor: notification.isRead 
                             ? '#FFFFFF' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                              ? '#fef2f2'
-                              : '#eff6ff',
-                          borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
-                            ? '3px solid #ef4444'
-                            : 'none',
-                          transition: 'background-color 0.2s'
+                              ? '#fff7ed'
+                              : '#f8fafc',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          gap: '0.75rem'
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = notification.isRead 
-                            ? '#f9fafb' 
+                            ? '#f8fafc' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                              ? '#fee2e2'
-                              : '#dbeafe';
+                              ? '#ffedd5'
+                              : '#edf2ff';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = notification.isRead 
                             ? '#FFFFFF' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                              ? '#fef2f2'
-                              : '#eff6ff';
+                              ? '#fff7ed'
+                              : '#f8fafc';
                         }}
                       >
                         <div style={{
+                          width: '2.5rem',
+                          height: '2.5rem',
+                          borderRadius: '0.75rem',
+                          backgroundColor: notification.priority === 'high' ? '#fef3c7' : '#e0e7ff',
                           display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start',
-                          gap: '0.5rem'
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
                         }}>
-                          <div style={{ flex: 1 }}>
-                            <p style={{
-                              fontSize: '0.875rem',
-                              fontWeight: notification.isRead ? '400' : '600',
-                              color: '#1D3557',
-                              margin: 0,
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.25rem',
+                            color: notification.priority === 'high' ? '#b45309' : '#4338ca'
+                          }}>
+                            {notification.type === 'event_announcement' || notification.type === 'new_event' ? 'campaign'
+                              : notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder' ? 'event'
+                              : 'notifications'}
+                          </span>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{
+                            fontWeight: notification.isRead ? '400' : '600',
+                            color: '#1D3557',
+                            fontSize: '0.875rem',
+                            marginBottom: '0.25rem'
+                          }}>
+                            {notification.title || notification.message}
+                          </div>
+                          {notification.message && notification.message !== notification.title && (
+                            <div style={{
+                              fontSize: '0.8125rem',
+                              color: '#475569',
                               marginBottom: '0.25rem'
                             }}>
-                              {notification.title || notification.message}
-                            </p>
-                            {notification.message && notification.message !== notification.title && (
-                              <p style={{
-                                fontSize: '0.75rem',
-                                color: '#6b7280',
-                                margin: 0
-                              }}>
-                                {notification.message}
-                              </p>
-                            )}
-                            <p style={{
-                              fontSize: '0.625rem',
-                              color: '#9ca3af',
-                              margin: '0.5rem 0 0 0'
-                            }}>
-                              {formatNotificationDate(notification.createdAt)}
-                            </p>
-                          </div>
-                          {!notification.isRead && (
-                            <div style={{
-                              width: '0.5rem',
-                              height: '0.5rem',
-                              borderRadius: '50%',
-                              backgroundColor: '#1e40af',
-                              flexShrink: 0,
-                              marginTop: '0.25rem'
-                            }} />
+                              {notification.message}
+                            </div>
                           )}
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#94a3b8'
+                          }}>
+                            {formatNotificationDate(notification.createdAt)}
+                          </div>
                         </div>
+                        {!notification.isRead && (
+                          <div style={{
+                            width: '0.5rem',
+                            height: '0.5rem',
+                            borderRadius: '50%',
+                            backgroundColor: '#1e40af',
+                            flexShrink: 0,
+                            marginTop: '0.25rem'
+                          }} />
+                        )}
                       </div>
                     ))
                   )}
@@ -2970,8 +3000,8 @@ const ProfessorEventsView = () => {
                 </select>
               </div>
 
-              {/* Professor Filter - Only show for workshop/conference */}
-              {(filter === 'workshop' || filter === 'conference') && (
+              {/* Professor Filter - Only show for workshop */}
+              {filter === 'workshop' && (
                 <div>
                   <h5 style={{
                     fontSize: '0.8125rem',
