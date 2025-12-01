@@ -889,8 +889,9 @@ module.exports.uploadVendorDocuments = async (req, res) => {
 
 // 🎯 Apply to Vendor Loyalty Program
 module.exports.applyToLoyaltyProgram = async (req, res) => {
+  let vendorId; // Declare at function scope for error handling
   try {
-    const vendorId = req.user.id;
+    vendorId = req.user.id;
     const { discountRate, discountType, promoCode, termsAndConditions, validFrom, validUntil, description, category } = req.body;
 
     // Validate required fields
@@ -929,50 +930,121 @@ module.exports.applyToLoyaltyProgram = async (req, res) => {
     // Check if vendor already has an active loyalty program application
     // Use vendor ID, with fallback to vendorName for old records
     const vendorName = vendor.companyName || `${vendor.firstName} ${vendor.lastName}`;
-    const existingApplication = await VendorLoyaltyProgram.findOne({
-      $or: [
-        { vendor: vendorId, isActive: true },
-        { vendorName: vendorName, vendor: { $exists: false }, isActive: true } // Old records
-      ]
-    });
+    
+    // First, check for ANY application with this vendor ID (regardless of active status)
+    // This handles the unique index constraint on vendor field
+    let existingApplication = await VendorLoyaltyProgram.findOne({ vendor: vendorId });
+    
+    // If not found by vendor ID, check by vendorName (case-insensitive) for old records
+    // The vendorName index has case-insensitive collation, so we need to match exactly
+    if (!existingApplication) {
+      // Try exact match first
+      existingApplication = await VendorLoyaltyProgram.findOne({
+        vendorName: vendorName,
+        vendor: { $exists: false }
+      });
+      
+      // If still not found, try case-insensitive match using regex
+      // This handles cases where vendorName might have different casing
+      if (!existingApplication) {
+        existingApplication = await VendorLoyaltyProgram.findOne({
+          vendorName: { $regex: new RegExp(`^${vendorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          vendor: { $exists: false }
+        });
+      }
+    }
 
     if (existingApplication) {
       // Update old records to have vendor field
       if (!existingApplication.vendor) {
         existingApplication.vendor = vendorId;
-        await existingApplication.save();
       }
-      return res.status(400).json({
-        success: false,
-        message: 'You already have an active loyalty program application. Update it instead.'
+      
+      // If it's active, return error
+      if (existingApplication.isActive) {
+        await existingApplication.save(); // Save vendor field update if needed
+        return res.status(400).json({
+          success: false,
+          message: 'You already have an active loyalty program application. Update it instead.'
+        });
+      }
+      
+      // If it's inactive, reactivate it (this will be handled below)
+      // Continue to reactivation logic
+    } else {
+      // No existing application found, will create new one
+      existingApplication = null;
+    }
+    
+    // If there's an inactive application, reactivate it instead of creating a new one
+    let inactiveApplication = null;
+    if (existingApplication && !existingApplication.isActive) {
+      inactiveApplication = existingApplication;
+    } else if (!existingApplication) {
+      // Only check for inactive if we didn't find any existing application
+      inactiveApplication = await VendorLoyaltyProgram.findOne({
+        $or: [
+          { vendor: vendorId, isActive: false },
+          { vendorName: vendorName, vendor: { $exists: false }, isActive: false } // Old records
+        ]
       });
     }
 
-    // If there's an inactive application, reactivate it instead of creating a new one
-    const inactiveApplication = await VendorLoyaltyProgram.findOne({
-      $or: [
-        { vendor: vendorId, isActive: false },
-        { vendorName: vendorName, vendor: { $exists: false }, isActive: false } // Old records
-      ]
-    });
-
     if (inactiveApplication) {
       // Reactivate and update the existing application
-      inactiveApplication.vendor = vendorId; // Ensure vendor ID is set
+      // If vendor field exists but is different, we need to handle the unique constraint
+      // by removing the old vendor reference first or updating it
+      const oldVendorId = inactiveApplication.vendor;
+      
+      // Update all fields
+      inactiveApplication.vendor = vendorId; // Set to current vendor ID
       inactiveApplication.vendorName = vendor.companyName || `${vendor.firstName} ${vendor.lastName}`; // Update name in case it changed
       inactiveApplication.discountRate = discountRate;
       inactiveApplication.discountType = discountType || 'percentage';
       inactiveApplication.promoCode = promoCode.toUpperCase();
       inactiveApplication.termsAndConditions = termsAndConditions;
-      inactiveApplication.validFrom = validFrom ? new Date(validFrom) : new Date();
-      inactiveApplication.validUntil = validUntil ? new Date(validUntil) : null;
+      inactiveApplication.validFrom = validFrom ? (validFrom instanceof Date ? validFrom : new Date(validFrom)) : new Date();
+      inactiveApplication.validUntil = validUntil ? (validUntil instanceof Date ? validUntil : new Date(validUntil)) : null;
       inactiveApplication.description = description || '';
       inactiveApplication.category = category || '';
       inactiveApplication.isActive = true;
       inactiveApplication.logoUrl = buildAbsoluteLogoUrl(
         vendor.vendorLogoPath || vendor.logoUrl || vendor.companyLogo
       );
-      await inactiveApplication.save();
+      
+      // Save with error handling for unique constraint
+      try {
+        await inactiveApplication.save();
+      } catch (saveError) {
+        // If save fails due to unique constraint on vendor field, 
+        // it means there's already an application with this vendor ID
+        // In this case, we should update that one instead
+        if (saveError.code === 11000 && saveError.message && saveError.message.includes('vendor')) {
+          const existingAppWithVendor = await VendorLoyaltyProgram.findOne({ vendor: vendorId });
+          if (existingAppWithVendor) {
+            // Update the existing application instead
+            existingAppWithVendor.vendorName = vendor.companyName || `${vendor.firstName} ${vendor.lastName}`;
+            existingAppWithVendor.discountRate = discountRate;
+            existingAppWithVendor.discountType = discountType || 'percentage';
+            existingAppWithVendor.promoCode = promoCode.toUpperCase();
+            existingAppWithVendor.termsAndConditions = termsAndConditions;
+            existingAppWithVendor.validFrom = validFrom ? (validFrom instanceof Date ? validFrom : new Date(validFrom)) : new Date();
+            existingAppWithVendor.validUntil = validUntil ? (validUntil instanceof Date ? validUntil : new Date(validUntil)) : null;
+            existingAppWithVendor.description = description || '';
+            existingAppWithVendor.category = category || '';
+            existingAppWithVendor.isActive = true;
+            existingAppWithVendor.logoUrl = buildAbsoluteLogoUrl(
+              vendor.vendorLogoPath || vendor.logoUrl || vendor.companyLogo
+            );
+            await existingAppWithVendor.save();
+            inactiveApplication = existingAppWithVendor;
+          } else {
+            throw saveError; // Re-throw if we can't handle it
+          }
+        } else {
+          throw saveError; // Re-throw other errors
+        }
+      }
 
       // Notify Staff, TA, Professor, and Student users about the reactivated loyalty program application
       try {
@@ -1012,8 +1084,8 @@ module.exports.applyToLoyaltyProgram = async (req, res) => {
       discountType: discountType || 'percentage',
       promoCode: promoCode.toUpperCase(),
       termsAndConditions,
-      validFrom: validFrom ? new Date(validFrom) : new Date(),
-      validUntil: validUntil ? new Date(validUntil) : null,
+      validFrom: validFrom ? (validFrom instanceof Date ? validFrom : new Date(validFrom)) : new Date(),
+      validUntil: validUntil ? (validUntil instanceof Date ? validUntil : new Date(validUntil)) : null,
       isActive: true,
       logoUrl: buildAbsoluteLogoUrl(
         vendor.vendorLogoPath || vendor.logoUrl || vendor.companyLogo
@@ -1049,6 +1121,99 @@ module.exports.applyToLoyaltyProgram = async (req, res) => {
     });
   } catch (error) {
     console.error('Error applying to loyalty program:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error code:', error.code);
+    
+    // Handle duplicate key error (unique index violation)
+    if (error.code === 11000 || error.name === 'MongoServerError') {
+      // Check if it's a duplicate vendor or vendorName error
+      if (error.message && (error.message.includes('vendor') || error.message.includes('vendorName'))) {
+        // Try to find and reactivate the existing application
+        try {
+          // Get vendor info if we have vendorId
+          let vendor = null;
+          if (vendorId) {
+            vendor = await User.findById(vendorId);
+          }
+          
+          // Try to find by vendor ID first
+          let existingApp = vendorId ? await VendorLoyaltyProgram.findOne({ vendor: vendorId }) : null;
+          
+          // If not found by vendor ID, try by vendorName (case-insensitive)
+          if (!existingApp && vendor) {
+            const vendorName = vendor.companyName || `${vendor.firstName} ${vendor.lastName}`;
+            existingApp = await VendorLoyaltyProgram.findOne({
+              $or: [
+                { vendorName: { $regex: new RegExp(`^${vendorName}$`, 'i') } },
+                { vendor: vendorId }
+              ]
+            });
+          }
+          
+          if (existingApp && vendor) {
+            // Update vendor field if missing
+            if (!existingApp.vendor) {
+              existingApp.vendor = vendorId;
+            }
+            
+            // Get request body values for update
+            const { discountRate, discountType, promoCode, termsAndConditions, validFrom, validUntil, description, category } = req.body;
+            
+            existingApp.isActive = true;
+            if (discountRate !== undefined) existingApp.discountRate = discountRate;
+            if (discountType) existingApp.discountType = discountType || 'percentage';
+            if (promoCode) existingApp.promoCode = promoCode.toUpperCase();
+            if (termsAndConditions) existingApp.termsAndConditions = termsAndConditions;
+            if (validFrom !== undefined) existingApp.validFrom = validFrom ? (validFrom instanceof Date ? validFrom : new Date(validFrom)) : new Date();
+            if (validUntil !== undefined) existingApp.validUntil = validUntil ? (validUntil instanceof Date ? validUntil : new Date(validUntil)) : null;
+            if (description !== undefined) existingApp.description = description || '';
+            if (category !== undefined) existingApp.category = category || '';
+            existingApp.logoUrl = buildAbsoluteLogoUrl(
+              vendor.vendorLogoPath || vendor.logoUrl || vendor.companyLogo
+            );
+            await existingApp.save();
+            
+            return res.status(200).json({
+              success: true,
+              message: 'Loyalty program application reactivated successfully',
+              application: {
+                _id: existingApp._id,
+                vendorName: existingApp.vendorName,
+                discountRate: existingApp.discountRate,
+                discountType: existingApp.discountType,
+                promoCode: existingApp.promoCode,
+                termsAndConditions: existingApp.termsAndConditions,
+                validFrom: existingApp.validFrom,
+                validUntil: existingApp.validUntil,
+                isActive: existingApp.isActive,
+                createdAt: existingApp.createdAt,
+                updatedAt: existingApp.updatedAt
+              }
+            });
+          }
+        } catch (reactivateError) {
+          console.error('Error reactivating application:', reactivateError);
+          console.error('Reactivate error stack:', reactivateError.stack);
+        }
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'You already have a loyalty program application. Please update it instead.',
+        error: error.message
+      });
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message).join(', ');
+      return res.status(400).json({
+        success: false,
+        message: `Validation error: ${validationErrors}`,
+        error: error.message
+      });
+    }
+    
     return res.status(500).json({
       success: false,
       message: 'Error submitting loyalty program application',
@@ -1074,12 +1239,43 @@ module.exports.getMyLoyaltyApplication = async (req, res) => {
     // Find vendor's loyalty program application (active or inactive) by vendor ID
     // Fallback to vendorName for backwards compatibility with old records
     const vendorName = vendor.companyName || `${vendor.firstName} ${vendor.lastName}`;
-    const application = await VendorLoyaltyProgram.findOne({
-      $or: [
-        { vendor: vendorId },
-        { vendorName: vendorName, vendor: { $exists: false } } // Only match by name if vendor field doesn't exist (old records)
-      ]
-    });
+    
+    // First try to find by vendor ID
+    let application = await VendorLoyaltyProgram.findOne({ vendor: vendorId });
+    
+    // If not found by vendor ID, try by vendorName (case-insensitive) for old records
+    if (!application) {
+      // Try exact match first
+      application = await VendorLoyaltyProgram.findOne({
+        vendorName: vendorName,
+        vendor: { $exists: false }
+      });
+      
+      // If still not found, try case-insensitive match
+      if (!application) {
+        application = await VendorLoyaltyProgram.findOne({
+          vendorName: { $regex: new RegExp(`^${vendorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          vendor: { $exists: false }
+        });
+      }
+      
+      // If found by name, update it to have the current vendor ID
+      if (application && !application.vendor) {
+        application.vendor = vendorId;
+        try {
+          await application.save();
+        } catch (updateError) {
+          // If update fails due to unique constraint, there might be another app with this vendor ID
+          // In that case, return that one instead
+          if (updateError.code === 11000) {
+            const appByVendorId = await VendorLoyaltyProgram.findOne({ vendor: vendorId });
+            if (appByVendorId) {
+              application = appByVendorId;
+            }
+          }
+        }
+      }
+    }
 
     if (!application) {
       return res.status(404).json({

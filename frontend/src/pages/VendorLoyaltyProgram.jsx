@@ -78,26 +78,77 @@ const VendorLoyaltyProgram = () => {
       }
       if (res && res.success) {
         const successMsg = res.message || (formMode === 'update' ? 'Application updated successfully' : 'Application submitted successfully');
+        // Clear any previous errors
+        setError('');
         setSuccess(successMsg);
         setModalMessage(successMsg);
         setShowSuccessModal(true);
-        // Refresh the application data
-        const appRes = await vendorApi.getMyLoyaltyApplication();
-        if (appRes && appRes.success) {
-          setExistingApp(appRes.application || null);
+        
+        // Use the application data from the response if available
+        if (res.application) {
+          setExistingApp(res.application);
+          setFormMode('update');
+          // Populate form with existing application data
+          setForm({
+            discountRate: res.application.discountRate || '',
+            discountType: res.application.discountType || 'percentage',
+            promoCode: res.application.promoCode || '',
+            termsAndConditions: res.application.termsAndConditions || '',
+            validFrom: res.application.validFrom ? new Date(res.application.validFrom).toISOString().split('T')[0] : '',
+            validUntil: res.application.validUntil ? new Date(res.application.validUntil).toISOString().split('T')[0] : '',
+            description: res.application.description || '',
+            category: res.application.category || ''
+          });
+        } else {
+          // If no application in response, try to fetch it (but don't show error if it fails)
+          try {
+            const appRes = await vendorApi.getMyLoyaltyApplication();
+            if (appRes && appRes.success && appRes.application) {
+              setExistingApp(appRes.application);
+              setFormMode('update');
+              // Populate form with existing application data
+              setForm({
+                discountRate: appRes.application.discountRate || '',
+                discountType: appRes.application.discountType || 'percentage',
+                promoCode: appRes.application.promoCode || '',
+                termsAndConditions: appRes.application.termsAndConditions || '',
+                validFrom: appRes.application.validFrom ? new Date(appRes.application.validFrom).toISOString().split('T')[0] : '',
+                validUntil: appRes.application.validUntil ? new Date(appRes.application.validUntil).toISOString().split('T')[0] : '',
+                description: appRes.application.description || '',
+                category: appRes.application.category || ''
+              });
+            } else {
+              // Clear form and reset mode if no application found
+              setForm({
+                discountRate: '',
+                discountType: 'percentage',
+                promoCode: '',
+                termsAndConditions: '',
+                validFrom: '',
+                validUntil: '',
+                description: '',
+                category: ''
+              });
+              setFormMode('create');
+            }
+          } catch (fetchErr) {
+            // Silently handle fetch errors - don't show error modal
+            // The application was successfully created/updated, so we don't need to show an error
+            console.log('Could not fetch application after submission (this is okay):', fetchErr);
+            // Clear form and reset mode
+            setForm({
+              discountRate: '',
+              discountType: 'percentage',
+              promoCode: '',
+              termsAndConditions: '',
+              validFrom: '',
+              validUntil: '',
+              description: '',
+              category: ''
+            });
+            setFormMode('create');
+          }
         }
-        // Clear form and reset mode
-        setForm({
-          discountRate: '',
-          discountType: 'percentage',
-          promoCode: '',
-          termsAndConditions: '',
-          validFrom: '',
-          validUntil: '',
-          description: '',
-          category: ''
-        });
-        setFormMode('create');
       } else {
         const errorMsg = res?.message || (formMode === 'update' ? 'Failed to update application' : 'Failed to submit application');
         setError(errorMsg);
