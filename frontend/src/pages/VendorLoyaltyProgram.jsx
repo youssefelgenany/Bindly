@@ -527,63 +527,67 @@ const VendorLoyaltyProgram = () => {
         </div>
       </header>
 
-      <main style={{ flex: 1, padding: '2rem 4rem' }}>
-        {/* Back button removed per vendor UX: keep vendor on loyalty page */}
-
-        <div style={{ 
-          position: 'relative', 
-          height: '140px', 
-          borderRadius: '0.75rem', 
-          overflow: 'hidden', 
-          marginBottom: '1.5rem', 
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-          animation: 'fadeInUp 0.6s ease-out'
+      <main style={{ flex: 1, padding: '2rem 0', overflowY: 'auto', backgroundColor: '#f6f7f8' }}>
+        {/* Content Wrapper with Margins */}
+        <div style={{
+          marginLeft: '4rem',
+          marginRight: '4rem'
         }}>
-          <style>{`
-            @keyframes fadeInUp {
-              from {
-                opacity: 0;
-                transform: translateY(20px);
-              }
-              to {
-                opacity: 1;
-                transform: translateY(0);
-              }
-            }
-            @keyframes slideInRight {
-              from {
-                opacity: 0;
-                transform: translateX(30px);
-              }
-              to {
-                opacity: 1;
-                transform: translateX(0);
-              }
-            }
-            @keyframes pulse {
-              0%, 100% { transform: scale(1); opacity: 1; }
-              50% { transform: scale(1.05); opacity: 0.9; }
-            }
-          `}</style>
-          <div style={{ 
-            position: 'absolute', 
-            inset: 0, 
-            backgroundImage: 'url(/assets/images/LoyaltyProgram.png)', 
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            backgroundSize: 'cover', 
-            filter: 'blur(2px)',
-            animation: 'pulse 4s ease-in-out infinite'
-          }}></div>
-          <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(29, 53, 87, 0.75)'}}></div>
-          <div style={{ position: 'relative', zIndex: 10, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '2rem', color: '#fff' }}>
-            <h3 style={{ margin: 0, fontSize: '1.75rem', animation: 'slideInRight 0.8s ease-out' }}>GUC Loyalty Program</h3>
-            <p style={{ margin: 0, animation: 'slideInRight 0.8s ease-out 0.2s both' }}>Apply to the GUC Loyalty Program to offer discounts to the campus community.</p>
-          </div>
-        </div>
+          {/* Back button removed per vendor UX: keep vendor on loyalty page */}
 
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <div style={{ width: '720px', background: '#fff', padding: '1.5rem', borderRadius: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <div style={{ 
+            position: 'relative', 
+            height: '140px', 
+            borderRadius: '0.75rem', 
+            overflow: 'hidden', 
+            marginBottom: '1.5rem', 
+            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+            animation: 'fadeInUp 0.6s ease-out'
+          }}>
+            <style>{`
+              @keyframes fadeInUp {
+                from {
+                  opacity: 0;
+                  transform: translateY(20px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+              }
+              @keyframes slideInRight {
+                from {
+                  opacity: 0;
+                  transform: translateX(30px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateX(0);
+                }
+              }
+              @keyframes pulse {
+                0%, 100% { transform: scale(1); opacity: 1; }
+                50% { transform: scale(1.05); opacity: 0.9; }
+              }
+            `}</style>
+            <div style={{ 
+              position: 'absolute', 
+              inset: 0, 
+              backgroundImage: 'url(/assets/images/LoyaltyProgram.png)', 
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover', 
+              filter: 'blur(2px)',
+              animation: 'pulse 4s ease-in-out infinite'
+            }}></div>
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(29, 53, 87, 0.75)'}}></div>
+            <div style={{ position: 'relative', zIndex: 10, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '2rem 2.5rem', color: '#fff' }}>
+              <h3 style={{ margin: 0, fontSize: '1.75rem', animation: 'slideInRight 0.8s ease-out' }}>GUC Loyalty Program</h3>
+              <p style={{ margin: 0, animation: 'slideInRight 0.8s ease-out 0.2s both' }}>Apply to the GUC Loyalty Program to offer discounts to the campus community.</p>
+            </div>
+          </div>
+
+          <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', animation: 'fadeInUp 0.6s ease-out 0.2s both' }}>
             {initialLoading ? (
               <div style={{ padding: '2rem', textAlign: 'center' }}>Loading…</div>
             ) : existingApp ? (
