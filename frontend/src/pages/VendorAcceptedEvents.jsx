@@ -1059,15 +1059,16 @@ const VendorAcceptedEvents = () => {
                                 style={{
                                   padding: '0.625rem 1.25rem',
                                   borderRadius: '0.375rem',
-                                  backgroundColor: '#f3f4f6',
-                                  color: '#6b7280',
-                                  border: '1px solid #e5e7eb',
+                                  backgroundColor: '#10b981',
+                                  color: '#FFFFFF',
+                                  border: '1px solid #10b981',
                                   cursor: 'not-allowed',
                                   fontSize: '0.875rem',
                                   fontWeight: '500',
                                   transition: 'all 0.2s',
                                   minWidth: '100px',
-                                  textAlign: 'center'
+                                  textAlign: 'center',
+                                  opacity: 0.9
                                 }}
                               >
                                 Paid
