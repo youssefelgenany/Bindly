@@ -94,9 +94,22 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
 
   const handleFileChange = (e, idx) => {
     const file = e.target.files && e.target.files[0];
+    if (file) {
+      const nextFiles = [...(formData.attendeeFiles || [])];
+      nextFiles[idx] = file;
+      setFormData(prev => ({ ...prev, attendeeFiles: nextFiles }));
+    }
+  };
+
+  const handleRemoveFile = (idx) => {
     const nextFiles = [...(formData.attendeeFiles || [])];
-    nextFiles[idx] = file || null;
+    nextFiles[idx] = null;
     setFormData(prev => ({ ...prev, attendeeFiles: nextFiles }));
+    // Reset the file input
+    const fileInput = document.getElementById(`attendeeFile_${idx}`);
+    if (fileInput) {
+      fileInput.value = '';
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -465,19 +478,75 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
                     />
                   </div>
                   <div>
-                    <FileChooser
-                      id={`platform_attendee_${idx}`}
-                      accept="image/*,application/pdf"
-                      onChange={(e) => handleFileChange(e, idx)}
-                      disabled={loading}
-                      buttonLabel="Choose File"
-                      showName={true}
-                      ariaLabel={`Attendee ${idx + 1} ID file`}
-                    />
-                    {formData.attendeeFiles && formData.attendeeFiles[idx] && (
-                      <div style={{ marginTop: '0.25rem', color: '#374151', fontSize: '0.75rem' }}>
-                        {formData.attendeeFiles[idx].name}
+                    {formData.attendeeFiles && formData.attendeeFiles[idx] ? (
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.5rem 0.75rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        position: 'relative'
+                      }}>
+                        <span className="material-symbols-outlined" style={{
+                          fontSize: '1.25rem',
+                          color: formData.attendeeFiles[idx].type === 'application/pdf' ? '#ef4444' : '#3b82f6'
+                        }}>
+                          {formData.attendeeFiles[idx].type === 'application/pdf' ? 'description' : 'image'}
+                        </span>
+                        <span style={{
+                          fontSize: '0.875rem',
+                          color: '#374151',
+                          maxWidth: '200px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {formData.attendeeFiles[idx].name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFile(idx)}
+                          disabled={loading}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            padding: '0.25rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ef4444',
+                            borderRadius: '50%',
+                            transition: 'all 0.2s',
+                            opacity: loading ? 0.5 : 1
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!loading) {
+                              e.target.style.backgroundColor = '#fee2e2';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'transparent';
+                          }}
+                          title="Remove file"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                            close
+                          </span>
+                        </button>
                       </div>
+                    ) : (
+                      <FileChooser
+                        id={`platform_attendee_${idx}`}
+                        accept="image/*,application/pdf"
+                        onChange={(e) => handleFileChange(e, idx)}
+                        disabled={loading}
+                        buttonLabel="Upload ID"
+                        showName={false}
+                        ariaLabel={`Attendee ${idx + 1} ID file`}
+                      />
                     )}
                   </div>
                   {formData.attendees.length > 1 && (

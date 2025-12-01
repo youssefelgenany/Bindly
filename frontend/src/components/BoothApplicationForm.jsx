@@ -130,9 +130,22 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
 
     const handleFileChange = (e, idx) => {
         const file = e.target.files && e.target.files[0];
+        if (file) {
+            const nextFiles = [...(formData.attendeeFiles || [])];
+            nextFiles[idx] = file;
+            setFormData(prev => ({ ...prev, attendeeFiles: nextFiles }));
+        }
+    };
+
+    const handleRemoveFile = (idx) => {
         const nextFiles = [...(formData.attendeeFiles || [])];
-        nextFiles[idx] = file || null;
+        nextFiles[idx] = null;
         setFormData(prev => ({ ...prev, attendeeFiles: nextFiles }));
+        // Reset the file input
+        const fileInput = document.getElementById(`attendeeFile_${idx}`);
+        if (fileInput) {
+            fileInput.value = '';
+        }
     };
 
     return (
@@ -364,13 +377,14 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
                                         <div>
                                             {formData.attendeeFiles && formData.attendeeFiles[idx] ? (
                                                 <div style={{
-                                                    display: 'flex',
+                                                    display: 'inline-flex',
                                                     alignItems: 'center',
                                                     gap: '0.5rem',
                                                     padding: '0.5rem 0.75rem',
                                                     backgroundColor: '#f9fafb',
                                                     borderRadius: '0.5rem',
-                                                    border: '1px solid #e5e7eb'
+                                                    border: '1px solid #e5e7eb',
+                                                    position: 'relative'
                                                 }}>
                                                     <span className="material-symbols-outlined" style={{
                                                         fontSize: '1.25rem',
@@ -379,9 +393,9 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
                                                         {formData.attendeeFiles[idx].type === 'application/pdf' ? 'description' : 'image'}
                                                     </span>
                                                     <span style={{
-                                                        flex: 1,
                                                         fontSize: '0.875rem',
                                                         color: '#374151',
+                                                        maxWidth: '200px',
                                                         overflow: 'hidden',
                                                         textOverflow: 'ellipsis',
                                                         whiteSpace: 'nowrap'
@@ -390,14 +404,7 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
                                                     </span>
                                                     <button
                                                         type="button"
-                                                        onClick={() => {
-                                                            const nextFiles = [...(formData.attendeeFiles || [])];
-                                                            nextFiles[idx] = null;
-                                                            setFormData(prev => ({ ...prev, attendeeFiles: nextFiles }));
-                                                            // Reset the file input
-                                                            const fileInput = document.getElementById(`attendeeFile_${idx}`);
-                                                            if (fileInput) fileInput.value = '';
-                                                        }}
+                                                        onClick={() => handleRemoveFile(idx)}
                                                         disabled={submitting}
                                                         style={{
                                                             background: 'none',
@@ -408,11 +415,21 @@ const BoothApplicationForm = ({ booth, bazaar, onClose, onSubmit }) => {
                                                             alignItems: 'center',
                                                             justifyContent: 'center',
                                                             color: '#ef4444',
+                                                            borderRadius: '50%',
+                                                            transition: 'all 0.2s',
                                                             opacity: submitting ? 0.5 : 1
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            if (!submitting) {
+                                                                e.target.style.backgroundColor = '#fee2e2';
+                                                            }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.target.style.backgroundColor = 'transparent';
                                                         }}
                                                         title="Remove file"
                                                     >
-                                                        <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
                                                             close
                                                         </span>
                                                     </button>
