@@ -3370,10 +3370,13 @@ const EventsOfficeEventsView = () => {
                                                     <span className="material-symbols-outlined" style={{ fontSize: '0.75rem' }}>
                                                       schedule
                                                     </span>
-                                                    Requested: {new Date(request.createdAt).toLocaleDateString('en-US', { 
+                                                    Requested: {new Date(request.createdAt).toLocaleString('en-US', { 
                                                       year: 'numeric', 
                                                       month: 'short', 
-                                                      day: 'numeric' 
+                                                      day: 'numeric',
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true
                                                     })}
                                                   </p>
                                                 )}

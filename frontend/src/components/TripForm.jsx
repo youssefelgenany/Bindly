@@ -1,10 +1,19 @@
 import React from 'react';
 
 const TripForm = ({ onSubmit, loading = false, initialData = {}, submitLabel = 'Create Trip', loadingLabel = 'Creating...' }) => {
+  // Format price to preserve decimals - convert number to string to avoid rounding
+  const formatPrice = (price) => {
+    if (price === null || price === undefined || price === '') return '';
+    // If it's already a string, return as is
+    if (typeof price === 'string') return price;
+    // If it's a number, convert to string preserving decimals
+    return price.toString();
+  };
+
   const [formData, setFormData] = React.useState({
     name: initialData.name || '',
     location: initialData.location || '',
-    price: initialData.price || '',
+    price: formatPrice(initialData.price),
     description: initialData.description || '',
     startDate: initialData.startDate || '',
     endDate: initialData.endDate || '',
