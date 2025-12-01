@@ -1975,6 +1975,48 @@ const TAEventsView = () => {
                           </span>
                         </div>
                       )}
+                      {event.type === 'workshop' && event.faculty && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#9ca3af'
+                          }}>
+                            domain
+                          </span>
+                          <span>Faculty: {event.faculty}</span>
+                        </div>
+                      )}
+                      {event.type === 'workshop' && event.agenda && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#9ca3af',
+                            marginTop: '0.125rem',
+                            flexShrink: 0
+                          }}>
+                            event_note
+                          </span>
+                          <span style={{
+                            color: '#6b7280',
+                            fontSize: '0.75rem',
+                            lineHeight: '1.4'
+                          }}>
+                            {event.agenda}
+                          </span>
+                        </div>
+                      )}
                       {event.type === 'conference' && event.website && (
                         <div style={{
                           display: 'flex',
@@ -2004,6 +2046,31 @@ const TAEventsView = () => {
                           >
                             {event.website}
                           </a>
+                        </div>
+                      )}
+                      {event.type === 'conference' && event.agenda && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#9ca3af',
+                            marginTop: '0.125rem',
+                            flexShrink: 0
+                          }}>
+                            event_note
+                          </span>
+                          <span style={{
+                            color: '#6b7280',
+                            fontSize: '0.75rem',
+                            lineHeight: '1.4'
+                          }}>
+                            {event.agenda}
+                          </span>
                         </div>
                       )}
                       {(event.type === 'bazaar' || event.type === 'conference') && event.description && (

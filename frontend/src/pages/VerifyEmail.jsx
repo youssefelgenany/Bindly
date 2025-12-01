@@ -11,6 +11,7 @@ const VerifyEmail = () => {
   // Handle verification token from URL
   useEffect(() => {
     const tokenFromUrl = searchParams.get('token');
+    const emailFromUrl = searchParams.get('email');
 
     // If the verification token is present in the URL, call the backend
     // verify endpoint in `redirect=false` mode (returns JSON) and then
@@ -53,8 +54,14 @@ const VerifyEmail = () => {
         }
       };
       doVerify();
+    } else if (emailFromUrl) {
+      // User was redirected from signup with email parameter - show success message
+      // Don't set loading or message, let the default UI show
+      setLoading(false);
+      setMessage('');
+      setMessageType('');
     } else {
-      // No token in URL - show error
+      // No token and no email - show error
       setMessage('Verification link is invalid or expired');
       setMessageType('error');
     }
@@ -142,8 +149,8 @@ const VerifyEmail = () => {
               </svg>
             </div>
 
-            {/* Title - Only show when not verifying */}
-            {!loading && !message && (
+            {/* Title - Show when not verifying and not showing error */}
+            {!loading && (!message || messageType !== 'error') && (
               <>
                 <h1 style={{
                   fontFamily: 'Manrope, sans-serif',
@@ -168,40 +175,86 @@ const VerifyEmail = () => {
                   We've sent a verification link to your email. Click the link to verify your account and you'll be redirected to the login page.
                 </p>
 
-                {/* Information Alert Box */}
-                <div style={{
-                  width: '100%',
-                  backgroundColor: '#E8F4F8',
-                  border: '1px solid #457B9D',
-                  borderRadius: '0.5rem',
-                  padding: '0.875rem',
-                  display: 'flex',
-                  gap: '0.75rem',
-                  alignItems: 'flex-start',
-                  textAlign: 'left'
-                }}>
-                  <svg 
-                    style={{ width: '1.125rem', height: '1.125rem', color: '#1D3557', flexShrink: 0, marginTop: '0.125rem' }}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path 
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <p style={{
-                    fontSize: '0.8125rem',
-                    color: '#1D3557',
-                    margin: 0,
-                    lineHeight: '1.4'
+                {/* Success Alert Box - Show when redirected from signup */}
+                {searchParams.get('email') && !searchParams.get('token') && (
+                  <div style={{
+                    width: '100%',
+                    backgroundColor: '#D4EDDA',
+                    border: '1px solid #28A745',
+                    borderRadius: '0.5rem',
+                    padding: '0.875rem',
+                    display: 'flex',
+                    gap: '0.75rem',
+                    alignItems: 'flex-start',
+                    textAlign: 'left'
                   }}>
-                    You must verify your email before you can log in. Login will fail if you haven't clicked the verification link.
-                  </p>
-                </div>
+                    <svg 
+                      style={{ 
+                        width: '1.125rem', 
+                        height: '1.125rem', 
+                        color: '#28A745', 
+                        flexShrink: 0, 
+                        marginTop: '0.125rem' 
+                      }}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path 
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    <p style={{
+                      fontSize: '0.8125rem',
+                      color: '#155724',
+                      margin: 0,
+                      lineHeight: '1.4',
+                      fontWeight: '600'
+                    }}>
+                      Verification link sent successfully!
+                    </p>
+                  </div>
+                )}
+
+                {/* Information Alert Box - Show when not showing success box */}
+                {(!searchParams.get('email') || searchParams.get('token')) && (
+                  <div style={{
+                    width: '100%',
+                    backgroundColor: '#E8F4F8',
+                    border: '1px solid #457B9D',
+                    borderRadius: '0.5rem',
+                    padding: '0.875rem',
+                    display: 'flex',
+                    gap: '0.75rem',
+                    alignItems: 'flex-start',
+                    textAlign: 'left'
+                  }}>
+                    <svg 
+                      style={{ width: '1.125rem', height: '1.125rem', color: '#1D3557', flexShrink: 0, marginTop: '0.125rem' }}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path 
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <p style={{
+                      fontSize: '0.8125rem',
+                      color: '#1D3557',
+                      margin: 0,
+                      lineHeight: '1.4'
+                    }}>
+                      You must verify your email before you can log in. Login will fail if you haven't clicked the verification link.
+                    </p>
+                  </div>
+                )}
               </>
             )}
 
