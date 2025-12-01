@@ -470,7 +470,7 @@ const PlatformBoothsModal = ({ isOpen, onClose, onSuccess }) => {
                       accept="image/*,application/pdf"
                       onChange={(e) => handleFileChange(e, idx)}
                       disabled={loading}
-                      buttonLabel="Choose File"
+                      buttonLabel="Upload ID"
                       showName={true}
                       ariaLabel={`Attendee ${idx + 1} ID file`}
                     />

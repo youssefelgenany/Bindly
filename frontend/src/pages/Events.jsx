@@ -768,7 +768,14 @@ const Events = () => {
                             display: 'flex',
                             justifyContent: 'space-between'
                           }}>
-                            <span>Submitted: {new Date(vendorRequest.createdAt).toLocaleDateString()}</span>
+                            <span>Submitted: {new Date(vendorRequest.createdAt).toLocaleString('en-US', { 
+                              year: 'numeric', 
+                              month: 'short', 
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            })}</span>
                             <span>Event: {vendorRequest.eventName}</span>
                           </div>
                         </div>
