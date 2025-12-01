@@ -25,7 +25,7 @@ const PendingVerification = () => {
       width: '100%',
       flexDirection: 'column',
       overflow: 'hidden',
-      backgroundColor: '#FFFFFF',
+      backgroundColor: '#fbfbfb',
       fontFamily: 'Manrope, sans-serif'
     }}>
       <div style={{
@@ -42,7 +42,7 @@ const PendingVerification = () => {
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#FFFFFF',
+          backgroundColor: '#fbfbfb',
           padding: '1.5rem',
           overflowY: 'auto',
           overflowX: 'hidden'
@@ -65,9 +65,9 @@ const PendingVerification = () => {
               gap: '0.75rem'
             }}>
               <img
-                src="/assets/images/Login-logo.png"
+                src="/assets/images/login-logo.jpeg"
                 alt="Bindly Logo"
-                style={{ height: '3rem', width: 'auto', objectFit: 'contain' }}
+                style={{ height: 'auto', width: 'auto', maxHeight: '5rem', maxWidth: '100%', objectFit: 'contain' }}
               />
             </div>
             
