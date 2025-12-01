@@ -624,7 +624,7 @@ const VendorMyRequests = () => {
                 margin: 0,
                 animation: 'slideInRight 0.8s ease-out 0.2s both'
               }}>
-                View all requests for upcoming bazaars or booth setups you want to participate in (pending or rejected).
+                View all requests for upcoming bazaars or booth setups you want to participate in.
               </p>
             </div>
           </div>
