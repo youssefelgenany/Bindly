@@ -1769,57 +1769,6 @@ const StaffDashboard = () => {
                         </div>
                     </section>
 
-                    {/* Quick Actions */}
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <h3 style={{
-                            color: '#1D3557',
-                            fontSize: '1.125rem',
-                            fontWeight: '600',
-                            marginBottom: '1rem',
-                            marginTop: 0
-                        }}>
-                            Quick Actions
-                        </h3>
-                        <div style={{
-                            display: 'flex',
-                            gap: '1rem',
-                            flexWrap: 'wrap'
-                        }}>
-                            <button
-                                onClick={() => navigate('/staff/loyalty-vendors')}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    padding: '0.75rem 1.5rem',
-                                    backgroundColor: '#1D3557',
-                                    color: '#FFFFFF',
-                                    border: 'none',
-                                    borderRadius: '0.5rem',
-                                    fontSize: '0.875rem',
-                                    fontWeight: '500',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.target.style.backgroundColor = '#152a47';
-                                    e.target.style.transform = 'translateY(-1px)';
-                                    e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.target.style.backgroundColor = '#1D3557';
-                                    e.target.style.transform = 'translateY(0)';
-                                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                                }}
-                            >
-                                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                    local_offer
-                                </span>
-                                View Loyalty Partners
-                            </button>
-                        </div>
-                    </div>
 
                     {/* Recent Activity and Upcoming Deadlines */}
                     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
