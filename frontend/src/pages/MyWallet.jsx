@@ -323,20 +323,15 @@ const MyWallet = () => {
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem 2.5rem',
-          backgroundColor: '#1D3557'
+          backgroundColor: '#182e4d'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
             <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <h2 style={{
-                color: '#FFFFFF',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                lineHeight: '1.25',
-                margin: 0,
-                cursor: 'pointer'
-              }}>
-                Bindly
-              </h2>
+              <img
+                src="/assets/images/bindly-logo.png"
+                alt="Bindly Logo"
+                style={{ height: '3rem', width: 'auto', objectFit: 'contain', cursor: 'pointer' }}
+              />
             </Link>
           </div>
 
@@ -898,20 +893,15 @@ const MyWallet = () => {
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem 2.5rem',
-          backgroundColor: '#1D3557'
+          backgroundColor: '#182e4d'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
             <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <h2 style={{
-                color: '#FFFFFF',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                lineHeight: '1.25',
-                margin: 0,
-                cursor: 'pointer'
-              }}>
-                Bindly
-              </h2>
+              <img
+                src="/assets/images/bindly-logo.png"
+                alt="Bindly Logo"
+                style={{ height: '3rem', width: 'auto', objectFit: 'contain', cursor: 'pointer' }}
+              />
             </Link>
           </div>
 
@@ -1699,16 +1689,11 @@ const MyWallet = () => {
         }}>
           <div>
             <Link to="/dashboard" style={{ textDecoration: 'none' }}>
-              <h2 style={{
-                color: '#1D3557',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                lineHeight: '1.25',
-                margin: 0,
-                cursor: 'pointer'
-              }}>
-                Bindly
-              </h2>
+              <img
+                src="/assets/images/bindly-logo.png"
+                alt="Bindly Logo"
+                style={{ height: '3rem', width: 'auto', objectFit: 'contain', cursor: 'pointer' }}
+              />
             </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
