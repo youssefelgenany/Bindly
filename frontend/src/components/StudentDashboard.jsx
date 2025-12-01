@@ -176,47 +176,126 @@ const StudentDashboard = () => {
             setLoading(true);
             
             // Fetch events from discover events for upcoming events preview
+            // Use getStudentEvents to get discover events (excludes registered events)
             try {
-                const eventsResult = await eventsApiService.getAllEventsAuthenticated({});
+                const eventsResult = await eventsApiService.getStudentEvents({});
                 
                 if (eventsResult.success) {
-                    const eventsList = Array.isArray(eventsResult.data) ? eventsResult.data : (eventsResult.data?.events || []);
+                    // Handle different response structures
+                    let eventsList = [];
+                    if (Array.isArray(eventsResult.data)) {
+                        eventsList = eventsResult.data;
+                    } else if (eventsResult.data?.events && Array.isArray(eventsResult.data.events)) {
+                        eventsList = eventsResult.data.events;
+                    } else if (eventsResult.data && typeof eventsResult.data === 'object') {
+                        // Try to find any array in the response
+                        eventsList = Object.values(eventsResult.data).find(val => Array.isArray(val)) || [];
+                    }
+                    
+                    console.log('🔍 Upcoming Events - Total events fetched:', eventsList.length);
+                    console.log('🔍 Upcoming Events - Response structure:', {
+                        success: eventsResult.success,
+                        hasData: !!eventsResult.data,
+                        dataType: typeof eventsResult.data,
+                        isArray: Array.isArray(eventsResult.data),
+                        hasEvents: !!eventsResult.data?.events,
+                        eventsListLength: eventsList.length
+                    });
+                    console.log('🔍 Upcoming Events - Events sample:', eventsList.slice(0, 3).map(ev => ({ 
+                        title: ev.title, 
+                        type: ev.type, 
+                        startDate: ev.startDate,
+                        id: ev._id || ev.id 
+                    })));
                     
                     const now = new Date();
-                    // Filter for upcoming events (future dates)
+                    
+                    // Separate upcoming and past events
                     const upcoming = eventsList.filter(ev => {
                         if (!ev.startDate) return false;
                         const date = new Date(ev.startDate);
                         return !isNaN(date.getTime()) && date > now;
                     });
+                    
+                    const past = eventsList.filter(ev => {
+                        if (!ev.startDate) return false;
+                        const date = new Date(ev.startDate);
+                        return !isNaN(date.getTime()) && date <= now;
+                    });
+                    
+                    console.log('🔍 Upcoming Events - Upcoming count:', upcoming.length);
+                    console.log('🔍 Upcoming Events - Past count:', past.length);
 
-                    // Sort by date
-                    const sortedByDate = upcoming.slice().sort((a, b) => {
+                    // Sort upcoming by date (earliest first)
+                    const sortedUpcoming = upcoming.slice().sort((a, b) => {
                         const dateA = new Date(a.startDate || 0);
                         const dateB = new Date(b.startDate || 0);
                         return dateA - dateB;
                     });
+                    
+                    // Sort past by date (most recent first)
+                    const sortedPast = past.slice().sort((a, b) => {
+                        const dateA = new Date(a.startDate || 0);
+                        const dateB = new Date(b.startDate || 0);
+                        return dateB - dateA;
+                    });
+                    
+                    // Combine: upcoming first, then past (to always have events to show)
+                    const sortedByDate = [...sortedUpcoming, ...sortedPast];
+                    
+                    console.log('🔍 Upcoming Events - Sorted events (upcoming + past):', sortedByDate.length);
+                    console.log('🔍 Upcoming Events - Event types:', sortedByDate.map(ev => ev.type));
 
                     // Select specific event types in order: Trip, Workshop, Bazaar, Conference/Booth
+                    // Always ensure different types are shown
                     const selectedEvents = [];
                     const priorityTypes = ['trip', 'workshop', 'bazaar', 'conference', 'booth'];
+                    
+                    // Helper function to normalize event type (handle platformBooth as booth)
+                    const normalizeEventType = (type) => {
+                        const normalized = (type || '').toLowerCase();
+                        return normalized === 'platformbooth' ? 'booth' : normalized;
+                    };
+                    
+                    // Helper function to get unique types already selected
+                    const getSelectedTypes = () => {
+                        return new Set(selectedEvents.map(ev => normalizeEventType(ev.type)));
+                    };
                     
                     // First pass: get one of each priority type in order
                     for (const type of priorityTypes) {
                         if (selectedEvents.length >= 4) break;
                         const found = sortedByDate.find(ev => {
-                            const eventType = (ev.type || '').toLowerCase();
-                            return eventType === type && !selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id));
+                            const eventType = normalizeEventType(ev.type);
+                            const isAlreadySelected = selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id));
+                            return eventType === type && !isAlreadySelected;
                         });
                         if (found) {
                             selectedEvents.push(found);
                         }
                     }
                     
-                    // If we don't have 4 yet, fill with any remaining events
+                    // Second pass: fill with events of different types only (no duplicates)
+                    const selectedTypes = getSelectedTypes();
                     for (const ev of sortedByDate) {
                         if (selectedEvents.length >= 4) break;
-                        if (!selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id))) {
+                        const eventType = normalizeEventType(ev.type);
+                        const isAlreadySelected = selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id));
+                        const isDifferentType = !selectedTypes.has(eventType);
+                        
+                        // Only add if not already selected AND is a different type
+                        if (!isAlreadySelected && isDifferentType) {
+                            selectedEvents.push(ev);
+                            selectedTypes.add(eventType); // Update selected types set
+                        }
+                    }
+                    
+                    // Third pass: if we still don't have 4, fill with any remaining events
+                    // (This ensures we always show up to 4 events from discover events)
+                    for (const ev of sortedByDate) {
+                        if (selectedEvents.length >= 4) break;
+                        const isAlreadySelected = selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id));
+                        if (!isAlreadySelected) {
                             selectedEvents.push(ev);
                         }
                     }
@@ -239,6 +318,32 @@ const StudentDashboard = () => {
                         }
                     }));
 
+                    console.log('🔍 Upcoming Events - Selected events count:', selectedEvents.length);
+                    console.log('🔍 Upcoming Events - Selected event types:', selectedEvents.map(ev => ev.type));
+                    console.log('🔍 Upcoming Events - Selected event titles:', selectedEvents.map(ev => ev.title));
+                    
+                    // CRITICAL FIX: Always ensure we have events to show from discover events
+                    // If selection logic failed or we have fewer than 4, fill from all available events
+                    if (selectedEvents.length < 4 && sortedByDate.length > 0) {
+                        console.log('🔍 Upcoming Events - Filling remaining slots. Selected:', selectedEvents.length, 'Available:', sortedByDate.length);
+                        const selectedIds = new Set(selectedEvents.map(ev => String(ev._id || ev.id)));
+                        for (const ev of sortedByDate) {
+                            if (selectedEvents.length >= 4) break;
+                            const evId = String(ev._id || ev.id);
+                            if (!selectedIds.has(evId)) {
+                                selectedEvents.push(ev);
+                                selectedIds.add(evId);
+                            }
+                        }
+                        console.log('🔍 Upcoming Events - After fill, total selected:', selectedEvents.length);
+                    }
+                    
+                    // Final fallback: if still empty, just take first 4 events (should never happen but safety net)
+                    if (selectedEvents.length === 0 && sortedByDate.length > 0) {
+                        console.log('🔍 Upcoming Events - CRITICAL: No events selected, using emergency fallback');
+                        selectedEvents.push(...sortedByDate.slice(0, 4));
+                    }
+                    
                     const previewCards = selectedEvents
                         .slice(0, 4)
                         .map((ev) => {
@@ -261,12 +366,16 @@ const StudentDashboard = () => {
                                 typeLabel: ev.type || 'Event'
                             };
                         });
+                    
+                    console.log('🔍 Upcoming Events - Preview cards created:', previewCards.length);
                     setUpcomingEventsPreview(previewCards);
                 } else {
+                    console.error('🔍 Upcoming Events - API call failed:', eventsResult.message);
                     setUpcomingEventsPreview([]);
                 }
             } catch (eventsError) {
-                console.error('Error fetching events for upcoming events preview:', eventsError);
+                console.error('🔍 Upcoming Events - Error fetching events:', eventsError);
+                console.error('🔍 Upcoming Events - Error details:', eventsError.response?.data || eventsError.message);
                 setUpcomingEventsPreview([]);
             }
 

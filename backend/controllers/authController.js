@@ -36,12 +36,15 @@ const signupValidation = [
 // ==================== SIGNUP ====================
 const signup = async (req, res) => {
   try {
-    console.log('Signup request received:', {
+    console.log('🔵 Signup request received:', {
       body: req.body,
       files: req.files,
       contentType: req.headers['content-type'],
       bodyKeys: req.body ? Object.keys(req.body) : 'no body',
-      bodyType: typeof req.body
+      bodyType: typeof req.body,
+      userType: req.body?.userType,
+      hasFiles: !!req.files,
+      fileKeys: req.files ? Object.keys(req.files) : []
     });
 
     // Check if req.body exists
@@ -142,23 +145,87 @@ const signup = async (req, res) => {
       }
       userData.companyName = companyName;
 
-      // Handle file uploads for vendors (simplified)
-      const files = req.files || {};
-      const logo = files.vendorLogo && files.vendorLogo[0];
-      const tax = files.vendorTaxCard && files.vendorTaxCard[0];
+      // Handle file uploads for vendors (REQUIRED)
+      try {
+        const files = req.files || {};
+        const logo = files.vendorLogo && files.vendorLogo[0];
+        const tax = files.vendorTaxCard && files.vendorTaxCard[0];
 
-      if (logo) {
+        console.log('Vendor file upload check:', {
+          hasFiles: !!req.files,
+          filesKeys: req.files ? Object.keys(req.files) : [],
+          hasLogo: !!logo,
+          hasTax: !!tax,
+          logoFilename: logo?.filename,
+          taxFilename: tax?.filename
+        });
+
+        // Require both tax card and logo for vendors
+        if (!tax || !tax.filename) {
+          return res.status(400).json({
+            success: false,
+            message: 'Tax card is required for vendors. Please upload a tax card file.'
+          });
+        }
+        if (!logo || !logo.filename) {
+          return res.status(400).json({
+            success: false,
+            message: 'Company logo is required for vendors. Please upload a company logo file.'
+          });
+        }
+
         userData.vendorLogoPath = '/uploads/' + logo.filename;
-      }
-      if (tax) {
         userData.vendorTaxCardPath = '/uploads/' + tax.filename;
+        
+        console.log('✅ Vendor files processed successfully:', {
+          logoPath: userData.vendorLogoPath,
+          taxCardPath: userData.vendorTaxCardPath
+        });
+      } catch (fileError) {
+        console.error('❌ Error processing vendor files:', fileError);
+        console.error('File error stack:', fileError.stack);
+        return res.status(400).json({
+          success: false,
+          message: 'Error processing uploaded files. Please ensure both tax card and company logo are uploaded correctly.',
+          error: process.env.NODE_ENV === 'development' ? fileError.message : 'File processing error'
+        });
       }
     }
 
-    const newUser = new User(userData);
-    await newUser.save();
+    console.log('🔵 Creating user with data:', {
+      email: userData.email,
+      userType: userData.userType,
+      hasVendorFiles: !!(userData.vendorLogoPath && userData.vendorTaxCardPath),
+      userDataKeys: Object.keys(userData)
+    });
 
-    console.log('User created successfully:', newUser._id);
+    let newUser;
+    try {
+      newUser = new User(userData);
+      await newUser.save();
+      console.log('✅ User created successfully:', newUser._id);
+    } catch (saveError) {
+      console.error('❌ Error saving user to database:', saveError);
+      console.error('Save error details:', {
+        message: saveError.message,
+        name: saveError.name,
+        code: saveError.code,
+        errors: saveError.errors
+      });
+      
+      // If it's a validation error, return a more helpful message
+      if (saveError.name === 'ValidationError') {
+        const validationErrors = Object.values(saveError.errors).map(err => err.message).join(', ');
+        return res.status(400).json({
+          success: false,
+          message: `Validation error: ${validationErrors}`,
+          errors: saveError.errors
+        });
+      }
+      
+      // Re-throw to be caught by outer catch
+      throw saveError;
+    }
 
     const userResponse = {
       id: newUser._id,
@@ -242,8 +309,9 @@ const signup = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Internal server error',
-      error: error.message
+      message: 'Internal server error during signup',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred while creating your account. Please try again.',
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
     });
   }
 };

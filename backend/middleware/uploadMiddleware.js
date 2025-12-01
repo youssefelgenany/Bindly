@@ -81,7 +81,7 @@ function fileFilter(req, file, cb) {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB per file
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB per file (increased for vendor documents)
 });
 
 // Expect fields: vendorLogo, vendorTaxCard
