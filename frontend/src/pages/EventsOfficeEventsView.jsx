@@ -1882,7 +1882,7 @@ const EventsOfficeEventsView = () => {
                   marginBottom: '0.5rem',
                   animation: 'slideInRight 0.8s ease-out'
                 }}>
-                  All Upcoming Events
+                  All Events
                 </h3>
                 <p style={{
                   color: 'rgba(255, 255, 255, 0.9)',

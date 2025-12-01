@@ -667,7 +667,7 @@ const VendorAcceptedEvents = () => {
                   margin: 0,
                   animation: 'slideInRight 0.8s ease-out 0.2s both'
                 }}>
-                  View all upcoming bazaars and booth setups you are participating in (accepted requests only).
+                  View all upcoming bazaars and booth setups you are participating in.
                 </p>
               </div>
             </div>
