@@ -420,6 +420,37 @@ const TALoyaltyVendorsView = () => {
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', flex: '0 0 auto' }}>
+          {/* Heart Icon - Favorites */}
+          <Link
+            to="/ta/favorites"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              textDecoration: 'none',
+              color: 'inherit'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined" style={{
+              fontSize: '1.5rem',
+              color: '#FFFFFF'
+            }}>
+              favorite
+            </span>
+          </Link>
+
           {/* Notifications Bell */}
           <div style={{ position: 'relative' }} data-notifications-dropdown>
             <button
@@ -482,18 +513,20 @@ const TALoyaltyVendorsView = () => {
                 top: '100%',
                 right: 0,
                 marginTop: '0.5rem',
-                width: '22rem',
                 backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
                 borderRadius: '0.5rem',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                border: '1px solid #e5e7eb',
-                zIndex: 1000,
-                maxHeight: '32rem',
-                overflowY: 'auto'
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 1001,
+                width: '360px',
+                maxHeight: '500px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
               }}>
                 <div style={{
                   padding: '1rem',
-                  borderBottom: '1px solid #e5e7eb',
+                  borderBottom: '1px solid #e2e8f0',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
@@ -512,56 +545,69 @@ const TALoyaltyVendorsView = () => {
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#2563eb',
-                        fontSize: '0.75rem',
+                        color: '#1e40af',
                         cursor: 'pointer',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '0.25rem'
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        padding: '0.25rem 0.5rem'
                       }}
                       onMouseEnter={(e) => {
-                        e.target.style.backgroundColor = '#eff6ff';
+                        e.target.style.textDecoration = 'underline';
                       }}
                       onMouseLeave={(e) => {
-                        e.target.style.backgroundColor = 'transparent';
+                        e.target.style.textDecoration = 'none';
                       }}
                     >
                       Mark all as read
                     </button>
                   )}
                 </div>
-                {loadingNotifications ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
-                    Loading...
-                  </div>
-                ) : notifications.length === 0 ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
-                    No notifications
-                  </div>
-                ) : (
-                  <div>
-                    {notifications.map((notification) => (
+                <div style={{
+                  overflowY: 'auto',
+                  maxHeight: '400px'
+                }}>
+                  {loadingNotifications ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      Loading...
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }}>
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
                       <div
                         key={notification._id}
-                        onClick={async () => {
+                        onClick={() => {
                           if (!notification.isRead) {
-                            await handleMarkAsRead(notification._id);
+                            handleMarkAsRead(notification._id);
                           }
                           // All event-related notifications redirect to discover events
                           if ((notification.type === 'event_announcement' || notification.type === 'new_event' || 
-                               notification.type === 'event_reminder' || 
-                               notification.type === 'workshop_reminder' || 
+                               notification.type === 'event_reminder' ||
+                               notification.type === 'workshop_reminder' ||
                                notification.type === 'trip_reminder' ||
-                               notification.type === 'gym_session_reminder') && 
+                               notification.type === 'gym_session_reminder') &&
                               (notification.metadata?.eventId || notification.metadata?.workshopId || notification.metadata?.tripId || notification.metadata?.gymSessionId)) {
                             navigate('/ta/events');
                             setShowNotificationsDropdown(false);
                           } else if (
-                            notification.type === 'new_loyalty_partner' || 
+                            notification.type === 'new_loyalty_partner' ||
                             notification.type === 'loyalty_partner_added' ||
                             notification.type === 'loyalty_program_application' ||
                             (notification.type === 'system' && notification.metadata?.vendorId)
                           ) {
-                            // Already on Loyalty Partners page, just close dropdown
+                            navigate('/ta/loyalty-vendors');
                             setShowNotificationsDropdown(false);
                           }
                         }}
@@ -648,43 +694,12 @@ const TALoyaltyVendorsView = () => {
                           }} />
                         )}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>
-          
-          {/* Heart Icon - Favorites */}
-          <Link
-            to="/ta/favorites"
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.5rem',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s',
-              textDecoration: 'none',
-              color: 'inherit'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{
-              fontSize: '1.5rem',
-              color: '#FFFFFF'
-            }}>
-              favorite
-            </span>
-          </Link>
 
           <div style={{ textAlign: 'right' }}>
             <p style={{
@@ -746,28 +761,26 @@ const TALoyaltyVendorsView = () => {
                 right: 0,
                 marginTop: '0.5rem',
                 backgroundColor: '#FFFFFF',
+                border: '1px solid #e2e8f0',
                 borderRadius: '0.5rem',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                border: '1px solid #e5e7eb',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                 zIndex: 1000,
-                minWidth: '10rem',
-                overflow: 'hidden'
+                minWidth: '150px'
               }}>
                 <Link
                   to="/wallet"
                   style={{
                     width: '100%',
                     padding: '0.75rem 1rem',
-                    background: 'none',
-                    border: 'none',
                     textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
                     cursor: 'pointer',
-                    color: '#1D3557',
                     fontSize: '0.875rem',
+                    color: '#1D3557',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    transition: 'background-color 0.2s',
                     textDecoration: 'none'
                   }}
                   onMouseEnter={(e) => {
@@ -788,16 +801,15 @@ const TALoyaltyVendorsView = () => {
                   style={{
                     width: '100%',
                     padding: '0.75rem 1rem',
-                    background: 'none',
-                    border: 'none',
                     textAlign: 'left',
+                    backgroundColor: 'transparent',
+                    border: 'none',
                     cursor: 'pointer',
-                    color: '#1D3557',
                     fontSize: '0.875rem',
+                    color: '#1D3557',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.5rem',
-                    transition: 'background-color 0.2s'
+                    gap: '0.5rem'
                   }}
                   onMouseEnter={(e) => {
                     e.target.style.backgroundColor = '#f3f4f6';

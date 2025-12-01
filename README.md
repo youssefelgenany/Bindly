@@ -1,20 +1,116 @@
-# Bindly
 
-A comprehensive event management platform for the German University in Cairo (GUC), designed to facilitate event organization, registration, and management for students, staff, professors, vendors, and administrators.
+# Bindly  
+*A unified, role-aware, capacity-safe, university-specific event management platform for students, professors, staff, vendors, and administrators.*
 
-## 📋 Table of Contents
+Bindly is a comprehensive campus web application built to centralize university event operations and campus stakeholder workflows into one smart system.  
+Its main purpose is to handle **event creation, approval transparency, capacity-safe registration, document-verified vendor onboarding, real-time notifications, and campus bookings (courts & gym sessions)** — reducing operational chaos and human errors while improving collaboration and efficiency across the university.
 
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Environment Setup](#environment-setup)
-- [Running the Application](#running-the-application)
-- [Project Structure](#project-structure)
-- [API Documentation](#api-documentation)
-- [User Types](#user-types)
-- [Key Features](#key-features)
-- [Contributing](#contributing)
+
+## 🚀 Motivation
+
+We built **Bindly** to remove the fragmentation and operational chaos that happens when campus event workflows are managed across different groups and tools.  
+It solves the lack of coordination between:
+
+- **Students**
+- **Professors**
+- **Teaching Assistants**
+- **University Staff**
+- **Vendors**
+- **Administrators**
+- **Event Office**
+
+Bindly introduces:
+
+- A **structured approval and edit–request workflow**
+- **Capacity-safe event registration**
+- **Role-based event access and restrictions**
+- **Centralized communication and transparency**
+- **Vendor onboarding with verified documents**
+- **Real-time notifications and centralized dashboards**
+
+This platform is important because it:
+
+> ✅ saves time  
+> ✅ reduces human errors  
+> ✅ ensures transparency  
+> ✅ improves collaboration  
+> ✅ organizes data reliably  
+> ✅ and makes campus operations smoother and more dependable.
+
+## 🚧 Build Status
+
+The **Bindly platform** is fully developed, operational, and stable with all **core and optional modules implemented successfully**.  
+The system has undergone **end-to-end workflow testing, including event approvals, capacity-safe registration, vendor onboarding, payment webhooks, and notification delivery**, and is now ready for **deployment or future enhancements**.
+
+### ✅ Current State
+- No known bugs or runtime errors  
+- System considered stable and production-ready  
+- Future updates will focus on:
+  - Scalability improvements  
+  - System maintenance  
+  - Minor UX and interface refinements  
+  - Campus-specific feature extensions  
+
+> ❗ **Note:** Any references to upcoming issues or feature requests can be tracked via GitHub Issues or Pull Requests.
+
+
+## 🛠 Tech Stack
+
+### Backend
+- **Runtime & Framework**
+  - **Node.js** (Express.js)
+  - **MongoDB** with **Mongoose** ODM
+- **Auth & Security**
+  - **JWT** for authentication
+  - **bcryptjs** for password hashing
+- **Validation & APIs**
+  - **express-validator** for request validation
+  - **cors** for cross-origin resource sharing
+- **Payments & Emails**
+  - **Stripe** for payment processing
+  - **Nodemailer** for email services
+- **Files, Docs & QR**
+  - **Multer** for file uploads
+  - **PDFKit** for PDF generation
+  - **qrcode** for QR code generation
+- **Scheduling & Utilities**
+  - **node-cron** for scheduled jobs (e.g., notifications)
+  - **xlsx** for Excel import/export
+- **Tooling**
+  - **ESLint** (with **@eslint/js**, **globals**) for linting
+  - **nodemon** / **supervisor** for auto-restart in development
+  - **concurrently** for running backend & frontend together
+
+### Frontend
+- **Core**
+  - **React** + **React DOM**
+  - **React Router** for SPA routing
+- **Data & Realtime**
+  - **Axios** for HTTP/API calls
+  - **socket.io-client** for real-time features
+- **Build & Dev Tools**
+  - **create-react-app** tooling via **react-scripts**
+  - **http-proxy-middleware** for local API proxying
+  - **web-vitals** for basic performance metrics
+- **Testing**
+  - **@testing-library/react**
+  - **@testing-library/jest-dom**
+  - **@testing-library/user-event**
+
+## 📸 Screenshots
+
+### 1. Login Page
+![Login Page](screenshots/signin.png)
+
+### 2. signup page
+![Sign up page](screenshots/signup.png)
+
+### 3. eventoffice dashboard
+![Event office dashboard](screenshots/eventofficedashboard.png)
+
+### 4. admin dashboard
+![admin dashboard](screenshots/admindashboard.png)
+
 
 ## ✨ Features
 
@@ -50,124 +146,32 @@ A comprehensive event management platform for the German University in Cairo (GU
 - **Dashboard Analytics**: Role-based dashboards with statistics
 - **File Uploads**: Support for images, PDFs, and documents
 
-## 🛠 Tech Stack
+### Key Flows
 
-### Backend
-- **Node.js** with Express.js
-- **MongoDB** with Mongoose ODM
-- **JWT** for authentication
-- **Stripe** for payment processing
-- **Socket.IO** for real-time notifications
-- **Nodemailer** for email services
-- **Multer** for file uploads
-- **PDFKit** for PDF generation
-- **QRCode** for QR code generation
+#### Event Registration Flow
+1. Event creation by Staff/TA/Professor
+2. Admin approval/rejection
+3. Student/Professor registration
+4. Payment processing (if applicable)
+5. Confirmation emails with receipts
+6. Event completion tracking
 
-### Frontend
-- **React** with React Router
-- **Axios** for API calls
-- **Socket.IO Client** for real-time features
+#### Payment Flow
+1. User registers for paid event
+2. Stripe checkout session created
+3. Payment processed
+4. Webhook verification
+5. Registration confirmed
+6. Receipt email sent with QR code
 
-## 📦 Prerequisites
+#### Vendor Onboarding
+1. Vendor signs up with documents
+2. Admin reviews vendor request
+3. Admin approves/rejects vendor
+4. Vendor gains access to platform
+5. Vendor can request booths and participate in bazaars
 
-Before you begin, ensure you have the following installed:
-- **Node.js** (v14 or higher)
-- **npm** (v6 or higher)
-- **MongoDB Atlas** account (or local MongoDB instance)
-- **Stripe** account (for payment features)
 
-## 🚀 Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/dyalaelsmery/Bindly.git
-   cd Bindly
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm run install:all
-   ```
-   
-   This will install dependencies for:
-   - Root directory
-   - Backend directory
-   - Frontend directory
-
-## ⚙️ Environment Setup
-
-### Backend Environment Variables
-
-Create a `.env` file in the `backend` directory with the following variables:
-
-```env
-# MongoDB Configuration
-MONGO_URI=mongodb+srv://<username>:<password>@<cluster-host>/<db-name>?retryWrites=true&w=majority
-
-# Server Configuration
-PORT=5000
-NODE_ENV=development
-
-# JWT Configuration
-JWT_SECRET=your-jwt-secret-key
-JWT_EXPIRE=7d
-
-# Email Configuration (for Nodemailer)
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASS=your-app-password
-
-# Stripe Configuration (optional, for payment features)
-STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
-STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
-```
-
-### Frontend Configuration
-
-The frontend is configured to proxy API requests to `http://localhost:5000` by default (see `frontend/package.json`).
-
-## 🏃 Running the Application
-
-### Development Mode
-
-Run both backend and frontend concurrently:
-```bash
-npm run dev
-```
-
-### Run Separately
-
-**Backend only:**
-```bash
-npm run start:backend
-# or
-cd backend
-npm start
-```
-
-**Frontend only:**
-```bash
-npm run start:frontend
-# or
-cd frontend
-npm start
-```
-
-### Production Mode
-
-**Backend:**
-```bash
-cd backend
-NODE_ENV=production npm start
-```
-
-**Frontend:**
-```bash
-cd frontend
-npm run build
-# Serve the build folder using a static server
-```
 
 ## 📁 Project Structure
 
@@ -564,68 +568,36 @@ See [backend/AUTH_API_DOCUMENTATION.md](backend/AUTH_API_DOCUMENTATION.md) for d
 
 ### Testing
 
-- See [backend/POSTMAN_TESTING_GUIDE.md](backend/POSTMAN_TESTING_GUIDE.md) for Postman testing instructions
-- See [POSTMAN_FINAL_TESTING_GUIDE.md](POSTMAN_FINAL_TESTING_GUIDE.md) for comprehensive testing guide
+- See [POSTMAN_FINAL_TESTING_GUIDE.md](POSTMAN_FINAL_TESTING_GUIDE.md) for a **single, comprehensive Postman guide** covering:
+  - Authentication and user onboarding
+  - Event creation, approval, and registration
+  - Payments, webhooks, and receipt emails
+  - Vendor onboarding, booths, and loyalty program flows
+  - Gym sessions, court bookings, notifications, and admin tools
 
-## 👥 User Types
+### How to Use?
 
-### Student
-- Must use `@student.guc.edu.eg` email
-- Requires GUC ID
-- Can register for events, workshops, trips
-- Can book courts
-- Can view and manage registrations
+Even experienced engineers appreciate clear instructions, and newcomers rely on them. Please follow this detailed walkthrough when testing or demoing Bindly:
 
-### Staff/TA/Professor
-- Must use `@guc.edu.eg` email
-- Requires GUC ID
-- Can create and manage events
-- Professors can create workshops
-- Access to events office dashboard
+1. **Start the stack**
+   - Open two terminals.
+   - In the first terminal run `npm run start:backend` (or `npm run dev` for simultaneous front + back).
+   - In the second terminal run `npm run start:frontend`.
+2. **Create initial users (if needed)**
+   - Use `backend/create-admin.js` or the POSTMAN admin collection to seed an admin account.
+   - Run any relevant scripts from `backend/scripts/` (e.g., `create-test-events.js`) to populate sample data.
+3. **Login via the frontend**
+   - Visit `http://localhost:3000` and log in using the credentials you created or seeded.
+4. **Walk through core flows**
+   - Create an event (as Staff/Professor).
+   - Approve it via the Admin/Event Office dashboard.
+   - Register students/vendors, run through payment (Stripe test keys), and verify email notifications.
+   - Try vendor onboarding and booth assignments if applicable.
+5. **Run automated tests**
+   - Follow the exact steps outlined in `POSTMAN_FINAL_TESTING_GUIDE.md` to replay all validated API flows using Postman.
 
-### Vendor
-- Can use any email
-- Requires company name
-- Must provide vendor logo and tax card
-- Can request platform booths
-- Can participate in bazaars
-- Access to vendor dashboard
+Document anything unexpected in GitHub Issues so others can reproduce and resolve it.
 
-### Admin
-- Full system access
-- User management (block/unblock, verify)
-- Event approval/rejection
-- Vendor request management
-- System configuration
-
-### Event Office
-- Event management and approval
-- Event office dashboard access
-
-## 🔑 Key Features
-
-### Event Registration Flow
-1. Event creation by Staff/TA/Professor
-2. Admin approval/rejection
-3. Student/Professor registration
-4. Payment processing (if applicable)
-5. Confirmation emails with receipts
-6. Event completion tracking
-
-### Payment Flow
-1. User registers for paid event
-2. Stripe checkout session created
-3. Payment processed
-4. Webhook verification
-5. Registration confirmed
-6. Receipt email sent with QR code
-
-### Vendor Onboarding
-1. Vendor signs up with documents
-2. Admin reviews vendor request
-3. Admin approves/rejects vendor
-4. Vendor gains access to platform
-5. Vendor can request booths and participate in bazaars
 
 ## 📝 Additional Documentation
 
@@ -634,6 +606,99 @@ See [backend/AUTH_API_DOCUMENTATION.md](backend/AUTH_API_DOCUMENTATION.md) for d
 - [Environment Setup](backend/ENV_SETUP.md)
 - [Block User Feature](BLOCK_USER_FEATURE.md)
 - [Payment Receipt Email Implementation](PAYMENT_RECEIPT_EMAIL_IMPLEMENTATION.md)
+
+## 🚀 Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/dyalaelsmery/Bindly.git
+   cd Bindly
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm run install:all
+   ```
+
+   This will install dependencies for:
+   - Root directory
+   - Backend directory
+   - Frontend directory
+
+### ⚙️ Environment Setup
+
+### Backend Environment Variables
+
+Create a `.env` file in the `backend` directory with the following variables:
+
+```env
+# MongoDB Configuration
+MONGO_URI=mongodb+srv://<username>:<password>@<cluster-host>/<db-name>?retryWrites=true&w=majority
+
+# Server Configuration
+PORT=5000
+NODE_ENV=development
+
+# JWT Configuration
+JWT_SECRET=your-jwt-secret-key
+JWT_EXPIRE=7d
+
+# Email Configuration (for Nodemailer)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
+
+# Stripe Configuration (optional, for payment features)
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+```
+
+### Frontend Configuration
+
+The frontend is configured to proxy API requests to `http://localhost:5000` by default (see `frontend/package.json`).
+
+## 🏃 Running the Application
+
+### Development Mode
+
+Run both backend and frontend concurrently:
+```bash
+npm run dev
+```
+
+### Run Separately
+
+**Backend only:**
+```bash
+npm run start:backend
+# or
+cd backend
+npm start
+```
+
+**Frontend only:**
+```bash
+npm run start:frontend
+# or
+cd frontend
+npm start
+```
+
+### Production Mode
+
+**Backend:**
+```bash
+cd backend
+NODE_ENV=production npm start
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm run build
+# Serve the build folder using a static server
+```
 
 ## 🤝 Contributing
 
@@ -646,32 +711,19 @@ See [backend/AUTH_API_DOCUMENTATION.md](backend/AUTH_API_DOCUMENTATION.md) for d
 ## 📄 License
 
 This project is licensed under the ISC License.
+## 🙏 Credits & Acknowledgments
 
-## 🐛 Troubleshooting
+This project was created and developed by students from the **German University in Cairo (GUC)** to centralize and structure campus event operations.
 
-### MongoDB Connection Issues
-- Ensure `MONGO_URI` is correctly set in `backend/.env`
-- Check MongoDB Atlas network access settings
-- Verify connection string format
+### 🎓 Development Team
+- **Nourhan Ehab Emara** (Scrum Master) → `@NourhanEhab-04`
+- **Salma Ahmed**  → `@salmaahmed21`
+- **Youssef Khaled** → `@youssefelgenany`
+- **Eyad Emara**  → `@EyadEmara11`
+- **Mazen Mossad**  → `@MazenMossad1`
+- **Mohamed El Sayed**  → `@ME312241`
+- **Hagar Lotfy**→ `@hagarlotfy`
+- **Dyala Elsmeary** → `@dyalaelsmery`
+- **Leena El Badawi**  → `@9leeeawi10`
 
-### Port Already in Use
-- Change `PORT` in `backend/.env` if port 5000 is occupied
-- Update frontend proxy configuration if backend port changes
 
-### Email Not Sending
-- Verify email credentials in `.env`
-- For Gmail, use App Password instead of regular password
-- Check email service configuration
-
-### Stripe Webhook Issues
-- Ensure webhook secret is correctly configured
-- Use Stripe CLI for local webhook testing
-- Verify webhook endpoint URL in Stripe dashboard
-
-## 📞 Support
-
-For issues and questions, please open an issue on the [GitHub repository](https://github.com/dyalaelsmery/Bindly/issues).
-
----
-
-**Note**: This is an active development project. Some features may be in progress or subject to change.

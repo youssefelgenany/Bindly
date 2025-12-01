@@ -189,6 +189,19 @@ const Signup = () => {
     }
 
 
+    // Vendor-specific validations
+    if (formData.userType === 'Vendor') {
+      if (!formData.companyName.trim()) {
+        newErrors.companyName = 'Company name is required';
+      }
+      if (!taxCardFile) {
+        newErrors.taxCard = 'Tax card is required';
+      }
+      if (!logoFile) {
+        newErrors.logo = 'Company logo is required';
+      }
+    }
+
     // GUC email validation for Student/Staff
     if (formData.userType === 'Student' || formData.userType === 'Staff') {
       const gucEmailRegex = /^[a-zA-Z0-9._%+-]+@student\.guc\.edu\.eg$|^[a-zA-Z0-9._%+-]+@guc\.edu\.eg$/;
@@ -250,11 +263,14 @@ const Signup = () => {
         submitData.append('companyName', formData.companyName);
       }
 
-      // Optional vendor documents
-      if (taxCardFile) {
+      // Required vendor documents
+      if (formData.userType === 'Vendor') {
+        if (!taxCardFile || !logoFile) {
+          setMessage('Tax card and company logo are required for vendors');
+          setLoading(false);
+          return;
+        }
         submitData.append('vendorTaxCard', taxCardFile);
-      }
-      if (logoFile) {
         submitData.append('vendorLogo', logoFile);
       }
 
@@ -937,11 +953,11 @@ const Signup = () => {
                   </label>
                 </div>
 
-                {/* Optional Vendor Documents */}
+                {/* Required Vendor Documents */}
                 {formData.userType === 'Vendor' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'row', gap: '1rem', width: '100%' }}>
                     {/* Tax Card Upload */}
-                    <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                       <p style={{
                         fontSize: '0.875rem',
                         fontWeight: '500',
@@ -949,8 +965,17 @@ const Signup = () => {
                         color: '#1A202C',
                         margin: 0
                       }}>
-                        Tax Card <span style={{ color: '#6B7280', fontWeight: '400' }}>(Optional)</span>
+                        Tax Card <span style={{ color: '#ef4444' }}>*</span>
                       </p>
+                      {errors.taxCard && (
+                        <p style={{
+                          fontSize: '0.75rem',
+                          color: '#ef4444',
+                          margin: '0.25rem 0 0 0'
+                        }}>
+                          {errors.taxCard}
+                        </p>
+                      )}
                       {!taxCardFile ? (
                         <FileChooser
                           id="taxCardInput"
@@ -1023,7 +1048,7 @@ const Signup = () => {
                     </label>
 
                     {/* Logo Upload */}
-                    <label style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                       <p style={{
                         fontSize: '0.875rem',
                         fontWeight: '500',
@@ -1031,8 +1056,17 @@ const Signup = () => {
                         color: '#1A202C',
                         margin: 0
                       }}>
-                        Company Logo <span style={{ color: '#6B7280', fontWeight: '400' }}>(Optional)</span>
+                        Company Logo <span style={{ color: '#ef4444' }}>*</span>
                       </p>
+                      {errors.logo && (
+                        <p style={{
+                          fontSize: '0.75rem',
+                          color: '#ef4444',
+                          margin: '0.25rem 0 0 0'
+                        }}>
+                          {errors.logo}
+                        </p>
+                      )}
                       {!logoFile ? (
                         <FileChooser
                           id="logoInput"

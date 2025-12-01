@@ -93,7 +93,7 @@ async function sendWorkshopCompletionEmail(email, name, workshopTitle, endDate, 
     console.log('✅ SMTP connection verified');
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || `Bindly <salma.husseinhassan@student.guc.edu.eg>`,
+      from: process.env.SMTP_FROM || `Bindly <salmaahmed1504@gmail.com>`,
       to: email,
       subject: `🎉 Congratulations on Completing - ${workshopTitle}`,
       html: html,

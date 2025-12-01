@@ -510,11 +510,19 @@ const updateVendorRequestStatus = async (req, res) => {
   }
 
   try {
-    // Find the request first to check if it's a platform booth request
-    const request = await VendorRequest.findById(id).populate('vendor', 'companyName firstName lastName email');
+    // Find the request first and populate necessary fields for fee calculation
+    // For bazaars, we need to populate the bazaar event to get location
+    let request = await VendorRequest.findById(id).populate('vendor', 'companyName firstName lastName email');
 
     if (!request) {
       return res.status(404).json({ message: "Vendor request not found" });
+    }
+
+    // If it's a bazaar request, populate the bazaar event to get location for fee calculation
+    if (request.eventType === 'bazaar' && request.bazaar) {
+      request = await VendorRequest.findById(id)
+        .populate('vendor', 'companyName firstName lastName email')
+        .populate('bazaar', 'location title name');
     }
 
     console.log(`🔍 updateVendorRequestStatus - Request details:`, {
@@ -523,7 +531,9 @@ const updateVendorRequestStatus = async (req, res) => {
       status: request.status,
       newStatus: status,
       hasBooth: !!request.booth,
-      boothId: request.booth
+      boothId: request.booth,
+      hasBazaar: !!request.bazaar,
+      bazaarLocation: request.bazaar?.location || null
     });
 
     // Update the request status
@@ -532,20 +542,22 @@ const updateVendorRequestStatus = async (req, res) => {
     // If accepting, calculate fee and set payment deadline
     if (status === 'accepted') {
       try {
-        // Calculate participation fee
+        // Calculate participation fee (now with proper event data populated)
         const fee = calculateVendorParticipationFee(request);
         request.participationFee = fee;
         request.paymentStatus = 'pending';
 
-        // Set payment deadline: 3 days from now
+        // Set payment deadline: 3 days from now (3 days after receiving acceptance email)
         const deadline = new Date();
         deadline.setDate(deadline.getDate() + 3);
+        deadline.setHours(23, 59, 59, 999); // End of day
         request.paymentDeadline = deadline;
 
         console.log(`💰 Calculated participation fee: ${fee} EGP`);
-        console.log(`📅 Payment deadline: ${deadline.toISOString()}`);
+        console.log(`📅 Payment deadline: ${deadline.toISOString()} (3 days from acceptance)`);
       } catch (error) {
         console.error('❌ Error calculating participation fee:', error);
+        console.error('❌ Error stack:', error.stack);
         // Continue with acceptance even if fee calculation fails
         // Admin can manually set fee later if needed
       }
