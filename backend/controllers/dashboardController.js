@@ -187,7 +187,7 @@ exports.getRecentActivity = async (req, res) => {
       .populate('createdBy', 'firstName lastName')
       .sort({ createdAt: -1 })
       .limit(5)
-      .select('title createdBy createdAt');
+      .select('title type createdBy createdAt');
 
     // Transform into activity format
     const activities = [];
@@ -204,17 +204,30 @@ exports.getRecentActivity = async (req, res) => {
       });
     });
 
-    // Add event creations
+    // Add event creations - format like Events Office (no user, proper format)
     recentEvents.forEach(event => {
-      const creatorFirst = event.createdBy?.firstName || 'Unknown';
-      const creatorLast = event.createdBy?.lastName || 'User';
+      // Format event type
+      const eventTypeMap = {
+        'bazaar': 'Bazaar',
+        'trip': 'Trip',
+        'conference': 'Conference',
+        'workshop': 'Workshop',
+        'gym': 'Gym Session',
+        'booth': 'Booth',
+        'platformBooth': 'Platform Booth',
+        'standaloneBooth': 'Platform Booth'
+      };
+      const eventTypeFormatted = eventTypeMap[event.type?.toLowerCase()] || 'Event';
+      
       activities.push({
         id: `event-${event._id}`,
         type: 'event',
-        user: `${creatorFirst} ${creatorLast}`,
-        action: `created new event: "${event.title}"`,
+        eventType: event.type,
+        eventName: event.title,
+        action: `A new ${eventTypeFormatted}`,
         timestamp: event.createdAt,
-        icon: '📅'
+        icon: '📅',
+        user: null // No user for event creation, matches Events Office format
       });
     });
 
