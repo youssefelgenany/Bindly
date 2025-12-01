@@ -109,7 +109,7 @@ The system has undergone **end-to-end workflow testing, including event approval
 ![Event office dashboard](screenshots/eventofficedashboard.png)
 
 ### 4. admin dashboard
-![admin dashboard](screenshots/screenshots.png)
+![admin dashboard](screenshots/admindashboard.png)
 
 
 ## ✨ Features
