@@ -1019,78 +1019,87 @@ const getDisplayStatus = (status) => {
                           }
                         }}
                         style={{
-                          padding: '1rem',
-                          borderBottom: '1px solid #f3f4f6',
-                          cursor: 'pointer',
+                          padding: '0.75rem 1rem',
+                          borderBottom: '1px solid #f1f5f9',
                           backgroundColor: notification.isRead 
                             ? '#FFFFFF' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                              ? '#fef2f2'
-                              : '#eff6ff',
-                          borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
-                            ? '3px solid #ef4444'
-                            : 'none',
-                          transition: 'background-color 0.2s'
+                              ? '#fff7ed'
+                              : '#f8fafc',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          gap: '0.75rem'
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = notification.isRead 
-                            ? '#f9fafb' 
+                            ? '#f8fafc' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                              ? '#fee2e2'
-                              : '#dbeafe';
+                              ? '#ffedd5'
+                              : '#edf2ff';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = notification.isRead 
                             ? '#FFFFFF' 
                             : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                              ? '#fef2f2'
-                              : '#eff6ff';
+                              ? '#fff7ed'
+                              : '#f8fafc';
                         }}
                       >
                         <div style={{
+                          width: '2.5rem',
+                          height: '2.5rem',
+                          borderRadius: '0.75rem',
+                          backgroundColor: notification.priority === 'high' ? '#fef3c7' : '#e0e7ff',
                           display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start',
-                          gap: '0.5rem'
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
                         }}>
-                          <div style={{ flex: 1 }}>
-                            <p style={{
-                              fontSize: '0.875rem',
-                              fontWeight: notification.isRead ? '400' : '600',
-                              color: '#1D3557',
-                              margin: 0,
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1.25rem',
+                            color: notification.priority === 'high' ? '#b45309' : '#4338ca'
+                          }}>
+                            {notification.type === 'event_announcement' || notification.type === 'new_event' ? 'campaign'
+                              : notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder' ? 'event'
+                              : 'notifications'}
+                          </span>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{
+                            fontWeight: notification.isRead ? '400' : '600',
+                            color: '#1D3557',
+                            fontSize: '0.875rem',
+                            marginBottom: '0.25rem'
+                          }}>
+                            {notification.title || notification.message}
+                          </div>
+                          {notification.message && notification.message !== notification.title && (
+                            <div style={{
+                              fontSize: '0.8125rem',
+                              color: '#475569',
                               marginBottom: '0.25rem'
                             }}>
-                              {notification.title || notification.message}
-                            </p>
-                            {notification.message && notification.message !== notification.title && (
-                              <p style={{
-                                fontSize: '0.75rem',
-                                color: '#6b7280',
-                                margin: 0
-                              }}>
-                                {notification.message}
-                              </p>
-                            )}
-                            <p style={{
-                              fontSize: '0.625rem',
-                              color: '#9ca3af',
-                              margin: '0.5rem 0 0 0'
-                            }}>
-                              {formatNotificationDate(notification.createdAt)}
-                            </p>
-                          </div>
-                          {!notification.isRead && (
-                            <div style={{
-                              width: '0.5rem',
-                              height: '0.5rem',
-                              borderRadius: '50%',
-                              backgroundColor: '#1e40af',
-                              flexShrink: 0,
-                              marginTop: '0.25rem'
-                            }} />
+                              {notification.message}
+                            </div>
                           )}
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#94a3b8'
+                          }}>
+                            {formatNotificationDate(notification.createdAt)}
+                          </div>
                         </div>
+                        {!notification.isRead && (
+                          <div style={{
+                            width: '0.5rem',
+                            height: '0.5rem',
+                            borderRadius: '50%',
+                            backgroundColor: '#1e40af',
+                            flexShrink: 0,
+                            marginTop: '0.25rem'
+                          }} />
+                        )}
                       </div>
                     ))
                   )}
