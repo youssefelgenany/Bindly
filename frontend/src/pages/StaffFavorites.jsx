@@ -733,7 +733,7 @@ const StaffFavorites = () => {
                           )}
                           <div style={{
                             fontSize: '0.75rem',
-                            color: '#94a3b8'
+                            color: '#9ca3af'
                           }}>
                             {formatNotificationDate(notification.createdAt)}
                           </div>

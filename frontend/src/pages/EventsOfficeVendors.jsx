@@ -205,7 +205,7 @@ const EventsOfficeVendors = () => {
       <aside style={{
         width: sidebarOpen ? '16rem' : '0',
         flexShrink: 0,
-        backgroundColor: '#1D3557',
+        backgroundColor: '#182e4d',
         padding: sidebarOpen ? '1.5rem' : '0',
         display: 'flex',
         flexDirection: 'column',
@@ -593,7 +593,7 @@ const EventsOfficeVendors = () => {
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem 2.5rem',
-          backgroundColor: '#1D3557',
+          backgroundColor: '#182e4d',
           position: 'fixed',
           top: 0,
           left: sidebarOpen ? '16rem' : '0',
@@ -620,17 +620,17 @@ const EventsOfficeVendors = () => {
                 menu
               </span>
             </button>
-            <Link to="/event-office" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <h2 style={{
-                color: '#FFFFFF',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                lineHeight: '1.25',
-                margin: 0,
-                cursor: 'pointer'
-              }}>
-                Bindly
-              </h2>
+            <Link to="/event-office" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+              <img
+                src="/assets/images/bindly-logo.png"
+                alt="Bindly Logo"
+                style={{
+                  height: '3rem',
+                  width: 'auto',
+                  cursor: 'pointer',
+                  objectFit: 'contain'
+                }}
+              />
             </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

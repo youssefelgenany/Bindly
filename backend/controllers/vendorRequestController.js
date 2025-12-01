@@ -1802,6 +1802,46 @@ const closeBoothPoll = async (req, res) => {
   }
 };
 
+// @desc Delete a booth poll (only for closed polls)
+// @route DELETE /api/vendor-requests/polls/:pollId
+// @access Events Office / Admin
+const deleteBoothPoll = async (req, res) => {
+  try {
+    const { pollId } = req.params;
+
+    const poll = await BoothPoll.findById(pollId);
+    if (!poll) {
+      return res.status(404).json({
+        success: false,
+        message: 'Poll not found'
+      });
+    }
+
+    // Only allow deletion of closed polls
+    if (poll.status !== 'closed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only closed polls can be deleted'
+      });
+    }
+
+    await BoothPoll.findByIdAndDelete(pollId);
+
+    res.json({
+      success: true,
+      message: 'Poll deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting booth poll:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting poll',
+      error: error.message
+    });
+  }
+};
+
 // @desc Get public booth polls (for Students/Staff/TA/Professor to vote)
 // @route GET /api/vendor-requests/polls/public
 // @access Students, Staff, TA, Professor
@@ -2120,6 +2160,7 @@ module.exports = {
   getPublicBoothPolls,
   voteInBoothPoll,
   closeBoothPoll,
+  deleteBoothPoll,
   getBoothPollResults,
   handleStripePaymentSuccess,
 };

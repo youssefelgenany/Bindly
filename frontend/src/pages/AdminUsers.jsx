@@ -9,9 +9,12 @@ const AdminUsers = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchField, setSearchField] = useState('all'); // all | name | email | gucId
   const [roleFilter, setRoleFilter] = useState('all'); // all | Admin | Event Office | TA | Staff | Professor | Student
+  const [statusFilter, setStatusFilter] = useState('all'); // all | active | blocked
+  const [sortBy, setSortBy] = useState('suggested'); // suggested | alphabetical | date-asc | date-desc
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, userId: null });
   const [deletingIds, setDeletingIds] = useState({}); // id -> boolean
   const [pendingRoles, setPendingRoles] = useState({}); // id -> role
@@ -110,7 +113,23 @@ const AdminUsers = () => {
     return { pendingVerificationUsers: pending, verifiedUsers: verified };
   }, [users, verificationStatusById]);
 
-  const filterUsers = (userList) => {
+  const [activeStatusById, setActiveStatusById] = useState({});
+  const [togglingIds, setTogglingIds] = useState({}); // id -> boolean
+  const [toggleMsgById, setToggleMsgById] = useState({}); // id -> message
+
+  // Update activeStatusById when users are loaded
+  useEffect(() => {
+    const initial = {};
+    const verificationInitial = {};
+    users.forEach(u => { 
+      initial[u._id || u.id] = u.status === 'active'; 
+      verificationInitial[u._id || u.id] = u.isVerified || false;
+    });
+    setActiveStatusById(initial);
+    setVerificationStatusById(verificationInitial);
+  }, [users]);
+
+  const filterAndSortUsers = (userList) => {
     let filtered = userList;
 
     // Filter by role
@@ -133,27 +152,95 @@ const AdminUsers = () => {
       });
     }
 
+    // Filter by status (active/blocked)
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(u => {
+        const userId = u._id || u.id;
+        const isActive = (activeStatusById && activeStatusById[userId] !== undefined) 
+          ? activeStatusById[userId] 
+          : (u.status === 'active' || u.status !== 'blocked');
+        
+        if (statusFilter === 'active') {
+          return isActive;
+        } else if (statusFilter === 'blocked') {
+          return !isActive;
+        }
+        return true;
+      });
+    }
+
     // Filter by search query
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return filtered;
+    if (q) {
+      const match = (u) => {
+        const name = `${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase();
+        const email = (u.email || '').toLowerCase();
+        const gucId = (u.gucId || '').toLowerCase();
+        const id = (u.id || u._id || '').toLowerCase();
 
-    const match = (u) => {
-      const name = `${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase();
-      const email = (u.email || '').toLowerCase();
-      const gucId = (u.gucId || '').toLowerCase();
-      const id = (u.id || u._id || '').toLowerCase();
+        if (searchField === 'name') return name.includes(q);
+        if (searchField === 'email') return email.includes(q);
+        if (searchField === 'gucId') return gucId.includes(q) || id.includes(q);
+        return name.includes(q) || email.includes(q) || gucId.includes(q) || id.includes(q);
+      };
+      filtered = filtered.filter(match);
+    }
 
-      if (searchField === 'name') return name.includes(q);
-      if (searchField === 'email') return email.includes(q);
-      if (searchField === 'gucId') return gucId.includes(q) || id.includes(q);
-      return name.includes(q) || email.includes(q) || gucId.includes(q) || id.includes(q);
-    };
+    // Sort users
+    if (sortBy === 'alphabetical') {
+      filtered = [...filtered].sort((a, b) => {
+        // Get display name for comparison - handle both firstName/lastName and name fields
+        // This matches exactly how names are displayed in the table
+        let nameA = '';
+        let nameB = '';
+        
+        // For vendors, use companyName (matches display logic)
+        if (a.userType === 'Vendor') {
+          nameA = (a.companyName || 'Unknown Vendor').trim().toLowerCase();
+        } else {
+          // For others, use firstName + lastName, fallback to name (matches display logic)
+          const firstNameA = (a.firstName || '').trim();
+          const lastNameA = (a.lastName || '').trim();
+          nameA = `${firstNameA} ${lastNameA}`.trim().toLowerCase();
+          if (!nameA) {
+            nameA = (a.name || 'Unknown User').trim().toLowerCase();
+          }
+        }
+        
+        if (b.userType === 'Vendor') {
+          nameB = (b.companyName || 'Unknown Vendor').trim().toLowerCase();
+        } else {
+          const firstNameB = (b.firstName || '').trim();
+          const lastNameB = (b.lastName || '').trim();
+          nameB = `${firstNameB} ${lastNameB}`.trim().toLowerCase();
+          if (!nameB) {
+            nameB = (b.name || 'Unknown User').trim().toLowerCase();
+          }
+        }
+        
+        // Compare alphabetically by first character, then full string
+        return nameA.localeCompare(nameB, 'en', { sensitivity: 'base', numeric: true });
+      });
+    } else if (sortBy === 'date-asc') {
+      filtered = [...filtered].sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.created || 0);
+        const dateB = new Date(b.createdAt || b.created || 0);
+        return dateA - dateB;
+      });
+    } else if (sortBy === 'date-desc') {
+      filtered = [...filtered].sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.created || 0);
+        const dateB = new Date(b.createdAt || b.created || 0);
+        return dateB - dateA;
+      });
+    }
+    // 'suggested' keeps original order (no sorting)
 
-    return filtered.filter(match);
+    return filtered;
   };
 
-  const filteredPendingUsers = useMemo(() => filterUsers(pendingVerificationUsers), [pendingVerificationUsers, searchQuery, searchField, roleFilter]);
-  const filteredVerifiedUsers = useMemo(() => filterUsers(verifiedUsers), [verifiedUsers, searchQuery, searchField, roleFilter]);
+  const filteredPendingUsers = useMemo(() => filterAndSortUsers(pendingVerificationUsers), [pendingVerificationUsers, searchQuery, searchField, roleFilter, statusFilter, sortBy, activeStatusById]);
+  const filteredVerifiedUsers = useMemo(() => filterAndSortUsers(verifiedUsers), [verifiedUsers, searchQuery, searchField, roleFilter, statusFilter, sortBy, activeStatusById]);
 
   // Only allow assigning academic roles
   const roleOptions = [
@@ -340,22 +427,6 @@ const AdminUsers = () => {
       setUpdatingIds(prev => ({ ...prev, [userId]: false }));
     }
   };
-
-  const [activeStatusById, setActiveStatusById] = useState({});
-  const [togglingIds, setTogglingIds] = useState({}); // id -> boolean
-  const [toggleMsgById, setToggleMsgById] = useState({}); // id -> message
-
-  // Update activeStatusById when users are loaded
-  useEffect(() => {
-    const initial = {};
-    const verificationInitial = {};
-    users.forEach(u => { 
-      initial[u._id || u.id] = u.status === 'active'; 
-      verificationInitial[u._id || u.id] = u.isVerified || false;
-    });
-    setActiveStatusById(initial);
-    setVerificationStatusById(verificationInitial);
-  }, [users]);
 
   const handleToggleActive = async (userId) => {
     const newStatus = !activeStatusById[userId];
@@ -623,7 +694,7 @@ const AdminUsers = () => {
       <aside style={{
         width: sidebarOpen ? '16rem' : '0',
         flexShrink: 0,
-        backgroundColor: '#1D3557',
+        backgroundColor: '#182e4d',
         padding: sidebarOpen ? '1.5rem' : '0',
         display: 'flex',
         flexDirection: 'column',
@@ -927,7 +998,7 @@ const AdminUsers = () => {
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem 2.5rem',
-          backgroundColor: '#1D3557'
+          backgroundColor: '#182e4d'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF' }}>
             <button
@@ -948,17 +1019,17 @@ const AdminUsers = () => {
                 menu
               </span>
             </button>
-            <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <h2 style={{
-                color: '#FFFFFF',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                lineHeight: '1.25',
-                margin: 0,
-                cursor: 'pointer'
-              }}>
-                Bindly
-              </h2>
+            <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+              <img
+                src="/assets/images/bindly-logo.png"
+                alt="Bindly Logo"
+                style={{
+                  height: '3rem',
+                  width: 'auto',
+                  cursor: 'pointer',
+                  objectFit: 'contain'
+                }}
+              />
             </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -1190,7 +1261,7 @@ const AdminUsers = () => {
               </div>
             )}
 
-              {/* Search and Filters */}
+              {/* Search and Filter Button */}
               <div style={{
                 backgroundColor: '#FFFFFF',
                 borderRadius: '0.75rem',
@@ -1198,150 +1269,126 @@ const AdminUsers = () => {
                 marginBottom: '1.5rem',
                 boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                 display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center'
+                gap: '1rem',
+                alignItems: 'center',
+                justifyContent: 'space-between'
               }}>
-                {/* Search Bar and Filters Row */}
-                <div
+                {/* Search Bar and Button Group */}
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1, maxWidth: '600px' }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <span className="material-symbols-outlined" style={{
+                      position: 'absolute',
+                      left: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: '#9ca3af',
+                      fontSize: '1.25rem',
+                      pointerEvents: 'none'
+                    }}>
+                      search
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Search by name, email, or ID..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && setSearchQuery(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e5e7eb',
+                        backgroundColor: '#FFFFFF',
+                        fontSize: '0.875rem',
+                        outline: 'none',
+                        transition: 'all 0.2s',
+                        boxSizing: 'border-box'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#1e40af';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#e5e7eb';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    />
+                  </div>
+                  
+                  {/* Search Button - Right next to search bar */}
+                  <button
+                    onClick={() => setSearchQuery(searchQuery)}
+                    style={{
+                      padding: '0.875rem 1.25rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#1e40af',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#1e3a8a';
+                      e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#1e40af';
+                      e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                      search
+                    </span>
+                    Search
+                  </button>
+                </div>
+                
+                {/* Filter Button - Right Side */}
+                <button
+                  onClick={() => setShowFilterPanel(true)}
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: sidebarOpen ? '1fr' : 'minmax(320px, 420px) auto',
-                    gap: '1rem',
-                    width: '100%',
-                    alignItems: 'start'
+                    padding: '0.875rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    backgroundColor: (roleFilter !== 'all' || searchField !== 'all' || statusFilter !== 'all') ? '#1e40af' : '#f9fafb',
+                    color: (roleFilter !== 'all' || searchField !== 'all' || statusFilter !== 'all') ? '#FFFFFF' : '#6b7280',
+                    border: (roleFilter !== 'all' || searchField !== 'all' || statusFilter !== 'all') ? 'none' : '1px solid #e5e7eb',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
+                    boxShadow: (roleFilter !== 'all' || searchField !== 'all' || statusFilter !== 'all') ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!(roleFilter !== 'all' || searchField !== 'all' || statusFilter !== 'all')) {
+                      e.target.style.backgroundColor = '#f3f4f6';
+                      e.target.style.borderColor = '#d1d5db';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!(roleFilter !== 'all' || searchField !== 'all' || statusFilter !== 'all')) {
+                      e.target.style.backgroundColor = '#f9fafb';
+                      e.target.style.borderColor = '#e5e7eb';
+                    }
                   }}
                 >
-                  {/* Search Bar */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: '0.75rem',
-                      alignItems: 'center',
-                      flexWrap: 'nowrap'
-                    }}
-                  >
-                    <div
-                      style={{
-                        position: 'relative',
-                        width: '100%',
-                        maxWidth: '420px'
-                      }}
-                    >
-                      <span className="material-symbols-outlined" style={{
-                        position: 'absolute',
-                        left: '0.75rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: '#9ca3af',
-                        fontSize: '1.25rem',
-                        pointerEvents: 'none'
-                      }}>
-                        search
-                      </span>
-              <input
-                type="text"
-                        placeholder="Search by name, email, or ID..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && setSearchQuery(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '0.875rem 0.875rem 0.875rem 2.75rem',
-                          borderRadius: '0.5rem',
-                          border: '1px solid #e5e7eb',
-                          backgroundColor: '#FFFFFF',
-                          fontSize: '0.875rem',
-                          outline: 'none',
-                          transition: 'all 0.2s',
-                          boxSizing: 'border-box'
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.borderColor = '#1e40af';
-                          e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.borderColor = '#e5e7eb';
-                          e.target.style.boxShadow = 'none';
-                        }}
-                      />
-                    </div>
-                    <button
-                      onClick={() => setSearchQuery(searchQuery)}
-                      style={{
-                        padding: '0.875rem 1.75rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: '#1e40af',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap',
-                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                        flexShrink: 0
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.backgroundColor = '#1e3a8a';
-                        e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.backgroundColor = '#1e40af';
-                        e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                      }}
-                    >
-                      Search
-                    </button>
-            </div>
-
-                  {/* Filter Buttons */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: '0.5rem',
-                      flexWrap: sidebarOpen ? 'wrap' : 'nowrap',
-                      alignItems: 'center',
-                      justifyContent: sidebarOpen ? 'flex-start' : 'flex-end'
-                    }}
-                  >
-                    {['all', 'Admin', 'Event Office', 'TA', 'Staff', 'Professor', 'Student', 'Vendor'].map((role) => (
-                      <button
-                        key={role}
-                        onClick={() => setRoleFilter(role)}
-                        style={{
-                          padding: '0.625rem 1.25rem',
-                          borderRadius: '0.5rem',
-                          backgroundColor: roleFilter === role ? '#1e40af' : '#f9fafb',
-                          color: roleFilter === role ? '#FFFFFF' : '#6b7280',
-                          border: roleFilter === role ? 'none' : '1px solid #e5e7eb',
-                          cursor: 'pointer',
-                          fontSize: '0.8125rem',
-                          fontWeight: roleFilter === role ? '600' : '500',
-                          textTransform: 'capitalize',
-                          transition: 'all 0.2s',
-                          boxShadow: roleFilter === role ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
-                          minWidth: '90px',
-                          textAlign: 'center'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (roleFilter !== role) {
-                            e.target.style.backgroundColor = '#f3f4f6';
-                            e.target.style.borderColor = '#d1d5db';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (roleFilter !== role) {
-                            e.target.style.backgroundColor = '#f9fafb';
-                            e.target.style.borderColor = '#e5e7eb';
-                          }
-                        }}
-                      >
-                        {role === 'all' ? 'All Users' : role}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                            </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                    filter_list
+                  </span>
+                  Filter & Sort
+                </button>
+              </div>
 
               {/* Pending Verification Users Section */}
               {filteredPendingUsers.length > 0 && (
@@ -1889,88 +1936,83 @@ const AdminUsers = () => {
                                                          userType === 'Event_Office' || userType === 'event_office' ||
                                                          userTypeLower === 'event office';
                                     
-                                    if (isAdmin || isEventOffice) {
-                                      return (
-                          <button
-                                          onClick={() => handleDeleteClick(userId)}
-                                          disabled={!!deletingIds[userId]}
-                                          style={{
-                                            padding: '0.5rem 1rem',
-                                            backgroundColor: '#dc2626',
-                                            color: '#FFFFFF',
-                                            border: 'none',
-                                            borderRadius: '0.5rem',
-                                            fontSize: '0.875rem',
-                                            fontWeight: '500',
-                                            cursor: deletingIds[userId] ? 'not-allowed' : 'pointer',
-                                            transition: 'background-color 0.2s'
-                                          }}
-                                          onMouseEnter={(e) => {
-                                            if (!deletingIds[userId]) {
-                                              e.target.style.backgroundColor = '#b91c1c';
-                                            }
-                                          }}
-                                          onMouseLeave={(e) => {
-                                            if (!deletingIds[userId]) {
-                                              e.target.style.backgroundColor = '#dc2626';
-                                            }
-                                          }}
-                                        >
-                                          {deletingIds[userId] ? 'Deleting...' : 'Delete'}
-                          </button>
-                                      );
-                                    } else {
-                                      const isBlocked = !activeStatusById[userId];
-                                      return (
+                                    const isBlocked = !activeStatusById[userId];
+                                    
+                                    return (
+                                      <>
+                                        {/* Delete button (only for Admin/Event Office) */}
+                                        {(isAdmin || isEventOffice) && (
+                                          <button
+                                            onClick={() => handleDeleteClick(userId)}
+                                            disabled={!!deletingIds[userId]}
+                                            title="Delete Account"
+                                            style={{
+                                              padding: '0.5rem',
+                                              backgroundColor: 'transparent',
+                                              color: '#dc2626',
+                                              border: 'none',
+                                              borderRadius: '0.5rem',
+                                              cursor: deletingIds[userId] ? 'not-allowed' : 'pointer',
+                                              transition: 'background-color 0.2s',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              opacity: deletingIds[userId] ? 0.5 : 1
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              if (!deletingIds[userId]) {
+                                                e.target.style.backgroundColor = '#fee2e2';
+                                              }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              if (!deletingIds[userId]) {
+                                                e.target.style.backgroundColor = 'transparent';
+                                              }
+                                            }}
+                                          >
+                                            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
+                                              {deletingIds[userId] ? 'hourglass_empty' : 'delete'}
+                                            </span>
+                                          </button>
+                                        )}
+                                        {/* Block button (always on the right) */}
                                         <button
                                           onClick={() => handleToggleActive(userId)}
                                           disabled={!!togglingIds[userId]}
+                                          title={isBlocked ? 'Unblock User' : 'Block User'}
                                           style={{
-                                            padding: '0.5rem 1rem',
-                                            backgroundColor: isBlocked ? '#059669' : '#dc2626',
-                                            color: '#FFFFFF',
+                                            padding: '0.5rem',
+                                            backgroundColor: 'transparent',
+                                            color: isBlocked ? '#059669' : '#dc2626',
                                             border: 'none',
                                             borderRadius: '0.5rem',
-                                            fontSize: '0.875rem',
-                                            fontWeight: '500',
                                             cursor: togglingIds[userId] ? 'not-allowed' : 'pointer',
-                                            transition: 'background-color 0.2s, transform 0.1s',
+                                            transition: 'background-color 0.2s',
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: '0.5rem',
-                                            opacity: togglingIds[userId] ? 0.7 : 1
+                                            justifyContent: 'center',
+                                            opacity: togglingIds[userId] ? 0.5 : 1
                                           }}
                                           onMouseEnter={(e) => {
                                             if (!togglingIds[userId]) {
-                                              e.target.style.backgroundColor = isBlocked ? '#047857' : '#b91c1c';
-                                              e.target.style.transform = 'translateY(-1px)';
+                                              e.target.style.backgroundColor = isBlocked ? '#d1fae5' : '#fee2e2';
                                             }
                                           }}
                                           onMouseLeave={(e) => {
                                             if (!togglingIds[userId]) {
-                                              e.target.style.backgroundColor = isBlocked ? '#059669' : '#dc2626';
-                                              e.target.style.transform = 'translateY(0)';
+                                              e.target.style.backgroundColor = 'transparent';
                                             }
                                           }}
                                         >
-                                          {togglingIds[userId] ? (
-                                            <>
-                                              <span className="material-symbols-outlined" style={{ fontSize: '1rem', animation: 'spin 1s linear infinite' }}>
-                                                hourglass_empty
-                          </span>
-                                              Updating...
-                                            </>
-                                          ) : (
-                                            <>
-                                              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
-                                                {isBlocked ? 'lock_open' : 'block'}
-                            </span>
-                                              {isBlocked ? 'Unblock' : 'Block'}
-                                            </>
-                                          )}
+                                          <span className="material-symbols-outlined" style={{ 
+                                            fontSize: '1.25rem',
+                                            animation: togglingIds[userId] ? 'spin 1s linear infinite' : 'none'
+                                          }}>
+                                            {togglingIds[userId] ? 'hourglass_empty' : (isBlocked ? 'lock_open' : 'block')}
+                                          </span>
                                         </button>
-                                      );
-                                    }
+                                      </>
+                                    );
                                   })()}
                                 </div>
                               </td>
@@ -2813,6 +2855,356 @@ const AdminUsers = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Filter Side Panel */}
+      {showFilterPanel && (
+        <>
+          {/* Styles for dropdown options */}
+          <style>{`
+            .styled-select {
+              border: 1.5px solid #e5e7eb !important;
+            }
+            .styled-select:hover {
+              border-color: #d1d5db !important;
+            }
+            .styled-select:focus {
+              border-color: #1e40af !important;
+              box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1) !important;
+            }
+            .styled-select option {
+              padding: 0.875rem 1rem;
+              font-size: 0.875rem;
+              color: #111827;
+              background-color: #FFFFFF;
+              cursor: pointer;
+              border: none;
+              line-height: 1.5;
+            }
+            .styled-select option:hover {
+              background-color: #f3f4f6 !important;
+              color: #1e40af;
+            }
+            .styled-select option:checked,
+            .styled-select option:focus {
+              background-color: #dbeafe !important;
+              color: #1e40af !important;
+              font-weight: 500;
+            }
+            .styled-select option:active {
+              background-color: #bfdbfe !important;
+            }
+          `}</style>
+          
+          {/* Overlay */}
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 999,
+              transition: 'opacity 0.3s'
+            }}
+            onClick={() => setShowFilterPanel(false)}
+          />
+          
+          {/* Side Panel */}
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: '400px',
+            backgroundColor: '#FFFFFF',
+            boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.1)',
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            transform: showFilterPanel ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.3s ease-in-out',
+            overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              flexShrink: 0,
+              backgroundColor: '#FFFFFF'
+            }}>
+              <h4 style={{
+                fontSize: '1rem',
+                fontWeight: '600',
+                color: '#111827',
+                margin: 0,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                Filter & Sort
+              </h4>
+              <button
+                onClick={() => setShowFilterPanel(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6b7280',
+                  borderRadius: '0.375rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#111827';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>
+                  close
+                </span>
+              </button>
+            </div>
+
+            {/* Content - Scrollable */}
+            <div style={{ 
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.25rem'
+            }}>
+              {/* Sort By Section */}
+              <div>
+                <h5 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  margin: 0,
+                  marginBottom: '0.75rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  Sort By
+                </h5>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  {[
+                    { value: 'suggested', label: 'Suggested' },
+                    { value: 'alphabetical', label: 'Name (Alphabetical)' },
+                    { value: 'date-asc', label: 'Joined Date (Ascending)' },
+                    { value: 'date-desc', label: 'Joined Date (Descending)' }
+                  ].map(option => (
+                    <label
+                      key={option.value}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#374151',
+                        padding: '0.5rem',
+                        borderRadius: '0.375rem',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f9fafb';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="sortBy"
+                        value={option.value}
+                        checked={sortBy === option.value}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        style={{
+                          width: '1rem',
+                          height: '1rem',
+                          cursor: 'pointer',
+                          accentColor: '#1e40af'
+                        }}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* User Role Filter Section */}
+              <div>
+                <h5 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  margin: 0,
+                  marginBottom: '0.75rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  User Type
+                </h5>
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="styled-select"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 2.5rem 0.75rem 1rem',
+                    border: '1.5px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    backgroundColor: '#FFFFFF',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    appearance: 'none',
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 0.75rem center',
+                    backgroundSize: '12px',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1e40af';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                  }}
+                  onMouseEnter={(e) => {
+                    if (document.activeElement !== e.target) {
+                      e.target.style.borderColor = '#d1d5db';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (document.activeElement !== e.target) {
+                      e.target.style.borderColor = '#e5e7eb';
+                    }
+                  }}
+                >
+                  <option value="all">All Users</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Event Office">Event Office</option>
+                  <option value="TA">TA</option>
+                  <option value="Staff">Staff</option>
+                  <option value="Professor">Professor</option>
+                  <option value="Student">Student</option>
+                  <option value="Vendor">Vendor</option>
+                </select>
+              </div>
+
+              {/* Status Filter Section */}
+              <div>
+                <h5 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  margin: 0,
+                  marginBottom: '0.75rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  Status
+                </h5>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="styled-select"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 2.5rem 0.75rem 1rem',
+                    border: '1.5px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    backgroundColor: '#FFFFFF',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    appearance: 'none',
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 0.75rem center',
+                    backgroundSize: '12px',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1e40af';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                  }}
+                  onMouseEnter={(e) => {
+                    if (document.activeElement !== e.target) {
+                      e.target.style.borderColor = '#d1d5db';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (document.activeElement !== e.target) {
+                      e.target.style.borderColor = '#e5e7eb';
+                    }
+                  }}
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="blocked">Blocked</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Clear Filters Button - Fixed at Bottom */}
+            <div style={{ 
+              padding: '1.5rem',
+              borderTop: '1px solid #e5e7eb',
+              flexShrink: 0,
+              backgroundColor: '#FFFFFF'
+            }}>
+              <button
+                onClick={() => {
+                  setRoleFilter('all');
+                  setStatusFilter('all');
+                  setSearchField('all');
+                  setSearchQuery('');
+                  setSortBy('suggested');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#e5e7eb';
+                  e.target.style.borderColor = '#d1d5db';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.borderColor = '#e5e7eb';
+                }}
+              >
+                Clear All Filters
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

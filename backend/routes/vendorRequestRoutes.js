@@ -15,6 +15,7 @@ const {
   getPublicBoothPolls,
   voteInBoothPoll,
   closeBoothPoll,
+  deleteBoothPoll,
   getBoothPollResults,
   getVendorRequestPayment,
   payVendorRequestFee,
@@ -65,6 +66,9 @@ router.post('/polls/:pollId/vote', protect, permit('Student', 'Staff', 'TA', 'Pr
 
 // Close booth poll - Events Office / Admin
 router.patch('/polls/:pollId/close', protect, permit('event_office', 'admin'), closeBoothPoll);
+
+// Delete booth poll - Events Office / Admin (only for closed polls)
+router.delete('/polls/:pollId', protect, permit('event_office', 'admin'), deleteBoothPoll);
 
 // Get booth poll results - Events Office / Admin
 router.get('/polls/:pollId/results', protect, permit('event_office', 'admin'), getBoothPollResults);
