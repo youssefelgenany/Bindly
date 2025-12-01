@@ -171,26 +171,370 @@ npm run build
 
 ## 📁 Project Structure
 
-```
-Bindly/
-├── backend/                 # Backend server
-│   ├── controllers/        # Route controllers
-│   ├── models/             # MongoDB models
-│   ├── routes/             # API routes
-│   ├── middleware/         # Custom middleware
-│   ├── services/           # Business logic services
-│   ├── utils/              # Utility functions
-│   ├── uploads/            # Uploaded files
-│   ├── scripts/            # Utility scripts
-│   └── server.js           # Main server file
-├── frontend/               # React frontend
-│   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── pages/         # Page components
-│   │   ├── contexts/      # React contexts
-│   │   └── App.jsx        # Main app component
-│   └── public/            # Static assets
-└── README.md              # This file
+Below is the full project layout (excluding `node_modules`). Generated folders such as uploads and build assets are included but grouped where appropriate.
+
+```text
+Bindly-/
+├── (_CSEN704_) 1 - Project Requirements (Project).xlsx
+├── BLOCK_USER_FEATURE.md
+├── BLOCK_USER_POSTMAN_TESTS.md
+├── create-admin.js
+├── DETAILED_CHANGES.md
+├── IMPLEMENTATION_CHECKLIST.md
+├── package.json
+├── package-lock.json
+├── PAYMENT_RECEIPT_EMAIL_ARCHITECTURE.md
+├── PAYMENT_RECEIPT_EMAIL_COMPLETE.md
+├── PAYMENT_RECEIPT_EMAIL_IMPLEMENTATION.md
+├── PAYMENT_RECEIPT_EMAIL_TEST_GUIDE.md
+├── POSTMAN_EVENT_PAYMENT_TEST.md
+├── POSTMAN_FINAL_TESTING_GUIDE.md
+├── POSTMAN_LIVE_TEST_STEPS.md
+├── POSTMAN_TEST_STEPS.md
+├── postman-admin-features-tests.json
+├── README.md
+├── STRIPE_COMPLETE.md
+├── STRIPE_PAYMENT_SUMMARY.md
+├── STRIPE_QUICK_START.md
+├── TEST_STRIPE_PAYMENT.md
+├── test-professor-events.js
+├── VERIFICATION_FLOW_IMPLEMENTATION.md
+├── verify-stripe.ps1
+├── verify-stripe.sh
+├── backend/
+│   ├── AUTH_API_DOCUMENTATION.md
+│   ├── check-events.js
+│   ├── check-payments.js
+│   ├── check-registrations.js
+│   ├── check-users.js
+│   ├── create-sample-booths.js
+│   ├── create-sample-vendor-requests.js
+│   ├── EMAIL_SETUP_GUIDE.md
+│   ├── ENV_SETUP.md
+│   ├── eslint.config.mjs
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── POSTMAN_TESTING_GUIDE.md
+│   ├── server.js
+│   ├── standalone-booth-events-final.json
+│   ├── standalone-booth-events.json
+│   ├── standalone-booths-data.json
+│   ├── standalone-booths.json
+│   ├── STRIPE_PAYMENT_SETUP.md
+│   ├── test-admin-features.js
+│   ├── test-archived-events.js
+│   ├── test-booth-poll.js
+│   ├── test-complete-flow.js
+│   ├── test-email-webhook.js
+│   ├── test-gym-sessions.js
+│   ├── test-image.png
+│   ├── test-restrictions.js
+│   ├── test-webhook-sim.js
+│   ├── vendor-requests.json
+│   ├── controllers/
+│   │   ├── adminAccountsController.js
+│   │   ├── adminController.js
+│   │   ├── announcementController.js
+│   │   ├── authController.js
+│   │   ├── authVerifyController.js
+│   │   ├── bazaarController.js
+│   │   ├── boothController.js
+│   │   ├── courtController.js
+│   │   ├── dashboardController.js
+│   │   ├── devEmailController.js
+│   │   ├── eventController.js
+│   │   ├── gymController.js
+│   │   ├── gymSessionController.js
+│   │   ├── notificationController.js
+│   │   ├── paymentVerificationController.js
+│   │   ├── professorController.js
+│   │   ├── stripeSuccessController.js
+│   │   ├── stripeWebhookController.js
+│   │   ├── studentRegistrationController.js
+│   │   ├── tripController.js
+│   │   ├── vendorController.js
+│   │   ├── vendorDocumentController.js
+│   │   ├── vendorRequestController.js
+│   │   ├── workshopCompletionController.js
+│   │   └── workshopController.js
+│   ├── middleware/
+│   │   ├── authMiddleware.js
+│   │   └── uploadMiddleware.js
+│   ├── models/
+│   │   ├── AdminModel.js
+│   │   ├── announcementModel.js
+│   │   ├── bazaarModel.js
+│   │   ├── boothModel.js
+│   │   ├── boothPollModel.js
+│   │   ├── courtBookingModel.js
+│   │   ├── courtModel.js
+│   │   ├── EmailModel.js
+│   │   ├── eventModel.js
+│   │   ├── gymRegistrationModel.js
+│   │   ├── GymSession.js
+│   │   ├── gymSessionModel.js
+│   │   ├── notificationModel.js
+│   │   ├── paymentModel.js
+│   │   ├── Professor.js
+│   │   ├── registrationModel.js
+│   │   ├── studentRegistrationModel.js
+│   │   ├── tripModel.js
+│   │   ├── userModel.js
+│   │   ├── vendorLoyaltyProgramModel.js
+│   │   ├── vendorRequest.js
+│   │   ├── vendorVoteModel.js
+│   │   └── Workshop.js
+│   ├── routes/
+│   │   ├── adminRoutes.js
+│   │   ├── announcementRoutes.js
+│   │   ├── authRoutes.js
+│   │   ├── bazaarRoutes.js
+│   │   ├── boothRoutes.js
+│   │   ├── courtRoutes.js
+│   │   ├── dashboardRoutes.js
+│   │   ├── devEmailRoutes.js
+│   │   ├── devEmailTestRoutes.js
+│   │   ├── eventRoutes.js
+│   │   ├── gymRoutes.js
+│   │   ├── gymSessionRoutes.js
+│   │   ├── notificationRoutes.js
+│   │   ├── professorRoutes.js
+│   │   ├── studentRegistrationRoutes.js
+│   │   ├── tripRoutes.js
+│   │   ├── vendorRequestRoutes.js
+│   │   ├── vendorRoutes.js
+│   │   └── workshopRoutes.js
+│   ├── scripts/
+│   │   ├── check-and-delete-email.js
+│   │   ├── create-test-events.js
+│   │   ├── create-test-users.js
+│   │   ├── insert-dev-email.js
+│   │   ├── migrateEventRatings.js
+│   │   ├── README.md
+│   │   ├── seedCourts.js
+│   │   ├── setup-test-uploads.js
+│   │   ├── TEST_EVENTS_README.md
+│   │   ├── test-sales-report.js
+│   │   ├── test-vendor-loyalty-program.js
+│   │   ├── trigger-send-qrcodes.js
+│   │   └── updateWorkshopPrices.js
+│   ├── services/
+│   │   ├── notificationScheduler.js
+│   │   ├── notificationService.js
+│   │   └── socket.js
+│   ├── utils/
+│   │   ├── calculateVendorFee.js
+│   │   ├── cleanupUserRegistrations.js
+│   │   ├── generateCertificate.js
+│   │   ├── generateQRCode.js
+│   │   ├── mailer.js
+│   │   ├── sendCommentWarningEmail.js
+│   │   ├── sendGymCancellationEmail.js
+│   │   ├── sendGymEditEmail.js
+│   │   ├── sendQRCodesToVendor.js
+│   │   ├── sendReceiptEmail.js
+│   │   ├── sendRefundEmail.js
+│   │   ├── sendVendorRequestStatusEmail.js
+│   │   └── sendWorkshopCompletionEmail.js
+│   ├── test-uploads/
+│   │   └── vendors/
+│   │       ├── abc/
+│   │       │   └── logo.png
+│   │       ├── athlete-hub/
+│   │       │   ├── individual-ids.pdf
+│   │       │   ├── logo.png
+│   │       │   └── tax-card.pdf
+│   │       ├── booknook-publishers/
+│   │       │   ├── individual-ids.pdf
+│   │       │   ├── logo.png
+│   │       │   └── tax-card.pdf
+│   │       ├── campus-coffee-roasters/
+│   │       │   ├── individual-ids.pdf
+│   │       │   ├── logo.png
+│   │       │   └── tax-card.pdf
+│   │       ├── mindful-meals/
+│   │       │   ├── individual-ids.pdf
+│   │       │   ├── logo.png
+│   │       │   └── tax-card.pdf
+│   │       ├── ro/
+│   │       │   └── logo.png
+│   │       ├── syn/
+│   │       │   ├── individual-ids.pdf
+│   │       │   ├── logo.png
+│   │       │   └── tax-card.pdf
+│   │       ├── tech-solutions-inc/
+│   │       │   ├── individual-ids.pdf
+│   │       │   ├── logo.png
+│   │       │   └── tax-card.pdf
+│   │       ├── testco/
+│   │       │   └── tax-card.pdf
+│   │       └── vendorv/
+│   │           ├── logo.png
+│   │           └── tax-card.pdf
+│   └── uploads/
+│       └── ... (runtime uploaded images and PDFs)
+├── frontend/
+│   ├── devServer.js
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── webpackDevServer.config.js
+│   ├── build/
+│   │   ├── assets/
+│   │   │   └── images/
+│   │   │       └── ... (optimized build images)
+│   │   └── manifest.json
+│   ├── public/
+│   │   ├── index.html
+│   │   ├── manifest.json
+│   │   └── assets/
+│   │       └── images/
+│   │           ├── ad.png
+│   │           ├── admin-users.jpg
+│   │           ├── basketball.webp
+│   │           ├── bazaar-background.jpg
+│   │           ├── booth-background.jpg
+│   │           ├── campus-courts.png
+│   │           ├── conference-background.jpg
+│   │           ├── dashboardimage.jpg
+│   │           ├── events-banner.jpeg
+│   │           ├── football.jpg
+│   │           ├── gym.jpg
+│   │           ├── login-background.jpg
+│   │           ├── LoyaltyProgram.png
+│   │           ├── map.jpg
+│   │           ├── platform-booth.jpg
+│   │           ├── README.md
+│   │           ├── tennis.jpg
+│   │           ├── trip-background.png
+│   │           ├── VendorAD.png
+│   │           ├── workshop-background.jpg
+│   │           └── workshop.jpg
+│   └── src/
+│       ├── App.jsx
+│       ├── index.js
+│       ├── routes.js
+│       ├── setupProxy.js
+│       ├── api/
+│       │   ├── adminApi.js
+│       │   ├── bazaarApi.js
+│       │   ├── courtsApi.js
+│       │   ├── eventManagementApi.js
+│       │   ├── eventsApi.js
+│       │   ├── gymApi.js
+│       │   ├── gymSessionApi.js
+│       │   ├── notificationApi.js
+│       │   ├── professorApi.js
+│       │   ├── studentRegistrationApi.js
+│       │   ├── vendorApi.js
+│       │   └── vendorRequestApi.js
+│       ├── components/
+│       │   ├── BazaarForm.jsx
+│       │   ├── BoothApplicationForm.jsx
+│       │   ├── BoothList.jsx
+│       │   ├── CampusMapSelector.jsx
+│       │   ├── ConferenceForm.jsx
+│       │   ├── FileChooser.jsx
+│       │   ├── GymSessionForm.jsx
+│       │   ├── GymSessionRegistrationForm.jsx
+│       │   ├── IDUploadModal.jsx
+│       │   ├── Navbar.jsx
+│       │   ├── PlatformBoothMapSelector.jsx
+│       │   ├── PlatformBoothsModal.jsx
+│       │   ├── PlatformMapSelector.jsx
+│       │   ├── ProfessorDashboard.jsx
+│       │   ├── StaffDashboard.jsx
+│       │   ├── StandaloneBoothsBrowser.jsx
+│       │   ├── StudentDashboard.jsx
+│       │   ├── StudentRegistrationForm.jsx
+│       │   ├── TADashboard.jsx
+│       │   ├── TripForm.jsx
+│       │   ├── VendorDocumentsModal.jsx
+│       │   ├── VendorNotificationBell.jsx
+│       │   └── WorkshopEditRequestModal.jsx
+│       ├── contexts/
+│       │   └── AuthContext.jsx
+│       ├── pages/
+│       │   ├── AdminDashboard.jsx
+│       │   ├── AdminEventsView.jsx
+│       │   ├── AdminLogin.jsx
+│       │   ├── AdminLoyaltyProgramVendors.jsx
+│       │   ├── AdminPlatformBoothRequests.jsx
+│       │   ├── AdminProfile.jsx
+│       │   ├── AdminUsers.jsx
+│       │   ├── AdminVendors.jsx
+│       │   ├── BoothPolls.jsx
+│       │   ├── Confrences.jsx
+│       │   ├── CourtAvailability.jsx
+│       │   ├── CreateBooth.jsx
+│       │   ├── CreateWorkshop.jsx
+│       │   ├── Dashboard.jsx
+│       │   ├── EditBazaar.jsx
+│       │   ├── EditConfrences.jsx
+│       │   ├── EditTrip.jsx
+│       │   ├── EventPayment.jsx
+│       │   ├── Events.jsx
+│       │   ├── EventsList.jsx
+│       │   ├── EventsOfficeCreatePoll.jsx
+│       │   ├── EventsOfficeDashboard.jsx
+│       │   ├── EventsOfficeEventsView.jsx
+│       │   ├── EventsOfficeLoyaltyProgramVendors.jsx
+│       │   ├── EventsOfficeNotificationBell.jsx
+│       │   ├── EventsOfficeVendors.jsx
+│       │   ├── EventsOfficeWorkshops.jsx
+│       │   ├── GymManage.jsx
+│       │   ├── GymSchedule.jsx
+│       │   ├── Login.jsx
+│       │   ├── MyWallet.jsx
+│       │   ├── MyWorkshops.jsx
+│       │   ├── PaymentCancel.jsx
+│       │   ├── PaymentSuccess.jsx
+│       │   ├── PendingVerification.jsx
+│       │   ├── PlatformBoothRequests.jsx
+│       │   ├── PlatformBoothReservation.jsx
+│       │   ├── PlatformBooths.jsx
+│       │   ├── ProfessorEventsView.jsx
+│       │   ├── ProfessorFavorites.jsx
+│       │   ├── ProfessorLoyaltyVendorsView.jsx
+│       │   ├── ProfessorMyRegistrations.jsx
+│       │   ├── ProfessorProfile.jsx
+│       │   ├── Signup.jsx
+│       │   ├── StaffEventsView.jsx
+│       │   ├── StaffFavorites.jsx
+│       │   ├── StaffLoyaltyVendorsView.jsx
+│       │   ├── StaffMyRegistrations.jsx
+│       │   ├── StudentCourtsView.jsx
+│       │   ├── StudentEventsView.jsx
+│       │   ├── StudentFavorites.jsx
+│       │   ├── StudentLoyaltyVendorsView.jsx
+│       │   ├── StudentMyRegistrations.jsx
+│       │   ├── TAEventsView.jsx
+│       │   ├── TAFavorites.jsx
+│       │   ├── TALoyaltyVendorsView.jsx
+│       │   ├── TAMyRegistrations.jsx
+│       │   ├── VendorAccepted.jsx
+│       │   ├── VendorAcceptedEvents.jsx
+│       │   ├── VendorBazaars.jsx
+│       │   ├── VendorBoothsSection.jsx
+│       │   ├── VendorDashboard.jsx
+│       │   ├── VendorLoyaltyProgram.jsx
+│       │   ├── VendorMyRequests.jsx
+│       │   ├── VendorRequestPayment.jsx
+│       │   ├── VendorRequests.jsx
+│       │   └── VerifyEmail.jsx
+│       └── styles/
+│           ├── BazaarForm.css
+│           ├── conference.css
+│           ├── CreateBazaar.css
+│           ├── CreateGymSession.css
+│           ├── CreateTrip.css
+│           ├── EditBazaar.css
+│           ├── EditTrip.css
+│           ├── EventsList.css
+│           ├── GymSessionForm.css
+│           ├── index.css
+│           ├── StudentRegistrationForm.css
+│           ├── TripForm.css
+│           └── VendorBazaars.css
 ```
 
 ## 📚 API Documentation
