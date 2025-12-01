@@ -568,51 +568,6 @@ const EventsOfficeEventsView = () => {
         }
         
         if (!matches) return false;
-  const filteredEvents = events.filter(event => {
-    // Skip invalid/empty events
-    const title = (event.title || event.name || '').trim();
-    if (!title) return false;
-    if (!event.startDate) return false;
-    
-    // Validate startDate is a valid date
-    const startDate = new Date(event.startDate);
-    if (isNaN(startDate.getTime())) return false;
-    
-    // Events Office can see all events (past and future), so don't filter by date
-    // Only filter out events with invalid end dates
-    if (event.endDate) {
-      const eventEndDate = new Date(event.endDate);
-      if (isNaN(eventEndDate.getTime())) return false;
-    }
-    
-    if (event.type === 'other') return false;
-    
-    // Filter by type
-    const typeMatch = filter === 'all' || (event.type && event.type === filter);
-    if (!typeMatch) return false;
-    
-    // Filter by professor name (for workshops and conferences)
-    if (professorNameFilter.trim()) {
-      const profFilter = professorNameFilter.trim().toLowerCase();
-      const creatorName = (event.creatorName || event.professorName || '').toLowerCase();
-      if (!creatorName.includes(profFilter)) return false;
-    }
-    
-    // Filter by location
-    if (locationFilter.trim()) {
-      const location = (event.location || '').trim();
-      if (location !== locationFilter.trim()) return false;
-    }
-    
-    // Filter by date
-    if (dateFilter.trim()) {
-      const filterDate = new Date(dateFilter);
-      if (!isNaN(filterDate.getTime())) {
-        const eventDate = new Date(event.startDate);
-        // Compare dates (ignore time)
-        const filterDateOnly = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate());
-        const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-        if (eventDateOnly.getTime() !== filterDateOnly.getTime()) return false;
       }
       
       // Filter by location

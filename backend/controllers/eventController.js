@@ -653,76 +653,6 @@ exports.getAllEvents = async (req, res) => {
       }))
     });
     
-    // For bazaars and booths, get vendor information
-    // Also recalculate registeredCount from actual registrations for accuracy
-    const Registration = require('../models/registrationModel');
-    const mongoose = require('mongoose');
-    const eventsWithVendors = await Promise.all(events.map(async (e) => {
-      const creatorFullName = e.createdBy ? `${e.createdBy.firstName || ''} ${e.createdBy.lastName || ''}`.trim() : null;
-      
-      // For bazaars and booths, registeredCount = number of accepted vendor requests (participating vendors)
-      // For other events, registeredCount = number of event participants
-      let finalCount = e.registeredCount || 0;
-      
-      if (e.type === 'bazaar' || e.type === 'booth') {
-        // Count accepted vendor requests (participating vendors)
-        const VendorRequest = require('../models/vendorRequest');
-        let eventIdForQuery = e._id;
-        if (mongoose.Types.ObjectId.isValid(e._id)) {
-          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
-        } else if (typeof e._id === 'string' && mongoose.Types.ObjectId.isValid(e._id)) {
-          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
-        }
-        
-        const vendorCount = await VendorRequest.countDocuments({
-          $or: [
-            { bazaar: eventIdForQuery, status: 'accepted' },
-            { booth: eventIdForQuery, status: 'accepted' },
-            { standaloneBooth: eventIdForQuery, status: 'accepted' }
-          ]
-        });
-        
-        // Try string format if ObjectId didn't work
-        if (vendorCount === 0 && typeof e._id === 'string') {
-          const stringVendorCount = await VendorRequest.countDocuments({
-            $or: [
-              { bazaar: e._id, status: 'accepted' },
-              { booth: e._id, status: 'accepted' },
-              { standaloneBooth: e._id, status: 'accepted' }
-            ]
-          });
-          finalCount = stringVendorCount;
-        } else {
-          finalCount = vendorCount;
-        }
-        
-        console.log(`🔍 Event ${String(e._id)} (${e.title || e.name}) - Bazaar/Booth: Found ${finalCount} accepted vendor(s)`);
-      } else {
-        // For other events, count actual event participants
-        let eventIdForQuery = e._id;
-        if (mongoose.Types.ObjectId.isValid(e._id)) {
-          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
-        } else if (typeof e._id === 'string' && mongoose.Types.ObjectId.isValid(e._id)) {
-          eventIdForQuery = new mongoose.Types.ObjectId(e._id);
-        }
-        
-        // Count from Registration model
-        const regCount = await Registration.countDocuments({ 
-          event: eventIdForQuery,
-          status: { $ne: 'cancelled' }
-        });
-        
-        // Also check StudentRegistration (for workshops and trips)
-        const StudentRegistration = require('../models/studentRegistrationModel');
-        const studentRegCount = await StudentRegistration.countDocuments({ 
-          event: eventIdForQuery,
-          status: { $ne: 'cancelled' }
-        });
-      } catch (regCountError) {
-        console.error('Error fetching registration counts:', regCountError);
-      }
-    }
-    
     // Batch fetch all vendor requests for bazaar/booth events (only if not minimal)
     const vendorRequestsMap = new Map();
     const vendorsMap = new Map(); // Make vendorsMap accessible in outer scope - MUST be in outer scope!
@@ -1247,16 +1177,6 @@ exports.getAllEvents = async (req, res) => {
             }
             
             return result;
-          baseEvent.vendors = vendorRequests.map(vr => ({
-            _id: vr.vendor._id,
-            name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
-            companyName: vr.vendor.companyName,
-            contactName: `${vr.vendor.firstName} ${vr.vendor.lastName}`,
-            email: vr.vendor.email,
-            boothSize: vr.boothSize,
-            durationWeeks: vr.durationWeeks,
-            boothLocation: vr.boothLocation,
-            attendees: vr.attendees || []
           }));
 
           // For bazaars, also get related booth events
