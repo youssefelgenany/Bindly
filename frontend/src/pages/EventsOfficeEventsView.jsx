@@ -85,9 +85,32 @@ const EventsOfficeEventsView = () => {
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const [sendingQRCodes, setSendingQRCodes] = useState({}); // eventId -> boolean
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [showFileModal, setShowFileModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
+  };
+
+  const handleDownload = async (fileUrl, fileName) => {
+    try {
+      const response = await fetch(fileUrl);
+      if (!response.ok) throw new Error('Failed to fetch file');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      // Fallback to direct download
+      window.open(fileUrl, '_blank');
+    }
   };
 
   const handleLogout = () => {
@@ -980,7 +1003,8 @@ const EventsOfficeEventsView = () => {
     const startDate = new Date(event.startDate);
     const endDate = new Date(event.endDate);
     
-    if (event.capacity && event.registeredCount >= event.capacity) {
+    // Don't show "Full" status for platform booths as they don't have capacity
+    if (event.capacity && event.registeredCount >= event.capacity && event.type !== 'platformBooth') {
       return { label: 'Full', color: 'red' };
     }
     if (now >= startDate && now <= endDate) {
@@ -2818,6 +2842,16 @@ const EventsOfficeEventsView = () => {
                                         const vendorBoothSize = vendor.boothSize || '';
                                         const vendorBoothLocation = vendor.boothLocation || '';
                                         const vendorAttendees = Array.isArray(vendor.attendees) ? vendor.attendees : [];
+                                        const vendorIdsPaths = Array.isArray(vendor.individualIdsPaths) ? vendor.individualIdsPaths : [];
+                                        
+                                        // Debug log
+                                        if (vendorIdsPaths.length > 0) {
+                                          console.log('🔍 Vendor IDs found:', {
+                                            vendorName,
+                                            vendorIdsPaths,
+                                            vendorAttendees
+                                          });
+                                        }
                                         
                                         return (
                                         <div
@@ -2961,6 +2995,97 @@ const EventsOfficeEventsView = () => {
                                                     • {attendee.name || attendee || `Attendee ${aIdx + 1}`}
                                                   </span>
                                                 ))}
+                                              </div>
+                                            </div>
+                                          )}
+                                          {vendorIdsPaths.length > 0 && (
+                                            <div style={{
+                                              fontSize: '0.8125rem',
+                                              color: '#6b7280',
+                                              margin: 0,
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              gap: '0.5rem',
+                                              paddingTop: '0.5rem',
+                                              borderTop: '1px solid #e5e7eb'
+                                            }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '500' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                  badge
+                                                </span>
+                                                Attendee IDs ({vendorIdsPaths.length}):
+                                              </div>
+                                              <div style={{ paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                {vendorIdsPaths.map((idPath, idIdx) => {
+                                                  const fileName = idPath.split('/').pop() || `ID_${idIdx + 1}`;
+                                                  const fileUrl = idPath.startsWith('http') ? idPath : `${API_BASE_URL}${idPath.startsWith('/') ? idPath : '/' + idPath}`;
+                                                  const attendeeName = vendorAttendees[idIdx]?.name || vendorAttendees[idIdx] || `Attendee ${idIdx + 1}`;
+                                                  
+                                                  return (
+                                                    <div key={idIdx} style={{
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      gap: '0.5rem',
+                                                      padding: '0.375rem 0.5rem',
+                                                      backgroundColor: '#f9fafb',
+                                                      borderRadius: '0.375rem',
+                                                      border: '1px solid #e5e7eb'
+                                                    }}>
+                                                      <span style={{ fontSize: '0.75rem', flex: 1, color: '#374151' }}>
+                                                        {attendeeName}
+                                                      </span>
+                                                      <button
+                                                        onClick={() => {
+                                                          setSelectedFile({ url: fileUrl, name: fileName, attendeeName });
+                                                          setShowFileModal(true);
+                                                        }}
+                                                        style={{
+                                                          display: 'flex',
+                                                          alignItems: 'center',
+                                                          gap: '0.25rem',
+                                                          padding: '0.25rem 0.5rem',
+                                                          backgroundColor: '#3b82f6',
+                                                          color: '#FFFFFF',
+                                                          border: 'none',
+                                                          borderRadius: '0.25rem',
+                                                          fontSize: '0.75rem',
+                                                          cursor: 'pointer',
+                                                          transition: 'background-color 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                                                        onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                                                      >
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                          visibility
+                                                        </span>
+                                                        View
+                                                      </button>
+                                                      <button
+                                                        onClick={() => handleDownload(fileUrl, fileName)}
+                                                        style={{
+                                                          display: 'flex',
+                                                          alignItems: 'center',
+                                                          gap: '0.25rem',
+                                                          padding: '0.25rem 0.5rem',
+                                                          backgroundColor: '#10b981',
+                                                          color: '#FFFFFF',
+                                                          border: 'none',
+                                                          borderRadius: '0.25rem',
+                                                          fontSize: '0.75rem',
+                                                          cursor: 'pointer',
+                                                          transition: 'background-color 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                                                        onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+                                                      >
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                                          download
+                                                        </span>
+                                                        Download
+                                                      </button>
+                                                    </div>
+                                                  );
+                                                })}
                                               </div>
                                             </div>
                                           )}
@@ -4792,7 +4917,7 @@ const EventsOfficeEventsView = () => {
                                 color: '#6b7280',
                                 textAlign: 'center'
                               }}>
-                                {event.capacity || 'N/A'}
+                                {event.type === 'platformBooth' ? 'N/A' : (event.capacity || 'N/A')}
                               </td>
                             </tr>
                           ))}
@@ -5999,6 +6124,163 @@ const EventsOfficeEventsView = () => {
           }
         }
       `}</style>
+
+      {/* File Viewer Modal */}
+      {showFileModal && selectedFile && (
+        <div
+          onClick={() => {
+            setShowFileModal(false);
+            setSelectedFile(null);
+          }}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '2rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '0.75rem',
+              width: '90%',
+              maxWidth: '1200px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <div style={{ flex: 1 }}>
+                <h3 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  margin: 0
+                }}>
+                  {selectedFile.attendeeName} - ID Document
+                </h3>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  onClick={() => {
+                    setShowFileModal(false);
+                    setSelectedFile(null);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    backgroundColor: '#f3f4f6',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#e5e7eb'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.25rem', color: '#6b7280' }}>
+                    close
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* File Content */}
+            <div style={{
+              flex: 1,
+              overflow: 'auto',
+              padding: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#f9fafb'
+            }}>
+              {selectedFile.url.toLowerCase().endsWith('.pdf') ? (
+                <iframe
+                  src={selectedFile.url}
+                  style={{
+                    width: '100%',
+                    height: '70vh',
+                    border: 'none',
+                    borderRadius: '0.5rem'
+                  }}
+                  title={selectedFile.name}
+                />
+              ) : selectedFile.url.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i) ? (
+                <img
+                  src={selectedFile.url}
+                  alt={selectedFile.name}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '70vh',
+                    objectFit: 'contain',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+              ) : (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '3rem',
+                  color: '#6b7280'
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '3rem', marginBottom: '1rem', display: 'block' }}>
+                    description
+                  </span>
+                  <p style={{ fontSize: '1rem', margin: 0, marginBottom: '0.5rem' }}>
+                    Preview not available for this file type
+                  </p>
+                  <button
+                    onClick={() => handleDownload(selectedFile.url, selectedFile.name)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.75rem 1.5rem',
+                      backgroundColor: '#3b82f6',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      marginTop: '1rem',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                      download
+                    </span>
+                    Download to view
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
