@@ -340,7 +340,7 @@ async function sendQRCodesToVendor(vendor, event, registrations = [], vendorQRCo
 
     const defaultFrom = process.env.SMTP_FROM && process.env.SMTP_FROM.trim()
       ? process.env.SMTP_FROM.trim()
-      : (process.env.SMTP_USER ? `Bindly <${process.env.SMTP_USER}>` : 'Bindly <no-reply@bindly.com>');
+      : (process.env.SMTP_USER ? `Bindly <${process.env.SMTP_USER}>` : 'Bindly <eyadomara202@gmail.com>');
 
     // Generate appropriate subject line based on what QR codes are being sent
     let emailSubject = '';
