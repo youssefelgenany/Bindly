@@ -664,11 +664,16 @@ module.exports.getMyRequests = async (req, res) => {
           }));
       }
       if (t === 'booth') {
-        const requests = await VendorRequest.find(buildQuery('booth'))
+        // Exclude platform booths from regular booth queries (they have their own fetch function)
+        const boothQuery = {
+          ...buildQuery('booth'),
+          eventType: { $ne: 'platformBooth' } // Exclude platform booths
+        };
+        const requests = await VendorRequest.find(boothQuery)
           .populate({ path: 'booth', select: pickFields })
           .lean();
         return (requests || [])
-          .filter(r => r.booth)
+          .filter(r => r.booth && r.eventType !== 'platformBooth') // Double check to exclude platform booths
           .map(r => ({
             _id: r.booth._id,
             title: r.booth.title,
