@@ -17,6 +17,11 @@ const VendorAcceptedEvents = () => {
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'upcoming', 'past'
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
+  const [cancelRequestId, setCancelRequestId] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
   
 
   const isActiveRoute = (path) => {
@@ -108,27 +113,37 @@ const VendorAcceptedEvents = () => {
     loadAcceptedEvents();
   }, []);
 
-  const handleCancel = async (requestId) => {
+  const handleCancel = (requestId) => {
     if (!requestId) return;
-    const ok = window.confirm('Are you sure you want to cancel this participation request? This cannot be undone.');
-    if (!ok) return;
+    setCancelRequestId(requestId);
+    setShowCancelConfirmModal(true);
+  };
+
+  const confirmCancel = async () => {
+    if (!cancelRequestId) return;
+    setShowCancelConfirmModal(false);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.delete(`http://localhost:5000/api/vendor-requests/${requestId}/cancel`, {
+      const res = await axios.delete(`http://localhost:5000/api/vendor-requests/${cancelRequestId}/cancel`, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         }
       });
       if (res.status === 200) {
-        setEvents(prev => prev.filter(ev => String(ev.requestId || ev._id) !== String(requestId)));
-        alert('Participation request cancelled successfully.');
+        setEvents(prev => prev.filter(ev => String(ev.requestId || ev._id) !== String(cancelRequestId)));
+        setModalMessage('Participation request cancelled successfully.');
+        setShowSuccessModal(true);
       } else {
-        alert(res.data?.message || 'Failed to cancel request');
+        setModalMessage(res.data?.message || 'Failed to cancel request');
+        setShowErrorModal(true);
       }
     } catch (err) {
       console.error('Error cancelling request:', err);
       const msg = err.response?.data?.message || err.message || 'Error cancelling request';
-      alert(msg);
+      setModalMessage(msg);
+      setShowErrorModal(true);
+    } finally {
+      setCancelRequestId(null);
     }
   };
 
@@ -1190,6 +1205,288 @@ const VendorAcceptedEvents = () => {
             }
           }}
         />
+      )}
+
+      {/* Cancel Confirmation Modal */}
+      {showCancelConfirmModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 3000,
+          padding: '1rem'
+        }}
+        onClick={() => setShowCancelConfirmModal(false)}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{
+                margin: 0,
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                color: '#1f2937',
+                marginBottom: '0.5rem'
+              }}>
+                Confirm Cancellation
+              </h3>
+              <p style={{
+                margin: 0,
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                lineHeight: '1.5'
+              }}>
+                Are you sure you want to cancel this participation request? This cannot be undone.
+              </p>
+            </div>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.75rem'
+            }}>
+              <button
+                onClick={() => setShowCancelConfirmModal(false)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#e5e7eb';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmCancel}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: '#dc2626',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#b91c1c';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#dc2626';
+                }}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 3000,
+          padding: '1rem'
+        }}
+        onClick={() => setShowSuccessModal(false)}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{
+                width: '3rem',
+                height: '3rem',
+                borderRadius: '50%',
+                backgroundColor: '#10b981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: '1rem'
+              }}>
+                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.5rem' }}>
+                  check
+                </span>
+              </div>
+              <h3 style={{
+                margin: 0,
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                color: '#1f2937'
+              }}>
+                Success
+              </h3>
+            </div>
+            <p style={{
+              margin: 0,
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              lineHeight: '1.5',
+              marginBottom: '1.5rem'
+            }}>
+              {modalMessage}
+            </p>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: '#3b82f6',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#2563eb';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#3b82f6';
+                }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 3000,
+          padding: '1rem'
+        }}
+        onClick={() => setShowErrorModal(false)}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{
+                width: '3rem',
+                height: '3rem',
+                borderRadius: '50%',
+                backgroundColor: '#ef4444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: '1rem'
+              }}>
+                <span className="material-symbols-outlined" style={{ color: '#FFFFFF', fontSize: '1.5rem' }}>
+                  error
+                </span>
+              </div>
+              <h3 style={{
+                margin: 0,
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                color: '#1f2937'
+              }}>
+                Error
+              </h3>
+            </div>
+            <p style={{
+              margin: 0,
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              lineHeight: '1.5',
+              marginBottom: '1.5rem'
+            }}>
+              {modalMessage}
+            </p>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => setShowErrorModal(false)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: '#3b82f6',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#2563eb';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#3b82f6';
+                }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
