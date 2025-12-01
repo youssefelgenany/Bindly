@@ -31,27 +31,43 @@ const VendorAccepted = () => {
         load();
     }, []);
 
-    const handleCancel = async (requestId) => {
+    const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
+    const [cancelRequestId, setCancelRequestId] = useState(null);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [modalMessage, setModalMessage] = useState('');
+
+    const handleCancel = (requestId) => {
         if (!requestId) return;
-        const ok = window.confirm('Are you sure you want to cancel this participation request? This cannot be undone.');
-        if (!ok) return;
+        setCancelRequestId(requestId);
+        setShowCancelConfirmModal(true);
+    };
+
+    const confirmCancel = async () => {
+        if (!cancelRequestId) return;
+        setShowCancelConfirmModal(false);
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.delete(`http://localhost:5000/api/vendor-requests/${requestId}/cancel`, {
+            const res = await axios.delete(`http://localhost:5000/api/vendor-requests/${cancelRequestId}/cancel`, {
                 headers: {
                     ...(token ? { Authorization: `Bearer ${token}` } : {})
                 }
             });
             if (res.status === 200) {
-                setEvents(prev => prev.filter(ev => String(ev.requestId || ev._id) !== String(requestId)));
-                alert('Participation request cancelled successfully.');
+                setEvents(prev => prev.filter(ev => String(ev.requestId || ev._id) !== String(cancelRequestId)));
+                setModalMessage('Participation request cancelled successfully.');
+                setShowSuccessModal(true);
             } else {
-                alert(res.data?.message || 'Failed to cancel request');
+                setModalMessage(res.data?.message || 'Failed to cancel request');
+                setShowErrorModal(true);
             }
         } catch (err) {
             console.error('Error cancelling request:', err);
             const msg = err.response?.data?.message || err.message || 'Error cancelling request';
-            alert(msg);
+            setModalMessage(msg);
+            setShowErrorModal(true);
+        } finally {
+            setCancelRequestId(null);
         }
     };
 
