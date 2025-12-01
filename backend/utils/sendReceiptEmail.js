@@ -159,7 +159,7 @@ async function sendReceiptEmail(email, name, eventTitle, amount, paymentMethod, 
     console.log('✅ SMTP connection verified successfully');
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || `Bindly <salma.husseinhassan@student.guc.edu.eg>`,
+      from: process.env.SMTP_FROM || `Bindly <salmaahmed1504@gmail.com>`,
       to: email,
       subject: `Payment Receipt - ${eventTitle}`,
       html: html

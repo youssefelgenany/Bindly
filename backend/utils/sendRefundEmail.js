@@ -90,7 +90,7 @@ async function sendRefundEmail(email, name, eventTitle, amount, refundDate) {
     console.log('✅ SMTP connection verified');
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || `Bindly <salma.husseinhassan@student.guc.edu.eg>`,
+      from: process.env.SMTP_FROM || `Bindly <salmaahmed1504@gmail.com>`,
       to: email,
       subject: `Registration Cancelled - Refund Processed - ${eventTitle}`,
       html: html
