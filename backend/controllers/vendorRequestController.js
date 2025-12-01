@@ -644,6 +644,19 @@ const updateVendorRequestStatus = async (req, res) => {
         try {
           console.log('📅 Creating new event for platform booth request...');
           
+          // Ensure vendor is populated
+          if (!reloadedRequest.vendor || !reloadedRequest.vendor._id) {
+            console.error('❌ Vendor not populated for platform booth request');
+            // Try to populate vendor
+            const requestWithVendor = await VendorRequest.findById(id)
+              .populate('vendor', 'companyName firstName lastName email _id');
+            if (requestWithVendor && requestWithVendor.vendor) {
+              reloadedRequest.vendor = requestWithVendor.vendor;
+            } else {
+              throw new Error('Vendor not found for platform booth request');
+            }
+          }
+          
           // Calculate dates
           const startDate = reloadedRequest.startDate || new Date();
           const durationWeeks = reloadedRequest.durationWeeks || 1;
@@ -680,9 +693,10 @@ const updateVendorRequestStatus = async (req, res) => {
             boothSize: reloadedRequest.boothSize || '2x2',
             boothNumber: reloadedRequest.boothId ? (parseInt(reloadedRequest.boothId) || 1) : 1, // Use boothId if available, otherwise default to 1
             boothStatus: 'taken', // Mark as taken since it's being reserved
-            currentOwner: reloadedRequest.vendor._id, // Set the vendor as the current owner
+            currentOwner: reloadedRequest.vendor?._id || reloadedRequest.vendor, // Set the vendor as the current owner (handle both populated and ObjectId)
             occupancyEndDate: endDate, // Set the occupancy end date
             status: 'approved',
+            archived: false, // Explicitly set to false to ensure it appears in events list
             createdBy: req.user._id || req.user.id,
             capacity: 1, // Platform booths typically have capacity of 1
             registeredCount: 0

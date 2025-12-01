@@ -429,9 +429,10 @@ const Login = () => {
               color: '#FFFFFF'
             }}>
               <p style={{
-                fontSize: '1.875rem',
+                fontFamily: 'Manrope, sans-serif',
+                fontSize: '2.25rem',
                 fontWeight: '700',
-                lineHeight: '1.375',
+                lineHeight: '1.25',
                 margin: 0
               }}>
                 "Connecting our campus, one event at a time."
@@ -439,7 +440,7 @@ const Login = () => {
               <p style={{
                 marginTop: '1rem',
                 fontSize: '1.125rem',
-                color: '#A8DADC',
+                color: 'rgba(255, 255, 255, 0.8)',
                 marginBottom: 0
               }}>
                 Explore, engage, and excel with Bindly.
