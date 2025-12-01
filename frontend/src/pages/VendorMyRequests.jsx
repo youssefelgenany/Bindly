@@ -69,13 +69,29 @@ const VendorMyRequests = () => {
       console.log('🔍 Pending requests:', pending);
       console.log('🔍 Rejected requests:', rejected);
       
-      const allRequests = [...pending, ...rejected].sort((a, b) => {
+      // Combine and deduplicate by ID to prevent duplicates
+      const allRequestsCombined = [...pending, ...rejected];
+      const seenIds = new Set();
+      const uniqueRequests = [];
+      
+      for (const req of allRequestsCombined) {
+        const id = req._id || req.id;
+        if (id && !seenIds.has(String(id))) {
+          seenIds.add(String(id));
+          uniqueRequests.push(req);
+        } else if (!id) {
+          // If no ID, still include it (shouldn't happen but safety check)
+          uniqueRequests.push(req);
+        }
+      }
+      
+      const allRequests = uniqueRequests.sort((a, b) => {
         const dateA = new Date(a.createdAt || a.dateApplied || 0);
         const dateB = new Date(b.createdAt || b.dateApplied || 0);
         return dateB - dateA; // Most recent first
       });
 
-      console.log('🔍 All requests (sorted):', allRequests);
+      console.log('🔍 All requests (deduplicated and sorted):', allRequests);
       setRequests(allRequests);
     } catch (err) {
       console.error('❌ Error loading my requests:', err);
@@ -608,7 +624,7 @@ const VendorMyRequests = () => {
                 margin: 0,
                 animation: 'slideInRight 0.8s ease-out 0.2s both'
               }}>
-                View all requests for upcoming bazaars or booth setups you want to participate in (pending or rejected).
+                View all requests for upcoming bazaars or booth setups you want to participate in.
               </p>
             </div>
           </div>

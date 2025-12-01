@@ -86,16 +86,32 @@ const AdminDashboard = () => {
 
       // 1. Activities from admin activity endpoint
       if (activityRes.data?.success && activityRes.data.activities) {
-        const adminActivities = activityRes.data.activities.map(activity => ({
-          id: activity.id || activity._id,
-          type: 'admin_activity',
-          activityType: activity.type, // Store the original activity type (registration, event, etc.)
-          title: activity.eventName || activity.event || 'Activity',
-          timestamp: activity.timestamp || activity.createdAt,
-          icon: activity.type === 'registration' ? 'person_add' : activity.type === 'event' ? 'event' : 'info',
-          action: activity.action || 'Activity',
-          user: activity.user || 'System'
-        }));
+        const adminActivities = activityRes.data.activities.map(activity => {
+          // For event creation activities, format them like event_created (no user)
+          if (activity.type === 'event') {
+            return {
+              id: activity.id || activity._id,
+              type: 'event_created', // Convert to event_created type
+              eventType: activity.eventType,
+              title: activity.eventName || activity.event || 'Event',
+              timestamp: activity.timestamp || activity.createdAt,
+              icon: getEventIcon(activity.eventType),
+              action: activity.action || 'A new Event',
+              user: null // No user for event creation
+            };
+          }
+          // For registration activities, keep the user
+          return {
+            id: activity.id || activity._id,
+            type: 'admin_activity',
+            activityType: activity.type, // Store the original activity type (registration, event, etc.)
+            title: activity.eventName || activity.event || 'Activity',
+            timestamp: activity.timestamp || activity.createdAt,
+            icon: activity.type === 'registration' ? 'person_add' : 'info',
+            action: activity.action || 'Activity',
+            user: activity.user || 'System'
+          };
+        });
         activities.push(...adminActivities);
       }
 
@@ -115,12 +131,30 @@ const AdminDashboard = () => {
           title: event.title || event.name,
           timestamp: event.createdAt || event.created,
           icon: getEventIcon(event.type),
-            action: `A new ${eventTypeFormatted} was created`,
+            action: `A new ${eventTypeFormatted}`,
             user: null
           };
         });
 
-      // 3. Vendor requests (new, accepted, rejected)
+      // 3. Events that started today or recently
+      const startedEvents = events
+        .filter(e => {
+          const startDate = new Date(e.startDate || e.start);
+          const daysDiff = (now - startDate) / (1000 * 60 * 60 * 24);
+          return daysDiff >= 0 && daysDiff <= 1; // Started today or yesterday
+        })
+        .map(event => ({
+          id: event._id,
+          type: 'event_started',
+          eventType: event.type,
+          title: event.title || event.name,
+          timestamp: event.startDate || event.start,
+          icon: getEventIcon(event.type),
+          action: 'An event has started',
+          user: null
+        }));
+
+      // 4. Vendor requests (new, accepted, rejected)
       const recentVendorRequests = vendorRequests
         .filter(req => {
           const created = new Date(req.createdAt || req.created);
@@ -170,7 +204,7 @@ const AdminDashboard = () => {
         });
 
       // Combine and sort all activities
-      const allActivities = [...activities, ...recentEvents, ...recentVendorRequests]
+      const allActivities = [...activities, ...recentEvents, ...startedEvents, ...recentVendorRequests]
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
         .slice(0, 10);
       
@@ -1218,15 +1252,24 @@ const AdminDashboard = () => {
                               <p style={{
                                 fontSize: '0.875rem',
                                 color: '#1D3557',
-                                margin: 0
+                                margin: 0,
+                                fontWeight: activity.type === 'workshop_submission' && !activity.isRead ? '600' : '400'
                               }}>
-                                {activity.user ? (
+                                {activity.type === 'workshop_submission' ? (
+                                  <>
+                                    Professor <span style={{ fontWeight: '600', color: '#3b82f6' }}>{activity.professorName}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
+                                  </>
+                                ) : activity.user ? (
                                   <>
                                     <span style={{ fontWeight: '600' }}>{activity.user}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
                                   </>
-                                ) : (
+                                ) : activity.type === 'event_started' ? (
                                   <>
                                     {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
+                                  </>
+                                ) : (
+                                  <>
+                                    {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span> was created.
                                   </>
                                 )}
                               </p>

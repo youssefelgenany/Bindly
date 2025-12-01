@@ -11,11 +11,14 @@ exports.createEventReminders = async () => {
   try {
     const now = new Date();
     
-    const oneDayBefore = new Date(now.getTime() + 23 * 60 * 60 * 1000);
-    const oneDayAfter = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+    // Expanded window for 1-day reminders: 23.5 to 24.5 hours from now (90-minute window)
+    // This ensures we catch events even if the cron job timing is slightly off
+    const oneDayBefore = new Date(now.getTime() + 23.5 * 60 * 60 * 1000);
+    const oneDayAfter = new Date(now.getTime() + 24.5 * 60 * 60 * 1000);
     
-    const oneHourBefore = new Date(now.getTime() + 59 * 60 * 1000);
-    const oneHourAfter = new Date(now.getTime() + 61 * 60 * 1000);
+    // Expanded window for 1-hour reminders: 58 to 62 minutes from now (4-minute window)
+    const oneHourBefore = new Date(now.getTime() + 58 * 60 * 1000);
+    const oneHourAfter = new Date(now.getTime() + 62 * 60 * 1000);
     
     // Run all database queries in parallel for better performance
     const [
@@ -74,19 +77,25 @@ exports.createEventReminders = async () => {
 };
 
 async function processEventReminders(events, timeframe) {
+  console.log(`📅 Processing ${events.length} events for ${timeframe} reminder`);
   for (const event of events) {
     try {
+      console.log(`🔍 Checking event: ${event.title} (ID: ${event._id}) - Start: ${event.startDate}`);
+      
       // Get student registrations (for workshops/trips)
       const studentRegistrations = await StudentRegistration.find({
         event: event._id,
         status: { $ne: 'cancelled' }
       });
+      console.log(`  📚 Found ${studentRegistrations.length} student registrations`);
       
       // Get regular registrations (for Staff, TA, Professor, and other students)
+      // Include all non-cancelled registrations to ensure we catch all user types
       const regularRegistrations = await Registration.find({
         event: event._id,
         status: { $in: ['approved', 'pending'] }
       });
+      console.log(`  👥 Found ${regularRegistrations.length} regular registrations (Staff/TA/Professor/Student)`);
       
       // Process student registrations
       for (const registration of studentRegistrations) {
@@ -137,7 +146,15 @@ async function processEventReminders(events, timeframe) {
       // Process regular registrations (Staff, TA, Professor, etc.)
       for (const registration of regularRegistrations) {
         const userId = registration.user;
-        if (!userId) continue; // Skip if no user found
+        if (!userId) {
+          console.log(`  ⚠️ Skipping registration ${registration._id} - no user ID`);
+          continue; // Skip if no user found
+        }
+        
+        // Get user info for logging
+        const user = await User.findById(userId).select('userType email firstName lastName');
+        const userType = user?.userType || 'Unknown';
+        console.log(`  👤 Processing registration for ${userType}: ${user?.email || userId}`);
         
         const existingNotification = await Notification.findOne({
           type: 'event_reminder',
@@ -162,6 +179,9 @@ async function processEventReminders(events, timeframe) {
               eventId: event._id.toString()
             }
           });
+          console.log(`  ✅ Created ${timeframe} reminder notification for ${userType}: ${user?.email || userId}`);
+        } else {
+          console.log(`  ⏭️  Skipped duplicate notification for ${userType}: ${user?.email || userId}`);
         }
       }
     } catch (error) {
@@ -234,7 +254,15 @@ async function processWorkshopReminders(workshops, timeframe) {
       // Process regular registrations (Staff, TA, Professor, etc.)
       for (const registration of regularRegistrations) {
         const userId = registration.user;
-        if (!userId) continue; // Skip if no user found
+        if (!userId) {
+          console.log(`  ⚠️ Skipping workshop registration ${registration._id} - no user ID`);
+          continue; // Skip if no user found
+        }
+        
+        // Get user info for logging
+        const user = await User.findById(userId).select('userType email firstName lastName');
+        const userType = user?.userType || 'Unknown';
+        console.log(`  👤 Processing workshop registration for ${userType}: ${user?.email || userId}`);
         
         const existingNotification = await Notification.findOne({
           type: 'workshop_reminder',
@@ -259,6 +287,9 @@ async function processWorkshopReminders(workshops, timeframe) {
               workshopId: workshop._id.toString()
             }
           });
+          console.log(`  ✅ Created ${timeframe} workshop reminder notification for ${userType}: ${user?.email || userId}`);
+        } else {
+          console.log(`  ⏭️  Skipped duplicate workshop notification for ${userType}: ${user?.email || userId}`);
         }
       }
     } catch (error) {
@@ -330,7 +361,15 @@ async function processTripReminders(trips, timeframe) {
       // Process regular registrations (Staff, TA, Professor, etc.)
       for (const registration of regularRegistrations) {
         const userId = registration.user;
-        if (!userId) continue; // Skip if no user found
+        if (!userId) {
+          console.log(`  ⚠️ Skipping trip registration ${registration._id} - no user ID`);
+          continue; // Skip if no user found
+        }
+        
+        // Get user info for logging
+        const user = await User.findById(userId).select('userType email firstName lastName');
+        const userType = user?.userType || 'Unknown';
+        console.log(`  👤 Processing trip registration for ${userType}: ${user?.email || userId}`);
         
         const existingNotification = await Notification.findOne({
           type: 'trip_reminder',
@@ -354,6 +393,9 @@ async function processTripReminders(trips, timeframe) {
               tripId: trip._id.toString()
             }
           });
+          console.log(`  ✅ Created ${timeframe} trip reminder notification for ${userType}: ${user?.email || userId}`);
+        } else {
+          console.log(`  ⏭️  Skipped duplicate trip notification for ${userType}: ${user?.email || userId}`);
         }
       }
     } catch (error) {

@@ -80,6 +80,7 @@ const getAllVendorRequests = async (req, res) => {
   try {
     console.log('🔍 getAllVendorRequests - Fetching all vendor requests');
     const requests = await VendorRequest.find()
+      .select('vendor bazaar booth standaloneBooth attendees individualIdsPaths boothSize durationWeeks boothLocation boothId startDate message status eventType createdAt updatedAt eventName')
       .populate({
         path: 'vendor',
         select: 'companyName firstName lastName email',
@@ -164,6 +165,7 @@ const getAllVendorRequests = async (req, res) => {
         booth: r.booth || null,
         standaloneBooth: r.standaloneBooth || null,
         attendees: r.attendees || [],
+        individualIdsPaths: r.individualIdsPaths || [],
         boothSize: r.boothSize,
         durationWeeks: r.durationWeeks,
         boothLocation: r.boothLocation,
@@ -183,7 +185,7 @@ const getAllVendorRequests = async (req, res) => {
     // If we can't, return empty array to prevent UI breaking
     try {
       const fallbackRequests = await VendorRequest.find()
-        .select('_id status eventType boothSize durationWeeks boothLocation createdAt updatedAt')
+        .select('_id status eventType boothSize durationWeeks boothLocation individualIdsPaths attendees createdAt updatedAt')
         .lean();
       const minimalNormalized = fallbackRequests.map(r => ({
         _id: r._id,
@@ -194,7 +196,8 @@ const getAllVendorRequests = async (req, res) => {
         bazaar: null,
         booth: null,
         standaloneBooth: null,
-        attendees: [],
+        attendees: r.attendees || [],
+        individualIdsPaths: r.individualIdsPaths || [],
         boothSize: r.boothSize,
         durationWeeks: r.durationWeeks,
         boothLocation: r.boothLocation,

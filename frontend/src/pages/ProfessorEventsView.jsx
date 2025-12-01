@@ -634,7 +634,7 @@ const ProfessorEventsView = () => {
     });
   };
 
-  // Filter events based on type (client-side filtering for past events)
+  // Filter events based on type and date (exclude past events)
   const filteredEvents = events.filter(event => {
     const title = (event.title || '').trim();
     if (!title) return false;
@@ -643,7 +643,13 @@ const ProfessorEventsView = () => {
     const startDate = new Date(event.startDate);
     if (isNaN(startDate.getTime())) return false;
     
-    // Show all events including past events - no date filtering
+    // Filter out past events - only show upcoming events
+    const now = new Date();
+    if (startDate < now) {
+      return false; // Event has already started, exclude it
+    }
+    
+    // Apply type filter
     const typeMatch = filter === 'all' || (event.type && event.type === filter);
     return typeMatch;
   });
@@ -1568,35 +1574,6 @@ const ProfessorEventsView = () => {
               }}>
                 Only events that haven't started yet are shown.
               </p>
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setFilter('all');
-                  loadEvents();
-                }}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#1e40af',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#1e3a8a';
-                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#1e40af';
-                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                }}
-              >
-                Show All Upcoming Events
-              </button>
             </div>
           ) : (
             <>
@@ -2099,7 +2076,8 @@ const ProfessorEventsView = () => {
                                 disabled
                                 onClick={(e) => e.stopPropagation()}
                                 style={{
-                                  padding: '0.625rem 1rem',
+                                  width: '100%',
+                                  padding: '0.75rem 1rem',
                                   borderRadius: '0.5rem',
                                   backgroundColor: '#10b981',
                                   color: '#FFFFFF',
@@ -2107,11 +2085,12 @@ const ProfessorEventsView = () => {
                                   cursor: 'not-allowed',
                                   fontSize: '0.875rem',
                                   fontWeight: '600',
+                                  marginTop: 'auto',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   gap: '0.5rem',
-                                  flex: 1
+                                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
                                 }}
                               >
                                 <div
@@ -2146,7 +2125,8 @@ const ProfessorEventsView = () => {
                                   handleRegisterClick(event);
                                 }}
                                 style={{
-                                  padding: '0.625rem 1rem',
+                                  width: '100%',
+                                  padding: '0.75rem 1rem',
                                   borderRadius: '0.5rem',
                                   backgroundColor: '#1e40af',
                                   color: '#FFFFFF',
@@ -2154,18 +2134,20 @@ const ProfessorEventsView = () => {
                                   cursor: 'pointer',
                                   fontSize: '0.875rem',
                                   fontWeight: '600',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '0.5rem',
                                   transition: 'all 0.2s',
-                                  flex: 1
+                                  marginTop: 'auto',
+                                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
                                 }}
-                                onMouseEnter={(e) => e.target.style.backgroundColor = '#1e3a8a'}
-                                onMouseLeave={(e) => e.target.style.backgroundColor = '#1e40af'}
+                                onMouseEnter={(e) => {
+                                  e.target.style.backgroundColor = '#1e3a8a';
+                                  e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.backgroundColor = '#1e40af';
+                                  e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                                }}
                               >
-                                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>how_to_reg</span>
-                                Register
+                                Register for {event.type === 'workshop' ? 'Workshop' : event.type === 'trip' ? 'Trip' : 'Event'}
                               </button>
                             )}
                           </>

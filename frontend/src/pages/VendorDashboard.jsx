@@ -46,25 +46,41 @@ const VendorDashboard = () => {
       }
       
       // Normalize events - extract event data from nested structure (bazaar, booth, etc.)
+      // IMPORTANT: Check platform booths FIRST to avoid duplication (they have both booth and eventType)
       const normalizedEvents = eventsList.map(ev => {
-        // If event is nested in bazaar or booth property, extract it
+        // For platform booths, the event data is at the root level (check FIRST to avoid duplication)
+        if (ev.eventType === 'platformBooth' || ev.type === 'platformBooth') {
+          return { ...ev, type: 'platformBooth', requestId: ev._id || ev.id };
+        }
+        // If event is nested in bazaar property, extract it
         if (ev.bazaar) {
           return { ...ev.bazaar, type: 'bazaar', requestId: ev._id || ev.id };
         }
-        if (ev.booth) {
+        // If event is nested in booth property, extract it (but skip if it's a platform booth)
+        if (ev.booth && ev.eventType !== 'platformBooth') {
           return { ...ev.booth, type: 'booth', requestId: ev._id || ev.id };
-        }
-        // For platform booths, the event data is at the root level
-        if (ev.eventType === 'platformBooth' || ev.type === 'platformBooth') {
-          return { ...ev, type: 'platformBooth', requestId: ev._id || ev.id };
         }
         // Default: return as is
         return { ...ev, requestId: ev._id || ev.id };
       });
       
+      // Deduplicate by requestId to ensure no duplicates
+      const uniqueEvents = [];
+      const seenIds = new Set();
+      for (const ev of normalizedEvents) {
+        const id = ev.requestId || ev._id || ev.id;
+        if (id && !seenIds.has(String(id))) {
+          seenIds.add(String(id));
+          uniqueEvents.push(ev);
+        } else if (!id) {
+          // If no ID, still include it (shouldn't happen but safety check)
+          uniqueEvents.push(ev);
+        }
+      }
+      
       // Sort events: upcoming first (nearest first), then past events (most recent past first)
       const now = new Date();
-      const upcoming = normalizedEvents.filter(ev => {
+      const upcoming = uniqueEvents.filter(ev => {
         const startDate = new Date(ev.startDate || ev.date || ev.bazaar?.startDate || ev.booth?.startDate || 0);
         return startDate >= now;
       }).sort((a, b) => {
@@ -73,7 +89,7 @@ const VendorDashboard = () => {
         return dateA - dateB; // Ascending: nearest first
       });
 
-      const past = normalizedEvents.filter(ev => {
+      const past = uniqueEvents.filter(ev => {
         const startDate = new Date(ev.startDate || ev.date || ev.bazaar?.startDate || ev.booth?.startDate || 0);
         return startDate < now;
       }).sort((a, b) => {
