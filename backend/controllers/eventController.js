@@ -277,11 +277,12 @@ exports.getSalesReport = async (req, res) => {
 // 📅 Get all approved/upcoming events
 exports.getAllEvents = async (req, res) => {
   try {
-    const { q, name, type, status } = req.query;
+    const { q, name, type, status, minimal } = req.query;
     const search = (q || name || '').toString().trim();
+    const isMinimal = minimal === 'true' || minimal === true;
 
     // Base match (type/status) - only allow valid event types
-    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth', 'platformBooth'];
     const baseMatch = {
       type: { $in: validTypes }, // Only include valid event types
       $and: [
@@ -390,6 +391,10 @@ exports.getAllEvents = async (req, res) => {
         trips: 'trip',
         bazaars: 'bazaar',
         booths: 'booth',
+        platformbooths: 'platformBooth',
+        platformbooth: 'platformBooth',
+        'platform-booth': 'platformBooth',
+        'platform_booth': 'platformBooth',
         confrence: 'conference',
         conference: 'conference'
       };
@@ -653,14 +658,24 @@ exports.getAllEvents = async (req, res) => {
       }))
     });
     
-    // Batch fetch all vendor requests for bazaar/booth events (only if not minimal)
+    // Collect IDs of bazaar, booth, and platformBooth events for vendor request lookup
+    const bazaarBoothEventIds = events
+      .filter(e => e.type === 'bazaar' || e.type === 'booth' || e.type === 'platformBooth')
+      .map(e => e._id);
+    
+    // Batch fetch all vendor requests for bazaar/booth/platformBooth events (only if not minimal)
     const vendorRequestsMap = new Map();
     const vendorsMap = new Map(); // Make vendorsMap accessible in outer scope - MUST be in outer scope!
     const originalVendorIds = new Map(); // Store original vendor IDs before populate
+    const vendorCountsMap = new Map(); // Count of vendor requests per event
+    const registrationCountsMap = new Map(); // Count of registrations per event
+    const studentRegistrationCountsMap = new Map(); // Count of student registrations per event
     if (bazaarBoothEventIds.length > 0 && !isMinimal) {
       try {
         // Fetch vendor requests WITH populate to get vendor data directly
         // Try populate first - if it works, we get vendor data immediately
+        // For platformBooth events, vendor requests use 'booth' field but have eventType='platformBooth'
+        // We need to query both regular booths and platformBooths separately
         const allVendorRequestsRaw = await VendorRequest.find({
           status: 'accepted',
           $or: [
@@ -893,17 +908,83 @@ exports.getAllEvents = async (req, res) => {
             });
           }
           
-          const eventId = vr.bazaar || vr.booth || vr.standaloneBooth;
+          // Get eventId from the appropriate field
+          let eventId = vr.bazaar || vr.booth || vr.standaloneBooth;
+          
+          // For platformBooth vendor requests, they use 'booth' field but have eventType='platformBooth'
+          // We need to match them correctly to platformBooth events only
+          if (vr.eventType === 'platformBooth' && vr.booth) {
+            eventId = vr.booth;
+          }
+          
           if (eventId) {
             const eventIdStr = String(eventId);
             if (!vendorRequestsMap.has(eventIdStr)) {
               vendorRequestsMap.set(eventIdStr, []);
             }
-            vendorRequestsMap.get(eventIdStr).push(vr);
+            // Only add vendor request if it matches the event type
+            // For platformBooth events, only include vendor requests with eventType='platformBooth'
+            // For regular booth events, exclude vendor requests with eventType='platformBooth'
+            const event = events.find(e => String(e._id) === eventIdStr);
+            if (event) {
+              if (event.type === 'platformBooth' && vr.eventType === 'platformBooth') {
+                vendorRequestsMap.get(eventIdStr).push(vr);
+              } else if (event.type === 'booth' && vr.eventType !== 'platformBooth') {
+                vendorRequestsMap.get(eventIdStr).push(vr);
+              } else if (event.type === 'bazaar' || event.type === 'standaloneBooth') {
+                vendorRequestsMap.get(eventIdStr).push(vr);
+              }
+            } else {
+              // If event not found in current events list, add it anyway (shouldn't happen)
+              vendorRequestsMap.get(eventIdStr).push(vr);
+            }
           }
+        });
+        
+        // Populate vendorCountsMap from vendorRequestsMap
+        vendorRequestsMap.forEach((vendorRequests, eventIdStr) => {
+          vendorCountsMap.set(eventIdStr, vendorRequests.length);
         });
       } catch (vendorReqError) {
         console.error('Error fetching vendor requests:', vendorReqError);
+      }
+    }
+    
+    // Fetch registration counts for non-bazaar/booth/platformBooth events
+    if (!isMinimal) {
+      try {
+        const Registration = require('../models/registrationModel');
+        const StudentRegistration = require('../models/studentRegistrationModel');
+        
+        const allEventIds = events.map(e => e._id);
+        const nonVendorEventIds = allEventIds.filter((id, idx) => {
+          const event = events[idx];
+          return event.type !== 'bazaar' && event.type !== 'booth' && event.type !== 'platformBooth';
+        });
+        
+        if (nonVendorEventIds.length > 0) {
+          // Get registration counts
+          const registrationCounts = await Registration.aggregate([
+            { $match: { event: { $in: nonVendorEventIds } } },
+            { $group: { _id: '$event', count: { $sum: 1 } } }
+          ]);
+          
+          registrationCounts.forEach(item => {
+            registrationCountsMap.set(String(item._id), item.count);
+          });
+          
+          // Get student registration counts
+          const studentRegistrationCounts = await StudentRegistration.aggregate([
+            { $match: { event: { $in: nonVendorEventIds } } },
+            { $group: { _id: '$event', count: { $sum: 1 } } }
+          ]);
+          
+          studentRegistrationCounts.forEach(item => {
+            studentRegistrationCountsMap.set(String(item._id), item.count);
+          });
+        }
+      } catch (regError) {
+        console.error('Error fetching registration counts:', regError);
       }
     }
     
@@ -916,15 +997,20 @@ exports.getAllEvents = async (req, res) => {
       let finalCount = e.registeredCount || 0;
       
       if (!isMinimal) {
-        if (e.type === 'bazaar' || e.type === 'booth' || e.type === 'platformBooth') {
-          finalCount = vendorCountsMap.get(eventIdStr) || 0;
-        } else {
-          const regCount = registrationCountsMap.get(eventIdStr) || 0;
-          const studentRegCount = studentRegistrationCountsMap.get(eventIdStr) || 0;
-          finalCount = regCount + studentRegCount;
+        try {
+          if (e.type === 'bazaar' || e.type === 'booth' || e.type === 'platformBooth') {
+            finalCount = vendorCountsMap ? (vendorCountsMap.get(eventIdStr) || 0) : 0;
+          } else {
+            const regCount = registrationCountsMap ? (registrationCountsMap.get(eventIdStr) || 0) : 0;
+            const studentRegCount = studentRegistrationCountsMap ? (studentRegistrationCountsMap.get(eventIdStr) || 0) : 0;
+            finalCount = regCount + studentRegCount;
+            console.log(`🔍 Event ${String(e._id)} (${e.title || e.name}): Registration=${regCount}, StudentRegistration=${studentRegCount}, Total=${finalCount}`);
+          }
+        } catch (countError) {
+          console.error(`Error calculating count for event ${eventIdStr}:`, countError);
+          // Use existing registeredCount if there's an error
+          finalCount = e.registeredCount || 0;
         }
-        
-        console.log(`🔍 Event ${String(e._id)} (${e.title || e.name}): Registration=${regCount}, StudentRegistration=${studentRegCount}, Total=${finalCount}`);
       }
       
       const baseEvent = {
@@ -938,36 +1024,50 @@ exports.getAllEvents = async (req, res) => {
         creatorLastName: e.createdBy?.lastName || null,
       };
 
-      // Add vendor information for bazaars and booths
-      if (e.type === 'bazaar' || e.type === 'booth') {
+      // Add vendor information for bazaars, booths, and platform booths
+      if (e.type === 'bazaar' || e.type === 'booth' || e.type === 'platformBooth') {
         try {
           const VendorRequest = require('../models/vendorRequest');
-          const vendorRequests = await VendorRequest.find({
-            [e.type]: e._id,
+          // PlatformBooth vendor requests use the 'booth' field, not 'platformBooth'
+          let vendorQuery = {
             status: 'accepted'
-          }).populate('vendor', 'firstName lastName companyName email').lean();
+          };
+          
+          if (e.type === 'platformBooth') {
+            // PlatformBooth uses 'booth' field but has eventType='platformBooth'
+            vendorQuery.booth = e._id;
+            vendorQuery.eventType = 'platformBooth';
+          } else {
+            // Regular booth, bazaar use their own field
+            vendorQuery[e.type] = e._id;
+          }
+          
+          const vendorRequests = await VendorRequest.find(vendorQuery)
+            .populate('vendor', 'firstName lastName companyName email').lean();
 
-          // For booth events, include full vendor request details
-          if (e.type === 'booth') {
-            baseEvent.vendorRequests = vendorRequests.map(vr => ({
-              _id: vr._id,
-              vendor: {
-                _id: vr.vendor._id,
-                name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
-                companyName: vr.vendor.companyName,
-                contactName: `${vr.vendor.firstName} ${vr.vendor.lastName}`,
-                email: vr.vendor.email,
-              },
-              boothSize: vr.boothSize,
-              durationWeeks: vr.durationWeeks,
-              boothLocation: vr.boothLocation,
-              attendees: vr.attendees || [],
-              message: vr.message || '',
-              status: vr.status,
-              createdAt: vr.createdAt,
-              eventName: vr.eventName,
-              eventType: vr.eventType
-            }));
+          // For booth and platformBooth events, include full vendor request details
+          if (e.type === 'booth' || e.type === 'platformBooth') {
+            baseEvent.vendorRequests = vendorRequests
+              .filter(vr => vr.vendor) // Filter out vendor requests with null vendors
+              .map(vr => ({
+                _id: vr._id,
+                vendor: {
+                  _id: vr.vendor?._id,
+                  name: vr.vendor?.companyName || `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+                  companyName: vr.vendor?.companyName,
+                  contactName: `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+                  email: vr.vendor?.email,
+                },
+                boothSize: vr.boothSize,
+                durationWeeks: vr.durationWeeks,
+                boothLocation: vr.boothLocation,
+                attendees: vr.attendees || [],
+                message: vr.message || '',
+                status: vr.status,
+                createdAt: vr.createdAt,
+                eventName: vr.eventName,
+                eventType: vr.eventType
+              }));
           }
 
           // Keep the original vendors array for backward compatibility
@@ -1321,7 +1421,7 @@ exports.getAllEventsForStudents = async (req, res) => {
     console.log('🔍 User registered event IDs:', registeredEventIds);
     
     // Build filter - Event Office users can see all events, others only see approved
-    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth', 'platformBooth'];
     
     // Check if user is Events Office (needed for date filter decision)
     const isEventOffice = req.user.userType === 'Event Office' || 
@@ -1751,7 +1851,7 @@ exports.getAllEventsForAdmin = async (req, res) => {
     const { q, type, status } = req.query;
     console.log('🔍 Admin requesting events with query:', { q, type, status });
     
-    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth'];
+    const validTypes = ['bazaar', 'trip', 'workshop', 'conference', 'booth', 'platformBooth'];
     const filter = {
       type: { $in: validTypes }, // Only valid event types
       $and: [
@@ -1781,6 +1881,10 @@ exports.getAllEventsForAdmin = async (req, res) => {
         bazaar: 'bazaar',
         booths: 'booth',
         booth: 'booth',
+        platformbooths: 'platformBooth',
+        platformbooth: 'platformBooth',
+        'platform-booth': 'platformBooth',
+        'platform_booth': 'platformBooth',
         confrence: 'conference',
         conference: 'conference',
         workshop: 'workshop',
@@ -1835,54 +1939,71 @@ exports.getAllEventsForAdmin = async (req, res) => {
     const eventsWithVendors = await Promise.all(events.map(async (event) => {
       const baseEvent = event.toObject();
       
-      // Add vendor information for workshops, booths, and bazaars
-      if (event.type === 'workshop' || event.type === 'booth' || event.type === 'bazaar') {
+      // Add vendor information for workshops, booths, bazaars, and platform booths
+      if (event.type === 'workshop' || event.type === 'booth' || event.type === 'bazaar' || event.type === 'platformBooth') {
         try {
           const VendorRequest = require('../models/vendorRequest');
-          const vendorRequests = await VendorRequest.find({
-            [event.type]: event._id,
+          // PlatformBooth vendor requests use the 'booth' field, not 'platformBooth'
+          // Build query based on event type
+          let vendorQuery = {
             status: 'accepted'
-          }).populate('vendor', 'firstName lastName companyName email phone userType').lean();
+          };
+          
+          if (event.type === 'platformBooth') {
+            // PlatformBooth uses 'booth' field but has eventType='platformBooth'
+            vendorQuery.booth = event._id;
+            vendorQuery.eventType = 'platformBooth';
+          } else {
+            // Regular booth, bazaar, workshop use their own field
+            vendorQuery[event.type] = event._id;
+          }
+          
+          const vendorRequests = await VendorRequest.find(vendorQuery)
+            .populate('vendor', 'firstName lastName companyName email phone userType').lean();
 
-          // For booth events, include full vendor request details
-          if (event.type === 'booth') {
-            baseEvent.vendorRequests = vendorRequests.map(vr => ({
-              _id: vr._id,
-              vendor: {
-                _id: vr.vendor._id,
-                name: vr.vendor.companyName || `${vr.vendor.firstName} ${vr.vendor.lastName}`,
-                companyName: vr.vendor.companyName,
-                contactName: `${vr.vendor.firstName} ${vr.vendor.lastName}`,
-                email: vr.vendor.email,
-              },
-              boothSize: vr.boothSize,
-              durationWeeks: vr.durationWeeks,
-              boothLocation: vr.boothLocation,
-              attendees: vr.attendees || [],
-              message: vr.message || '',
-              status: vr.status,
-              createdAt: vr.createdAt,
-              eventName: vr.eventName,
-              eventType: vr.eventType
-            }));
+          // For booth and platformBooth events, include full vendor request details
+          if (event.type === 'booth' || event.type === 'platformBooth') {
+            baseEvent.vendorRequests = vendorRequests
+              .filter(vr => vr.vendor) // Filter out vendor requests with null vendors
+              .map(vr => ({
+                _id: vr._id,
+                vendor: {
+                  _id: vr.vendor?._id,
+                  name: vr.vendor?.companyName || `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+                  companyName: vr.vendor?.companyName,
+                  contactName: `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+                  email: vr.vendor?.email,
+                },
+                boothSize: vr.boothSize,
+                durationWeeks: vr.durationWeeks,
+                boothLocation: vr.boothLocation,
+                attendees: vr.attendees || [],
+                message: vr.message || '',
+                status: vr.status,
+                createdAt: vr.createdAt,
+                eventName: vr.eventName,
+                eventType: vr.eventType
+              }));
           }
 
           // Keep the original vendors array for backward compatibility
-          baseEvent.vendors = vendorRequests.map(vr => ({
-            id: vr._id,
-            companyName: vr.vendor?.companyName || `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
-            contactName: `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
-            email: vr.vendor?.email || '',
-            phone: vr.vendor?.phone || '',
-            userType: vr.vendor?.userType || '',
-            boothSize: vr.boothSize || null,
-            durationWeeks: vr.durationWeeks || null,
-            boothLocation: vr.boothLocation || null,
-            attendees: vr.attendees || [],
-            message: vr.message || '',
-            status: vr.status,
-            joinedAt: vr.createdAt
-          }));
+          baseEvent.vendors = vendorRequests
+            .filter(vr => vr.vendor) // Filter out vendor requests with null vendors
+            .map(vr => ({
+              id: vr._id,
+              companyName: vr.vendor?.companyName || `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+              contactName: `${vr.vendor?.firstName || ''} ${vr.vendor?.lastName || ''}`.trim(),
+              email: vr.vendor?.email || '',
+              phone: vr.vendor?.phone || '',
+              userType: vr.vendor?.userType || '',
+              boothSize: vr.boothSize || null,
+              durationWeeks: vr.durationWeeks || null,
+              boothLocation: vr.boothLocation || null,
+              attendees: vr.attendees || [],
+              message: vr.message || '',
+              status: vr.status,
+              joinedAt: vr.createdAt
+            }));
         } catch (vendorError) {
           console.error('Error fetching vendor information:', vendorError);
           baseEvent.vendors = [];

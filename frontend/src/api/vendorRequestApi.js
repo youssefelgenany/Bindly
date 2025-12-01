@@ -591,6 +591,59 @@ export const vendorRequestApi = {
         error: error
       };
     }
+  },
+
+  // Delete a poll (Events Office/Admin) - only for closed polls
+  deletePoll: async (pollId) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return {
+          success: false,
+          message: 'No authentication token found. Please log in again.'
+        };
+      }
+
+      const response = await fetch(`${API_BASE}/vendor-requests/polls/${pollId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          return {
+            success: false,
+            message: 'Invalid/expired token. Please log in again.',
+            requiresLogin: true
+          };
+        }
+
+        return {
+          success: false,
+          message: data.message || data.error || 'Failed to delete poll',
+          error: data
+        };
+      }
+
+      return {
+        success: true,
+        message: data.message || 'Poll deleted successfully'
+      };
+    } catch (error) {
+      console.error('Error deleting poll:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to delete poll',
+        error: error
+      };
+    }
   }
 };
 

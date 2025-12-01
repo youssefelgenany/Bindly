@@ -415,7 +415,7 @@ const GymSchedule = () => {
       <aside style={{
         width: sidebarOpen ? '16rem' : '0',
         flexShrink: 0,
-        backgroundColor: '#1D3557',
+        backgroundColor: '#182e4d',
         padding: sidebarOpen ? '1.5rem' : '0',
         display: 'flex',
         flexDirection: 'column',
@@ -801,7 +801,7 @@ const GymSchedule = () => {
         justifyContent: 'space-between',
         borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#1D3557',
+        backgroundColor: '#182e4d',
         zIndex: useFixedHeader ? 100 : 'auto',
         transition: useFixedHeader ? 'left 0.3s ease, width 0.3s ease' : 'none'
       }}>
@@ -826,17 +826,17 @@ const GymSchedule = () => {
               </span>
             </button>
             )}
-            <Link to={(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '/dashboard' : '/event-office'} style={{ textDecoration: 'none', color: 'inherit' }}>
-            <h2 style={{
-              color: '#FFFFFF',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              lineHeight: '1.25',
-                margin: 0,
-                cursor: 'pointer'
-            }}>
-              Bindly
-            </h2>
+            <Link to={(user?.userType === 'Student' || user?.userType === 'TA' || user?.userType === 'Staff' || user?.userType === 'Professor') ? '/dashboard' : '/event-office'} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+              <img
+                src="/assets/images/bindly-logo.png"
+                alt="Bindly Logo"
+                style={{
+                  height: '3rem',
+                  width: 'auto',
+                  cursor: 'pointer',
+                  objectFit: 'contain'
+                }}
+              />
             </Link>
           </div>
           

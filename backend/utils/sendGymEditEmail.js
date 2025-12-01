@@ -176,7 +176,7 @@ async function sendGymEditEmail(
     console.log('✅ SMTP connection verified');
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || `Bindly <salma.husseinhassan@student.guc.edu.eg>`,
+      from: process.env.SMTP_FROM || `Bindly <salmaahmed1504@gmail.com>`,
       to: email,
       subject: `Gym Session Updated - ${sessionType ? sessionType.charAt(0).toUpperCase() + sessionType.slice(1) : 'Gym Session'}`,
       html: html

@@ -422,9 +422,6 @@ const StaffMyRegistrations = () => {
   // Check if event has passed (can rate/comment)
   const hasEventPassed = (eventDate, eventEndDate) => {
     try {
-      const now = new Date();
-      now.setHours(23, 59, 59, 999); // Set to end of today to include events that ended today
-      
       // Check endDate first (most accurate), then eventDate
       let checkDate = null;
       if (eventEndDate) {
@@ -432,11 +429,8 @@ const StaffMyRegistrations = () => {
         if (isNaN(checkDate.getTime())) {
           checkDate = null;
         } else {
-          // Use the full datetime, not just date
-          // If it's a date string without time, set to end of that day
-          if (checkDate.getHours() === 0 && checkDate.getMinutes() === 0 && checkDate.getSeconds() === 0) {
-            checkDate.setHours(23, 59, 59, 999);
-          }
+          // Normalize to midnight for accurate day comparison
+          checkDate = new Date(checkDate.getFullYear(), checkDate.getMonth(), checkDate.getDate());
         }
       }
       
@@ -445,11 +439,8 @@ const StaffMyRegistrations = () => {
         if (isNaN(checkDate.getTime())) {
           return false;
         } else {
-          // Use the full datetime, not just date
-          // If it's a date string without time, set to end of that day
-          if (checkDate.getHours() === 0 && checkDate.getMinutes() === 0 && checkDate.getSeconds() === 0) {
-            checkDate.setHours(23, 59, 59, 999);
-          }
+          // Normalize to midnight for accurate day comparison
+          checkDate = new Date(checkDate.getFullYear(), checkDate.getMonth(), checkDate.getDate());
         }
       }
       
@@ -457,8 +448,12 @@ const StaffMyRegistrations = () => {
         return false;
       }
       
-      // Event has passed if the checkDate is before or equal to now
-      return checkDate <= now;
+      // Normalize today to midnight for accurate day comparison
+      const today = new Date();
+      const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      // Event has passed if checkDate is before or equal to today
+      return checkDate <= todayOnly;
     } catch (error) {
       console.error('Error checking if event has passed:', error);
       return false;

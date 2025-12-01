@@ -33,6 +33,7 @@ const PlatformBoothRequests = () => {
   const [loadingResults, setLoadingResults] = useState(false);
   const [sendingQRCodes, setSendingQRCodes] = useState({});
   const [closePollConfirm, setClosePollConfirm] = useState({ show: false, pollId: null });
+  const [deletePollConfirm, setDeletePollConfirm] = useState({ show: false, pollId: null });
 
   const isActiveRoute = (path) => {
     return location.pathname === path;
@@ -88,9 +89,30 @@ const PlatformBoothRequests = () => {
         return false;
       });
 
-      console.log('🔍 Platform booth requests (filtered):', platformBoothRequests);
-      console.log('🔍 Platform booth requests count:', platformBoothRequests.length);
-      setRequests(platformBoothRequests);
+      // Filter out requests from deleted vendor accounts
+      const validRequests = platformBoothRequests.filter(req => {
+        // Check if vendor exists and has valid data
+        if (!req.vendor) {
+          return false; // No vendor = deleted account
+        }
+        
+        // If vendor is just an ID (string or ObjectId), it means the user was deleted
+        if (typeof req.vendor === 'string' || (req.vendor && !req.vendor._id && !req.vendor.email && !req.vendor.companyName)) {
+          return false; // Vendor reference exists but user is deleted
+        }
+        
+        // If vendor object exists but has no identifying information, consider it deleted
+        if (req.vendor && !req.vendor._id && !req.vendor.email && !req.vendor.companyName && !req.vendor.firstName) {
+          return false;
+        }
+        
+        return true; // Valid vendor account
+      });
+
+      console.log('🔍 Platform booth requests (filtered):', validRequests);
+      console.log('🔍 Platform booth requests count:', validRequests.length);
+      console.log('🔍 Filtered out deleted accounts:', platformBoothRequests.length - validRequests.length);
+      setRequests(validRequests);
     } catch (err) {
       console.error('Error loading platform booth requests:', err);
       // Check if it's an axios error with response data
@@ -410,6 +432,34 @@ const PlatformBoothRequests = () => {
     }
   };
 
+  const handleDeletePollClick = (pollId) => {
+    setDeletePollConfirm({ show: true, pollId });
+  };
+
+  const handleDeletePoll = async () => {
+    const pollId = deletePollConfirm.pollId;
+    if (!pollId) return;
+
+    try {
+      const result = await vendorRequestApi.deletePoll(pollId);
+      if (result.success) {
+        showToast('Poll deleted successfully', 'success');
+        await loadPolls();
+        if (selectedPoll && selectedPoll._id === pollId) {
+          setSelectedPoll(null);
+          setPollResults(null);
+        }
+      } else {
+        showToast(result.message || 'Failed to delete poll', 'error');
+      }
+    } catch (err) {
+      console.error('Error deleting poll:', err);
+      showToast('Failed to delete poll', 'error');
+    } finally {
+      setDeletePollConfirm({ show: false, pollId: null });
+    }
+  };
+
   const getLocationName = (location) => {
     const locationNames = {
       'sports-area': 'Sports Area',
@@ -428,7 +478,7 @@ const PlatformBoothRequests = () => {
     <aside style={{
       width: sidebarOpen ? '16rem' : '0',
       flexShrink: 0,
-      backgroundColor: '#1D3557',
+        backgroundColor: '#182e4d',
       padding: sidebarOpen ? '1.5rem' : '0',
       display: 'flex',
       flexDirection: 'column',
@@ -832,7 +882,7 @@ const PlatformBoothRequests = () => {
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem 2.5rem',
-          backgroundColor: '#1D3557'
+          backgroundColor: '#182e4d'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF' }}>
             <button
@@ -853,17 +903,17 @@ const PlatformBoothRequests = () => {
                 menu
               </span>
             </button>
-            <Link to="/event-office" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <h2 style={{
-                color: '#FFFFFF',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                lineHeight: '1.25',
-                margin: 0,
-                cursor: 'pointer'
-              }}>
-                Bindly
-              </h2>
+            <Link to="/event-office" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+              <img
+                src="/assets/images/bindly-logo.png"
+                alt="Bindly Logo"
+                style={{
+                  height: '3rem',
+                  width: 'auto',
+                  cursor: 'pointer',
+                  objectFit: 'contain'
+                }}
+              />
             </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -2301,6 +2351,37 @@ const PlatformBoothRequests = () => {
                                   Close Poll
                                 </button>
                               )}
+                              {poll.status === 'closed' && (
+                                <button
+                                  onClick={() => handleDeletePollClick(poll._id)}
+                                  style={{
+                                    padding: '0.5rem 1rem',
+                                    borderRadius: '0.5rem',
+                                    border: '1px solid #e5e7eb',
+                                    backgroundColor: '#FFFFFF',
+                                    color: '#ef4444',
+                                    fontSize: '0.875rem',
+                                    fontWeight: '500',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.target.style.backgroundColor = '#fef2f2';
+                                    e.target.style.borderColor = '#fecaca';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.target.style.backgroundColor = '#FFFFFF';
+                                    e.target.style.borderColor = '#e5e7eb';
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                                    delete
+                                  </span>
+                                  Delete Poll
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2410,6 +2491,108 @@ const PlatformBoothRequests = () => {
                 }}
               >
                 Close Poll
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Poll Confirmation Modal */}
+      {deletePollConfirm.show && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10001,
+          padding: '2rem'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setDeletePollConfirm({ show: false, pollId: null });
+          }
+        }}
+        >
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '0.75rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            width: '100%',
+            maxWidth: '400px',
+            padding: '2rem'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <h4 style={{
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              color: '#111827',
+              margin: 0,
+              marginBottom: '1rem'
+            }}>
+              Delete Poll
+            </h4>
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              margin: 0,
+              marginBottom: '1.5rem',
+              lineHeight: '1.5'
+            }}>
+              Are you sure you want to delete this poll? This action cannot be undone and all poll data will be permanently removed.
+            </p>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.75rem'
+            }}>
+              <button
+                onClick={() => setDeletePollConfirm({ show: false, pollId: null })}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f9fafb';
+                  e.target.style.borderColor = '#d1d5db';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#FFFFFF';
+                  e.target.style.borderColor = '#e5e7eb';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeletePoll}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  backgroundColor: '#ef4444',
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#dc2626';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#ef4444';
+                }}
+              >
+                Delete Poll
               </button>
             </div>
           </div>

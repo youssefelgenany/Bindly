@@ -326,13 +326,13 @@ const StudentMyRegistrations = () => {
         return false;
       }
       
-      // Use the same logic as getDaysUntilEvent: check if date is in the past
+      // Normalize to midnight for accurate day comparison (same logic as getDaysUntilEvent)
+      checkDate = new Date(checkDate.getFullYear(), checkDate.getMonth(), checkDate.getDate());
       const today = new Date();
-      const diffTime = checkDate - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       
-      // Event has passed if diffDays < 0 (same logic as getDaysUntilEvent)
-      return diffDays < 0;
+      // Event has passed if checkDate is before or equal to today
+      return checkDate <= todayOnly;
     } catch (error) {
       console.error('❌ Error checking if event has passed:', error, { eventDate, eventEndDate });
       return false;

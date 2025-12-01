@@ -97,7 +97,7 @@ async function sendVerificationEmail(to, token, name) {
     <title>Verify your Bindly account</title>
   </head>
   <body style="margin:0;padding:0;background-color:#F4F6FB;font-family:'Manrope','Segoe UI','Helvetica Neue',Arial,sans-serif;color:#111827;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F6FB;padding:32px 12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F6FB;padding:12px 12px;">
       <tr>
         <td align="center">
           <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background-color:#FFFFFF;border-radius:24px;border:1px solid #E3E8F4;box-shadow:0 18px 45px rgba(16,24,40,0.12);overflow:hidden;">
@@ -108,7 +108,7 @@ async function sendVerificationEmail(to, token, name) {
               </td>
             </tr>
             <tr>
-              <td style="padding:40px 40px 32px;">
+              <td style="padding:24px 40px 32px;">
                 <div style="display:flex;justify-content:center;">
                   <div style="width:64px;height:64px;border-radius:20px;background-color:#E8F1FA;border:2px solid #C7DAF0;display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
                     <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#1D3557" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -211,7 +211,7 @@ async function sendVerificationEmail(to, token, name) {
     console.log('✅ SMTP connection verified');
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || `Bindly <salma.husseinhassan@student.guc.edu.eg>`,
+      from: process.env.SMTP_FROM || `Bindly <salmaahmed1504@gmail.com>`,
       to,
       subject: "GUC Events — Verify your account",
       text: textBody,
