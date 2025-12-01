@@ -141,7 +141,15 @@ const TAEventsView = () => {
             }
           }
           
-          // Show all events including past events - no date filtering
+          // Filter out past events - only show upcoming events
+          if (ev.startDate) {
+            const startDate = new Date(ev.startDate);
+            const now = new Date();
+            if (!isNaN(startDate.getTime()) && startDate < now) {
+              return false; // Event has already started, exclude it
+            }
+          }
+          
           return true;
         });
         

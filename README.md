@@ -42,10 +42,25 @@ This platform is important because it:
 The **Bindly platform** is fully developed, operational, and stable with all **core and optional modules implemented successfully**.  
 The system has undergone **end-to-end workflow testing, including event approvals, capacity-safe registration, vendor onboarding, payment webhooks, and notification delivery**, and is now ready for **deployment or future enhancements**.
 
+### ⚠️ Known Issues & Limitations
+
+The following issues have been identified and are planned for future improvements:
+
+1. **High CPU consumption** — The scheduler for notifications and workshop completion emails can consume significant CPU resources when processing large batches of reminders or completion emails.
+
+2. **Slow dashboard rendering** — Some pages, especially dashboards, take a long time to render due to multiple API calls and data processing. This is particularly noticeable when loading dashboards with many events or registrations.
+
+3. **N+1 query problem in court availability** — In `getAllCourts`, when a date is provided, the code loops through each court and queries bookings individually, causing multiple database queries instead of a single optimized query. This can lead to performance degradation with many courts.
+
+4. **No API rate limiting** — The application lacks rate limiting middleware, which could allow API abuse, DDoS attacks, or excessive resource consumption from repeated requests. This is a security and performance concern for production deployment.
+
+5. **File upload storage accumulation** — Uploaded files (vendor documents, profile pictures, event banners) are stored locally in the uploads directory without automatic cleanup. Over time, this can consume significant disk space, especially with vendor document uploads and event images.
+
 ### ✅ Current State
-- No known bugs or runtime errors  
-- System considered stable and production-ready  
+- Core functionality is stable and production-ready  
+- All major features are implemented and tested  
 - Future updates will focus on:
+  - Performance optimizations (addressing the issues above)  
   - Scalability improvements  
   - System maintenance  
   - Minor UX and interface refinements  
@@ -53,6 +68,73 @@ The system has undergone **end-to-end workflow testing, including event approval
 
 > ❗ **Note:** Any references to upcoming issues or feature requests can be tracked via GitHub Issues or Pull Requests.
 
+## 💻 Code Style
+
+This project follows consistent coding conventions and naming patterns:
+
+### Naming Conventions
+
+- **Files & Components**: 
+  - React components use PascalCase (e.g., `StudentDashboard.jsx`, `AuthContext.jsx`)
+  - Backend controllers use camelCase with descriptive names (e.g., `authController.js`, `eventController.js`)
+  - Utility files use camelCase (e.g., `sendReceiptEmail.js`, `calculateVendorFee.js`)
+
+- **Variables & Functions**:
+  - camelCase for variables and functions (e.g., `loadDashboardData`, `handleRegisterClick`)
+  - Constants use UPPER_SNAKE_CASE (e.g., `JWT_SECRET`, `MONGO_URI`)
+  - Boolean variables often use `is`, `has`, `should` prefixes (e.g., `isRegistered`, `hasTaxCard`)
+
+- **Database Models**:
+  - Model files use PascalCase (e.g., `UserModel.js`, `EventModel.js`)
+  - Schema fields use camelCase (e.g., `startDate`, `registeredCount`)
+
+- **API Routes**:
+  - RESTful conventions with kebab-case in URLs (e.g., `/api/vendor-requests`, `/api/gym-sessions`)
+  - Route handlers use descriptive verbs (e.g., `registerForEvent`, `createVendorRequest`)
+
+### Code Formatting
+
+- **Indentation**: 2 spaces (consistent across frontend and backend)
+- **Quotes**: Single quotes for JavaScript/JSX strings
+- **Semicolons**: Used consistently
+- **Line Length**: Aim for 100-120 characters max per line
+- **Comments**: Used for complex logic, API endpoints, and important business rules
+
+### React Component Structure
+
+```javascript
+// Standard component structure:
+import React, { useState, useEffect } from 'react';
+// ... other imports
+
+const ComponentName = () => {
+  // 1. State declarations
+  // 2. Hooks (useEffect, useCallback, etc.)
+  // 3. Handler functions
+  // 4. Render logic
+  return (/* JSX */);
+};
+
+export default ComponentName;
+```
+
+### Backend Controller Structure
+
+```javascript
+// Standard controller structure:
+const Model = require('../models/modelName');
+
+exports.functionName = async (req, res) => {
+  try {
+    // Validation
+    // Business logic
+    // Database operations
+    // Response
+  } catch (error) {
+    // Error handling
+  }
+};
+```
 
 ## 🛠 Tech Stack
 
@@ -158,6 +240,412 @@ The system has undergone **end-to-end workflow testing, including event approval
 - **Fee System**: Accepted vendors pay participation fees and receive receipts
 - **Loyalty Program Support**: Vendors can apply to join or cancel from GUC loyalty partnerships
 - **Moderation Tools**: Admins can block users or delete inappropriate comments
+
+---
+
+## 💡 Code Examples
+
+Here are key code snippets demonstrating core functionality:
+
+### 1. User Signup Function (Backend)
+
+```javascript
+// backend/controllers/authController.js
+const signup = async (req, res) => {
+  try {
+    const { email, password, firstName, lastName, userType, gucId, companyName } = req.body;
+    
+    // Normalize email
+    const normalizedEmail = String(email).toLowerCase().trim();
+    
+    // Check for existing user
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (existingUser) {
+      return res.status(409).json({ 
+        success: false, 
+        message: 'User with this email already exists' 
+      });
+    }
+    
+    // GUC email validation for academic users
+    if (['Student', 'Staff', 'TA', 'Professor'].includes(userType)) {
+      const gucEmailRegex = /^[a-z0-9._%+-]+@student\.guc\.edu\.eg$|^[a-z0-9._%+-]+@guc\.edu\.eg$/;
+      if (!gucEmailRegex.test(normalizedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: 'GUC users must use a valid GUC email address'
+        });
+      }
+    }
+    
+    // Create user with appropriate defaults
+    const userData = {
+      email: normalizedEmail,
+      password,
+      isVerified: false
+    };
+    
+    if (userType === 'Student' || userType === 'Vendor') {
+      userData.userType = userType;
+    }
+    
+    const user = await User.create(userData);
+    // ... send verification email
+    
+    res.status(201).json({
+      success: true,
+      message: 'User created. Verification email sent.',
+      user: { id: user._id, email: user.email, userType: user.userType }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+```
+
+### 2. Event Registration with Capacity Check (Backend)
+
+```javascript
+// backend/controllers/eventController.js
+exports.registerForEvent = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const userId = req.user?._id || req.user?.id;
+    
+    // Find event or trip
+    let holder = await Event.findById(id);
+    let holderType = holder ? "event" : null;
+    
+    if (!holder) {
+      holder = await Trip.findById(id);
+      holderType = holder ? "trip" : null;
+    }
+    
+    if (!holder) {
+      return res.status(404).json({ msg: "Event/Trip not found" });
+    }
+    
+    // Capacity check
+    const regCount = await Registration.countDocuments({ event: id });
+    if (holder.capacity && regCount >= holder.capacity) {
+      return res.status(400).json({ 
+        msg: `${holderType === 'trip' ? 'Trip' : 'Event'} is full` 
+      });
+    }
+    
+    // Prevent duplicate registration
+    const existing = await Registration.findOne({ event: id, user: userId });
+    if (existing) {
+      return res.status(400).json({ msg: "You are already registered" });
+    }
+    
+    // Create registration
+    const registration = await Registration.create({
+      event: id,
+      user: userId,
+      role: req.user.userType.toLowerCase(),
+      status: "approved",
+      paid: (holder.price || 0) <= 0
+    });
+    
+    res.status(201).json({
+      success: true,
+      message: "Registration successful",
+      registration
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+```
+
+### 3. Authentication Context (Frontend)
+
+```javascript
+// frontend/src/contexts/AuthContext.jsx
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const socketRef = useRef(null);
+
+  useEffect(() => {
+    // Check if user is logged in on app start
+    const token = localStorage.getItem('token');
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const parsed = JSON.parse(userData);
+        setUser(parsed);
+        
+        // Initialize socket connection for real-time notifications
+        if (!socketRef.current) {
+          const socket = ioClient('http://localhost:5000', {
+            auth: { token },
+            transports: ['websocket']
+          });
+          socketRef.current = socket;
+          
+          socket.on('connect', () => {
+            if (parsed && parsed._id) socket.emit('join', parsed._id);
+          });
+          
+          socket.on('new_notification', (notif) => {
+            window.dispatchEvent(new CustomEvent('new_notification', { detail: notif }));
+          });
+        }
+      }
+    }
+    setLoading(false);
+  }, []);
+
+  const login = async (email, password) => {
+    try {
+      const response = await axios.post('http://localhost:5000/api/auth/login', {
+        email,
+        password
+      });
+      
+      if (response.data.success) {
+        const { token, user } = response.data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setUser(user);
+        return { success: true };
+      }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || 'Login failed' };
+    }
+  };
+  
+  // ... logout, signup functions
+  
+  return (
+    <AuthContext.Provider value={{ user, login, logout, signup, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+```
+
+### 4. Event Reminder Notification Service (Backend)
+
+```javascript
+// backend/services/notificationService.js
+async function processEventReminders(events, timeframe) {
+  for (const event of events) {
+    try {
+      // Get student registrations (for workshops/trips)
+      const studentRegistrations = await StudentRegistration.find({
+        event: event._id,
+        status: { $ne: 'cancelled' }
+      });
+      
+      // Get regular registrations (for Staff, TA, Professor, etc.)
+      const regularRegistrations = await Registration.find({
+        event: event._id,
+        status: { $in: ['approved', 'pending'] }
+      });
+      
+      // Process regular registrations
+      for (const registration of regularRegistrations) {
+        const userId = registration.user;
+        if (!userId) continue;
+        
+        const existingNotification = await Notification.findOne({
+          type: 'event_reminder',
+          recipient: userId,
+          'metadata.timeframe': timeframe,
+          'metadata.eventId': event._id.toString()
+        });
+        
+        if (!existingNotification) {
+          await Notification.create({
+            recipient: userId,
+            type: 'event_reminder',
+            title: `Reminder: ${event.title} starts in ${timeframe}`,
+            message: `The event "${event.title}" will start in ${timeframe} at ${event.location}`,
+            relatedEvent: event._id,
+            priority: timeframe === '1 hour' ? 'high' : 'medium',
+            metadata: {
+              eventTitle: event.title,
+              eventDate: event.startDate,
+              location: event.location,
+              timeframe: timeframe,
+              eventId: event._id.toString()
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`Error processing event ${event._id}:`, error);
+    }
+  }
+}
+```
+
+### 5. Dashboard Data Loading with Error Handling (Frontend)
+
+```javascript
+// frontend/src/components/StudentDashboard.jsx
+const loadDashboardData = async () => {
+  try {
+    setLoading(true);
+    
+    // Fetch events from discover events
+    const eventsResult = await eventsApiService.getStudentEvents({});
+    
+    if (eventsResult.success) {
+      let eventsList = [];
+      if (Array.isArray(eventsResult.data)) {
+        eventsList = eventsResult.data;
+      } else if (eventsResult.data?.events) {
+        eventsList = eventsResult.data.events;
+      }
+      
+      const now = new Date();
+      const upcoming = eventsList.filter(ev => {
+        if (!ev.startDate) return false;
+        const date = new Date(ev.startDate);
+        return !isNaN(date.getTime()) && date > now;
+      }).sort((a, b) => {
+        const dateA = new Date(a.startDate || 0);
+        const dateB = new Date(b.startDate || 0);
+        return dateA - dateB;
+      });
+      
+      // Generate upcoming deadlines from upcoming events
+      const deadlines = upcoming
+        .map(reg => {
+          const eventDate = reg.eventDate || reg.event?.startDate;
+          if (!eventDate) return null;
+          const date = new Date(eventDate);
+          if (isNaN(date.getTime())) return null;
+          
+          const timeDiff = date.getTime() - now.getTime();
+          const isUrgent = timeDiff < 7 * 24 * 60 * 60 * 1000;
+          
+          return {
+            id: reg.id || reg._id,
+            month: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+            day: date.getDate(),
+            title: reg.eventTitle || reg.event?.title || 'Event',
+            description: 'Event date',
+            color: isUrgent 
+              ? 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300'
+              : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300'
+          };
+        })
+        .filter(d => d !== null)
+        .sort((a, b) => {
+          const year = new Date().getFullYear();
+          const dateA = new Date(`${a.month} ${a.day}, ${year}`);
+          const dateB = new Date(`${b.month} ${b.day}, ${year}`);
+          return dateA - dateB;
+        })
+        .slice(0, 3);
+      
+      setUpcomingDeadlines(deadlines);
+    }
+  } catch (error) {
+    console.error('Error loading dashboard data:', error);
+    setError('Failed to load dashboard data');
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+### 6. Vendor Request Creation with File Upload (Backend)
+
+```javascript
+// backend/controllers/vendorRequestController.js
+const createVendorRequest = async (req, res) => {
+  try {
+    const {
+      eventType,
+      attendees: rawAttendees,
+      boothSize,
+      durationWeeks,
+      boothLocation
+    } = req.body;
+
+    // Parse attendees if sent as JSON string (multipart/form-data)
+    let attendees = rawAttendees;
+    if (typeof attendees === 'string') {
+      try {
+        attendees = JSON.parse(attendees);
+      } catch (e) {
+        attendees = [];
+      }
+    }
+
+    // Validate required fields
+    if (!eventType || !attendees || !Array.isArray(attendees) || attendees.length === 0) {
+      return res.status(400).json({
+        message: 'Event type and at least one attendee are required',
+        error: 'Missing required fields'
+      });
+    }
+
+    // Validate attendees structure
+    for (let i = 0; i < attendees.length; i++) {
+      const attendee = attendees[i];
+      if (!attendee.name || !attendee.email) {
+        return res.status(400).json({
+          message: `Attendee at index ${i} must have a valid name and email`,
+          error: 'Invalid attendee structure'
+        });
+      }
+      attendees[i] = {
+        name: attendee.name.trim(),
+        email: attendee.email.trim()
+      };
+    }
+
+    // Prepare request data
+    const requestData = {
+      vendor: req.user._id,
+      eventType,
+      attendees,
+      status: 'pending'
+    };
+
+    // Add optional fields if valid
+    if (boothSize && ['2x2', '4x4'].includes(boothSize)) {
+      requestData.boothSize = boothSize;
+    }
+
+    if (durationWeeks) {
+      const duration = parseInt(durationWeeks);
+      if (!isNaN(duration) && duration >= 1 && duration <= 4) {
+        requestData.durationWeeks = duration;
+      }
+    }
+
+    // If files were uploaded (multipart), include their stored paths
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      requestData.individualIdsPaths = req.files.map(f => '/uploads/' + f.filename);
+    }
+
+    // Create the vendor request
+    const vendorRequest = new VendorRequest(requestData);
+    await vendorRequest.save();
+
+    res.status(201).json({
+      message: 'Vendor request created successfully',
+      request: vendorRequest
+    });
+  } catch (error) {
+    console.error('Error creating vendor request:', error);
+    res.status(500).json({
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+```
 
 ---
 
@@ -731,6 +1219,121 @@ See [backend/AUTH_API_DOCUMENTATION.md](backend/AUTH_API_DOCUMENTATION.md) for d
   - Vendor onboarding, booths, and loyalty program flows
   - Gym sessions, court bookings, notifications, and admin tools
 
+## 🧪 Tests
+
+The application uses **Postman** for API testing. All tests are documented with step-by-step instructions and expected responses.
+
+### Test Coverage
+
+The following test scenarios are covered:
+
+#### 1. Authentication Tests
+
+**Test: User Signup**
+- **Endpoint**: `POST /api/auth/signup`
+- **Purpose**: Verify user registration with email validation
+- **Test Cases**:
+  - Student signup with GUC email
+  - Vendor signup with file uploads
+  - Duplicate email rejection
+  - Invalid email format rejection
+
+**Test: User Login**
+- **Endpoint**: `POST /api/auth/login`
+- **Purpose**: Verify authentication and JWT token generation
+- **Test Cases**:
+  - Valid credentials return token
+  - Invalid credentials are rejected
+  - Unverified accounts cannot login
+
+#### 2. Event Management Tests
+
+**Test: Create Event**
+- **Endpoint**: `POST /api/events`
+- **Purpose**: Verify event creation with proper validation
+- **Test Cases**:
+  - Events Office can create events
+  - Required fields validation
+  - Date validation (startDate < endDate)
+
+**Test: Register for Event**
+- **Endpoint**: `POST /api/events/:id/register`
+- **Purpose**: Verify capacity-safe registration
+- **Test Cases**:
+  - Successful registration when capacity available
+  - Registration blocked when event is full
+  - Duplicate registration prevention
+
+#### 3. Vendor Request Tests
+
+**Test: Create Vendor Request**
+- **Endpoint**: `POST /api/vendor-requests`
+- **Purpose**: Verify vendor booth/bazaar application
+- **Test Cases**:
+  - Vendor can submit request with attendees
+  - File upload validation (ID documents)
+  - Request status set to 'pending'
+
+**Test: Approve/Reject Vendor Request**
+- **Endpoint**: `POST /api/vendor-requests/:id/approve` or `/reject`
+- **Purpose**: Verify Events Office can process vendor requests
+- **Test Cases**:
+  - Request approval sends notification to vendor
+  - Request rejection sends notification with reason
+  - Status updates correctly in database
+
+#### 4. Payment Tests
+
+**Test: Stripe Payment Processing**
+- **Endpoint**: `POST /api/vendor-requests/:id/payment`
+- **Purpose**: Verify payment integration
+- **Test Cases**:
+  - Payment intent creation
+  - Webhook handling for payment confirmation
+  - Receipt email delivery after successful payment
+
+#### 5. Admin Functionality Tests
+
+**Test: Block User**
+- **Endpoint**: `POST /api/admin/users/:id/block`
+- **Purpose**: Verify admin can block users
+- **Test Cases**:
+  - User status changes to 'blocked'
+  - Blocked user cannot login
+  - Block reason is stored
+
+**Test: Delete Comment**
+- **Endpoint**: `DELETE /api/admin/comments/:id`
+- **Purpose**: Verify comment moderation
+- **Test Cases**:
+  - Comment is removed from database
+  - Warning email sent to comment author
+  - Event ratings remain intact
+
+### Postman Test Collections
+
+All tests are organized in Postman collections with:
+- Pre-configured test users (see [POSTMAN_FINAL_TESTING_GUIDE.md](POSTMAN_FINAL_TESTING_GUIDE.md))
+- Environment variables for tokens and IDs
+- Assertions for response validation
+- Test scripts for automated verification
+
+### Running Tests
+
+1. **Import Postman Collection**: Import the test collection from `postman-admin-features-tests.json`
+2. **Set Environment Variables**: Configure test user credentials and base URL
+3. **Run Tests**: Execute individual requests or run the entire collection
+4. **Verify Results**: Check response status codes, data structure, and business logic
+
+### Test Screenshots
+
+Screenshots of Postman tests are available in:
+- `POSTMAN_FINAL_TESTING_GUIDE.md` - Comprehensive testing guide
+- `BLOCK_USER_POSTMAN_TESTS.md` - Admin block user feature tests
+- `POSTMAN_EVENT_PAYMENT_TEST.md` - Payment flow tests
+
+> **Note**: All tests use test credentials and Stripe test keys. Never use production credentials in tests.
+
 ### How to Use?
 
 Even experienced engineers appreciate clear instructions, and newcomers rely on them. Please follow this detailed walkthrough when testing or demoing Bindly:
@@ -845,7 +1448,30 @@ npm start
 
 ## 📄 License
 
-This project is licensed under the ISC License.
+This project is licensed under the **ISC License**.
+
+### Third-Party Licenses
+
+The following third-party services and libraries are used in this project:
+
+- **Stripe** - Payment processing service
+  - License: Apache License 2.0
+  - Used for: Payment processing, webhook handling, receipt generation
+  - More information: [Stripe License](https://github.com/stripe/stripe-node/blob/master/LICENSE)
+
+- **React** - Frontend framework
+  - License: MIT License
+  - Used for: UI component library and state management
+
+- **Express.js** - Backend framework
+  - License: MIT License
+  - Used for: RESTful API server
+
+- **MongoDB** - Database
+  - License: Server Side Public License (SSPL)
+  - Used for: Data storage and retrieval
+
+All other dependencies follow their respective open-source licenses as specified in `package.json` files.
 ## 🙏 Credits & Acknowledgments
 
 This project was created and developed by students from the **German University in Cairo (GUC)** to centralize and structure campus event operations.
@@ -860,5 +1486,27 @@ This project was created and developed by students from the **German University 
 - **Hagar Lotfy**→ `@hagarlotfy`
 - **Dyala Elsmeary** → `@dyalaelsmery`
 - **Leena El Badawi**  → `@9leeeawi10`
+
+### 📚 External Resources & References
+
+The following online resources, documentation, and tutorials were referenced during the development of this project:
+
+#### Official Documentation
+- [React Documentation](https://react.dev/) - Frontend framework and hooks
+- [Express.js Guide](https://expressjs.com/) - Backend framework and middleware
+- [MongoDB Documentation](https://www.mongodb.com/docs/) - Database operations and Mongoose ODM
+- [Stripe API Documentation](https://stripe.com/docs/api) - Payment processing integration
+- [Socket.io Documentation](https://socket.io/docs/) - Real-time notifications
+- [Node.js Documentation](https://nodejs.org/docs/) - Runtime environment
+- [JWT.io](https://jwt.io/) - JSON Web Token authentication
+
+#### YouTube Tutorials
+- [MERN Stack Tutorial](https://youtu.be/F9gB5b4jgOI?si=YWbHtCQZeU5IYvUP) - Full-stack development guide
+- [React & Node.js Integration](https://youtu.be/O3BUHwfHf84?si=22sfskKt-F0FKl9Z) - Frontend-backend communication
+
+#### Additional Resources
+- [MDN Web Docs](https://developer.mozilla.org/) - JavaScript and web development references
+- [Stack Overflow](https://stackoverflow.com/) - Community solutions for technical challenges
+- [GitHub Documentation](https://docs.github.com/) - Version control and collaboration
 
 
