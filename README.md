@@ -97,6 +97,21 @@ The system has undergone **end-to-end workflow testing, including event approval
   - **@testing-library/jest-dom**
   - **@testing-library/user-event**
 
+## 📸 Screenshots
+
+### 1. Login Page
+![Login Page](screenshots/signin.png)
+
+### 2. signup page
+![Sign up page](screenshots/signup.png)
+
+### 3. eventoffice dashboard
+![Event office dashboard](screenshots/eventofficedashboard.png)
+
+### 4. admin dashboard
+![admin dashboard](screenshots/screenshots.png)
+
+
 ## ✨ Features
 
 ### Event Management
