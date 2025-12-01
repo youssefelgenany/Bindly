@@ -96,14 +96,11 @@ const VendorAccepted = () => {
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#1D3557' }}>
                     <Link to="/vendor" style={{ textDecoration: 'none', color: 'inherit' }}>
-                        <h2 style={{
-                            color: '#1D3557',
-                            fontSize: '1.5rem',
-                            fontWeight: '700',
-                            lineHeight: '1.25',
-                            margin: 0,
-                            cursor: 'pointer'
-                        }}>Bindly</h2>
+                        <img
+                            src="/assets/images/bindly-logo.png"
+                            alt="Bindly Logo"
+                            style={{ height: '3rem', width: 'auto', objectFit: 'contain', cursor: 'pointer' }}
+                        />
                     </Link>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>

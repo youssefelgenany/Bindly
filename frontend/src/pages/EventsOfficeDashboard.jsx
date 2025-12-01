@@ -865,15 +865,15 @@ const EventsOfficeDashboard = () => {
               <img
                 src="/assets/images/bindly-logo.png"
                 alt="Bindly"
-                style={{
+              style={{ 
                   height: '3rem',
                   width: 'auto',
-                  cursor: 'pointer',
+                cursor: 'pointer',
                   objectFit: 'contain'
                 }}
               />
             </Link>
-          </div>
+                </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
             {/* Notification Bell */}
             <EventsOfficeNotificationBell />

@@ -795,13 +795,13 @@ const AdminPlatformBoothRequests = () => {
             marginBottom: '1.5rem',
             boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
-            <div style={{
-              display: 'flex',
+          <div style={{
+            display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               flexWrap: 'wrap',
               gap: '1rem'
-            }}>
+          }}>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {['all', 'pending', 'accepted', 'rejected'].map((filter) => {
                   const count = filter === 'all' 
@@ -810,18 +810,18 @@ const AdminPlatformBoothRequests = () => {
                   const label = filter.charAt(0).toUpperCase() + filter.slice(1);
                   
                   return (
-                    <button
+            <button
                       key={filter}
                       onClick={() => setStatusFilter(filter)}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '0.5rem',
-                        border: 'none',
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                border: 'none',
                         backgroundColor: statusFilter === filter ? '#1D3557' : '#f9fafb',
                         color: statusFilter === filter ? '#FFFFFF' : '#6b7280',
-                        fontSize: '0.875rem',
-                        fontWeight: '500',
-                        cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                cursor: 'pointer',
                         boxShadow: statusFilter === filter ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
                         transition: 'all 0.2s'
                       }}
@@ -837,24 +837,24 @@ const AdminPlatformBoothRequests = () => {
                       }}
                     >
                       {label} ({count})
-                    </button>
+            </button>
                   );
                 })}
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
+            <button
                   onClick={() => {
                     setError(''); // Clear any previous errors
                     setShowPollsModal(true);
                     loadPolls();
                   }}
-                  style={{
+              style={{
                     padding: '0.875rem 1.5rem',
-                    borderRadius: '0.5rem',
+                borderRadius: '0.5rem',
                     backgroundColor: '#f9fafb',
                     color: '#6b7280',
                     border: '1px solid #e5e7eb',
-                    cursor: 'pointer',
+                cursor: 'pointer',
                     fontSize: '0.875rem',
                     fontWeight: '600',
                     transition: 'all 0.2s',
@@ -862,7 +862,7 @@ const AdminPlatformBoothRequests = () => {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem'
-                  }}
+              }}
                   onMouseEnter={(e) => {
                     e.target.style.backgroundColor = '#f3f4f6';
                     e.target.style.borderColor = '#d1d5db';
@@ -876,7 +876,7 @@ const AdminPlatformBoothRequests = () => {
                     visibility
                   </span>
                   View Polls
-                </button>
+            </button>
               </div>
             </div>
           </div>
