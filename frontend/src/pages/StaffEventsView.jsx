@@ -172,6 +172,25 @@ const StaffEventsView = () => {
           if (!validTypes.includes(type) || !ev.title || ev.title.trim() === '' || !ev.location || ev.location.trim() === '') {
             return false;
           }
+          
+          // Apply type filter if not 'all' - strict matching
+          if (filter && filter !== 'all' && filter.trim() !== '') {
+            const filterType = filter.trim().toLowerCase();
+            const eventType = (type || '').toString().trim().toLowerCase();
+            if (eventType !== filterType) {
+              return false;
+            }
+          }
+          
+          // Filter out past events - only show upcoming events
+          if (ev.startDate) {
+            const startDate = new Date(ev.startDate);
+            const now = new Date();
+            if (!isNaN(startDate.getTime()) && startDate < now) {
+              return false; // Event has already started, exclude it
+            }
+          }
+          
           return true;
         });
         

@@ -634,7 +634,7 @@ const ProfessorEventsView = () => {
     });
   };
 
-  // Filter events based on type (client-side filtering for past events)
+  // Filter events based on type and date (exclude past events)
   const filteredEvents = events.filter(event => {
     const title = (event.title || '').trim();
     if (!title) return false;
@@ -643,7 +643,13 @@ const ProfessorEventsView = () => {
     const startDate = new Date(event.startDate);
     if (isNaN(startDate.getTime())) return false;
     
-    // Show all events including past events - no date filtering
+    // Filter out past events - only show upcoming events
+    const now = new Date();
+    if (startDate < now) {
+      return false; // Event has already started, exclude it
+    }
+    
+    // Apply type filter
     const typeMatch = filter === 'all' || (event.type && event.type === filter);
     return typeMatch;
   });
