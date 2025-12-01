@@ -28,21 +28,69 @@ const VendorDashboard = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      // Fetch upcoming events (accepted applications)
-      const acceptedRes = await vendorApi.listMyAccepted();
-      const events = Array.isArray(acceptedRes?.events) ? acceptedRes.events : [];
-      setUpcomingEvents(events.slice(0, 3)); // Show first 3
-
-      // Fetch recent applications
-      const [pendingRes, rejectedRes, acceptedAppsRes] = await Promise.all([
+      // Fetch upcoming events (accepted applications) - use listMyRequests to get all accepted including platform booths
+      const [acceptedRes, pendingRes, rejectedRes] = await Promise.all([
+        vendorApi.listMyRequests({ status: 'accepted' }),
         vendorApi.listMyRequests({ status: 'pending' }),
-        vendorApi.listMyRequests({ status: 'rejected' }),
-        vendorApi.listMyRequests({ status: 'accepted' })
+        vendorApi.listMyRequests({ status: 'rejected' })
       ]);
+      
+      // Handle different response formats for accepted events
+      let eventsList = [];
+      if (Array.isArray(acceptedRes)) {
+        eventsList = acceptedRes;
+      } else if (acceptedRes && Array.isArray(acceptedRes.events)) {
+        eventsList = acceptedRes.events;
+      } else if (acceptedRes && acceptedRes.success !== false) {
+        eventsList = [];
+      }
+      
+      // Normalize events - extract event data from nested structure (bazaar, booth, etc.)
+      const normalizedEvents = eventsList.map(ev => {
+        // If event is nested in bazaar or booth property, extract it
+        if (ev.bazaar) {
+          return { ...ev.bazaar, type: 'bazaar', requestId: ev._id || ev.id };
+        }
+        if (ev.booth) {
+          return { ...ev.booth, type: 'booth', requestId: ev._id || ev.id };
+        }
+        // For platform booths, the event data is at the root level
+        if (ev.eventType === 'platformBooth' || ev.type === 'platformBooth') {
+          return { ...ev, type: 'platformBooth', requestId: ev._id || ev.id };
+        }
+        // Default: return as is
+        return { ...ev, requestId: ev._id || ev.id };
+      });
+      
+      // Sort events: upcoming first (nearest first), then past events (most recent past first)
+      const now = new Date();
+      const upcoming = normalizedEvents.filter(ev => {
+        const startDate = new Date(ev.startDate || ev.date || ev.bazaar?.startDate || ev.booth?.startDate || 0);
+        return startDate >= now;
+      }).sort((a, b) => {
+        const dateA = new Date(a.startDate || a.date || a.bazaar?.startDate || a.booth?.startDate || 0);
+        const dateB = new Date(b.startDate || b.date || b.bazaar?.startDate || b.booth?.startDate || 0);
+        return dateA - dateB; // Ascending: nearest first
+      });
 
-      const pending = Array.isArray(pendingRes?.events) ? pendingRes.events : [];
-      const rejected = Array.isArray(rejectedRes?.events) ? rejectedRes.events : [];
-      const accepted = Array.isArray(acceptedAppsRes?.events) ? acceptedAppsRes.events : [];
+      const past = normalizedEvents.filter(ev => {
+        const startDate = new Date(ev.startDate || ev.date || ev.bazaar?.startDate || ev.booth?.startDate || 0);
+        return startDate < now;
+      }).sort((a, b) => {
+        const dateA = new Date(a.startDate || a.date || a.bazaar?.startDate || a.booth?.startDate || 0);
+        const dateB = new Date(b.startDate || b.date || b.bazaar?.startDate || b.booth?.startDate || 0);
+        return dateB - dateA; // Descending: most recent past first
+      });
+
+      // Combine: upcoming first, then past (to always have events to show)
+      const sortedByDate = [...upcoming, ...past];
+      
+      // Always show exactly 4 events
+      setUpcomingEvents(sortedByDate.slice(0, 4));
+
+      const pending = Array.isArray(pendingRes?.events) ? pendingRes.events : (Array.isArray(pendingRes) ? pendingRes : []);
+      const rejected = Array.isArray(rejectedRes?.events) ? rejectedRes.events : (Array.isArray(rejectedRes) ? rejectedRes : []);
+      const accepted = normalizedEvents; // Use the normalized events we already processed
 
       // Calculate stats
       setStats({
@@ -69,10 +117,10 @@ const VendorDashboard = () => {
           icon: 'campaign'
         });
       }
-      if (events.length > 0) {
+      if (sortedByDate.length > 0) {
         notifs.push({
           type: 'warning',
-          message: `Payment for the ${events[0].name || events[0].title || 'upcoming event'} booth is due in 3 days.`,
+          message: `Payment for the ${sortedByDate[0].name || sortedByDate[0].title || 'upcoming event'} booth is due in 3 days.`,
           time: '2 days ago',
           icon: 'error'
         });
@@ -585,12 +633,9 @@ const VendorDashboard = () => {
                 gridTemplateColumns: 'repeat(12, 1fr)',
                 gap: '1.5rem'
               }}>
-                {/* Left Column - Quick Stats and Recent Activity */}
+                {/* Animated Vendor Loyalty Partner Ad - Full Width */}
                 <div style={{
-                  gridColumn: 'span 12',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1.5rem'
+                  gridColumn: 'span 12'
                 }}>
                   {/* Animated Vendor Loyalty Partner Ad - Tripadvisor Style Layout */}
                   <div 
@@ -912,204 +957,62 @@ const VendorDashboard = () => {
                       </div>
                     </div>
                   </div>
-
-                  {/* Quick Stats */}
-                  <div>
-                    <h3 style={{
-                      fontSize: '1.125rem',
-                      fontWeight: '600',
-                      color: '#1D3557',
-                      marginBottom: '1rem'
-                    }}>
-                      Quick Stats
-                    </h3>
-                    <div style={{
-                      display: 'flex',
-                      gap: '1.5rem',
-                      alignItems: 'flex-start'
-                    }}>
-                      {/* Quick Stats Rectangle */}
-                      <div style={{
-                        backgroundColor: '#FFFFFF',
-                        padding: '0.75rem 1rem',
-                        borderRadius: '0.5rem',
-                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.5rem',
-                        width: 'fit-content'
-                      }}>
-                        {/* Total Applications Card */}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.75rem',
-                          padding: '0.5rem'
-                        }}>
-                          <div style={{
-                            backgroundColor: '#dbeafe',
-                            padding: '0.375rem',
-                            borderRadius: '50%'
-                          }}>
-                            <span className="material-symbols-outlined" style={{ color: '#1D3557', fontSize: '1rem' }}>
-                              assignment
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <p style={{
-                              color: '#1D3557',
-                              fontSize: '1rem',
-                              fontWeight: '700',
-                              margin: 0
-                            }}>
-                              {stats.totalApplications}
-                            </p>
-                            <p style={{
-                              color: 'rgba(29, 53, 87, 0.6)',
-                              fontSize: '0.75rem',
-                              margin: 0
-                            }}>
-                              Total Applications
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Pending Applications Card */}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.75rem',
-                          padding: '0.5rem'
-                        }}>
-                          <div style={{
-                            backgroundColor: '#fef3c7',
-                            padding: '0.375rem',
-                            borderRadius: '50%'
-                          }}>
-                            <span className="material-symbols-outlined" style={{ color: '#92400e', fontSize: '1rem' }}>
-                              schedule
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <p style={{
-                              color: '#1D3557',
-                              fontSize: '1rem',
-                              fontWeight: '700',
-                              margin: 0
-                            }}>
-                              {stats.pendingApplications}
-                            </p>
-                            <p style={{
-                              color: 'rgba(29, 53, 87, 0.6)',
-                              fontSize: '0.75rem',
-                              margin: 0
-                            }}>
-                              Pending
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Accepted Applications Card */}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.75rem',
-                          padding: '0.5rem'
-                        }}>
-                          <div style={{
-                            backgroundColor: '#dcfce7',
-                            padding: '0.375rem',
-                            borderRadius: '50%'
-                          }}>
-                            <span className="material-symbols-outlined" style={{ color: '#065f46', fontSize: '1rem' }}>
-                              check_circle
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <p style={{
-                              color: '#1D3557',
-                              fontSize: '1rem',
-                              fontWeight: '700',
-                              margin: 0
-                            }}>
-                              {stats.acceptedApplications}
-                            </p>
-                            <p style={{
-                              color: 'rgba(29, 53, 87, 0.6)',
-                              fontSize: '0.75rem',
-                              margin: 0
-                            }}>
-                              Accepted
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Buttons Outside Rectangle */}
-                      {(() => {
-                        const hasTaxCard = !!(user?.vendorTaxCardPath || user?.hasTaxCard);
-                        const hasLogo = !!(user?.vendorLogoPath || user?.hasLogo);
-                        const isVerified = hasTaxCard && hasLogo;
-                        
-                        return !isVerified ? (
-                          <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '1rem',
-                            minWidth: '250px'
-                          }}>
-                            {/* Verify Account Button - Only show when not verified */}
-                            <button
-                              onClick={() => setShowDocumentsModal(true)}
-                              style={{
-                                backgroundColor: '#FFFFFF',
-                                border: '1px solid #e5e7eb',
-                                borderRadius: '0.5rem',
-                                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '1rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                padding: '1.25rem 1.5rem',
-                                textAlign: 'left'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.target.style.borderColor = '#1D3557';
-                                e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.borderColor = '#e5e7eb';
-                                e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                              }}
-                            >
-                              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem', color: '#1D3557' }}>
-                                verified
-                              </span>
-                              <span style={{
-                                color: '#1D3557',
-                                fontSize: '1rem',
-                                fontWeight: '600'
-                              }}>
-                                Verify Account
-                              </span>
-                            </button>
-                          </div>
-                        ) : null;
-                      })()}
-                    </div>
-                  </div>
-
                 </div>
 
-                {/* Right Column - Upcoming Events and Notifications */}
+                {/* Verify Account Button - Only show when not verified */}
                 <div style={{
                   gridColumn: 'span 12',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '1.5rem'
                 }}>
-                  {/* Upcoming Events */}
+                  {(() => {
+                    const hasTaxCard = !!(user?.vendorTaxCardPath || user?.hasTaxCard);
+                    const hasLogo = !!(user?.vendorLogoPath || user?.hasLogo);
+                    const isVerified = hasTaxCard && hasLogo;
+                    
+                    return !isVerified ? (
+                      <div>
+                        <button
+                          onClick={() => setShowDocumentsModal(true)}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '0.5rem',
+                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            padding: '1.25rem 1.5rem',
+                            textAlign: 'left'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.borderColor = '#1D3557';
+                            e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.borderColor = '#e5e7eb';
+                            e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem', color: '#1D3557' }}>
+                            verified
+                          </span>
+                          <span style={{
+                            color: '#1D3557',
+                            fontSize: '1rem',
+                            fontWeight: '600'
+                          }}>
+                            Verify Account
+                          </span>
+                        </button>
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {/* Upcoming Events Section */}
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                       <h3 style={{
@@ -1120,212 +1023,300 @@ const VendorDashboard = () => {
                       }}>
                         Upcoming Events
                       </h3>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        {upcomingEvents.length > 0 && (
-                          <Link
-                            to="/vendor/accepted-events"
-                            style={{
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.5rem',
-                              border: '1px solid #d1d5db',
-                              backgroundColor: '#FFFFFF',
-                              color: '#1D3557',
-                              fontSize: '0.8125rem',
-                              fontWeight: '500',
-                              textDecoration: 'none',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = '#f9fafb';
-                              e.target.style.borderColor = '#94a3b8';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = '#FFFFFF';
-                              e.target.style.borderColor = '#d1d5db';
-                            }}
-                          >
-                            View More
-                          </Link>
-                        )}
-                        <button
-                          onClick={() => setShowPlatformBoothsModal(true)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            padding: '0.625rem 1rem',
-                            backgroundColor: '#1D3557',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            borderRadius: '0.5rem',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s',
-                            height: 'fit-content'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = '#152843';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = '#1D3557';
-                          }}
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
-                            add
-                          </span>
-                          New Booth
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setShowPlatformBoothsModal(true)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.75rem 1.5rem',
+                          backgroundColor: '#1D3557',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: '0 2px 4px rgba(29, 53, 87, 0.2)',
+                          height: 'fit-content'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#152843';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 4px 8px rgba(29, 53, 87, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#1D3557';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 4px rgba(29, 53, 87, 0.2)';
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                          add
+                        </span>
+                        New Booth
+                      </button>
                     </div>
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                       gap: '1rem'
                     }}>
-                      {upcomingEvents.length === 0 ? (
-                        <div style={{
-                          backgroundColor: '#FFFFFF',
-                          padding: '2rem',
-                          borderRadius: '0.5rem',
-                          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                          textAlign: 'center',
-                          gridColumn: '1 / -1'
-                        }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: '3rem', color: '#9ca3af', display: 'block', marginBottom: '0.5rem' }}>
-                            event_busy
-                          </span>
-                          <p style={{ color: '#6b7280', margin: '0 0 0.5rem 0' }}>No upcoming events</p>
-                          <Link
-                            to="/vendor/bazaars"
-                            style={{
-                              display: 'inline-block',
-                              padding: '0.5rem 1rem',
-                              backgroundColor: '#1D3557',
-                              color: '#FFFFFF',
-                              borderRadius: '0.375rem',
-                              textDecoration: 'none',
-                              fontSize: '0.875rem',
-                              fontWeight: '500'
-                            }}
-                          >
-                            Find An Event
-                          </Link>
-                        </div>
-                      ) : (
-                        upcomingEvents.map((event, index) => {
-                          const eventType = event.type || event.eventType || 'bazaar';
+                      {upcomingEvents.length > 0 ? (
+                        // Ensure we always show exactly 4 cards
+                        Array.from({ length: 4 }).map((_, index) => {
+                          const event = upcomingEvents[index];
+                          // Always blur the last card (4th card) to indicate "Discover more"
+                          const shouldBlurCard = index === 3;
+                          
+                          // If we don't have enough events, show placeholder for remaining slots
+                          if (!event) {
+                            return (
+                              <div
+                                key={`placeholder-${index}`}
+                                onClick={() => navigate('/vendor/accepted-events')}
+                                style={{
+                                  backgroundColor: '#FFFFFF',
+                                  borderRadius: '1rem',
+                                  overflow: 'hidden',
+                                  border: '1px solid #e5e7eb',
+                                  boxShadow: '0 12px 20px -6px rgba(15, 23, 42, 0.15)',
+                                  position: 'relative',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  minHeight: '260px',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#6b7280'
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>
+                                  event
+                                </span>
+                                <p style={{ margin: 0, fontSize: '0.875rem' }}>Discover more events</p>
+                              </div>
+                            );
+                          }
+                          
+                          // Normalize event type for platform booths
+                          let eventType = event.type || event.eventType || 'bazaar';
+                          if (eventType === 'platformBooth' || event.eventType === 'platformBooth') {
+                            eventType = 'platformBooth';
+                          }
+                          
                           const startDate = event.startDate || event.date;
                           const eventName = event.name || event.title || 'Untitled Event';
-
+                          
                           return (
-                            <Link
+                            <div
                               key={event._id || index}
-                              to="/vendor/accepted-events"
+                              onClick={() => {
+                                // All cards redirect to My Participations
+                                navigate('/vendor/accepted-events');
+                              }}
                               style={{
                                 backgroundColor: '#FFFFFF',
-                                borderRadius: '0.75rem',
-                                padding: 0,
-                                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                                borderRadius: '1rem',
+                                overflow: 'hidden',
                                 border: '1px solid #e5e7eb',
+                                boxShadow: '0 12px 20px -6px rgba(15, 23, 42, 0.15)',
+                                position: 'relative',
+                                cursor: 'pointer',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                overflow: 'hidden',
-                                textDecoration: 'none',
-                                color: 'inherit',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
+                                minHeight: '260px',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both`
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+                                e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                                e.currentTarget.style.boxShadow = '0 25px 40px -10px rgba(15,23,42,0.25)';
                                 e.currentTarget.style.borderColor = '#1e40af';
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                e.currentTarget.style.boxShadow = '0 12px 20px -6px rgba(15, 23, 42, 0.15)';
                                 e.currentTarget.style.borderColor = '#e5e7eb';
                               }}
                             >
-                              {getEventTypeImage(eventType) && (
-                                <div style={{
-                                  width: '100%',
-                                  height: '200px',
-                                  overflow: 'hidden',
-                                  position: 'relative',
-                                  backgroundColor: '#f3f4f6',
-                                  flexShrink: 0
-                                }}>
-                                  <img
-                                    src={getEventTypeImage(eventType)}
-                                    alt={getEventTypeLabel(eventType)}
-                                    style={{
-                                      width: '100%',
-                                      height: '100%',
-                                      objectFit: 'cover',
-                                      objectPosition: 'center'
-                                    }}
-                                    onError={(e) => {
-                                      e.target.style.display = 'none';
-                                      e.target.parentElement.style.backgroundColor = getEventTypeColor(eventType);
-                                      e.target.parentElement.style.display = 'flex';
-                                      e.target.parentElement.style.alignItems = 'center';
-                                      e.target.parentElement.style.justifyContent = 'center';
-                                      if (!e.target.parentElement.querySelector('.fallback-text')) {
-                                        const fallback = document.createElement('div');
-                                        fallback.className = 'fallback-text';
-                                        fallback.textContent = getEventTypeFallbackText(eventType);
-                                        fallback.style.color = '#FFFFFF';
-                                        fallback.style.fontSize = '1rem';
-                                        fallback.style.fontWeight = '700';
-                                        e.target.parentElement.appendChild(fallback);
-                                      }
-                                    }}
-                                  />
-                                </div>
-                              )}
+                              <div style={{
+                                height: '200px',
+                                overflow: 'hidden',
+                                position: 'relative'
+                              }}>
+                                <img
+                                  src={getEventTypeImage(eventType) || ''}
+                                  alt={eventName}
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    objectPosition: 'center'
+                                  }}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.parentElement.style.backgroundColor = '#f1f5f9';
+                                  }}
+                                />
+                              </div>
 
-                              <div style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', flex: 1, gap: '0.5rem' }}>
-                                <div style={{
-                                  padding: '0.25rem 0.5rem',
-                                  borderRadius: '0.375rem',
-                                  backgroundColor: getEventTypeColor(eventType),
-                                  color: '#FFFFFF',
-                                  fontSize: '0.625rem',
-                                  fontWeight: '700',
-                                  letterSpacing: '0.05em',
-                                  textTransform: 'uppercase',
-                                  alignSelf: 'flex-start'
-                                }}>
-                                  {getEventTypeLabel(eventType)}
-                                </div>
-
-                                <h4 style={{
+                              <div style={{ padding: '0.7rem 0.8rem 0.9rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
+                                <p style={{
                                   color: '#1D3557',
-                                  fontSize: '0.875rem',
+                                  fontSize: '0.9rem',
                                   fontWeight: '600',
-                                  margin: 0,
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                  lineHeight: '1.3'
+                                  margin: 0
                                 }}>
                                   {eventName}
-                                </h4>
-
+                                </p>
                                 {startDate && (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.6875rem', color: '#6b7280' }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#6b7280' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
                                       calendar_today
                                     </span>
-                                    <span style={{ fontSize: '0.6875rem' }}>{formatDate(startDate)}</span>
+                                    <span>{formatDate(startDate)}</span>
                                   </div>
                                 )}
                               </div>
-                            </Link>
+
+                              {shouldBlurCard && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    backgroundColor: 'rgba(248,250,252,0.7)',
+                                    backdropFilter: 'blur(2px)',
+                                    WebkitBackdropFilter: 'blur(2px)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    textAlign: 'center',
+                                    padding: '0.5rem',
+                                    color: '#1D3557',
+                                    fontWeight: '600',
+                                    fontSize: '0.9rem',
+                                    zIndex: 10,
+                                    borderRadius: '1rem'
+                                  }}
+                                >
+                                  Discover more events
+                                </div>
+                              )}
+                            </div>
                           );
                         })
+                      ) : (
+                        // Show "No upcoming events" message with action buttons
+                        <div style={{
+                          gridColumn: '1 / -1',
+                          backgroundColor: '#FFFFFF',
+                          padding: '3rem 2rem',
+                          borderRadius: '1rem',
+                          boxShadow: '0 12px 20px -6px rgba(15, 23, 42, 0.15)',
+                          textAlign: 'center',
+                          border: '1px solid #e5e7eb'
+                        }}>
+                          <span className="material-symbols-outlined" style={{ 
+                            fontSize: '4rem', 
+                            color: '#9ca3af', 
+                            display: 'block', 
+                            marginBottom: '1rem' 
+                          }}>
+                            event_busy
+                          </span>
+                          <h3 style={{
+                            color: '#1D3557',
+                            fontSize: '1.25rem',
+                            fontWeight: '600',
+                            margin: '0 0 0.5rem 0'
+                          }}>
+                            No upcoming events
+                          </h3>
+                          <p style={{
+                            color: '#6b7280',
+                            fontSize: '0.875rem',
+                            margin: '0 0 2rem 0'
+                          }}>
+                            Start participating in events to see them here
+                          </p>
+                          <div style={{
+                            display: 'flex',
+                            gap: '1rem',
+                            justifyContent: 'center',
+                            flexWrap: 'wrap'
+                          }}>
+                            <Link
+                              to="/vendor/bazaars"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#1D3557',
+                                color: '#FFFFFF',
+                                borderRadius: '0.5rem',
+                                textDecoration: 'none',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = '#152843';
+                                e.target.style.transform = 'translateY(-2px)';
+                                e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.15)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = '#1D3557';
+                                e.target.style.transform = 'translateY(0)';
+                                e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                              }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                                storefront
+                              </span>
+                              Discover Bazaar
+                            </Link>
+                            <button
+                              onClick={() => setShowPlatformBoothsModal(true)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#FFFFFF',
+                                color: '#1D3557',
+                                border: '2px solid #1D3557',
+                                borderRadius: '0.5rem',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = '#f3f4f6';
+                                e.target.style.transform = 'translateY(-2px)';
+                                e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.15)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = '#FFFFFF';
+                                e.target.style.transform = 'translateY(0)';
+                                e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                              }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
+                                add
+                              </span>
+                              Reserve a Booth
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>

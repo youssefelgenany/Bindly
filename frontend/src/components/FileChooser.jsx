@@ -13,9 +13,19 @@ const FileChooser = ({ id, accept, multiple, onChange, disabled, buttonLabel = '
         const files = e.target.files;
         if (files && files.length > 0) {
             setFileName(multiple ? `${files.length} file(s)` : files[0].name);
+        } else {
+            setFileName('');
         }
         if (onChange) onChange(e);
     };
+
+    // Reset fileName when input is cleared externally
+    React.useEffect(() => {
+        const input = inputRef.current;
+        if (input && !input.files || (input.files && input.files.length === 0)) {
+            setFileName('');
+        }
+    }, [id]);
 
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
