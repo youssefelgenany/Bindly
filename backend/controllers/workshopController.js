@@ -758,21 +758,31 @@ const approveWorkshop = async (req, res) => {
     
     // Create notification for the professor
     try {
-      const recipientId = event.createdBy instanceof mongoose.Types.ObjectId 
-        ? event.createdBy 
-        : new mongoose.Types.ObjectId(event.createdBy);
-      
-      console.log('🔔 Creating notification for professor:', recipientId);
-      
-      const notification = await Notification.create({
-        recipient: recipientId,
-        type: 'workshop_approved',
-        title: 'Workshop Approved',
-        message: `Your workshop "${event.title}" has been approved and is now available for student registration.`,
-        relatedEvent: event._id,
-        priority: 'high'
-      });
-      console.log('✅ Notification created successfully:', notification._id);
+      if (!event.createdBy) {
+        console.warn('⚠️ Workshop has no createdBy field, skipping notification');
+      } else {
+        const recipientId = event.createdBy instanceof mongoose.Types.ObjectId 
+          ? event.createdBy 
+          : mongoose.Types.ObjectId.isValid(event.createdBy)
+            ? new mongoose.Types.ObjectId(event.createdBy)
+            : null;
+        
+        if (!recipientId) {
+          console.warn('⚠️ Invalid createdBy ID for workshop:', event._id, 'createdBy:', event.createdBy);
+        } else {
+          console.log('🔔 Creating notification for professor:', recipientId);
+          
+          const notification = await Notification.create({
+            recipient: recipientId,
+            type: 'workshop_approved',
+            title: 'Workshop Approved',
+            message: `Your workshop "${event.title}" has been approved and is now available for student registration.`,
+            relatedEvent: event._id,
+            priority: 'high'
+          });
+          console.log('✅ Notification created successfully:', notification._id);
+        }
+      }
     } catch (notifError) {
       console.error('❌ Error creating notification:', notifError);
       // Don't fail the approval if notification fails
@@ -847,25 +857,35 @@ const rejectWorkshop = async (req, res) => {
     
     // Create notification for the professor
     try {
-      const recipientId = event.createdBy instanceof mongoose.Types.ObjectId 
-        ? event.createdBy 
-        : new mongoose.Types.ObjectId(event.createdBy);
-      
-      const reasonText = rejectionReason || 'No reason provided';
-      console.log('🔔 Creating rejection notification for professor:', recipientId);
-      
-      const notification = await Notification.create({
-        recipient: recipientId,
-        type: 'workshop_rejected',
-        title: 'Workshop Rejected',
-        message: `Your workshop "${event.title}" has been rejected. Reason: ${reasonText}`,
-        relatedEvent: event._id,
-        priority: 'high',
-        metadata: {
-          rejectionReason: reasonText
+      if (!event.createdBy) {
+        console.warn('⚠️ Workshop has no createdBy field, skipping notification');
+      } else {
+        const recipientId = event.createdBy instanceof mongoose.Types.ObjectId 
+          ? event.createdBy 
+          : mongoose.Types.ObjectId.isValid(event.createdBy)
+            ? new mongoose.Types.ObjectId(event.createdBy)
+            : null;
+        
+        if (!recipientId) {
+          console.warn('⚠️ Invalid createdBy ID for workshop:', event._id, 'createdBy:', event.createdBy);
+        } else {
+          const reasonText = rejectionReason || 'No reason provided';
+          console.log('🔔 Creating rejection notification for professor:', recipientId);
+          
+          const notification = await Notification.create({
+            recipient: recipientId,
+            type: 'workshop_rejected',
+            title: 'Workshop Rejected',
+            message: `Your workshop "${event.title}" has been rejected. Reason: ${reasonText}`,
+            relatedEvent: event._id,
+            priority: 'high',
+            metadata: {
+              rejectionReason: reasonText
+            }
+          });
+          console.log('✅ Notification created successfully:', notification._id);
         }
-      });
-      console.log('✅ Notification created successfully:', notification._id);
+      }
     } catch (notifError) {
       console.error('❌ Error creating notification:', notifError);
       // Don't fail the rejection if notification fails
@@ -941,25 +961,35 @@ const requestEdits = async (req, res) => {
     
     // Create notification for the professor
     try {
-      const recipientId = event.createdBy instanceof mongoose.Types.ObjectId 
-        ? event.createdBy 
-        : new mongoose.Types.ObjectId(event.createdBy);
-      
-      const editRequestsText = editRequests || 'Please review and update your workshop submission.';
-      console.log('🔔 Creating edit request notification for professor:', recipientId);
-      
-      const notification = await Notification.create({
-        recipient: recipientId,
-        type: 'workshop_edits_requested',
-        title: 'Workshop Edits Requested',
-        message: `Your workshop "${event.title}" requires edits. Please review the requested changes and update your submission.`,
-        relatedEvent: event._id,
-        priority: 'high',
-        metadata: {
-          editRequests: editRequestsText
+      if (!event.createdBy) {
+        console.warn('⚠️ Workshop has no createdBy field, skipping notification');
+      } else {
+        const recipientId = event.createdBy instanceof mongoose.Types.ObjectId 
+          ? event.createdBy 
+          : mongoose.Types.ObjectId.isValid(event.createdBy)
+            ? new mongoose.Types.ObjectId(event.createdBy)
+            : null;
+        
+        if (!recipientId) {
+          console.warn('⚠️ Invalid createdBy ID for workshop:', event._id, 'createdBy:', event.createdBy);
+        } else {
+          const editRequestsText = editRequests || 'Please review and update your workshop submission.';
+          console.log('🔔 Creating edit request notification for professor:', recipientId);
+          
+          const notification = await Notification.create({
+            recipient: recipientId,
+            type: 'workshop_edits_requested',
+            title: 'Workshop Edits Requested',
+            message: `Your workshop "${event.title}" requires edits. Please review the requested changes and update your submission.`,
+            relatedEvent: event._id,
+            priority: 'high',
+            metadata: {
+              editRequests: editRequestsText
+            }
+          });
+          console.log('✅ Notification created successfully:', notification._id);
         }
-      });
-      console.log('✅ Notification created successfully:', notification._id);
+      }
     } catch (notifError) {
       console.error('❌ Error creating notification:', notifError);
       // Don't fail the edit request if notification fails

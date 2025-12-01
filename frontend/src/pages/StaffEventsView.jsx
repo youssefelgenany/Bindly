@@ -1873,6 +1873,39 @@ const StaffEventsView = () => {
                               </div>
                             ) : null;
                           })()}
+                          {event.type === 'bazaar' && event.vendors && event.vendors.length > 0 && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '0.5rem',
+                              fontSize: '0.75rem',
+                              color: '#6b7280'
+                            }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: '1rem',
+                                color: '#9ca3af',
+                                marginTop: '0.125rem',
+                                flexShrink: 0
+                              }}>
+                                storefront
+                              </span>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ marginBottom: '0.25rem', fontWeight: '500' }}>
+                                  Participating Vendors ({event.vendors.length}):
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                  {event.vendors.map((vendor, idx) => (
+                                    <span key={vendor._id || idx} style={{
+                                      fontSize: '0.75rem',
+                                      color: '#6b7280'
+                                    }}>
+                                      {vendor.name || vendor.companyName || 'Vendor'}{idx < event.vendors.length - 1 ? ',' : ''}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1944,23 +1977,6 @@ const StaffEventsView = () => {
                                   : (event.creatorName || 'Professor')
                                 }
                               </span>
-                            </div>
-                          )}
-                          {event.type === 'workshop' && event.faculty && (
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              fontSize: '0.75rem',
-                              color: '#6b7280'
-                            }}>
-                              <span className="material-symbols-outlined" style={{
-                                fontSize: '1rem',
-                                color: '#9ca3af'
-                              }}>
-                                domain
-                              </span>
-                              <span>Faculty: {event.faculty}</span>
                             </div>
                           )}
                           {event.type === 'workshop' && event.agenda && (
@@ -2153,7 +2169,29 @@ const StaffEventsView = () => {
                                 gap: '0.5rem'
                               }}
                             >
-                              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>check_circle</span>
+                              <div
+                                style={{ 
+                                  width: '1.25rem',
+                                  height: '1.25rem',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#FFFFFF',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <span 
+                                  className="material-symbols-outlined" 
+                                  style={{ 
+                                    fontSize: '0.875rem',
+                                    color: '#10b981',
+                                    lineHeight: 1
+                                  }}
+                                >
+                                  check
+                                </span>
+                              </div>
                               Registered
                             </button>
                           ) : (
@@ -2611,6 +2649,82 @@ const StaffEventsView = () => {
                     </div>
                   </div>
                 )}
+                {selectedEvent.type === 'workshop' && selectedEvent.faculty && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      domain
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Faculty Responsible</div>
+                      <div style={{ color: '#374151', fontWeight: '500' }}>
+                        {selectedEvent.faculty}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {selectedEvent.type === 'conference' && selectedEvent.website && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af'
+                    }}>
+                      link
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Website</div>
+                      <a 
+                        href={selectedEvent.website} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          color: '#1e40af',
+                          textDecoration: 'none',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          wordBreak: 'break-all'
+                        }}
+                        onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                        onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                      >
+                        {selectedEvent.website}
+                      </a>
+                    </div>
+                  </div>
+                )}
+                {selectedEvent.type === 'conference' && selectedEvent.agenda && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.75rem'
+                  }}>
+                    <span className="material-symbols-outlined" style={{
+                      fontSize: '1.25rem',
+                      color: '#9ca3af',
+                      marginTop: '0.125rem',
+                      flexShrink: 0
+                    }}>
+                      event_note
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Agenda</div>
+                      <div style={{ color: '#374151', fontWeight: '500', fontSize: '0.875rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                        {selectedEvent.agenda}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {((selectedEvent.type === 'bazaar' || selectedEvent.type === 'booth') && selectedEvent.vendors && selectedEvent.vendors.length > 0) ? (
@@ -2746,7 +2860,21 @@ const StaffEventsView = () => {
                       boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
                     }}
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>check_circle</span>
+                    <span 
+                      className="material-symbols-outlined" 
+                      style={{ 
+                        fontSize: '1rem',
+                        width: '1.25rem',
+                        height: '1.25rem',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      check
+                    </span>
                     Registered
                   </button>
                 ) : (
