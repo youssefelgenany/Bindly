@@ -20,6 +20,7 @@ const ProfessorDashboard = () => {
     const [notifications, setNotifications] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
     const [upcomingEventsPreview, setUpcomingEventsPreview] = useState([]);
+    const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [unreadCount, setUnreadCount] = useState(0);
@@ -346,10 +347,85 @@ const ProfessorDashboard = () => {
                 console.error('Error fetching events for upcoming events preview:', eventsError);
                 setUpcomingEventsPreview([]);
             }
+
+            // Fetch professor registrations for upcoming deadlines
+            if (user?.email) {
+                try {
+                    const registrationsRes = await studentRegistrationApi.getMyRegistrations();
+                    
+                    let registrations = [];
+                    if (registrationsRes.success) {
+                        let allRegs = registrationsRes.data?.registrations || 
+                                       registrationsRes.data?.data?.registrations ||
+                                       (Array.isArray(registrationsRes.data) ? registrationsRes.data : []) ||
+                                       [];
+                        
+                        // Filter out unpaid registrations for workshops/trips
+                        registrations = allRegs.filter(reg => {
+                            const eventType = (reg.event?.type || reg.eventType || '').toLowerCase();
+                            // For workshops and trips, only include if paid
+                            if ((eventType === 'workshop' || eventType === 'trip') && !reg.paid) {
+                                return false;
+                            }
+                            return true;
+                        });
+                    }
+
+                    const now = new Date();
+                    
+                    // Filter upcoming events
+                    const upcoming = registrations.filter(reg => {
+                        const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
+                        if (!eventDate) return false;
+                        const date = new Date(eventDate);
+                        return !isNaN(date.getTime()) && date > now;
+                    });
+
+                    // Generate upcoming deadlines from upcoming events
+                    const deadlines = upcoming
+                        .map(reg => {
+                            const eventDate = reg.eventDate || reg.event?.startDate || reg.event?.eventDate;
+                            if (!eventDate) return null;
+                            const date = new Date(eventDate);
+                            if (isNaN(date.getTime())) return null;
+                            
+                            const timeDiff = date.getTime() - now.getTime();
+                            const isUrgent = timeDiff < 7 * 24 * 60 * 60 * 1000;
+                            
+                            return {
+                                id: reg.id || reg._id,
+                                month: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+                                day: date.getDate(),
+                                title: reg.eventTitle || reg.event?.title || 'Event',
+                                description: 'Event date',
+                                color: isUrgent 
+                                    ? 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300'
+                                    : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300'
+                            };
+                        })
+                        .filter(d => d !== null) // Remove invalid dates
+                        .sort((a, b) => {
+                            // Sort by actual date
+                            const year = new Date().getFullYear();
+                            const dateA = new Date(`${a.month} ${a.day}, ${year}`);
+                            const dateB = new Date(`${b.month} ${b.day}, ${year}`);
+                            return dateA - dateB;
+                        })
+                        .slice(0, 3);
+
+                    setUpcomingDeadlines(deadlines);
+                } catch (deadlinesError) {
+                    console.error('Error fetching registrations for deadlines:', deadlinesError);
+                    setUpcomingDeadlines([]);
+                }
+            } else {
+                setUpcomingDeadlines([]);
+            }
         } catch (error) {
             console.error('Error loading dashboard data:', error);
             setError('Failed to load dashboard data');
             setUpcomingEventsPreview([]);
+            setUpcomingDeadlines([]);
         } finally {
             setLoading(false);
         }
@@ -1516,7 +1592,7 @@ const ProfessorDashboard = () => {
                                                             return (
                                                                 <div
                                                                     key={`placeholder-${index}`}
-                                                                    onClick={() => navigate('/professor/events')}
+                                                                    onClick={() => navigate('/professor/all-events')}
                                                                     style={{
                                                                         backgroundColor: '#FFFFFF',
                                                                         borderRadius: '1rem',
@@ -1546,7 +1622,7 @@ const ProfessorDashboard = () => {
                                                                 key={event.id || index}
                                                                 onClick={() => {
                                                                     // All cards redirect to Discover Events
-                                                                    navigate('/professor/events');
+                                                                    navigate('/professor/all-events');
                                                                 }}
                                                                 style={{
                                                                     backgroundColor: '#FFFFFF',
@@ -1682,7 +1758,7 @@ const ProfessorDashboard = () => {
                                                     Array.from({ length: 4 }).map((_, index) => (
                                                         <div
                                                             key={`placeholder-${index}`}
-                                                            onClick={() => navigate('/professor/events')}
+                                                            onClick={() => navigate('/professor/all-events')}
                                                             style={{
                                                                 backgroundColor: '#FFFFFF',
                                                                 borderRadius: '1rem',
@@ -1786,6 +1862,84 @@ const ProfessorDashboard = () => {
                                             ) : (
                                                 <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                                                     No recent activity.
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Upcoming Deadlines */}
+                                        <div style={{
+                                            backgroundColor: '#FFFFFF',
+                                            padding: '1.5rem',
+                                            borderRadius: '0.75rem',
+                                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                        }}>
+                                            <h3 style={{
+                                                color: '#1D3557',
+                                                fontSize: '1.125rem',
+                                                fontWeight: '600',
+                                                marginBottom: '1rem',
+                                                marginTop: 0
+                                            }}>
+                                                Upcoming Deadlines
+                                            </h3>
+                                            {loading ? (
+                                                <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                                    Loading...
+                                                </div>
+                                            ) : upcomingDeadlines.length === 0 ? (
+                                                <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                                    No upcoming deadlines.
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                                    {upcomingDeadlines.map((deadline) => {
+                                                        const isUrgent = deadline.color.includes('red');
+                                                        const bgColor = isUrgent ? '#fee2e2' : '#dbeafe';
+                                                        const textColor = isUrgent ? '#991b1b' : '#1e40af';
+                                                        
+                                                        return (
+                                                            <div key={deadline.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+                                                                <div style={{
+                                                                    flexShrink: 0,
+                                                                    width: '3rem',
+                                                                    height: '3rem',
+                                                                    display: 'flex',
+                                                                    flexDirection: 'column',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    backgroundColor: bgColor,
+                                                                    color: textColor,
+                                                                    borderRadius: '0.375rem',
+                                                                    padding: '0.5rem'
+                                                                }}>
+                                                                    <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase' }}>
+                                                                        {deadline.month}
+                                                                    </span>
+                                                                    <span style={{ fontSize: '1.25rem', fontWeight: '700' }}>
+                                                                        {deadline.day}
+                                                                    </span>
+                                                                </div>
+                                                                <div style={{ flex: 1 }}>
+                                                                    <p style={{
+                                                                        color: '#111827',
+                                                                        fontSize: '0.875rem',
+                                                                        fontWeight: '500',
+                                                                        margin: 0,
+                                                                        marginBottom: '0.25rem'
+                                                                    }}>
+                                                                        {deadline.title}
+                                                                    </p>
+                                                                    <p style={{
+                                                                        color: '#6b7280',
+                                                                        fontSize: '0.75rem',
+                                                                        margin: 0
+                                                                    }}>
+                                                                        {deadline.description}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                         </div>
