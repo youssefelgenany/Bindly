@@ -77,34 +77,36 @@ async function sendReceiptEmail(email, name, eventTitle, amount, paymentMethod, 
       </div>
     `;
   } const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #d32f2f; margin: 0;">Bindly</h1>
-        <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; background-color: #f6f7f8;">
+      <div style="background-color: #1D3557; padding: 30px 20px; text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #FFFFFF; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Bindly</h1>
+        <p style="color: rgba(255, 255, 255, 0.8); margin: 8px 0 0 0; font-size: 14px;">GUC Events Platform</p>
       </div>
       
-      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-        <h2 style="color: #333; margin-top: 0;">Payment Receipt</h2>
+      <div style="padding: 0 20px 20px 20px;">
+      
+      <div style="background: #FFFFFF; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
+        <h2 style="color: #1D3557; margin-top: 0; font-size: 20px; font-weight: 600;">Payment Receipt</h2>
         <p>Hi ${name || 'there'},</p>
         <p>Thank you for your payment. Your transaction has been completed successfully.</p>
       </div>
 
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background: white; border: 1px solid #e9ecef;">
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Event</td>
-          <td style="padding: 12px; border: 1px solid #e9ecef;">${eventTitle}</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #1D3557; color: #FFFFFF;">Event</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; color: #1D3557;">${eventTitle}</td>
         </tr>
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Amount Paid</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #1D3557; color: #FFFFFF;">Amount Paid</td>
           <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; color: #27ae60;">${formattedAmount} EGP</td>
         </tr>
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Payment Method</td>
-          <td style="padding: 12px; border: 1px solid #e9ecef;">${paymentMethodDisplay}</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #1D3557; color: #FFFFFF;">Payment Method</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; color: #1D3557;">${paymentMethodDisplay}</td>
         </tr>
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Payment Date</td>
-          <td style="padding: 12px; border: 1px solid #e9ecef;">${formattedDate}</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #1D3557; color: #FFFFFF;">Payment Date</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; color: #1D3557;">${formattedDate}</td>
         </tr>
       </table>
 
@@ -123,6 +125,7 @@ async function sendReceiptEmail(email, name, eventTitle, amount, paymentMethod, 
           Best regards,<br>
           <strong>The Bindly Team</strong>
         </p>
+      </div>
       </div>
     </div>
   `;
@@ -159,7 +162,7 @@ async function sendReceiptEmail(email, name, eventTitle, amount, paymentMethod, 
     console.log('✅ SMTP connection verified successfully');
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || `Bindly <salmaahmed1504@gmail.com>`,
+      from: process.env.SMTP_FROM || `Bindly <eyadomara202@gmail.com>`,
       to: email,
       subject: `Payment Receipt - ${eventTitle}`,
       html: html

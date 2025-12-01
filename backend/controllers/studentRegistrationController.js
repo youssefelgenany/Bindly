@@ -193,20 +193,21 @@ exports.registerStudentForEvent = async (req, res) => {
       });
       
       const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #d32f2f; margin: 0;">Bindly</h1>
-            <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; background-color: #f6f7f8;">
+          <div style="background-color: #1D3557; padding: 30px 20px; text-align: center; margin-bottom: 20px;">
+            <h1 style="color: #FFFFFF; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Bindly</h1>
+            <p style="color: rgba(255, 255, 255, 0.8); margin: 8px 0 0 0; font-size: 14px;">GUC Events Platform</p>
           </div>
           
-          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <h2 style="color: #333; margin-top: 0;">Welcome to Bindly!</h2>
+          <div style="padding: 0 20px 20px 20px;">
+          <div style="background: #FFFFFF; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
+            <h2 style="color: #1D3557; margin-top: 0; font-size: 20px; font-weight: 600;">Welcome to Bindly!</h2>
             <p>Hello ${studentName},</p>
             <p>Thank you for registering for ${event.title}. To complete your registration and access your account, please verify your email address by clicking the link below:</p>
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${verifyUrl}" style="background: #d32f2f; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+            <a href="${verifyUrl}" style="background: #1D3557; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
               Verify My Email
             </a>
           </div>
@@ -214,7 +215,7 @@ exports.registerStudentForEvent = async (req, res) => {
           <div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
             <p style="margin: 0; color: #856404;">
               <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
-              <a href="${verifyUrl}" style="color: #d32f2f; word-break: break-all;">${verifyUrl}</a>
+              <a href="${verifyUrl}" style="color: #1D3557; word-break: break-all;">${verifyUrl}</a>
             </p>
           </div>
           
@@ -226,12 +227,13 @@ exports.registerStudentForEvent = async (req, res) => {
               <strong>The Bindly Team</strong>
             </p>
           </div>
+          </div>
         </div>
       `;
       
       try {
         const mailOptions = {
-          from: process.env.SMTP_FROM || `Bindly <${process.env.SMTP_USER}>`,
+          from: process.env.SMTP_FROM || `Bindly <eyadomara202@gmail.com>`,
           to: studentEmail,
           subject: 'Verify Your Student Account - Bindly',
           html: html

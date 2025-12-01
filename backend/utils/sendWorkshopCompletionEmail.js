@@ -21,31 +21,33 @@ async function sendWorkshopCompletionEmail(email, name, workshopTitle, endDate, 
   });
 
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #d32f2f; margin: 0;">Bindly</h1>
-        <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; background-color: #f6f7f8;">
+      <div style="background-color: #1D3557; padding: 30px 20px; text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #FFFFFF; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Bindly</h1>
+        <p style="color: rgba(255, 255, 255, 0.8); margin: 8px 0 0 0; font-size: 14px;">GUC Events Platform</p>
       </div>
       
-      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-        <h2 style="color: #333; margin-top: 0;">🎉 Congratulations on Completing the Workshop!</h2>
+      <div style="padding: 0 20px 20px 20px;">
+      
+      <div style="background: #FFFFFF; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
+        <h2 style="color: #1D3557; margin-top: 0; font-size: 20px; font-weight: 600;">🎉 Congratulations on Completing the Workshop!</h2>
         <p>Hi ${name || 'there'},</p>
         <p>Congratulations! You have successfully completed the workshop. We hope you found it valuable and enriching.</p>
       </div>
 
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background: white; border: 1px solid #e9ecef;">
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Workshop</td>
-          <td style="padding: 12px; border: 1px solid #e9ecef;">${workshopTitle}</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #1D3557; color: #FFFFFF;">Workshop</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; color: #1D3557;">${workshopTitle}</td>
         </tr>
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Completion Date</td>
-          <td style="padding: 12px; border: 1px solid #e9ecef;">${formattedDate}</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #1D3557; color: #FFFFFF;">Completion Date</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; color: #1D3557;">${formattedDate}</td>
         </tr>
         ${location ? `
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Location</td>
-          <td style="padding: 12px; border: 1px solid #e9ecef;">${location}</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #1D3557; color: #FFFFFF;">Location</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; color: #1D3557;">${location}</td>
         </tr>
         ` : ''}
       </table>
@@ -64,6 +66,7 @@ async function sendWorkshopCompletionEmail(email, name, workshopTitle, endDate, 
           Best regards,<br>
           <strong>The Bindly Team</strong>
         </p>
+      </div>
       </div>
     </div>
   `;
@@ -93,7 +96,7 @@ async function sendWorkshopCompletionEmail(email, name, workshopTitle, endDate, 
     console.log('✅ SMTP connection verified');
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || `Bindly <salmaahmed1504@gmail.com>`,
+      from: process.env.SMTP_FROM || `Bindly <eyadomara202@gmail.com>`,
       to: email,
       subject: `🎉 Congratulations on Completing - ${workshopTitle}`,
       html: html,

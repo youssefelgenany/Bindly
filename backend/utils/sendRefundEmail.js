@@ -21,30 +21,32 @@ async function sendRefundEmail(email, name, eventTitle, amount, refundDate) {
   });
 
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #d32f2f; margin: 0;">Bindly</h1>
-        <p style="color: #666; margin: 5px 0;">GUC Events Platform</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; background-color: #f6f7f8;">
+      <div style="background-color: #1D3557; padding: 30px 20px; text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #FFFFFF; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Bindly</h1>
+        <p style="color: rgba(255, 255, 255, 0.8); margin: 8px 0 0 0; font-size: 14px;">GUC Events Platform</p>
       </div>
       
-      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-        <h2 style="color: #333; margin-top: 0;">Registration Cancelled - Refund Processed</h2>
+      <div style="padding: 0 20px 20px 20px;">
+      
+      <div style="background: #FFFFFF; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
+        <h2 style="color: #1D3557; margin-top: 0; font-size: 20px; font-weight: 600;">Registration Cancelled - Refund Processed</h2>
         <p>Hi ${name || 'there'},</p>
         <p>Your registration cancellation has been processed and your refund has been credited to your wallet.</p>
       </div>
 
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background: white; border: 1px solid #e9ecef;">
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Event</td>
-          <td style="padding: 12px; border: 1px solid #e9ecef;">${eventTitle}</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #1D3557; color: #FFFFFF;">Event</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; color: #1D3557;">${eventTitle}</td>
         </tr>
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Refund Amount</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #1D3557; color: #FFFFFF;">Refund Amount</td>
           <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; color: #27ae60;">${formattedAmount} EGP</td>
         </tr>
         <tr>
-          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Refund Date</td>
-          <td style="padding: 12px; border: 1px solid #e9ecef;">${formattedDate}</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #1D3557; color: #FFFFFF;">Refund Date</td>
+          <td style="padding: 12px; border: 1px solid #e9ecef; color: #1D3557;">${formattedDate}</td>
         </tr>
         <tr>
           <td style="padding: 12px; border: 1px solid #e9ecef; font-weight: bold; background: #f8f9fa;">Refund Method</td>
@@ -65,6 +67,7 @@ async function sendRefundEmail(email, name, eventTitle, amount, refundDate) {
           Best regards,<br>
           <strong>The Bindly Team</strong>
         </p>
+      </div>
       </div>
     </div>
   `;
@@ -90,7 +93,7 @@ async function sendRefundEmail(email, name, eventTitle, amount, refundDate) {
     console.log('✅ SMTP connection verified');
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || `Bindly <salmaahmed1504@gmail.com>`,
+      from: process.env.SMTP_FROM || `Bindly <eyadomara202@gmail.com>`,
       to: email,
       subject: `Registration Cancelled - Refund Processed - ${eventTitle}`,
       html: html
