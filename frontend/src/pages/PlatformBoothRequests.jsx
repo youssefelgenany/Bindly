@@ -122,7 +122,7 @@ const PlatformBoothRequests = () => {
         if (errorMessage.toLowerCase().includes('error fetching vendor')) {
           console.warn('Vendor request fetch had issues, continuing with empty list');
           setError('');
-          setRequests([]);
+      setRequests([]);
         } else {
           setError(errorMessage);
           setRequests([]);
@@ -862,12 +862,12 @@ const PlatformBoothRequests = () => {
           }
         }
       `}</style>
-      <div style={{
-        display: 'flex',
-        height: '100vh',
-        fontFamily: 'Inter, sans-serif',
-        backgroundColor: '#f8f6f6'
-      }}>
+    <div style={{
+      display: 'flex',
+      height: '100vh',
+      fontFamily: 'Inter, sans-serif',
+      backgroundColor: '#f8f6f6'
+    }}>
       {renderSidebar()}
 
       <main style={{
@@ -1823,7 +1823,7 @@ const PlatformBoothRequests = () => {
                                     </div>
                                   </div>
                                 </div>
-                              </div>
+    </div>
                             );
                           })}
                         </div>

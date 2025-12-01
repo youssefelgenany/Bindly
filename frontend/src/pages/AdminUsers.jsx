@@ -172,17 +172,17 @@ const AdminUsers = () => {
     // Filter by search query
     const q = searchQuery.trim().toLowerCase();
     if (q) {
-      const match = (u) => {
-        const name = `${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase();
-        const email = (u.email || '').toLowerCase();
-        const gucId = (u.gucId || '').toLowerCase();
-        const id = (u.id || u._id || '').toLowerCase();
+    const match = (u) => {
+      const name = `${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      const gucId = (u.gucId || '').toLowerCase();
+      const id = (u.id || u._id || '').toLowerCase();
 
-        if (searchField === 'name') return name.includes(q);
-        if (searchField === 'email') return email.includes(q);
-        if (searchField === 'gucId') return gucId.includes(q) || id.includes(q);
-        return name.includes(q) || email.includes(q) || gucId.includes(q) || id.includes(q);
-      };
+      if (searchField === 'name') return name.includes(q);
+      if (searchField === 'email') return email.includes(q);
+      if (searchField === 'gucId') return gucId.includes(q) || id.includes(q);
+      return name.includes(q) || email.includes(q) || gucId.includes(q) || id.includes(q);
+    };
       filtered = filtered.filter(match);
     }
 
@@ -560,7 +560,7 @@ const AdminUsers = () => {
         
         // Clean up after a short delay to ensure download starts
         setTimeout(() => {
-          window.URL.revokeObjectURL(blobUrl);
+        window.URL.revokeObjectURL(blobUrl);
         }, 100);
       } else {
         alert('Failed to download document');
@@ -1276,130 +1276,130 @@ const AdminUsers = () => {
                 {/* Search Bar and Button Group */}
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1, maxWidth: '600px' }}>
                   <div style={{ position: 'relative', flex: 1 }}>
-                    <span className="material-symbols-outlined" style={{
-                      position: 'absolute',
-                      left: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: '#9ca3af',
-                      fontSize: '1.25rem',
-                      pointerEvents: 'none'
-                    }}>
-                      search
-                    </span>
-                    <input
-                      type="text"
-                      placeholder="Search by name, email, or ID..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && setSearchQuery(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.875rem 0.875rem 0.875rem 2.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #e5e7eb',
-                        backgroundColor: '#FFFFFF',
-                        fontSize: '0.875rem',
-                        outline: 'none',
-                        transition: 'all 0.2s',
-                        boxSizing: 'border-box'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = '#1e40af';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = '#e5e7eb';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                    />
-                  </div>
+                      <span className="material-symbols-outlined" style={{
+                        position: 'absolute',
+                        left: '0.75rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#9ca3af',
+                        fontSize: '1.25rem',
+                        pointerEvents: 'none'
+                      }}>
+                        search
+                      </span>
+              <input
+                type="text"
+                        placeholder="Search by name, email, or ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && setSearchQuery(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem 0.875rem 0.875rem 2.75rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid #e5e7eb',
+                          backgroundColor: '#FFFFFF',
+                          fontSize: '0.875rem',
+                          outline: 'none',
+                          transition: 'all 0.2s',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#1e40af';
+                          e.target.style.boxShadow = '0 0 0 3px rgba(30, 64, 175, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = '#e5e7eb';
+                          e.target.style.boxShadow = 'none';
+                        }}
+                      />
+                    </div>
                   
                   {/* Search Button - Right next to search bar */}
-                  <button
-                    onClick={() => setSearchQuery(searchQuery)}
-                    style={{
+                    <button
+                      onClick={() => setSearchQuery(searchQuery)}
+                      style={{
                       padding: '0.875rem 1.25rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: '#1e40af',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      transition: 'all 0.2s',
-                      whiteSpace: 'nowrap',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        borderRadius: '0.5rem',
+                        backgroundColor: '#1e40af',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                       flexShrink: 0,
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#1e3a8a';
-                      e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#1e40af';
-                      e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                    }}
-                  >
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#1e3a8a';
+                        e.target.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = '#1e40af';
+                        e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                      }}
+                    >
                     <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
                       search
                     </span>
-                    Search
-                  </button>
-                </div>
-                
+                      Search
+                    </button>
+            </div>
+
                 {/* Filter Button - Right Side */}
-                <button
+                      <button
                   onClick={() => setShowFilterPanel(true)}
-                  style={{
+                        style={{
                     padding: '0.875rem 1.5rem',
-                    borderRadius: '0.5rem',
+                          borderRadius: '0.5rem',
                     backgroundColor: (roleFilter !== 'all' || searchField !== 'all' || statusFilter !== 'all') ? '#1e40af' : '#f9fafb',
                     color: (roleFilter !== 'all' || searchField !== 'all' || statusFilter !== 'all') ? '#FFFFFF' : '#6b7280',
                     border: (roleFilter !== 'all' || searchField !== 'all' || statusFilter !== 'all') ? 'none' : '1px solid #e5e7eb',
-                    cursor: 'pointer',
+                          cursor: 'pointer',
                     fontSize: '0.875rem',
                     fontWeight: '600',
-                    transition: 'all 0.2s',
+                          transition: 'all 0.2s',
                     whiteSpace: 'nowrap',
                     boxShadow: (roleFilter !== 'all' || searchField !== 'all' || statusFilter !== 'all') ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem'
-                  }}
-                  onMouseEnter={(e) => {
+                        }}
+                        onMouseEnter={(e) => {
                     if (!(roleFilter !== 'all' || searchField !== 'all' || statusFilter !== 'all')) {
-                      e.target.style.backgroundColor = '#f3f4f6';
-                      e.target.style.borderColor = '#d1d5db';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = '#f3f4f6';
+                            e.target.style.borderColor = '#d1d5db';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
                     if (!(roleFilter !== 'all' || searchField !== 'all' || statusFilter !== 'all')) {
-                      e.target.style.backgroundColor = '#f9fafb';
-                      e.target.style.borderColor = '#e5e7eb';
-                    }
-                  }}
-                >
+                            e.target.style.backgroundColor = '#f9fafb';
+                            e.target.style.borderColor = '#e5e7eb';
+                          }
+                        }}
+                      >
                   <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
                     filter_list
                   </span>
                   Filter & Sort
-                </button>
-              </div>
+                      </button>
+                            </div>
 
               {/* Pending Verification Users Section */}
               {filteredPendingUsers.length > 0 && (
-                <div style={{ 
+                            <div style={{ 
                   backgroundColor: '#FFFFFF',
                   borderRadius: '0.75rem',
                   boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                   marginBottom: '2rem',
                   overflow: 'hidden'
                 }}>
-                <div style={{ 
+                            <div style={{ 
                     padding: '1rem 1.5rem',
                     borderBottom: '1px solid #e5e7eb',
                     backgroundColor: '#fef3c7',
@@ -1424,7 +1424,7 @@ const AdminUsers = () => {
                     }}>
                       Users awaiting role assignment and verification
                     </p>
-                  </div>
+                            </div>
                   <button
                     onClick={() => toggleSectionExpansion('pending')}
                     style={{
@@ -1732,8 +1732,8 @@ const AdminUsers = () => {
                     </tbody>
                   </table>
                 )}
-              </div>
-              )}
+                        </div>
+                        )}
 
               {/* All Users Section */}
               <div style={{
@@ -1752,22 +1752,22 @@ const AdminUsers = () => {
                   gap: '1rem'
                 }}>
                   <div>
-                    <h4 style={{
-                      fontSize: '1rem',
-                      fontWeight: '600',
-                      color: '#111827',
-                      margin: 0
-                    }}>
-                      All Users ({filteredVerifiedUsers.length})
-                    </h4>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      color: '#6b7280',
-                      margin: '0.25rem 0 0 0'
-                    }}>
-                      Verified and active users
-                    </p>
-                  </div>
+                  <h4 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#111827',
+                    margin: 0
+                  }}>
+                    All Users ({filteredVerifiedUsers.length})
+                  </h4>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    margin: '0.25rem 0 0 0'
+                  }}>
+                    Verified and active users
+                  </p>
+                </div>
                   <button
                     onClick={() => toggleSectionExpansion('all')}
                     style={{
@@ -1802,11 +1802,11 @@ const AdminUsers = () => {
                 </div>
                 {sectionExpanded.all && (
                   filteredVerifiedUsers.length === 0 ? (
-                    <div style={{ padding: '3rem 2rem', textAlign: 'center', color: '#6b7280' }}>
-                      {users.length === 0 ? 'No users found.' : 'No users match your search.'}
-                    </div>
-                  ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <div style={{ padding: '3rem 2rem', textAlign: 'center', color: '#6b7280' }}>
+                    {users.length === 0 ? 'No users found.' : 'No users match your search.'}
+                  </div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#f9fafb' }}>
                         <th style={{
@@ -1938,42 +1938,42 @@ const AdminUsers = () => {
                                     
                                     const isBlocked = !activeStatusById[userId];
                                     
-                                    return (
+                                      return (
                                       <>
                                         {/* Delete button (only for Admin/Event Office) */}
                                         {(isAdmin || isEventOffice) && (
-                                          <button
-                                            onClick={() => handleDeleteClick(userId)}
-                                            disabled={!!deletingIds[userId]}
+                          <button
+                                          onClick={() => handleDeleteClick(userId)}
+                                          disabled={!!deletingIds[userId]}
                                             title="Delete Account"
-                                            style={{
+                                          style={{
                                               padding: '0.5rem',
                                               backgroundColor: 'transparent',
                                               color: '#dc2626',
-                                              border: 'none',
-                                              borderRadius: '0.5rem',
-                                              cursor: deletingIds[userId] ? 'not-allowed' : 'pointer',
+                                            border: 'none',
+                                            borderRadius: '0.5rem',
+                                            cursor: deletingIds[userId] ? 'not-allowed' : 'pointer',
                                               transition: 'background-color 0.2s',
                                               display: 'flex',
                                               alignItems: 'center',
                                               justifyContent: 'center',
                                               opacity: deletingIds[userId] ? 0.5 : 1
-                                            }}
-                                            onMouseEnter={(e) => {
-                                              if (!deletingIds[userId]) {
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            if (!deletingIds[userId]) {
                                                 e.target.style.backgroundColor = '#fee2e2';
-                                              }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                              if (!deletingIds[userId]) {
+                                            }
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            if (!deletingIds[userId]) {
                                                 e.target.style.backgroundColor = 'transparent';
-                                              }
-                                            }}
-                                          >
+                                            }
+                                          }}
+                                        >
                                             <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
                                               {deletingIds[userId] ? 'hourglass_empty' : 'delete'}
                                             </span>
-                                          </button>
+                          </button>
                                         )}
                                         {/* Block button (always on the right) */}
                                         <button
@@ -2009,10 +2009,10 @@ const AdminUsers = () => {
                                             animation: togglingIds[userId] ? 'spin 1s linear infinite' : 'none'
                                           }}>
                                             {togglingIds[userId] ? 'hourglass_empty' : (isBlocked ? 'lock_open' : 'block')}
-                                          </span>
+                          </span>
                                         </button>
                                       </>
-                                    );
+                                      );
                                   })()}
                                 </div>
                               </td>
@@ -2270,7 +2270,7 @@ const AdminUsers = () => {
                         );
                       })}
                     </tbody>
-                    </table>
+                  </table>
                   )
                 )}
               </div>

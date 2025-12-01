@@ -108,68 +108,224 @@ The system has undergone **end-to-end workflow testing, including event approval
 ### 3. eventoffice dashboard
 ![Event office dashboard](screenshots/eventofficedashboard.png)
 
-### 4. admin dashboard
-![admin dashboard](screenshots/admindashboard.png)
+### 5. TA dashboard1
+![TA dashboard](screenshots/TAdashboard1.png)
+
+
+### 6. TA dashboard (continue)
+![TA dashboard](screenshots/TAdashboard2.png)
+
+
+### 7. staff dashboard
+![staff dashboard](screenshots/staffdashboard1.png)
+
+
+### 8. staff dashboard (continue)
+![staff dashboard](screenshots/staffdashboard2.png)
+
+
+### 9. vendor dashboard
+![vendor dashboard](screenshots/vendordashboard1.png)
+
+
+### 10. vendor dashboard (continue)
+![vendor dashboard](screenshots/vendordashboard2.png)
+
+
+### 11. proffessor dashboard
+![proffessor dashboard](screenshots/proffessordashboard1.png)
+
+
+### 12. proffessor dashboard
+![proffessor dashboard](screenshots/professordashboard2.png)
 
 
 ## ✨ Features
 
 ### Event Management
-- **Multiple Event Types**: Bazaars, Trips, Workshops, Conferences, and Booths
-- **Event Registration**: Student and professor registration with capacity management
-- **Event Approval Workflow**: Admin approval system with edit requests
-- **Event Restrictions**: Support for restricted events with user/type-based access
+- **Multiple Event Types**: Bazaars, Trips, Workshops, Conferences, Booth Setups, Sports Fields, and Gym/Fitness sessions
+- **Event Registration**: Students, professors, and staff can register with capacity limits
+- **Event Approval Workflow**: Admin and Events Office approval system with edit requests
+- **Event Restrictions**: Support for restricted events with stakeholder/type-based access
 - **Event Archiving**: Archive past events for historical reference
+- **Event Editing**: Update event details even after publishing if needed
+- **Automated Reminders**: Users get reminders 1 day and 1 hour before registered events
+- **Commenting System**: Users can leave feedback/comments on events
+- **Role Management**: Admin can assign roles to staff/TA/professor accounts
+- **Vendor Validation**: Vendors can be verified using uploaded tax card + company logo
+- **Booth Requests**: Vendors can apply to join bazaars or request campus booth setups
+- **QR Distribution**: Approved vendors receive QR codes for registered visitors
+- **Fee System**: Accepted vendors pay participation fees and receive receipts
+- **Loyalty Program Support**: Vendors can apply to join or cancel from GUC loyalty partnerships
+- **Moderation Tools**: Admins can block users or delete inappropriate comments
 
-### User Management
-- **Multi-User Type Support**: Students, Staff, TAs, Professors, Vendors, Admins, and Event Office
-- **Email Verification**: Secure email verification system
-- **User Blocking**: Admin capability to block/unblock users
-- **Profile Management**: Comprehensive user profiles with role-based access
+---
 
-### Payment Integration
-- **Stripe Integration**: Secure payment processing for event registrations
-- **Payment Receipts**: Automated email receipts with QR codes
-- **Payment Verification**: Webhook-based payment verification system
+## 👥 Stakeholders & Permissions
 
-### Vendor Management
-- **Vendor Registration**: Vendor onboarding with document verification
-- **Booth Management**: Platform booth requests and management
-- **Vendor Loyalty Programs**: Loyalty program support for vendors
-- **Bazaar Management**: Vendor participation in bazaars
+### 🎓 Student
+- Sign up using GUC email (First name, Last name, password, phone…)
+- Verify email with received activation link
+- Log in to dashboard
+- Browse all university events
+- Register to events (if capacity available)
+- Cannot register if event is full
+- Book sports fields (football/tennis/basketball) at available time slots
+- Register to gym/fitness sessions (yoga, pilates, zumba…)
+- Receive reminders before attending
+- Receive notifications if an event/session is edited or cancelled
+- Leave comments/feedback on events
+- Participate in campus polls (e.g., vendors to invite, services to request…)
 
-### Additional Features
-- **Gym Management**: Gym session scheduling and court bookings
-- **Workshop Management**: Professor-led workshops with completion tracking
-- **Announcements**: System-wide announcements
-- **Notifications**: Real-time notifications via Socket.IO
-- **Dashboard Analytics**: Role-based dashboards with statistics
-- **File Uploads**: Support for images, PDFs, and documents
+---
 
-### Key Flows
+### 🧑‍💼 Staff & TA
+- Sign up using GUC email
+- Admin assigns internal role
+- Log in and view dashboard
+- Browse all university events
+- Register just like students
+- Book sports fields and gym sessions
+- Leave feedback/comments
+- Receive all notifications/reminders for what they register to
 
-#### Event Registration Flow
-1. Event creation by Staff/TA/Professor
-2. Admin approval/rejection
-3. Student/Professor registration
-4. Payment processing (if applicable)
-5. Confirmation emails with receipts
-6. Event completion tracking
+---
 
-#### Payment Flow
-1. User registers for paid event
-2. Stripe checkout session created
-3. Payment processed
-4. Webhook verification
-5. Registration confirmed
-6. Receipt email sent with QR code
+### 👨‍🏫 Professor
+- All student capabilities +
+- Create workshops by filling:
+  - Workshop name
+  - Location (Campus Room)
+  - Date & Time
+  - Short Description
+  - Capacity limit
+  - Source of funding (External or GUC)
+  - Extra required resources
+  - Registration deadline
+- Edit workshop details after creation
+- View list of workshops they created
+- View number of registered attendees + remaining spots
+- Receive notifications if accepted, rejected, or asked to edit
 
-#### Vendor Onboarding
-1. Vendor signs up with documents
-2. Admin reviews vendor request
-3. Admin approves/rejects vendor
-4. Vendor gains access to platform
-5. Vendor can request booths and participate in bazaars
+---
+
+### 🏢 Events Office
+- Create official events:
+  - **Bazaars** → name, start/end time, location, description, registration deadline
+  - **Trips** → name, transportation, location, date/time, capacity, description, deadline
+  - **Conferences** → name, funding source, date/time, location, resources, description
+- Edit any event details after creation
+- Receive alerts when professors submit workshop requests
+- Accept/publish professor workshops
+- Reject workshops or request edits
+- Review vendor requests to join bazaars and booths
+- Approve/reject vendor participation
+- System notifies vendors automatically
+
+---
+
+### 🛡 Admin
+- Assign correct roles to staff/TA/professor after they sign up
+- Create or delete Events Office/Admin accounts
+- Block any user if needed
+- View list of all users + status (active or blocked)
+- Delete inappropriate comments
+- Moderate platform behavior and user activity
+
+---
+
+### 🧾 Vendor
+- Sign up using company email + password + company name
+- Upload tax card and company logo to prove validity
+- Verify email link via system email
+- Admin/Events Office reviews and approves files
+- Once approved vendor can log in
+- View list of upcoming bazaars
+- Apply to join a bazaar from available list
+- Apply for campus booth setups by filling:
+  - Company name
+  - Products/Category
+  - IDs of attending individuals
+  - Booth size
+  - Duration and location
+  - Setup dates/times
+- Upload attendee IDs for full participation period
+- Receive email when bazaar/booth request is accepted/rejected
+- If accepted → vendor must pay participation fees
+- Receive payment receipt via email
+- Receive visitor QR codes via email
+- Cancel participation request anytime before payment
+- Apply or cancel from **GUC Loyalty Program**:
+  - Form includes discount rate, promo code, terms & conditions
+
+---
+
+## 🔁 System Flows
+
+### ✅ 1. User Sign-Up & Verification (Students / Staff / TA / Professors / Vendors)
+1. User enters university/company registration info + email & password
+2. System enforces GUC email for university stakeholders
+3. Vendor uploads business proof files
+4. System sends verification link email
+5. User clicks verification link → account activated
+6. Admin assigns role if internal university user
+7. Vendor account is validated by Admin or Events Office before full activation
+
+---
+
+### ✅ 2. Event Creation Flow (Admin / Events Office / Professor Workshops)
+1. Creator opens “Create Event” form
+2. Selects event type
+3. Inputs all details (time, location, description, capacity, resources, funding, deadline…)
+4. Submits event for review if professor workshop
+5. System publishes immediately if Admin/Events Office
+6. If workshop:
+   - Events Office can accept → publish, reject, request edits
+7. Creator receives status notifications
+
+---
+
+### ✅ 3. Registration Flow (Student / Staff / TA / Professor)
+1. User opens Events page
+2. Filters by type
+3. Reads event details
+4. Clicks register
+5. System checks capacity
+6. If full → block registration
+7. If success → add to “My Events”
+8. System sends confirmation and later reminders
+
+---
+
+### ✅ 4. Vendor Participation Request Flow
+1. Vendor views bazaar list
+2. Selects bazaar
+3. Fills participation/booth form
+4. System marks as “Pending” and notifies Events Office
+5. Events Office/Admin reviews:
+   - Approve → vendor pays fees → gets receipt + visitor QR codes
+   - Reject → vendor notified and remains not included
+6. Vendor can cancel request anytime before payment
+
+---
+
+### ✅ 5. Sports & Gym Booking Flow
+1. Student opens facility page (Sports/Gym)
+2. System shows free slots/sessions
+3. Student selects and confirms
+4. Booking saved to dashboard
+5. User receives notification if cancelled or edited
+
+---
+
+### ✅ 6. Comment Moderation Flow
+1. Users post feedback on events
+2. Admin views comments
+3. If inappropriate → Admin deletes comment
+4. If user continues abuse → Admin blocks user
+
+
+
 
 
 
@@ -611,7 +767,7 @@ Document anything unexpected in GitHub Issues so others can reproduce and resolv
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/dyalaelsmery/Bindly.git
+   git clone https://github.com/Advanced-Computer-Lab-2025/Bindly
    cd Bindly
    ```
 
@@ -659,14 +815,6 @@ STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
 The frontend is configured to proxy API requests to `http://localhost:5000` by default (see `frontend/package.json`).
 
 ## 🏃 Running the Application
-
-### Development Mode
-
-Run both backend and frontend concurrently:
-```bash
-npm run dev
-```
-
 ### Run Separately
 
 **Backend only:**
@@ -685,20 +833,7 @@ cd frontend
 npm start
 ```
 
-### Production Mode
 
-**Backend:**
-```bash
-cd backend
-NODE_ENV=production npm start
-```
-
-**Frontend:**
-```bash
-cd frontend
-npm run build
-# Serve the build folder using a static server
-```
 
 ## 🤝 Contributing
 
@@ -716,7 +851,7 @@ This project is licensed under the ISC License.
 This project was created and developed by students from the **German University in Cairo (GUC)** to centralize and structure campus event operations.
 
 ### 🎓 Development Team
-- **Nourhan Ehab Emara** (Scrum Master) → `@NourhanEhab-04`
+- **Nourhan Ehab** (Scrum Master) → `@NourhanEhab-04`
 - **Salma Ahmed**  → `@salmaahmed21`
 - **Youssef Khaled** → `@youssefelgenany`
 - **Eyad Emara**  → `@EyadEmara11`

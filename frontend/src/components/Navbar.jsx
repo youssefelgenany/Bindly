@@ -74,13 +74,11 @@ const Navbar = () => {
               alignItems: 'center'
             }}
           >
-            <div style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              color: 'var(--guc-red)'
-            }}>
-              Bindly
-            </div>
+            <img
+              src="/assets/images/bindly-logo.png"
+              alt="Bindly Logo"
+              style={{ height: '3rem', width: 'auto', objectFit: 'contain' }}
+            />
           </Link>
         </div>
 

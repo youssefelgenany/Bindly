@@ -590,20 +590,15 @@ const StudentDashboard = () => {
                 justifyContent: 'space-between',
                 borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
                 padding: '1rem 2.5rem',
-                backgroundColor: '#1D3557'
+                backgroundColor: '#182e4d'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
                     <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
-                        <h2 style={{
-                            color: '#FFFFFF',
-                            fontSize: '1.5rem',
-                            fontWeight: '700',
-                            lineHeight: '1.25',
-                            margin: 0,
-                            cursor: 'pointer'
-                        }}>
-                            Bindly
-                        </h2>
+                        <img
+                            src="/assets/images/bindly-logo.png"
+                            alt="Bindly Logo"
+                            style={{ height: '3rem', width: 'auto', objectFit: 'contain', cursor: 'pointer' }}
+                        />
                     </Link>
                 </div>
                 
@@ -1821,59 +1816,6 @@ const StudentDashboard = () => {
                                 </div>
                             )}
                         </section>
-
-                        {/* Quick Actions */}
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <h3 style={{
-                                color: '#1D3557',
-                                fontSize: '1.125rem',
-                                fontWeight: '600',
-                                marginBottom: '1rem',
-                                marginTop: 0
-                            }}>
-                                Quick Actions
-                            </h3>
-                            <div style={{
-                                display: 'flex',
-                                gap: '1rem',
-                                flexWrap: 'wrap'
-                            }}>
-                                <button
-                                    onClick={() => navigate('/student/loyalty-vendors')}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.75rem',
-                                        padding: '0.75rem 1.5rem',
-                                        backgroundColor: '#1D3557',
-                                        color: '#FFFFFF',
-                                        border: 'none',
-                                        borderRadius: '0.5rem',
-                                        fontSize: '0.875rem',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                                        animation: 'fadeInUp 0.6s ease-out 0.6s both'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.backgroundColor = '#152a47';
-                                        e.target.style.transform = 'translateY(-3px) scale(1.05)';
-                                        e.target.style.boxShadow = '0 8px 12px -4px rgba(0, 0, 0, 0.2)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.backgroundColor = '#1D3557';
-                                        e.target.style.transform = 'translateY(0) scale(1)';
-                                        e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                                    }}
-                                >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                        local_offer
-                                    </span>
-                                    View Loyalty Partners
-                                </button>
-                            </div>
-                        </div>
 
                         {/* Recent Activity and Upcoming Deadlines */}
                         <div style={{

@@ -1043,6 +1043,7 @@ exports.getAllEvents = async (req, res) => {
           }
           
           const vendorRequests = await VendorRequest.find(vendorQuery)
+            .select('vendor boothSize durationWeeks boothLocation attendees message status createdAt eventName eventType individualIdsPaths')
             .populate('vendor', 'firstName lastName companyName email').lean();
 
           // For booth and platformBooth events, include full vendor request details
@@ -1062,6 +1063,7 @@ exports.getAllEvents = async (req, res) => {
                 durationWeeks: vr.durationWeeks,
                 boothLocation: vr.boothLocation,
                 attendees: vr.attendees || [],
+                individualIdsPaths: vr.individualIdsPaths || [],
                 message: vr.message || '',
                 status: vr.status,
                 createdAt: vr.createdAt,
@@ -1269,7 +1271,8 @@ exports.getAllEvents = async (req, res) => {
               boothSize: vr.boothSize || null,
               durationWeeks: vr.durationWeeks || null,
               boothLocation: vr.boothLocation || null,
-              attendees: Array.isArray(vr.attendees) ? vr.attendees : []
+              attendees: Array.isArray(vr.attendees) ? vr.attendees : [],
+              individualIdsPaths: Array.isArray(vr.individualIdsPaths) ? vr.individualIdsPaths : []
             };
             
             if (index === 0) {
@@ -1959,6 +1962,7 @@ exports.getAllEventsForAdmin = async (req, res) => {
           }
           
           const vendorRequests = await VendorRequest.find(vendorQuery)
+            .select('vendor boothSize durationWeeks boothLocation attendees message status createdAt eventName eventType individualIdsPaths')
             .populate('vendor', 'firstName lastName companyName email phone userType').lean();
 
           // For booth and platformBooth events, include full vendor request details
@@ -1978,6 +1982,7 @@ exports.getAllEventsForAdmin = async (req, res) => {
                 durationWeeks: vr.durationWeeks,
                 boothLocation: vr.boothLocation,
                 attendees: vr.attendees || [],
+                individualIdsPaths: vr.individualIdsPaths || [],
                 message: vr.message || '',
                 status: vr.status,
                 createdAt: vr.createdAt,
@@ -2000,6 +2005,7 @@ exports.getAllEventsForAdmin = async (req, res) => {
               durationWeeks: vr.durationWeeks || null,
               boothLocation: vr.boothLocation || null,
               attendees: vr.attendees || [],
+              individualIdsPaths: vr.individualIdsPaths || [],
               message: vr.message || '',
               status: vr.status,
               joinedAt: vr.createdAt

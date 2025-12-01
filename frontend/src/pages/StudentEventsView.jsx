@@ -857,20 +857,15 @@ const StudentEventsView = () => {
         justifyContent: 'space-between',
         borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '1rem 2.5rem',
-        backgroundColor: '#1D3557'
+        backgroundColor: '#182e4d'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF', flex: '0 0 auto' }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <h2 style={{
-              color: '#FFFFFF',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              lineHeight: '1.25',
-              margin: 0,
-              cursor: 'pointer'
-            }}>
-              Bindly
-            </h2>
+            <img
+              src="/assets/images/bindly-logo.png"
+              alt="Bindly Logo"
+              style={{ height: '3rem', width: 'auto', objectFit: 'contain', cursor: 'pointer' }}
+            />
           </Link>
               </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
@@ -2070,6 +2065,48 @@ const StudentEventsView = () => {
                           </span>
                         </div>
                       )}
+                      {event.type === 'workshop' && event.faculty && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#9ca3af'
+                          }}>
+                            domain
+                          </span>
+                          <span>Faculty: {event.faculty}</span>
+                        </div>
+                      )}
+                      {event.type === 'workshop' && event.agenda && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#9ca3af',
+                            marginTop: '0.125rem',
+                            flexShrink: 0
+                          }}>
+                            event_note
+                          </span>
+                          <span style={{
+                            color: '#6b7280',
+                            fontSize: '0.75rem',
+                            lineHeight: '1.4'
+                          }}>
+                            {event.agenda}
+                          </span>
+                        </div>
+                      )}
                       {event.type === 'conference' && event.website && (
                         <div style={{
                           display: 'flex',
@@ -2099,6 +2136,31 @@ const StudentEventsView = () => {
                           >
                             {event.website}
                           </a>
+                        </div>
+                      )}
+                      {event.type === 'conference' && event.agenda && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#9ca3af',
+                            marginTop: '0.125rem',
+                            flexShrink: 0
+                          }}>
+                            event_note
+                          </span>
+                          <span style={{
+                            color: '#6b7280',
+                            fontSize: '0.75rem',
+                            lineHeight: '1.4'
+                          }}>
+                            {event.agenda}
+                          </span>
                         </div>
                       )}
                       {(event.type === 'bazaar' || event.type === 'conference') && event.description && (
