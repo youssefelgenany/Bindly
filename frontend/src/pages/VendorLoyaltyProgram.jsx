@@ -78,6 +78,8 @@ const VendorLoyaltyProgram = () => {
       }
       if (res && res.success) {
         const successMsg = res.message || (formMode === 'update' ? 'Application updated successfully' : 'Application submitted successfully');
+        // Clear any previous errors
+        setError('');
         setSuccess(successMsg);
         setModalMessage(successMsg);
         setShowSuccessModal(true);
