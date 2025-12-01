@@ -1703,7 +1703,7 @@ const TAEventsView = () => {
                       {getEventTypeImage(event.type) && (
                         <div style={{
                           width: '100%',
-                          height: '180px',
+                          height: '160px',
                           overflow: 'hidden',
                           position: 'relative',
                           backgroundColor: '#f3f4f6',
@@ -1781,14 +1781,14 @@ const TAEventsView = () => {
                         </div>
                       )}
                       
-                      <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                      <div style={{ padding: (event.type === 'bazaar' || event.type === 'conference' || event.type === 'booth') ? '0.5rem' : '0.375rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.375rem' }}>
                       <div style={{
-                        padding: '0.375rem 0.875rem',
-                        borderRadius: '0.5rem',
+                        padding: '0.25rem 0.625rem',
+                        borderRadius: '0.375rem',
                         backgroundColor: getEventTypeColor(event.type),
                         color: '#FFFFFF',
-                        fontSize: '0.6875rem',
+                        fontSize: '0.625rem',
                         fontWeight: '700',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em'
@@ -1813,7 +1813,7 @@ const TAEventsView = () => {
                       color: '#1D3557',
                       fontSize: '1.125rem',
                       fontWeight: '600',
-                          marginBottom: '0.75rem',
+                          marginBottom: '0.5rem',
                       marginTop: 0,
                       lineHeight: '1.4'
                     }}>
@@ -1823,8 +1823,8 @@ const TAEventsView = () => {
                     <div style={{
                       display: 'flex',
                       flexDirection: 'column',
-                          gap: '0.5rem',
-                          marginBottom: '0.75rem',
+                          gap: event.type === 'booth' ? '0.75rem' : (event.type === 'bazaar' || event.type === 'conference') ? '0.625rem' : '0.375rem',
+                          marginBottom: (event.type === 'bazaar' || event.type === 'conference' || event.type === 'booth') ? '0.625rem' : '0.5rem',
                       flex: 1
                     }}>
                       <div style={{
@@ -1842,6 +1842,62 @@ const TAEventsView = () => {
                         </span>
                         <span>{formatDate(event.startDate)}</span>
                       </div>
+                      {(event.type === 'bazaar' || event.type === 'conference' || event.type === 'booth') && event.endDate && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: '#6b7280'
+                        }}>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#9ca3af'
+                          }}>
+                            event_available
+                          </span>
+                          <span>{formatDate(event.endDate)}</span>
+                        </div>
+                      )}
+                      {event.type === 'booth' && (() => {
+                        // Get vendor name from vendors array, vendorRequests, or extract from title
+                        let vendorName = null;
+                        if (event.vendors && event.vendors.length > 0) {
+                          vendorName = event.vendors[0].name || event.vendors[0].companyName || 
+                                       (event.vendors[0].vendor?.companyName) ||
+                                       (event.vendors[0].vendor?.firstName && event.vendors[0].vendor?.lastName 
+                                         ? `${event.vendors[0].vendor.firstName} ${event.vendors[0].vendor.lastName}` 
+                                         : null);
+                        } else if (event.vendorRequests && event.vendorRequests.length > 0) {
+                          const vendor = event.vendorRequests[0].vendor;
+                          vendorName = vendor?.companyName || 
+                                      (vendor?.firstName && vendor?.lastName ? `${vendor.firstName} ${vendor.lastName}` : null) ||
+                                      event.vendorRequests[0].vendor?.name;
+                        } else if (event.title && event.title.includes('Platform Booth')) {
+                          // Extract vendor name from title: "Platform Booth - {vendor} - {location}"
+                          const parts = event.title.split(' - ');
+                          if (parts.length >= 2) {
+                            vendorName = parts[1];
+                          }
+                        }
+                        return vendorName ? (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            fontSize: '0.75rem',
+                            color: '#6b7280'
+                          }}>
+                            <span className="material-symbols-outlined" style={{
+                              fontSize: '1rem',
+                              color: '#9ca3af'
+                            }}>
+                              storefront
+                            </span>
+                            <span>{vendorName}</span>
+                          </div>
+                        ) : null;
+                      })()}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1876,7 +1932,7 @@ const TAEventsView = () => {
                           </span>
                         </div>
                       )}
-                      {event.capacity && (
+                      {(event.type === 'trip' || event.type === 'workshop') && event.capacity && (
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -1893,33 +1949,16 @@ const TAEventsView = () => {
                           <span>{event.registeredCount || 0}/{event.capacity} registered</span>
                         </div>
                       )}
-                      {(event.type === 'bazaar' || event.type === 'booth') && (
+                      {event.type === 'workshop' && (
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
+                          gap: '0.5rem',
+                          fontSize: '0.75rem',
                           color: '#6b7280'
                         }}>
                           <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
-                            color: '#9ca3af'
-                          }}>
-                            storefront
-                          </span>
-                          <span>{(event.vendors && event.vendors.length) || 0} vendor{((event.vendors && event.vendors.length) || 0) !== 1 ? 's' : ''} participating</span>
-                        </div>
-                      )}
-                      {(event.type === 'workshop' || event.type === 'conference') && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.625rem',
-                          fontSize: '0.8125rem',
-                          color: '#6b7280'
-                        }}>
-                          <span className="material-symbols-outlined" style={{
-                            fontSize: '1.125rem',
+                            fontSize: '1rem',
                             color: '#9ca3af'
                           }}>
                             school
@@ -1932,77 +1971,119 @@ const TAEventsView = () => {
                           </span>
                         </div>
                       )}
-                    </div>
-
-                    {event.description && (
-                      <p style={{
-                        color: '#6b7280',
-                        fontSize: '0.8125rem',
-                            marginBottom: '0.75rem',
-                        marginTop: 0,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        lineHeight: '1.5'
-                      }}>
-                        {event.description}
-                      </p>
-                    )}
-
-                    {/* Bottom Section: Rating Display */}
-                    <div style={{
-                      marginTop: 'auto',
-                      paddingTop: '0.75rem',
-                      borderTop: '1px solid #e5e7eb',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '0.5rem',
-                      marginBottom: '0.75rem'
-                    }}>
-                      {/* Average Rating Display - Bottom Left (Clickable to view ratings/comments for ALL events) */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewRatingsComments(event.id, event.title);
-                        }}
-                        style={{
+                      {event.type === 'conference' && event.website && (
+                        <div style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '0.375rem',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '0.25rem',
-                          borderRadius: '0.375rem',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f3f4f6';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                        title="View ratings and comments"
-                      >
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '1rem',
-                          color: '#fbbf24'
+                          gap: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: '#6b7280'
                         }}>
-                          star
-                        </span>
-                        <span style={{
-                          fontSize: '0.8125rem',
-                          fontWeight: '600',
-                          color: '#374151'
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#9ca3af'
+                          }}>
+                            link
+                          </span>
+                          <a 
+                            href={event.website} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              color: '#1e40af',
+                              textDecoration: 'none',
+                              fontSize: '0.75rem'
+                            }}
+                            onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                            onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                          >
+                            {event.website}
+                          </a>
+                        </div>
+                      )}
+                      {(event.type === 'bazaar' || event.type === 'conference') && event.description && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: '#6b7280'
                         }}>
-                          {eventRatings[event.id]?.average > 0 
-                            ? eventRatings[event.id].average.toFixed(1)
-                            : '—'}
-                        </span>
-                      </button>
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#9ca3af',
+                            marginTop: '0.125rem',
+                            flexShrink: 0
+                          }}>
+                            description
+                          </span>
+                          <span style={{
+                            color: '#6b7280',
+                            fontSize: '0.75rem',
+                            lineHeight: '1.4'
+                          }}>
+                            {event.description.length > 100 ? event.description.substring(0, 100) + '...' : event.description}
+                          </span>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Bottom Section: Rating Display - Only for workshop/trip */}
+                    {(event.type === 'workshop' || event.type === 'trip') && (
+                      <div style={{
+                        marginTop: 'auto',
+                        paddingTop: '0.5rem',
+                        borderTop: '1px solid #e5e7eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.5rem',
+                        marginBottom: '0.5rem'
+                      }}>
+                        {/* Average Rating Display - Bottom Left (Clickable to view ratings/comments) */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewRatingsComments(event.id, event.title);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.375rem',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '0.25rem',
+                            borderRadius: '0.375rem',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f3f4f6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                          title="View ratings and comments"
+                        >
+                          <span className="material-symbols-outlined" style={{
+                            fontSize: '1rem',
+                            color: '#fbbf24'
+                          }}>
+                            star
+                          </span>
+                          <span style={{
+                            fontSize: '0.8125rem',
+                            fontWeight: '600',
+                            color: '#374151'
+                          }}>
+                            {eventRatings[event.id]?.average > 0 
+                              ? eventRatings[event.id].average.toFixed(1)
+                              : '—'}
+                          </span>
+                        </button>
+                      </div>
+                    )}
 
                     {(event.type === 'workshop' || event.type === 'trip') && (
                           isRegistered ? (
@@ -2319,7 +2400,7 @@ const TAEventsView = () => {
                     </div>
                   </div>
                 )}
-                {selectedEvent.capacity && (
+                {((selectedEvent.type === 'trip' || selectedEvent.type === 'workshop') && selectedEvent.capacity) && (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -2337,25 +2418,7 @@ const TAEventsView = () => {
                     </div>
                   </div>
                 )}
-                {(selectedEvent.type === 'bazaar' || selectedEvent.type === 'booth') && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                  }}>
-                    <span className="material-symbols-outlined" style={{
-                      fontSize: '1.25rem',
-                      color: '#9ca3af'
-                    }}>
-                      storefront
-                    </span>
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Vendors</div>
-                      <div style={{ color: '#374151', fontWeight: '500' }}>{(selectedEvent.vendors && selectedEvent.vendors.length) || 0} vendor{((selectedEvent.vendors && selectedEvent.vendors.length) || 0) !== 1 ? 's' : ''} participating</div>
-                    </div>
-                  </div>
-                )}
-                {(selectedEvent.type === 'workshop' || selectedEvent.type === 'conference') && (
+                {selectedEvent.type === 'workshop' && (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',

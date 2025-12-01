@@ -94,7 +94,7 @@ async function sendGymCancellationEmail(email, name, sessionType, sessionDate, s
     console.log('✅ SMTP connection verified');
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || `Bindly <salma.husseinhassan@student.guc.edu.eg>`,
+      from: process.env.SMTP_FROM || `Bindly <salmaahmed1504@gmail.com>`,
       to: email,
       subject: `Gym Session Cancelled - ${sessionType}`,
       html: html
