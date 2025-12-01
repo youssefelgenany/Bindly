@@ -137,7 +137,7 @@ The system has undergone **end-to-end workflow testing, including event approval
 
 
 ### 12. proffessor dashboard
-![proffessor dashboard](screenshots/proffessordashboard2.png)
+![proffessor dashboard](screenshots/professordashboard2.png)
 
 
 ## ✨ Features
