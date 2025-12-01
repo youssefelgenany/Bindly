@@ -187,50 +187,155 @@ const StaffDashboard = () => {
             setLoading(true);
             
             // Fetch events from discover events for upcoming events preview
+            // Use getStudentEvents to get discover events (excludes registered events)
             try {
-                const eventsResult = await eventsApiService.getAllEventsAuthenticated({});
+                const eventsResult = await eventsApiService.getStudentEvents({});
+                
+                console.log('🔍 Staff Dashboard - Events API Result:', eventsResult);
                 
                 if (eventsResult.success) {
-                    const eventsList = Array.isArray(eventsResult.data) ? eventsResult.data : (eventsResult.data?.events || []);
+                    // Handle different response structures
+                    let eventsList = [];
+                    if (Array.isArray(eventsResult.data)) {
+                        eventsList = eventsResult.data;
+                    } else if (eventsResult.data?.events && Array.isArray(eventsResult.data.events)) {
+                        eventsList = eventsResult.data.events;
+                    } else if (eventsResult.data?.data && Array.isArray(eventsResult.data.data)) {
+                        eventsList = eventsResult.data.data;
+                    } else if (eventsResult.data?.data?.events && Array.isArray(eventsResult.data.data.events)) {
+                        eventsList = eventsResult.data.data.events;
+                    } else if (eventsResult.data && typeof eventsResult.data === 'object') {
+                        // Try to find any array in the response
+                        eventsList = Object.values(eventsResult.data).find(val => Array.isArray(val)) || [];
+                    }
+                    
+                    // Ensure we have an array
+                    if (!Array.isArray(eventsList)) {
+                        console.error('🔍 Staff Dashboard - eventsList is not an array:', eventsList);
+                        eventsList = [];
+                    }
+                    
+                    console.log('🔍 Staff Dashboard - Events List:', eventsList.length, 'events');
+                    console.log('🔍 Staff Dashboard - Events List Sample:', eventsList.slice(0, 3).map(ev => ({ 
+                        title: ev.title, 
+                        type: ev.type, 
+                        startDate: ev.startDate,
+                        id: ev._id || ev.id 
+                    })));
                     
                     const now = new Date();
-                    // Filter for upcoming events (future dates)
+                    
+                    // Separate upcoming and past events
                     const upcoming = eventsList.filter(ev => {
                         if (!ev.startDate) return false;
                         const date = new Date(ev.startDate);
                         return !isNaN(date.getTime()) && date > now;
                     });
+                    
+                    const past = eventsList.filter(ev => {
+                        if (!ev.startDate) return false;
+                        const date = new Date(ev.startDate);
+                        return !isNaN(date.getTime()) && date <= now;
+                    });
 
-                    // Sort by date
-                    const sortedByDate = upcoming.slice().sort((a, b) => {
+                    // Sort upcoming by date (earliest first)
+                    const sortedUpcoming = upcoming.slice().sort((a, b) => {
                         const dateA = new Date(a.startDate || 0);
                         const dateB = new Date(b.startDate || 0);
                         return dateA - dateB;
                     });
+                    
+                    // Sort past by date (most recent first)
+                    const sortedPast = past.slice().sort((a, b) => {
+                        const dateA = new Date(a.startDate || 0);
+                        const dateB = new Date(b.startDate || 0);
+                        return dateB - dateA;
+                    });
+                    
+                    // Combine: upcoming first, then past (to always have events to show)
+                    const sortedByDate = [...sortedUpcoming, ...sortedPast];
+                    
+                    console.log('🔍 Staff Dashboard - Upcoming count:', upcoming.length);
+                    console.log('🔍 Staff Dashboard - Past count:', past.length);
+                    console.log('🔍 Staff Dashboard - Sorted by date count:', sortedByDate.length);
 
-                    // Select specific event types in order: Trip, Workshop, Bazaar, Conference/Booth (blurred)
+                    // Select specific event types in order: Trip, Workshop, Bazaar, Conference/Booth
+                    // Always ensure different types are shown
                     const selectedEvents = [];
                     const priorityTypes = ['trip', 'workshop', 'bazaar', 'conference', 'booth'];
+                    
+                    // Helper function to normalize event type (handle platformBooth as booth)
+                    const normalizeEventType = (type) => {
+                        const normalized = (type || '').toLowerCase();
+                        return normalized === 'platformbooth' ? 'booth' : normalized;
+                    };
+                    
+                    // Helper function to get unique types already selected
+                    const getSelectedTypes = () => {
+                        return new Set(selectedEvents.map(ev => normalizeEventType(ev.type)));
+                    };
                     
                     // First pass: get one of each priority type in order
                     for (const type of priorityTypes) {
                         if (selectedEvents.length >= 4) break;
                         const found = sortedByDate.find(ev => {
-                            const eventType = (ev.type || '').toLowerCase();
-                            return eventType === type && !selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id));
+                            const eventType = normalizeEventType(ev.type);
+                            const isAlreadySelected = selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id));
+                            return eventType === type && !isAlreadySelected;
                         });
                         if (found) {
                             selectedEvents.push(found);
                         }
                     }
                     
-                    // If we don't have 4 yet, fill with any remaining events
+                    // Second pass: fill with events of different types only (no duplicates)
+                    const selectedTypes = getSelectedTypes();
                     for (const ev of sortedByDate) {
                         if (selectedEvents.length >= 4) break;
-                        if (!selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id))) {
+                        const eventType = normalizeEventType(ev.type);
+                        const isAlreadySelected = selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id));
+                        const isDifferentType = !selectedTypes.has(eventType);
+                        
+                        // Only add if not already selected AND is a different type
+                        if (!isAlreadySelected && isDifferentType) {
+                            selectedEvents.push(ev);
+                            selectedTypes.add(eventType); // Update selected types set
+                        }
+                    }
+                    
+                    // Third pass: if we still don't have 4, fill with any remaining events
+                    // (This ensures we always show up to 4 events from discover events)
+                    for (const ev of sortedByDate) {
+                        if (selectedEvents.length >= 4) break;
+                        const isAlreadySelected = selectedEvents.find(e => (e._id || e.id) === (ev._id || ev.id));
+                        if (!isAlreadySelected) {
                             selectedEvents.push(ev);
                         }
                     }
+
+                    // CRITICAL FIX: Always ensure we have events to show from discover events
+                    // If selection logic failed or we have fewer than 4, fill from all available events
+                    if (selectedEvents.length < 4 && sortedByDate.length > 0) {
+                        const selectedIds = new Set(selectedEvents.map(ev => String(ev._id || ev.id)));
+                        for (const ev of sortedByDate) {
+                            if (selectedEvents.length >= 4) break;
+                            const evId = String(ev._id || ev.id);
+                            if (!selectedIds.has(evId)) {
+                                selectedEvents.push(ev);
+                                selectedIds.add(evId);
+                            }
+                        }
+                    }
+                    
+                    // Final fallback: if still empty, just take first 4 events (should never happen but safety net)
+                    if (selectedEvents.length === 0 && sortedByDate.length > 0) {
+                        console.log('🔍 Staff Dashboard - Using fallback: taking first 4 events');
+                        selectedEvents.push(...sortedByDate.slice(0, 4));
+                    }
+                    
+                    console.log('🔍 Staff Dashboard - Selected events count:', selectedEvents.length);
+                    console.log('🔍 Staff Dashboard - Selected event types:', selectedEvents.map(ev => ev.type));
+                    console.log('🔍 Staff Dashboard - Selected event titles:', selectedEvents.map(ev => ev.title));
 
                     // Load ratings for selected events
                     const ratingsMap = {};
@@ -272,12 +377,16 @@ const StaffDashboard = () => {
                                 typeLabel: ev.type || 'Event'
                             };
                         });
+                    
+                    console.log('🔍 Staff Dashboard - Preview cards created:', previewCards.length);
+                    console.log('🔍 Staff Dashboard - Preview cards:', previewCards.map(card => ({ title: card.title, type: card.typeLabel })));
                     setUpcomingEventsPreview(previewCards);
                 } else {
+                    console.error('🔍 Staff Dashboard - Events API call failed:', eventsResult.message);
                     setUpcomingEventsPreview([]);
                 }
             } catch (eventsError) {
-                console.error('Error fetching events for upcoming events preview:', eventsError);
+                console.error('🔍 Staff Dashboard - Error fetching events for upcoming events preview:', eventsError);
                 setUpcomingEventsPreview([]);
             }
 
@@ -789,78 +898,87 @@ const StaffDashboard = () => {
                                                     }
                                                 }}
                                                 style={{
-                                                    padding: '1rem',
-                                                    borderBottom: '1px solid #f3f4f6',
-                                                    cursor: 'pointer',
+                                                    padding: '0.75rem 1rem',
+                                                    borderBottom: '1px solid #f1f5f9',
                                                     backgroundColor: notification.isRead 
                                                         ? '#FFFFFF' 
                                                         : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                                                          ? '#fef2f2'
-                                                          : '#eff6ff',
-                                                    borderLeft: notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder') && !notification.isRead
-                                                        ? '3px solid #ef4444'
-                                                        : 'none',
-                                                    transition: 'background-color 0.2s'
+                                                          ? '#fff7ed'
+                                                          : '#f8fafc',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s',
+                                                    display: 'flex',
+                                                    gap: '0.75rem'
                                                 }}
                                                 onMouseEnter={(e) => {
                                                     e.currentTarget.style.backgroundColor = notification.isRead 
-                                                        ? '#f9fafb' 
+                                                        ? '#f8fafc' 
                                                         : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                                                          ? '#fee2e2'
-                                                          : '#dbeafe';
+                                                          ? '#ffedd5'
+                                                          : '#edf2ff';
                                                 }}
                                                 onMouseLeave={(e) => {
                                                     e.currentTarget.style.backgroundColor = notification.isRead 
                                                         ? '#FFFFFF' 
                                                         : (notification.priority === 'high' && (notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder'))
-                                                          ? '#fef2f2'
-                                                          : '#eff6ff';
+                                                          ? '#fff7ed'
+                                                          : '#f8fafc';
                                                 }}
                                             >
                                                 <div style={{
+                                                    width: '2.5rem',
+                                                    height: '2.5rem',
+                                                    borderRadius: '0.75rem',
+                                                    backgroundColor: notification.priority === 'high' ? '#fef3c7' : '#e0e7ff',
                                                     display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'flex-start',
-                                                    gap: '0.5rem'
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0
                                                 }}>
-                                                    <div style={{ flex: 1 }}>
-                                                        <p style={{
-                                                            fontSize: '0.875rem',
-                                                            fontWeight: notification.isRead ? '400' : '600',
-                                                            color: '#1D3557',
-                                                            margin: 0,
+                                                    <span className="material-symbols-outlined" style={{
+                                                        fontSize: '1.25rem',
+                                                        color: notification.priority === 'high' ? '#b45309' : '#4338ca'
+                                                    }}>
+                                                        {notification.type === 'event_announcement' || notification.type === 'new_event' ? 'campaign'
+                                                            : notification.type === 'event_reminder' || notification.type === 'workshop_reminder' || notification.type === 'trip_reminder' || notification.type === 'gym_session_reminder' ? 'event'
+                                                            : 'notifications'}
+                                                    </span>
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{
+                                                        fontWeight: notification.isRead ? '400' : '600',
+                                                        color: '#1D3557',
+                                                        fontSize: '0.875rem',
+                                                        marginBottom: '0.25rem'
+                                                    }}>
+                                                        {notification.title || notification.message}
+                                                    </div>
+                                                    {notification.message && notification.message !== notification.title && (
+                                                        <div style={{
+                                                            fontSize: '0.8125rem',
+                                                            color: '#475569',
                                                             marginBottom: '0.25rem'
                                                         }}>
-                                                            {notification.title || notification.message}
-                                                        </p>
-                                                        {notification.message && notification.message !== notification.title && (
-                                                            <p style={{
-                                                                fontSize: '0.75rem',
-                                                                color: '#6b7280',
-                                                                margin: 0
-                                                            }}>
-                                                                {notification.message}
-                                                            </p>
-                                                        )}
-                                                        <p style={{
-                                                            fontSize: '0.625rem',
-                                                            color: '#9ca3af',
-                                                            margin: '0.5rem 0 0 0'
-                                                        }}>
-                                                            {formatNotificationDate(notification.createdAt)}
-                                                        </p>
-                                                    </div>
-                                                    {!notification.isRead && (
-                                                        <div style={{
-                                                            width: '0.5rem',
-                                                            height: '0.5rem',
-                                                            borderRadius: '50%',
-                                                            backgroundColor: '#1e40af',
-                                                            flexShrink: 0,
-                                                            marginTop: '0.25rem'
-                                                        }} />
+                                                            {notification.message}
+                                                        </div>
                                                     )}
+                                                    <div style={{
+                                                        fontSize: '0.75rem',
+                                                        color: '#9ca3af'
+                                                    }}>
+                                                        {formatNotificationDate(notification.createdAt)}
+                                                    </div>
                                                 </div>
+                                                {!notification.isRead && (
+                                                    <div style={{
+                                                        width: '0.5rem',
+                                                        height: '0.5rem',
+                                                        borderRadius: '50%',
+                                                        backgroundColor: '#1e40af',
+                                                        flexShrink: 0,
+                                                        marginTop: '0.25rem'
+                                                    }} />
+                                                )}
                                             </div>
                                         ))
                                     )}
@@ -1429,33 +1547,66 @@ const StaffDashboard = () => {
                     </div>
 
                     {/* Upcoming Events Preview */}
-                    {upcomingEventsPreview.length > 0 && (
-                        <section style={{ marginBottom: '1.5rem' }}>
-                            <div style={{ marginBottom: '0.75rem' }}>
-                                <h3 style={{
-                                    color: '#1D3557',
-                                    fontSize: '1.125rem',
-                                    fontWeight: '600',
-                                    margin: 0
-                                }}>
-                                    Upcoming Events
-                                </h3>
-                            </div>
-
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
-                                gap: '0.85rem'
+                    <section style={{ marginBottom: '1.5rem' }}>
+                        <div style={{ marginBottom: '0.75rem' }}>
+                            <h3 style={{
+                                color: '#1D3557',
+                                fontSize: '1.125rem',
+                                fontWeight: '600',
+                                margin: 0
                             }}>
-                                {upcomingEventsPreview.map((event, index) => {
-                                    const shouldBlurCard = upcomingEventsPreview.length === 4 && index === 3;
+                                Upcoming Events
+                            </h3>
+                        </div>
+
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+                            gap: '0.85rem'
+                        }}>
+                            {upcomingEventsPreview.length > 0 ? (
+                                // Ensure we always show exactly 4 cards
+                                Array.from({ length: 4 }).map((_, index) => {
+                                    const event = upcomingEventsPreview[index];
+                                    // Always blur the last card (4th card) to indicate "Discover more"
+                                    const shouldBlurCard = index === 3;
+                                    
+                                    // If we don't have enough events, show placeholder for remaining slots
+                                    if (!event) {
+                                        return (
+                                            <div
+                                                key={`placeholder-${index}`}
+                                                onClick={() => navigate('/staff/events')}
+                                                style={{
+                                                    backgroundColor: '#FFFFFF',
+                                                    borderRadius: '1rem',
+                                                    overflow: 'hidden',
+                                                    border: '1px solid #e5e7eb',
+                                                    boxShadow: '0 12px 20px -6px rgba(15, 23, 42, 0.15)',
+                                                    position: 'relative',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    minHeight: '260px',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: '#6b7280'
+                                                }}
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>
+                                                    event
+                                                </span>
+                                                <p style={{ margin: 0, fontSize: '0.875rem' }}>Discover more events</p>
+                                            </div>
+                                        );
+                                    }
+                                    
                                     return (
                                         <div
                                             key={event.id || index}
                                             onClick={() => {
-                                                if (shouldBlurCard) {
-                                                    navigate('/staff/events');
-                                                }
+                                                // All cards redirect to Discover Events
+                                                navigate('/staff/events');
                                             }}
                                             style={{
                                                 backgroundColor: '#FFFFFF',
@@ -1464,7 +1615,7 @@ const StaffDashboard = () => {
                                                 border: '1px solid #e5e7eb',
                                                 boxShadow: '0 12px 20px -6px rgba(15, 23, 42, 0.15)',
                                                 position: 'relative',
-                                                cursor: shouldBlurCard ? 'pointer' : 'default',
+                                                cursor: 'pointer',
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 minHeight: '260px',
@@ -1585,10 +1736,38 @@ const StaffDashboard = () => {
                                             )}
                                         </div>
                                     );
-                                })}
-                            </div>
-                        </section>
-                    )}
+                                })
+                            ) : (
+                                // Show placeholder cards if no events
+                                Array.from({ length: 4 }).map((_, index) => (
+                                    <div
+                                        key={`placeholder-${index}`}
+                                        onClick={() => navigate('/staff/events')}
+                                        style={{
+                                            backgroundColor: '#FFFFFF',
+                                            borderRadius: '1rem',
+                                            overflow: 'hidden',
+                                            border: '1px solid #e5e7eb',
+                                            boxShadow: '0 12px 20px -6px rgba(15, 23, 42, 0.15)',
+                                            position: 'relative',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            minHeight: '260px',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#6b7280'
+                                        }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>
+                                            event
+                                        </span>
+                                        <p style={{ margin: 0, fontSize: '0.875rem' }}>Discover more events</p>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </section>
 
                     {/* Quick Actions */}
                     <div style={{ marginBottom: '1.5rem' }}>
@@ -1606,39 +1785,6 @@ const StaffDashboard = () => {
                             gap: '1rem',
                             flexWrap: 'wrap'
                         }}>
-                            <button
-                                onClick={() => navigate('/staff/favorites')}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    padding: '0.75rem 1.5rem',
-                                    backgroundColor: '#1D3557',
-                                    color: '#FFFFFF',
-                                    border: 'none',
-                                    borderRadius: '0.5rem',
-                                    fontSize: '0.875rem',
-                                    fontWeight: '500',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.target.style.backgroundColor = '#152a47';
-                                    e.target.style.transform = 'translateY(-1px)';
-                                    e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.target.style.backgroundColor = '#1D3557';
-                                    e.target.style.transform = 'translateY(0)';
-                                    e.target.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                                }}
-                            >
-                                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                                    favorite
-                                </span>
-                                My Favorites
-                            </button>
                             <button
                                 onClick={() => navigate('/staff/loyalty-vendors')}
                                 style={{
