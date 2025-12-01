@@ -17,7 +17,32 @@ const {
 
 // 📝 User signup (with multer for file uploads)
 const { uploadVendorFiles, uploadProfilePicture } = require('../middleware/uploadMiddleware');
-router.post('/signup', uploadVendorFiles, signup);
+
+// Error handling middleware for multer errors
+const handleMulterError = (err, req, res, next) => {
+  if (err) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        message: 'File size too large. Maximum file size is 10MB. Please compress your files and try again.'
+      });
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        success: false,
+        message: 'Unexpected file field. Please ensure you are uploading the correct files.'
+      });
+    }
+    // For other multer errors
+    return res.status(400).json({
+      success: false,
+      message: `File upload error: ${err.message}`
+    });
+  }
+  next();
+};
+
+router.post('/signup', uploadVendorFiles, handleMulterError, signup);
 
 // 🔑 User login
 router.post('/login', login);

@@ -103,15 +103,24 @@ async function sendVendorRequestStatusEmail(vendor, request, status) {
           ${request.paymentDeadline ? `
           <div style="margin-bottom: 0;">
             <span style="display: inline-block; width: 140px; font-weight: bold; color: #333;">Payment Deadline:</span>
-            <span style="color: #666;">${new Date(request.paymentDeadline).toLocaleDateString()}</span>
+            <span style="color: #666;">${new Date(request.paymentDeadline).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
           </div>
           ` : ''}
         </div>
 
         ${status.toLowerCase() === 'accepted' ? `
+        <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+          <p style="margin: 0; color: #856404; font-weight: bold; font-size: 16px;">💰 Payment Required</p>
+          <p style="margin: 8px 0 0 0; color: #856404;">
+            Your participation has been approved! To confirm your participation, please complete the payment of <strong>${request.participationFee || 0} EGP</strong> within <strong>3 days</strong> (by ${request.paymentDeadline ? new Date(request.paymentDeadline).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the deadline'}). 
+          </p>
+          <p style="margin: 8px 0 0 0; color: #856404;">
+            You can make the payment through your vendor dashboard. Failure to pay by the deadline may result in cancellation of your participation.
+          </p>
+        </div>
         <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #27ae60;">
           <p style="margin: 0; color: #2e7d32; font-weight: bold;">🎉 Congratulations!</p>
-          <p style="margin: 8px 0 0 0; color: #558b2f;">Your participation has been approved. Please complete the payment to confirm your participation.</p>
+          <p style="margin: 8px 0 0 0; color: #558b2f;">Your participation request has been approved. Please complete the payment to confirm your participation.</p>
         </div>
         ` : status.toLowerCase() === 'rejected' ? `
         <div style="background: #ffebee; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #d32f2f;">
