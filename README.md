@@ -182,7 +182,7 @@ exports.functionName = async (req, res) => {
 ## 📸 Screenshots
 
 ### 1. Login Page
-![Login Page](screenshots/signin.png)
+![Login Page](screenshots/login.png)
 
 ### 2. signup page
 ![Sign up page](screenshots/signup.png)
@@ -190,36 +190,23 @@ exports.functionName = async (req, res) => {
 ### 3. eventoffice dashboard
 ![Event office dashboard](screenshots/eventofficedashboard.png)
 
-### 5. TA dashboard1
-![TA dashboard](screenshots/TAdashboard1.png)
+### 4. Admin Dashboard
+![TA dashboard](screenshots/admindashboard.png)
 
-
-### 6. TA dashboard (continue)
-![TA dashboard](screenshots/TAdashboard2.png)
-
-
-### 7. staff dashboard
-![staff dashboard](screenshots/staffdashboard1.png)
-
-
-### 8. staff dashboard (continue)
-![staff dashboard](screenshots/staffdashboard2.png)
-
-
-### 9. vendor dashboard
+### 5. vendor dashboard
 ![vendor dashboard](screenshots/vendordashboard1.png)
 
 
-### 10. vendor dashboard (continue)
+### 6. vendor dashboard (continue)
 ![vendor dashboard](screenshots/vendordashboard2.png)
 
+### 6. staff dashboard
+![staff dashboard](screenshots/staffdashboard1.png)
 
-### 11. proffessor dashboard
-![proffessor dashboard](screenshots/proffessordashboard1.png)
 
+### 7. staff dashboard (continue)
+![staff dashboard](screenshots/staffdashboard2.png)
 
-### 12. proffessor dashboard
-![proffessor dashboard](screenshots/professordashboard2.png)
 
 
 ## ✨ Features
@@ -1438,13 +1425,144 @@ npm start
 
 
 
-## 🤝 Contributing
+## 🤝 How Can Others Contribute?
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+We welcome contributions from the community! While Bindly is fully functional, there are several areas where improvements and contributions would be valuable. Here's how you can help:
+
+### 🎯 Areas That Need Improvement
+
+Based on our current limitations and future goals, here are specific areas where contributions would be most impactful:
+
+#### 1. **Performance Optimization**
+- **High CPU consumption in schedulers**: The notification and workshop completion email schedulers can consume significant CPU when processing large batches. Contributions to optimize batch processing, implement queue systems, or add rate limiting would be valuable.
+- **Slow dashboard rendering**: Some dashboards take a long time to load due to multiple API calls. Contributions to implement data caching, pagination, or lazy loading would improve user experience.
+- **N+1 query problem in court availability**: The `getAllCourts` function queries bookings individually for each court. Contributions to optimize this with aggregation pipelines or batch queries would significantly improve performance.
+
+#### 2. **Security & Reliability**
+- **API rate limiting**: The application lacks rate limiting middleware, which could allow API abuse or DDoS attacks. Contributions to implement rate limiting (e.g., using `express-rate-limit`) would enhance security.
+- **File upload cleanup**: Uploaded files accumulate in the uploads directory without automatic cleanup. Contributions to implement file lifecycle management, automatic cleanup of orphaned files, or integration with cloud storage would prevent disk space issues.
+
+#### 3. **Code Quality & Testing**
+- **Test coverage**: While we have Postman tests, automated unit and integration tests would improve code reliability. Contributions to add Jest/Mocha tests for critical functions would be valuable.
+- **Error handling**: Some error handling could be more comprehensive. Contributions to improve error messages, logging, and user-facing error handling would enhance the developer and user experience.
+- **Code documentation**: Additional JSDoc comments, API documentation, and inline comments for complex logic would help new contributors understand the codebase.
+
+#### 4. **Feature Enhancements**
+- **Search and filtering**: Enhanced search functionality across events, users, and vendor requests would improve usability.
+- **Analytics and reporting**: Dashboard analytics, event attendance reports, and vendor performance metrics would provide valuable insights.
+- **Mobile responsiveness**: While the application works on mobile, dedicated mobile optimizations and responsive design improvements would enhance the mobile experience.
+- **Accessibility**: Improvements to ARIA labels, keyboard navigation, and screen reader support would make the platform more accessible.
+
+#### 5. **Developer Experience**
+- **Development tools**: Docker setup, development environment scripts, and improved local setup documentation would make it easier for new contributors to get started.
+- **Code refactoring**: Some controllers and components are quite large. Contributions to break them into smaller, more maintainable modules would improve code organization.
+- **TypeScript migration**: Gradual migration to TypeScript would improve type safety and developer experience.
+
+### 🚀 How to Contribute
+
+#### Getting Started
+
+1. **Fork the repository** and clone your fork:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/Bindly.git
+   cd Bindly
+   ```
+
+2. **Set up your development environment**:
+   - Follow the [Installation](#-installation) and [Environment Setup](#-environment-setup) sections
+   - Ensure you can run both backend and frontend locally
+   - Test that you can create an admin account and log in
+
+3. **Choose an area to contribute**:
+   - Check the [Known Issues & Limitations](#-known-issues--limitations) section
+   - Look for open GitHub Issues labeled `good first issue`, `help wanted`, or `enhancement`
+   - Or propose your own improvement in a new issue
+
+#### Contribution Workflow
+
+1. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   # or
+   git checkout -b fix/your-bug-fix
+   ```
+
+2. **Make your changes**:
+   - Follow the [Code Style](#-code-style) guidelines
+   - Write clear, descriptive commit messages
+   - Test your changes thoroughly
+   - Update documentation if needed
+
+3. **Test your changes**:
+   - Run the application locally and test the functionality
+   - Use Postman to test API endpoints (see [Testing](#-tests) section)
+   - Check for console errors and warnings
+   - Test edge cases and error scenarios
+
+4. **Commit your changes**:
+   ```bash
+   git add .
+   git commit -m "Add: Description of your changes"
+   ```
+   Use clear commit messages:
+   - `Add:` for new features
+   - `Fix:` for bug fixes
+   - `Update:` for improvements to existing features
+   - `Refactor:` for code refactoring
+   - `Docs:` for documentation changes
+
+5. **Push to your fork**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+6. **Open a Pull Request**:
+   - Provide a clear description of what your PR does
+   - Reference any related issues
+   - Include screenshots or examples if applicable
+   - Explain any breaking changes
+
+### 📋 Pull Request Guidelines
+
+When submitting a PR, please ensure:
+
+- **Code follows the project's style guide** (see [Code Style](#-code-style))
+- **Changes are tested** and don't break existing functionality
+- **Documentation is updated** if you're adding new features or changing existing behavior
+- **Commit messages are clear** and descriptive
+- **PR description explains**:
+  - What the PR does
+  - Why the change is needed
+  - How to test the changes
+  - Any breaking changes
+
+### 🐛 Reporting Issues
+
+If you find a bug or have a suggestion:
+
+1. **Check existing issues** to see if it's already reported
+2. **Create a new issue** with:
+   - A clear, descriptive title
+   - Steps to reproduce (for bugs)
+   - Expected vs. actual behavior
+   - Screenshots if applicable
+   - Environment details (OS, Node version, etc.)
+
+### 💡 Questions or Need Help?
+
+- Open a GitHub Discussion for questions or ideas
+- Check existing documentation in the `backend/` directory
+- Review the [API Documentation](#-api-documentation) section
+- Look at similar code in the codebase for examples
+
+### 🙏 Recognition
+
+Contributors will be recognized in:
+- The README's credits section (for significant contributions)
+- Release notes
+- Project documentation
+
+Thank you for considering contributing to Bindly! Every contribution, no matter how small, helps make the platform better for the entire campus community.
 
 ## 📄 License
 
