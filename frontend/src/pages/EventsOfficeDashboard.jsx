@@ -180,12 +180,12 @@ const EventsOfficeDashboard = () => {
         .map(event => {
           const eventTypeFormatted = formatEventType(event.type);
           return {
-            id: event._id,
-            type: 'event_created',
-            eventType: event.type,
-            title: event.title || event.name,
-            timestamp: event.createdAt || event.created,
-            icon: getEventIcon(event.type),
+          id: event._id,
+          type: 'event_created',
+          eventType: event.type,
+          title: event.title || event.name,
+          timestamp: event.createdAt || event.created,
+          icon: getEventIcon(event.type),
             action: `A new ${eventTypeFormatted}`,
             user: null
           };
@@ -346,14 +346,14 @@ const EventsOfficeDashboard = () => {
           } else {
             const daysDiff = Math.floor(timeDiff / msPerDay);
             if (daysDiff <= 3) {
-              dueText = `In ${daysDiff} days`;
-              color = '#f97316'; // Orange
-            } else if (daysDiff <= 7) {
-              dueText = `In ${daysDiff} days`;
-              color = '#eab308'; // Yellow
-            } else {
-              dueText = `In ${daysDiff} days`;
-              color = '#eab308'; // Yellow
+            dueText = `In ${daysDiff} days`;
+            color = '#f97316'; // Orange
+          } else if (daysDiff <= 7) {
+            dueText = `In ${daysDiff} days`;
+            color = '#eab308'; // Yellow
+          } else {
+            dueText = `In ${daysDiff} days`;
+            color = '#eab308'; // Yellow
             }
           }
           
@@ -840,7 +840,7 @@ const EventsOfficeDashboard = () => {
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem 2.5rem',
-          backgroundColor: '#1D3557'
+          backgroundColor: '#182e4d'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF' }}>
             <button
@@ -861,17 +861,17 @@ const EventsOfficeDashboard = () => {
                 menu
               </span>
             </button>
-            <Link to="/event-office" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <h2 style={{
-                color: '#FFFFFF',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                lineHeight: '1.25',
-                margin: 0,
-                cursor: 'pointer'
-              }}>
-                Bindly
-              </h2>
+            <Link to="/event-office" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+              <img
+                src="/assets/images/bindly-logo.png"
+                alt="Bindly"
+                style={{
+                  height: '3rem',
+                  width: 'auto',
+                  cursor: 'pointer',
+                  objectFit: 'contain'
+                }}
+              />
             </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
@@ -1085,9 +1085,9 @@ const EventsOfficeDashboard = () => {
                     <div 
                       onClick={() => navigate('/event-office/events')}
                       style={{
-                        backgroundColor: '#FFFFFF',
-                        padding: '1.5rem',
-                        borderRadius: '0.5rem',
+                      backgroundColor: '#FFFFFF',
+                      padding: '1.5rem',
+                      borderRadius: '0.5rem',
                         boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                         minHeight: '100px',
                         display: 'flex',
@@ -1150,9 +1150,9 @@ const EventsOfficeDashboard = () => {
                     <div 
                       onClick={() => navigate('/event-office/vendors')}
                       style={{
-                        backgroundColor: '#FFFFFF',
-                        padding: '1.5rem',
-                        borderRadius: '0.5rem',
+                      backgroundColor: '#FFFFFF',
+                      padding: '1.5rem',
+                      borderRadius: '0.5rem',
                         boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                         minHeight: '100px',
                         display: 'flex',
@@ -1280,9 +1280,9 @@ const EventsOfficeDashboard = () => {
                     <div 
                       onClick={() => navigate('/event-office/events')}
                       style={{
-                        backgroundColor: '#FFFFFF',
-                        padding: '1.5rem',
-                        borderRadius: '0.5rem',
+                      backgroundColor: '#FFFFFF',
+                      padding: '1.5rem',
+                      borderRadius: '0.5rem',
                         boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                         minHeight: '100px',
                         display: 'flex',
@@ -1398,9 +1398,9 @@ const EventsOfficeDashboard = () => {
                           key={`${activity.type}-${activity.id}-${index}`} 
                           onClick={() => url && navigate(url)}
                           style={{
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: '1rem',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '1rem',
                             padding: activity.type === 'workshop_submission' && !activity.isRead ? '0.75rem' : url ? '0.5rem' : '0',
                             backgroundColor: activity.type === 'workshop_submission' && !activity.isRead 
                               ? 'rgba(59, 130, 246, 0.1)' 
@@ -1425,83 +1425,83 @@ const EventsOfficeDashboard = () => {
                             }
                           }}
                         >
-                          {activity.type === 'workshop_submission' ? (
-                            <div style={{
-                              backgroundColor: '#dbeafe',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '2.5rem',
-                              height: '2.5rem',
-                              borderRadius: '50%',
-                              flexShrink: 0
-                            }}>
-                              <span className="material-symbols-outlined" style={{ color: '#3b82f6', fontSize: '1.25rem' }}>
-                                {activity.icon}
-                              </span>
-                            </div>
-                          ) : activity.user && index === 0 ? (
-                            <div style={{
-                              width: '2.5rem',
-                              height: '2.5rem',
-                              borderRadius: '50%',
-                              backgroundColor: '#e5e7eb',
-                              backgroundImage: user?.profilePicturePath ? `url(http://localhost:5000${user.profilePicturePath})` : 'none',
-                              backgroundSize: 'cover',
-                              backgroundPosition: 'center',
-                              flexShrink: 0
-                            }}></div>
-                          ) : (
-                            <div style={{
-                              backgroundColor: '#e5e7eb',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '2.5rem',
-                              height: '2.5rem',
-                              borderRadius: '50%',
-                              flexShrink: 0
-                            }}>
-                              <span className="material-symbols-outlined" style={{ color: '#6b7280', fontSize: '1.25rem' }}>
-                                {activity.icon}
-                              </span>
-                            </div>
-                          )}
-                          <div style={{ flex: 1 }}>
-                            <p style={{
-                              fontSize: '0.875rem',
-                              color: '#1D3557',
-                              margin: 0,
-                              fontWeight: activity.type === 'workshop_submission' && !activity.isRead ? '600' : '400'
-                            }}>
-                              {activity.type === 'workshop_submission' ? (
-                                <>
-                                  Professor <span style={{ fontWeight: '600', color: '#3b82f6' }}>{activity.professorName}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
-                                </>
-                              ) : activity.user ? (
-                                <>
+                        {activity.type === 'workshop_submission' ? (
+                          <div style={{
+                            backgroundColor: '#dbeafe',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '2.5rem',
+                            height: '2.5rem',
+                            borderRadius: '50%',
+                            flexShrink: 0
+                          }}>
+                            <span className="material-symbols-outlined" style={{ color: '#3b82f6', fontSize: '1.25rem' }}>
+                              {activity.icon}
+                            </span>
+                          </div>
+                        ) : activity.user && index === 0 ? (
+                          <div style={{
+                            width: '2.5rem',
+                            height: '2.5rem',
+                            borderRadius: '50%',
+                            backgroundColor: '#e5e7eb',
+                            backgroundImage: user?.profilePicturePath ? `url(http://localhost:5000${user.profilePicturePath})` : 'none',
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            flexShrink: 0
+                          }}></div>
+                        ) : (
+                          <div style={{
+                            backgroundColor: '#e5e7eb',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '2.5rem',
+                            height: '2.5rem',
+                            borderRadius: '50%',
+                            flexShrink: 0
+                          }}>
+                            <span className="material-symbols-outlined" style={{ color: '#6b7280', fontSize: '1.25rem' }}>
+                              {activity.icon}
+                            </span>
+                          </div>
+                        )}
+                        <div style={{ flex: 1 }}>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            color: '#1D3557',
+                            margin: 0,
+                            fontWeight: activity.type === 'workshop_submission' && !activity.isRead ? '600' : '400'
+                          }}>
+                            {activity.type === 'workshop_submission' ? (
+                              <>
+                                Professor <span style={{ fontWeight: '600', color: '#3b82f6' }}>{activity.professorName}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
+                              </>
+                            ) : activity.user ? (
+                              <>
                                   <span style={{ fontWeight: '600' }}>{activity.user}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
                                 </>
                               ) : activity.type === 'event_started' ? (
                                 <>
                                   {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
-                                </>
-                              ) : (
-                                <>
-                                  {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span> was created.
-                                </>
-                              )}
-                            </p>
-                            <p style={{
-                              fontSize: '0.75rem',
-                              color: 'rgba(29, 53, 87, 0.6)',
-                              marginTop: '0.25rem',
-                              margin: 0
-                            }}>
-                              {formatTimeAgo(activity.timestamp)}
-                            </p>
-                          </div>
-                        </li>
+                              </>
+                            ) : (
+                              <>
+                                {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span> was created.
+                              </>
+                            )}
+                          </p>
+                          <p style={{
+                            fontSize: '0.75rem',
+                            color: 'rgba(29, 53, 87, 0.6)',
+                            marginTop: '0.25rem',
+                            margin: 0
+                          }}>
+                            {formatTimeAgo(activity.timestamp)}
+                          </p>
+                        </div>
+                      </li>
                       );
                     }) : (
                       <li style={{ color: '#6b7280', fontSize: '0.875rem' }}>
@@ -1544,13 +1544,13 @@ const EventsOfficeDashboard = () => {
                       flexDirection: 'column',
                       gap: '1rem'
                     }}>
-                          {upcomingDeadlines.map((deadline) => (
+                  {upcomingDeadlines.map((deadline) => (
                             <li 
                               key={deadline.id} 
                               onClick={() => navigate(`/event-office/events?expand=${deadline.id}`)}
                               style={{
-                                display: 'flex',
-                                alignItems: 'flex-start',
+                      display: 'flex',
+                      alignItems: 'flex-start',
                                 gap: '0.75rem',
                                 cursor: 'pointer',
                                 padding: '0.5rem',
@@ -1564,33 +1564,33 @@ const EventsOfficeDashboard = () => {
                                 e.currentTarget.style.backgroundColor = 'transparent';
                               }}
                             >
-                              <div style={{
-                                marginTop: '0.25rem',
-                                width: '0.5rem',
-                                height: '0.5rem',
-                                borderRadius: '50%',
-                                backgroundColor: deadline.color,
-                                flexShrink: 0
-                              }}></div>
-                              <div>
-                                <p style={{
-                                  fontWeight: '500',
-                                  fontSize: '0.875rem',
-                                  color: '#1D3557',
-                                  margin: 0
-                                }}>
-                                  {deadline.task}
-                                </p>
-                                <p style={{
-                                  fontSize: '0.75rem',
-                                  color: 'rgba(29, 53, 87, 0.6)',
-                                  margin: 0
-                                }}>
-                                  Due: {deadline.due}
-                                </p>
-                              </div>
-                            </li>
-                          ))}
+                      <div style={{
+                        marginTop: '0.25rem',
+                        width: '0.5rem',
+                        height: '0.5rem',
+                        borderRadius: '50%',
+                        backgroundColor: deadline.color,
+                        flexShrink: 0
+                      }}></div>
+                      <div>
+                        <p style={{
+                          fontWeight: '500',
+                          fontSize: '0.875rem',
+                          color: '#1D3557',
+                          margin: 0
+                        }}>
+                          {deadline.task}
+                        </p>
+                        <p style={{
+                          fontSize: '0.75rem',
+                          color: 'rgba(29, 53, 87, 0.6)',
+                          margin: 0
+                        }}>
+                          Due: {deadline.due}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
                     </ul>
                   </div>
                 </div>

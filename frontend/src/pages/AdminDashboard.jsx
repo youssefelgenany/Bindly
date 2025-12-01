@@ -109,12 +109,12 @@ const AdminDashboard = () => {
         .map(event => {
           const eventTypeFormatted = formatEventType(event.type);
           return {
-            id: event._id,
-            type: 'event_created',
-            eventType: event.type,
-            title: event.title || event.name,
-            timestamp: event.createdAt || event.created,
-            icon: getEventIcon(event.type),
+          id: event._id,
+          type: 'event_created',
+          eventType: event.type,
+          title: event.title || event.name,
+          timestamp: event.createdAt || event.created,
+          icon: getEventIcon(event.type),
             action: `A new ${eventTypeFormatted} was created`,
             user: null
           };
@@ -219,14 +219,14 @@ const AdminDashboard = () => {
           } else {
             const daysDiff = Math.floor(timeDiff / msPerDay);
             if (daysDiff <= 3) {
-              dueText = `In ${daysDiff} days`;
-              color = '#f97316';
-            } else if (daysDiff <= 7) {
-              dueText = `In ${daysDiff} days`;
-              color = '#eab308';
-            } else {
-              dueText = `In ${daysDiff} days`;
-              color = '#eab308';
+            dueText = `In ${daysDiff} days`;
+            color = '#f97316';
+          } else if (daysDiff <= 7) {
+            dueText = `In ${daysDiff} days`;
+            color = '#eab308';
+          } else {
+            dueText = `In ${daysDiff} days`;
+            color = '#eab308';
             }
           }
           
@@ -321,7 +321,7 @@ const AdminDashboard = () => {
       <aside style={{
         width: sidebarOpen ? '16rem' : '0',
         flexShrink: 0,
-        backgroundColor: '#1D3557',
+        backgroundColor: '#182e4d',
         padding: sidebarOpen ? '1.5rem' : '0',
         display: 'flex',
         flexDirection: 'column',
@@ -625,7 +625,7 @@ const AdminDashboard = () => {
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem 2.5rem',
-          backgroundColor: '#1D3557'
+          backgroundColor: '#182e4d'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: '#FFFFFF' }}>
             <button
@@ -646,17 +646,17 @@ const AdminDashboard = () => {
                 menu
               </span>
             </button>
-            <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <h2 style={{
-                color: '#FFFFFF',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                lineHeight: '1.25',
-                margin: 0,
-                cursor: 'pointer'
-              }}>
-                Bindly
-              </h2>
+            <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+              <img
+                src="/assets/images/bindly-logo.png"
+                alt="Bindly Logo"
+                style={{
+                  height: '3rem',
+                  width: 'auto',
+                  cursor: 'pointer',
+                  objectFit: 'contain'
+                }}
+              />
             </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -856,9 +856,9 @@ const AdminDashboard = () => {
                       <div 
                         onClick={() => navigate('/admin/users')}
                         style={{
-                          backgroundColor: '#FFFFFF',
-                          padding: '1.5rem',
-                          borderRadius: '0.5rem',
+                        backgroundColor: '#FFFFFF',
+                        padding: '1.5rem',
+                        borderRadius: '0.5rem',
                           boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                           minHeight: '100px',
                           display: 'flex',
@@ -921,9 +921,9 @@ const AdminDashboard = () => {
                       <div 
                         onClick={() => navigate('/admin/users')}
                         style={{
-                          backgroundColor: '#FFFFFF',
-                          padding: '1.5rem',
-                          borderRadius: '0.5rem',
+                        backgroundColor: '#FFFFFF',
+                        padding: '1.5rem',
+                        borderRadius: '0.5rem',
                           boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                           minHeight: '100px',
                           display: 'flex',
@@ -986,9 +986,9 @@ const AdminDashboard = () => {
                       <div 
                         onClick={() => navigate('/admin/events-view')}
                         style={{
-                          backgroundColor: '#FFFFFF',
-                          padding: '1.5rem',
-                          borderRadius: '0.5rem',
+                        backgroundColor: '#FFFFFF',
+                        padding: '1.5rem',
+                        borderRadius: '0.5rem',
                           boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                           minHeight: '100px',
                           display: 'flex',
@@ -1051,9 +1051,9 @@ const AdminDashboard = () => {
                       <div 
                         onClick={() => navigate('/admin/events-view')}
                         style={{
-                          backgroundColor: '#FFFFFF',
-                          padding: '1.5rem',
-                          borderRadius: '0.5rem',
+                        backgroundColor: '#FFFFFF',
+                        padding: '1.5rem',
+                        borderRadius: '0.5rem',
                           boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                           minHeight: '100px',
                           display: 'flex',
@@ -1181,8 +1181,8 @@ const AdminDashboard = () => {
                               key={`${activity.type}-${activity.id}-${index}`} 
                               onClick={() => url && navigate(url)}
                               style={{
-                                display: 'flex',
-                                alignItems: 'flex-start',
+                            display: 'flex',
+                            alignItems: 'flex-start',
                                 gap: '1rem',
                                 cursor: url ? 'pointer' : 'default',
                                 padding: url ? '0.5rem' : '0',
@@ -1200,46 +1200,46 @@ const AdminDashboard = () => {
                                 }
                               }}
                             >
-                              <div style={{
-                                backgroundColor: '#e5e7eb',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '2.5rem',
-                                height: '2.5rem',
-                                borderRadius: '50%',
-                                flexShrink: 0
+                            <div style={{
+                              backgroundColor: '#e5e7eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              borderRadius: '50%',
+                              flexShrink: 0
+                            }}>
+                              <span className="material-symbols-outlined" style={{ color: '#6b7280', fontSize: '1.25rem' }}>
+                                {activity.icon}
+                              </span>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <p style={{
+                                fontSize: '0.875rem',
+                                color: '#1D3557',
+                                margin: 0
                               }}>
-                                <span className="material-symbols-outlined" style={{ color: '#6b7280', fontSize: '1.25rem' }}>
-                                  {activity.icon}
-                                </span>
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <p style={{
-                                  fontSize: '0.875rem',
-                                  color: '#1D3557',
-                                  margin: 0
-                                }}>
-                                  {activity.user ? (
-                                    <>
-                                      <span style={{ fontWeight: '600' }}>{activity.user}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
-                                    </>
-                                  ) : (
-                                    <>
-                                      {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
-                                    </>
-                                  )}
-                                </p>
-                                <p style={{
-                                  fontSize: '0.75rem',
-                                  color: 'rgba(29, 53, 87, 0.6)',
-                                  marginTop: '0.25rem',
-                                  margin: 0
-                                }}>
-                                  {formatTimeAgo(activity.timestamp)}
-                                </p>
-                              </div>
-                            </li>
+                                {activity.user ? (
+                                  <>
+                                    <span style={{ fontWeight: '600' }}>{activity.user}</span> {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
+                                  </>
+                                ) : (
+                                  <>
+                                    {activity.action} <span style={{ fontWeight: '600' }}>"{activity.title}"</span>.
+                                  </>
+                                )}
+                              </p>
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: 'rgba(29, 53, 87, 0.6)',
+                                marginTop: '0.25rem',
+                                margin: 0
+                              }}>
+                                {formatTimeAgo(activity.timestamp)}
+                              </p>
+                            </div>
+                          </li>
                           );
                         }) : (
                           <li style={{ color: '#6b7280', fontSize: '0.875rem' }}>No recent activity</li>
@@ -1289,8 +1289,8 @@ const AdminDashboard = () => {
                               key={deadline.id} 
                               onClick={() => navigate(`/admin/events-view?expand=${deadline.id}`)}
                               style={{
-                                display: 'flex',
-                                alignItems: 'flex-start',
+                              display: 'flex',
+                              alignItems: 'flex-start',
                                 gap: '0.75rem',
                                 cursor: 'pointer',
                                 padding: '0.5rem',

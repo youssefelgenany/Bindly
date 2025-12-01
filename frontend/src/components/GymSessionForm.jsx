@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import '../styles/GymSessionForm.css';
 
 const GymSessionForm = ({ onSubmit, loading = false, submitLabel = 'Create Gym Session', loadingLabel = 'Creating...' }) => {
   const [formData, setFormData] = useState({
@@ -7,10 +6,7 @@ const GymSessionForm = ({ onSubmit, loading = false, submitLabel = 'Create Gym S
     time: '',
     duration: '',
     type: '',
-    maxParticipants: '',
-    instructor: '',
-    location: 'Gym',
-    description: ''
+    maxParticipants: ''
   });
 
   const handleChange = (e) => {
@@ -62,54 +58,111 @@ const GymSessionForm = ({ onSubmit, loading = false, submitLabel = 'Create Gym S
     { value: 'kick-boxing', label: 'Kick-boxing' }
   ];
 
+  const inputStyle = {
+    width: '100%',
+    padding: '0.75rem',
+    borderRadius: '0.5rem',
+    border: '1px solid #e5e7eb',
+    backgroundColor: '#f3f4f6',
+    fontSize: '0.875rem',
+    outline: 'none',
+    transition: 'border-color 0.2s, background-color 0.2s',
+    fontFamily: 'inherit'
+  };
+
+  const labelStyle = {
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: '0.5rem',
+    display: 'block'
+  };
+
+  const formGroupStyle = {
+    marginBottom: '1.5rem'
+  };
+
   return (
-    <form className="gym-session-form" onSubmit={handleSubmit}>
-      <div className="form-group">
-        <label className="form-label">Date <span style={{ color: '#ef4444' }}>*</span></label>
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={formGroupStyle}>
+        <label style={labelStyle}>Date <span style={{ color: '#ef4444' }}>*</span></label>
         <input
           type="date"
           name="date"
-          className="form-input"
           value={formData.date}
           onChange={handleChange}
           required
+          placeholder="Select date"
+          style={inputStyle}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#3b82f6';
+            e.target.style.backgroundColor = '#ffffff';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = '#e5e7eb';
+            e.target.style.backgroundColor = '#f3f4f6';
+          }}
         />
       </div>
 
-      <div className="form-group">
-        <label className="form-label">Time <span style={{ color: '#ef4444' }}>*</span></label>
+      <div style={formGroupStyle}>
+        <label style={labelStyle}>Time <span style={{ color: '#ef4444' }}>*</span></label>
         <input
           type="time"
           name="time"
-          className="form-input"
           value={formData.time}
           onChange={handleChange}
           required
+          style={inputStyle}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#3b82f6';
+            e.target.style.backgroundColor = '#ffffff';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = '#e5e7eb';
+            e.target.style.backgroundColor = '#f3f4f6';
+          }}
         />
       </div>
 
-      <div className="form-group">
-        <label className="form-label">Duration (minutes) <span style={{ color: '#ef4444' }}>*</span></label>
+      <div style={formGroupStyle}>
+        <label style={labelStyle}>Duration (minutes) <span style={{ color: '#ef4444' }}>*</span></label>
         <input
           type="number"
           name="duration"
-          className="form-input"
           value={formData.duration}
           onChange={handleChange}
           min="1"
           required
           placeholder="e.g., 60"
+          style={inputStyle}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#3b82f6';
+            e.target.style.backgroundColor = '#ffffff';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = '#e5e7eb';
+            e.target.style.backgroundColor = '#f3f4f6';
+          }}
         />
       </div>
 
-      <div className="form-group">
-        <label className="form-label">Session Type <span style={{ color: '#ef4444' }}>*</span></label>
+      <div style={formGroupStyle}>
+        <label style={labelStyle}>Session Type <span style={{ color: '#ef4444' }}>*</span></label>
         <select
           name="type"
-          className="form-input"
           value={formData.type}
           onChange={handleChange}
           required
+          style={inputStyle}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#3b82f6';
+            e.target.style.backgroundColor = '#ffffff';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = '#e5e7eb';
+            e.target.style.backgroundColor = '#f3f4f6';
+          }}
         >
           <option value="">Select session type</option>
           {sessionTypes.map(type => (
@@ -120,60 +173,54 @@ const GymSessionForm = ({ onSubmit, loading = false, submitLabel = 'Create Gym S
         </select>
       </div>
 
-      <div className="form-group">
-        <label className="form-label">Max Number of Participants <span style={{ color: '#ef4444' }}>*</span></label>
+      <div style={formGroupStyle}>
+        <label style={labelStyle}>Max Number of Participants <span style={{ color: '#ef4444' }}>*</span></label>
         <input
           type="number"
           name="maxParticipants"
-          className="form-input"
           value={formData.maxParticipants}
           onChange={handleChange}
           min="1"
           required
           placeholder="e.g., 20"
-        />
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">Instructor</label>
-        <input
-          type="text"
-          name="instructor"
-          className="form-input"
-          value={formData.instructor}
-          onChange={handleChange}
-          placeholder="Instructor name (optional)"
-        />
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">Location</label>
-        <input
-          type="text"
-          name="location"
-          className="form-input"
-          value={formData.location}
-          onChange={handleChange}
-          placeholder="Location (default: Gym)"
-        />
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">Description</label>
-        <textarea
-          name="description"
-          className="form-input"
-          rows="3"
-          value={formData.description}
-          onChange={handleChange}
-          placeholder="Session description (optional)"
+          style={inputStyle}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#3b82f6';
+            e.target.style.backgroundColor = '#ffffff';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = '#e5e7eb';
+            e.target.style.backgroundColor = '#f3f4f6';
+          }}
         />
       </div>
 
       <button 
         type="submit" 
-        className="submit-btn"
         disabled={loading}
+        style={{
+          width: '100%',
+          padding: '0.75rem 1.5rem',
+          borderRadius: '0.5rem',
+          border: 'none',
+          backgroundColor: loading ? '#9ca3af' : '#1D3557',
+          color: '#FFFFFF',
+          fontSize: '0.875rem',
+          fontWeight: '600',
+          cursor: loading ? 'not-allowed' : 'pointer',
+          transition: 'background-color 0.2s',
+          marginTop: '0.5rem'
+        }}
+        onMouseEnter={(e) => {
+          if (!loading) {
+            e.target.style.backgroundColor = '#152843';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!loading) {
+            e.target.style.backgroundColor = '#1D3557';
+          }
+        }}
       >
         {loading ? loadingLabel : submitLabel}
       </button>

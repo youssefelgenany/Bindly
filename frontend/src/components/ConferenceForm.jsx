@@ -13,8 +13,6 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {}, submitLab
     extraResources: initialData.extraResources || '',
     startDate: initialData.startDate || '',
     endDate: initialData.endDate || '',
-    location: initialData.location || '',
-    capacity: initialData.capacity || '',
     allowedUserTypes: initialData.allowedUserTypes || []
   });
 
@@ -45,8 +43,7 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {}, submitLab
     // Parse number fields on submit
     const parsedData = {
       ...formData,
-      budget: formData.budget ? parseFloat(formData.budget) : '',
-      capacity: formData.capacity ? parseInt(formData.capacity, 10) : ''
+      budget: formData.budget ? parseFloat(formData.budget) : ''
     };
     onSubmit(parsedData);
   };
@@ -147,47 +144,25 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {}, submitLab
         />
       </div>
 
-      <div style={formRowStyle}>
-        <div style={formGroupStyle}>
-          <label style={labelStyle}>Website Link <span style={{ color: '#ef4444' }}>*</span></label>
-          <input
-            type="url"
-            name="website"
-            value={formData.website}
-            onChange={handleChange}
-            required
-            placeholder="https://example.com"
-            style={inputStyle}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#3b82f6';
-              e.target.style.backgroundColor = '#ffffff';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = '#e5e7eb';
-              e.target.style.backgroundColor = '#f3f4f6';
-            }}
-          />
-        </div>
-        <div style={formGroupStyle}>
-          <label style={labelStyle}>Location <span style={{ color: '#ef4444' }}>*</span></label>
-          <input
-            type="text"
-            name="location"
-            value={formData.location}
-            onChange={handleChange}
-            required
-            placeholder="Conference venue"
-            style={inputStyle}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#3b82f6';
-              e.target.style.backgroundColor = '#ffffff';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = '#e5e7eb';
-              e.target.style.backgroundColor = '#f3f4f6';
-            }}
-          />
-        </div>
+      <div style={formGroupStyle}>
+        <label style={labelStyle}>Website Link <span style={{ color: '#ef4444' }}>*</span></label>
+        <input
+          type="url"
+          name="website"
+          value={formData.website}
+          onChange={handleChange}
+          required
+          placeholder="https://example.com"
+          style={inputStyle}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#3b82f6';
+            e.target.style.backgroundColor = '#ffffff';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = '#e5e7eb';
+            e.target.style.backgroundColor = '#f3f4f6';
+          }}
+        />
       </div>
 
       <div style={formRowStyle}>
@@ -278,32 +253,12 @@ const ConferenceForm = ({ onSubmit, loading = false, initialData = {}, submitLab
       </div>
 
       <div style={formGroupStyle}>
-        <label style={labelStyle}>Capacity</label>
-        <input
-          type="number"
-          name="capacity"
-          value={formData.capacity}
-          onChange={handleChange}
-          min="0"
-          placeholder="Maximum number of attendees"
-          style={inputStyle}
-          onFocus={(e) => {
-            e.target.style.borderColor = '#3b82f6';
-            e.target.style.backgroundColor = '#ffffff';
-          }}
-          onBlur={(e) => {
-            e.target.style.borderColor = '#e5e7eb';
-            e.target.style.backgroundColor = '#f3f4f6';
-          }}
-        />
-      </div>
-
-      <div style={formGroupStyle}>
-        <label style={labelStyle}>Extra Resources</label>
+        <label style={labelStyle}>Extra Resources <span style={{ color: '#ef4444' }}>*</span></label>
         <textarea
           name="extraResources"
           value={formData.extraResources}
           onChange={handleChange}
+          required
           placeholder="Additional resources or requirements"
           rows="3"
           style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}

@@ -8,6 +8,7 @@ import BazaarForm from '../components/BazaarForm';
 import ConferenceForm from '../components/ConferenceForm';
 import TripForm from '../components/TripForm';
 import WorkshopEditRequestModal from '../components/WorkshopEditRequestModal';
+import EventsOfficeNotificationBell from './EventsOfficeNotificationBell';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
@@ -1283,7 +1284,7 @@ const EventsOfficeEventsView = () => {
       <aside style={{
         width: sidebarOpen ? '16rem' : '0',
         flexShrink: 0,
-        backgroundColor: '#1D3557',
+        backgroundColor: '#182e4d',
         padding: sidebarOpen ? '1.5rem' : '0',
         display: 'flex',
         flexDirection: 'column',
@@ -1669,7 +1670,7 @@ const EventsOfficeEventsView = () => {
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           padding: '1rem 2.5rem',
-          backgroundColor: '#1D3557',
+          backgroundColor: '#182e4d',
           position: 'fixed',
           top: 0,
           left: sidebarOpen ? '16rem' : '0',
@@ -1696,230 +1697,21 @@ const EventsOfficeEventsView = () => {
                 menu
               </span>
             </button>
-            <Link to="/event-office" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <h2 style={{
-                color: '#FFFFFF',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                lineHeight: '1.25',
-                margin: 0,
-                cursor: 'pointer'
-              }}>
-                Bindly
-              </h2>
+            <Link to="/event-office" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+              <img
+                src="/assets/images/bindly-logo.png"
+                alt="Bindly Logo"
+                style={{
+                  height: '3rem',
+                  width: 'auto',
+                  cursor: 'pointer',
+                  objectFit: 'contain'
+                }}
+              />
             </Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
-            {/* Notification Icon */}
-            <div 
-              data-notification-icon
-              onClick={() => setNotificationPanelOpen(!notificationPanelOpen)}
-              style={{ 
-                position: 'relative', 
-                cursor: 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ 
-                fontSize: '1.5rem', 
-                color: '#1D3557'
-              }}>
-                notifications
-              </span>
-              {unreadCount > 0 && (
-                <div style={{
-                  position: 'absolute',
-                  top: '0.25rem',
-                  right: '0.25rem',
-                  backgroundColor: '#ef4444',
-                  color: '#FFFFFF',
-                  borderRadius: '50%',
-                  width: '1.25rem',
-                  height: '1.25rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  border: '2px solid #FFFFFF'
-                }}>
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </div>
-              )}
-            </div>
-            
-            {/* Notification Panel */}
-            {notificationPanelOpen && (
-              <div 
-                data-notification-panel
-                style={{
-                  position: 'absolute',
-                  top: '3.5rem',
-                  right: '0',
-                  width: '24rem',
-                  maxHeight: '32rem',
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '0.5rem',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                  border: '1px solid #e2e8f0',
-                  zIndex: 1000,
-                  overflowY: 'auto',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }}
-              >
-                <div style={{
-                  padding: '1rem',
-                  borderBottom: '1px solid #e2e8f0',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <h3 style={{
-                    fontSize: '1rem',
-                    fontWeight: '600',
-                    color: '#1D3557',
-                    margin: 0
-                  }}>
-                    Notifications
-                  </h3>
-                  <button
-                    onClick={() => setNotificationPanelOpen(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '0.25rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#6b7280'
-                    }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>
-                      close
-                    </span>
-                  </button>
-                </div>
-                <div style={{ flex: 1, overflowY: 'auto' }}>
-                  {notifications && notifications.length > 0 ? (
-                    <ul style={{
-                      listStyle: 'none',
-                      padding: 0,
-                      margin: 0
-                    }}>
-                      {notifications.map((notif, idx) => (
-                        <li
-                          key={notif._id || notif.id || `notif-${idx}`}
-                          onClick={async () => {
-                            const notifId = notif._id || notif.id;
-                            if (!notif.isRead && notifId) {
-                              try {
-                                const token = localStorage.getItem('token');
-                                await axios.put(
-                                  `http://localhost:5000/api/notifications/${notifId}/read`,
-                                  {},
-                                  { headers: { Authorization: `Bearer ${token}` } }
-                                );
-                                setNotifications(prev => prev.map(n => 
-                                  (n._id === notifId || n.id === notifId) ? { ...n, isRead: true } : n
-                                ));
-                                setUnreadCount(prev => Math.max(0, prev - 1));
-                              } catch (err) {
-                                console.error('Error marking notification as read:', err);
-                              }
-                            }
-                          }}
-                          style={{
-                            padding: '1rem',
-                            borderBottom: '1px solid #f3f4f6',
-                            cursor: 'pointer',
-                            backgroundColor: !notif.isRead ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
-                            transition: 'background-color 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = !notif.isRead 
-                              ? 'rgba(59, 130, 246, 0.1)' 
-                              : 'rgba(0, 0, 0, 0.02)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = !notif.isRead 
-                              ? 'rgba(59, 130, 246, 0.05)' 
-                              : 'transparent';
-                          }}
-                        >
-                          <div style={{ display: 'flex', gap: '0.75rem' }}>
-                            <div style={{
-                              backgroundColor: !notif.isRead ? '#dbeafe' : '#e5e7eb',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '2.5rem',
-                              height: '2.5rem',
-                              borderRadius: '50%',
-                              flexShrink: 0
-                            }}>
-                              <span className="material-symbols-outlined" style={{
-                                fontSize: '1.25rem',
-                                color: !notif.isRead ? '#3b82f6' : '#6b7280'
-                              }}>
-                                {notif.type === 'workshop_submission' ? 'school' : 
-                                 notif.type === 'vendor_request' ? 'storefront' : 
-                                 notif.type === 'event_announcement' ? 'event' : 'notifications'}
-                              </span>
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{
-                                fontSize: '0.875rem',
-                                fontWeight: !notif.isRead ? '600' : '500',
-                                color: '#111827',
-                                margin: '0 0 0.25rem 0',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {notif.title || 'Notification'}
-                              </p>
-                              <p style={{
-                                fontSize: '0.75rem',
-                                color: '#6b7280',
-                                margin: 0,
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical'
-                              }}>
-                                {notif.message || ''}
-                              </p>
-                              <p style={{
-                                fontSize: '0.625rem',
-                                color: '#9ca3af',
-                                margin: '0.25rem 0 0 0'
-                              }}>
-                                {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
-                              </p>
-                            </div>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div style={{
-                      padding: '3rem 1rem',
-                      textAlign: 'center',
-                      color: '#6b7280',
-                      fontSize: '0.875rem'
-                    }}>
-                      No notifications
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            <EventsOfficeNotificationBell />
 
             <div style={{ textAlign: 'right' }}>
               <p style={{
@@ -2797,8 +2589,8 @@ const EventsOfficeEventsView = () => {
                         </div>
                       )}
 
-                                  {/* Capacity - Hide for platform booths as they don't have registrations */}
-                                  {event.capacity && event.type !== 'platformBooth' && (
+                                  {/* Capacity - Hide for platform booths and conferences as they don't have registrations */}
+                                  {event.capacity && event.type !== 'platformBooth' && event.type !== 'conference' && (
                                     <div>
                                       <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
                                         Capacity
@@ -2845,62 +2637,89 @@ const EventsOfficeEventsView = () => {
                                     </div>
                                   )}
 
-                                  {/* Budget (for conferences) */}
-                                  {event.type === 'conference' && event.budget && (
-                                    <div>
-                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Budget
-                                      </h4>
-                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {event.budget} EGP
-                                      </p>
-                                    </div>
-                                  )}
+                                  {/* Conference-specific fields - organized layout */}
+                                  {event.type === 'conference' && (
+                                    <>
+                                      {/* Budget and Funding Source in a row */}
+                                      {event.budget && (
+                                        <div>
+                                          <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                            Budget
+                                          </h4>
+                                          <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                            {event.budget} EGP
+                                          </p>
+                                        </div>
+                                      )}
 
-                                  {/* Funding Source (for conferences) */}
-                                  {event.type === 'conference' && event.fundingSource && (
-                                    <div>
-                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Funding Source
-                                      </h4>
-                                      <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                                        {event.fundingSource}
-                                      </p>
-                                    </div>
-                                  )}
+                                      {event.fundingSource && (
+                                        <div>
+                                          <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                            Funding Source
+                                          </h4>
+                                          <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                            {event.fundingSource}
+                                          </p>
+                                        </div>
+                                      )}
 
-                                  {/* Website (for conferences) */}
-                                  {event.type === 'conference' && event.website && (
-                                    <div>
-                                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                                        Website
-                                      </h4>
-                                      <a
-                                        href={event.website}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{
-                                          fontSize: '0.875rem',
-                                          color: '#137fec',
-                                          textDecoration: 'none'
-                                        }}
-                                      >
-                                        {event.website}
-                                      </a>
-                                    </div>
+                                      {/* Website */}
+                                      {event.website && (
+                                        <div>
+                                          <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                                            Website
+                                          </h4>
+                                          <a
+                                            href={event.website}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{
+                                              fontSize: '0.875rem',
+                                              color: '#137fec',
+                                              textDecoration: 'none'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.target.style.textDecoration = 'underline';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.target.style.textDecoration = 'none';
+                                            }}
+                                          >
+                                            {event.website}
+                                          </a>
+                                        </div>
+                                      )}
+                                    </>
                                   )}
                                 </div>
 
-                                {/* Agenda (for conferences) */}
-                                {event.type === 'conference' && event.agenda && (
-                                  <div>
-                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
-                                      Agenda
-                                    </h4>
-                                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, whiteSpace: 'pre-wrap' }}>
-                                      {event.agenda}
-                                    </p>
-                                  </div>
+                                {/* Conference-specific sections below the grid */}
+                                {event.type === 'conference' && (
+                                  <>
+                                    {/* Agenda */}
+                                    {event.agenda && (
+                                      <div>
+                                        <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
+                                          Agenda
+                                        </h4>
+                                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+                                          {event.agenda}
+                                        </p>
+                                      </div>
+                                    )}
+
+                                    {/* Extra Resources */}
+                                    {event.extraResources && (
+                                      <div>
+                                        <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
+                                          Extra Resources
+                                        </h4>
+                                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+                                          {event.extraResources}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
 
                                 {/* Participating Vendors (for bazaars and booths) */}
