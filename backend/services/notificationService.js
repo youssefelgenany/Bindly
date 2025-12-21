@@ -7,7 +7,7 @@ const Trip = require('../models/tripModel');
 const GymSession = require('../models/gymSessionModel');
 const User = require('../models/userModel');
 
-exports.createEventReminders = async () => {
+exports.createEventReminders = async (sendAllUpcoming = false) => {
   try {
     const now = new Date();
     
@@ -20,6 +20,94 @@ exports.createEventReminders = async () => {
     const oneHourBefore = new Date(now.getTime() + 58 * 60 * 1000);
     const oneHourAfter = new Date(now.getTime() + 62 * 60 * 1000);
     
+    // Immediate reminders: events starting within the next 30 minutes
+    const immediateBefore = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes ago (to catch events starting now)
+    const immediateAfter = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes from now
+    
+    let eventQueries, tripQueries, gymQueries;
+    
+    if (sendAllUpcoming) {
+      // Send reminders for ALL upcoming events (starting from now onwards)
+      console.log('📢 Sending reminders for ALL upcoming events...');
+      eventQueries = [
+        Event.find({
+          startDate: { $gte: now },
+          status: 'approved'
+        }),
+        Event.find({
+          startDate: { $gte: now },
+          status: 'approved'
+        }),
+        Event.find({
+          type: 'workshop',
+          startDate: { $gte: now },
+          status: 'approved'
+        }),
+        Event.find({
+          type: 'workshop',
+          startDate: { $gte: now },
+          status: 'approved'
+        })
+      ];
+      tripQueries = [
+        Trip.find({ startDate: { $gte: now } }),
+        Trip.find({ startDate: { $gte: now } })
+      ];
+      gymQueries = [
+        GymSession.find({ startDate: { $gte: now } }),
+        GymSession.find({ startDate: { $gte: now } })
+      ];
+    } else {
+      // Normal scheduled reminders
+      eventQueries = [
+        Event.find({
+          startDate: { $gte: oneDayBefore, $lte: oneDayAfter },
+          status: 'approved'
+        }),
+        Event.find({
+          startDate: { $gte: oneHourBefore, $lte: oneHourAfter },
+          status: 'approved'
+        }),
+        Event.find({
+          type: 'workshop',
+          startDate: { $gte: oneDayBefore, $lte: oneDayAfter },
+          status: 'approved'
+        }),
+        Event.find({
+          type: 'workshop',
+          startDate: { $gte: oneHourBefore, $lte: oneHourAfter },
+          status: 'approved'
+        })
+      ];
+      tripQueries = [
+        Trip.find({ startDate: { $gte: oneDayBefore, $lte: oneDayAfter } }),
+        Trip.find({ startDate: { $gte: oneHourBefore, $lte: oneHourAfter } })
+      ];
+      gymQueries = [
+        GymSession.find({ startDate: { $gte: oneDayBefore, $lte: oneDayAfter } }),
+        GymSession.find({ startDate: { $gte: oneHourBefore, $lte: oneHourAfter } })
+      ];
+    }
+    
+    // Also query for immediate reminders (events starting soon)
+    const immediateEventQueries = [
+      Event.find({
+        startDate: { $gte: immediateBefore, $lte: immediateAfter },
+        status: 'approved'
+      }),
+      Event.find({
+        type: 'workshop',
+        startDate: { $gte: immediateBefore, $lte: immediateAfter },
+        status: 'approved'
+      })
+    ];
+    const immediateTripQueries = [
+      Trip.find({ startDate: { $gte: immediateBefore, $lte: immediateAfter } })
+    ];
+    const immediateGymQueries = [
+      GymSession.find({ startDate: { $gte: immediateBefore, $lte: immediateAfter } })
+    ];
+    
     // Run all database queries in parallel for better performance
     const [
       eventsIn1Day,
@@ -29,38 +117,22 @@ exports.createEventReminders = async () => {
       tripsIn1Day,
       tripsIn1Hour,
       gymSessionsIn1Day,
-      gymSessionsIn1Hour
+      gymSessionsIn1Hour,
+      eventsImmediate,
+      workshopsImmediate,
+      tripsImmediate,
+      gymSessionsImmediate
     ] = await Promise.all([
-      Event.find({
-        startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
-      }),
-      Event.find({
-        startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
-      }),
-      Event.find({
-        type: 'workshop',
-        startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
-      }),
-      Event.find({
-        type: 'workshop',
-        startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
-      }),
-      Trip.find({
-        startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
-      }),
-      Trip.find({
-        startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
-      }),
-      GymSession.find({
-        startDate: { $gte: oneDayBefore, $lte: oneDayAfter }
-      }),
-      GymSession.find({
-        startDate: { $gte: oneHourBefore, $lte: oneHourAfter }
-      })
+      ...eventQueries,
+      ...tripQueries,
+      ...gymQueries,
+      ...immediateEventQueries,
+      ...immediateTripQueries,
+      ...immediateGymQueries
     ]);
     
     // Process all reminders in parallel since they're independent
-    await Promise.all([
+    const reminderPromises = [
       processEventReminders(eventsIn1Day, '1 day'),
       processEventReminders(eventsIn1Hour, '1 hour'),
       processWorkshopReminders(workshopsIn1Day, '1 day'),
@@ -68,8 +140,15 @@ exports.createEventReminders = async () => {
       processTripReminders(tripsIn1Day, '1 day'),
       processTripReminders(tripsIn1Hour, '1 hour'),
       processGymSessionReminders(gymSessionsIn1Day, '1 day'),
-      processGymSessionReminders(gymSessionsIn1Hour, '1 hour')
-    ]);
+      processGymSessionReminders(gymSessionsIn1Hour, '1 hour'),
+      // Immediate reminders
+      processEventReminders(eventsImmediate, 'soon'),
+      processWorkshopReminders(workshopsImmediate, 'soon'),
+      processTripReminders(tripsImmediate, 'soon'),
+      processGymSessionReminders(gymSessionsImmediate, 'soon')
+    ];
+    
+    await Promise.all(reminderPromises);
     
   } catch (error) {
     console.error('Error in createEventReminders:', error);
@@ -112,26 +191,27 @@ async function processEventReminders(events, timeframe) {
         
         if (!userId) continue; // Skip if no user found
         
-        // For workshops/trips, only send reminders for paid registrations if event has a price
-        if (event.price > 0 && registration.paid !== true) {
-          continue; // Skip unpaid registrations for paid events
+        // Special handling for "trip test 2" event: only send reminders to professors and staff
+        const isTripTest2 = event.type === 'trip' && event.title && event.title.toLowerCase().includes('trip test 2');
+        if (isTripTest2) {
+          const user = await User.findById(userId).select('userType');
+          if (user?.userType !== 'Professor' && user?.userType !== 'Staff') {
+            console.log(`  ⏭️  Skipping student registration reminder - "trip test 2" is only for professors and staff`);
+            continue;
+          }
         }
         
-        const existingNotification = await Notification.findOne({
-          type: 'event_reminder',
-          recipient: userId,
-          'metadata.timeframe': timeframe,
-          'metadata.eventId': event._id.toString()
-        });
+        // Send reminders to all registered users regardless of payment status
         
-        if (!existingNotification) {
+        try {
+          const timeframeText = timeframe === 'soon' ? 'soon' : timeframe;
           await Notification.create({
             recipient: userId,
             type: 'event_reminder',
-            title: `Reminder: ${event.title} starts in ${timeframe}`,
-            message: `The event "${event.title}" will start in ${timeframe} at ${event.location}`,
+            title: `Reminder: ${event.title} starts ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`}`,
+            message: `The event "${event.title}" will start ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`} at ${event.location}`,
             relatedEvent: event._id,
-            priority: timeframe === '1 hour' ? 'high' : 'medium',
+            priority: (timeframe === '1 hour' || timeframe === 'soon') ? 'high' : 'medium',
             metadata: {
               eventTitle: event.title,
               eventDate: event.startDate,
@@ -140,6 +220,13 @@ async function processEventReminders(events, timeframe) {
               eventId: event._id.toString()
             }
           });
+        } catch (error) {
+          // Handle duplicate key error gracefully
+          if (error.code === 11000) {
+            console.log(`  ⏭️  Duplicate notification skipped for event ${event._id} and user ${userId}`);
+          } else {
+            throw error;
+          }
         }
       }
       
@@ -156,21 +243,22 @@ async function processEventReminders(events, timeframe) {
         const userType = user?.userType || 'Unknown';
         console.log(`  👤 Processing registration for ${userType}: ${user?.email || userId}`);
         
-        const existingNotification = await Notification.findOne({
-          type: 'event_reminder',
-          recipient: userId,
-          'metadata.timeframe': timeframe,
-          'metadata.eventId': event._id.toString()
-        });
+        // Special handling for "trip test 2" event: only send reminders to professors and staff
+        const isTripTest2 = event.type === 'trip' && event.title && event.title.toLowerCase().includes('trip test 2');
+        if (isTripTest2 && userType !== 'Professor' && userType !== 'Staff') {
+          console.log(`  ⏭️  Skipping reminder for ${userType} - "trip test 2" is only for professors and staff`);
+          continue;
+        }
         
-        if (!existingNotification) {
+        try {
+          const timeframeText = timeframe === 'soon' ? 'soon' : timeframe;
           await Notification.create({
             recipient: userId,
             type: 'event_reminder',
-            title: `Reminder: ${event.title} starts in ${timeframe}`,
-            message: `The event "${event.title}" will start in ${timeframe} at ${event.location}`,
+            title: `Reminder: ${event.title} starts ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`}`,
+            message: `The event "${event.title}" will start ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`} at ${event.location}`,
             relatedEvent: event._id,
-            priority: timeframe === '1 hour' ? 'high' : 'medium',
+            priority: (timeframe === '1 hour' || timeframe === 'soon') ? 'high' : 'medium',
             metadata: {
               eventTitle: event.title,
               eventDate: event.startDate,
@@ -180,8 +268,13 @@ async function processEventReminders(events, timeframe) {
             }
           });
           console.log(`  ✅ Created ${timeframe} reminder notification for ${userType}: ${user?.email || userId}`);
-        } else {
-          console.log(`  ⏭️  Skipped duplicate notification for ${userType}: ${user?.email || userId}`);
+        } catch (error) {
+          // Handle duplicate key error gracefully
+          if (error.code === 11000) {
+            console.log(`  ⏭️  Duplicate notification skipped for event ${event._id} and user ${userId}`);
+          } else {
+            throw error;
+          }
         }
       }
     } catch (error) {
@@ -220,26 +313,17 @@ async function processWorkshopReminders(workshops, timeframe) {
         
         if (!userId) continue; // Skip if no user found
         
-        // For workshops with price, only send reminders for paid registrations
-        if (workshop.price > 0 && registration.paid !== true) {
-          continue; // Skip unpaid registrations for paid workshops
-        }
+        // Send reminders to all registered users regardless of payment status
         
-        const existingNotification = await Notification.findOne({
-          type: 'workshop_reminder',
-          recipient: userId,
-          'metadata.timeframe': timeframe,
-          'metadata.workshopId': workshop._id.toString()
-        });
-        
-        if (!existingNotification) {
+        try {
+          const timeframeText = timeframe === 'soon' ? 'soon' : timeframe;
           await Notification.create({
             recipient: userId,
             type: 'workshop_reminder',
-            title: `Reminder: ${workshop.title} starts in ${timeframe}`,
-            message: `The workshop "${workshop.title}" will start in ${timeframe} at ${workshop.location}`,
+            title: `Reminder: ${workshop.title} starts ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`}`,
+            message: `The workshop "${workshop.title}" will start ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`} at ${workshop.location}`,
             relatedEvent: workshop._id,
-            priority: timeframe === '1 hour' ? 'high' : 'medium',
+            priority: (timeframe === '1 hour' || timeframe === 'soon') ? 'high' : 'medium',
             metadata: {
               workshopName: workshop.title,
               workshopDate: workshop.startDate,
@@ -248,6 +332,13 @@ async function processWorkshopReminders(workshops, timeframe) {
               workshopId: workshop._id.toString()
             }
           });
+        } catch (error) {
+          // Handle duplicate key error gracefully
+          if (error.code === 11000) {
+            console.log(`  ⏭️  Duplicate notification skipped for workshop ${workshop._id} and user ${userId}`);
+          } else {
+            throw error;
+          }
         }
       }
       
@@ -264,21 +355,15 @@ async function processWorkshopReminders(workshops, timeframe) {
         const userType = user?.userType || 'Unknown';
         console.log(`  👤 Processing workshop registration for ${userType}: ${user?.email || userId}`);
         
-        const existingNotification = await Notification.findOne({
-          type: 'workshop_reminder',
-          recipient: userId,
-          'metadata.timeframe': timeframe,
-          'metadata.workshopId': workshop._id.toString()
-        });
-        
-        if (!existingNotification) {
+        try {
+          const timeframeText = timeframe === 'soon' ? 'soon' : timeframe;
           await Notification.create({
             recipient: userId,
             type: 'workshop_reminder',
-            title: `Reminder: ${workshop.title} starts in ${timeframe}`,
-            message: `The workshop "${workshop.title}" will start in ${timeframe} at ${workshop.location}`,
+            title: `Reminder: ${workshop.title} starts ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`}`,
+            message: `The workshop "${workshop.title}" will start ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`} at ${workshop.location}`,
             relatedEvent: workshop._id,
-            priority: timeframe === '1 hour' ? 'high' : 'medium',
+            priority: (timeframe === '1 hour' || timeframe === 'soon') ? 'high' : 'medium',
             metadata: {
               workshopName: workshop.title,
               workshopDate: workshop.startDate,
@@ -288,8 +373,13 @@ async function processWorkshopReminders(workshops, timeframe) {
             }
           });
           console.log(`  ✅ Created ${timeframe} workshop reminder notification for ${userType}: ${user?.email || userId}`);
-        } else {
-          console.log(`  ⏭️  Skipped duplicate workshop notification for ${userType}: ${user?.email || userId}`);
+        } catch (error) {
+          // Handle duplicate key error gracefully
+          if (error.code === 11000) {
+            console.log(`  ⏭️  Duplicate notification skipped for workshop ${workshop._id} and user ${userId}`);
+          } else {
+            throw error;
+          }
         }
       }
     } catch (error) {
@@ -328,25 +418,27 @@ async function processTripReminders(trips, timeframe) {
         
         if (!userId) continue; // Skip if no user found
         
-        // For trips with price, only send reminders for paid registrations
-        if (trip.price > 0 && registration.paid !== true) {
-          continue; // Skip unpaid registrations for paid trips
+        // Special handling for "trip test 2": only send reminders to professors and staff
+        const isTripTest2 = trip.name && trip.name.toLowerCase().includes('trip test 2');
+        if (isTripTest2) {
+          const user = await User.findById(userId).select('userType');
+          if (user?.userType !== 'Professor' && user?.userType !== 'Staff') {
+            console.log(`  ⏭️  Skipping student registration reminder - "trip test 2" is only for professors and staff`);
+            continue;
+          }
         }
         
-        const existingNotification = await Notification.findOne({
-          type: 'trip_reminder',
-          recipient: userId,
-          'metadata.timeframe': timeframe,
-          'metadata.tripId': trip._id.toString()
-        });
+        // Send reminders to all registered users regardless of payment status
         
-        if (!existingNotification) {
+        try {
+          const timeframeText = timeframe === 'soon' ? 'soon' : timeframe;
           await Notification.create({
             recipient: userId,
             type: 'trip_reminder',
-            title: `Reminder: ${trip.name} starts in ${timeframe}`,
-            message: `The trip "${trip.name}" will start in ${timeframe} at ${trip.location}`,
-            priority: timeframe === '1 hour' ? 'high' : 'medium',
+            title: `Reminder: ${trip.name} starts ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`}`,
+            message: `The trip "${trip.name}" will start ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`} at ${trip.location}`,
+            relatedEvent: trip._id, // Set relatedEvent even for Trip model for consistency
+            priority: (timeframe === '1 hour' || timeframe === 'soon') ? 'high' : 'medium',
             metadata: {
               tripName: trip.name,
               tripDate: trip.startDate,
@@ -355,6 +447,13 @@ async function processTripReminders(trips, timeframe) {
               tripId: trip._id.toString()
             }
           });
+        } catch (error) {
+          // Handle duplicate key error gracefully
+          if (error.code === 11000) {
+            console.log(`  ⏭️  Duplicate notification skipped for trip ${trip._id} and user ${userId}`);
+          } else {
+            throw error;
+          }
         }
       }
       
@@ -371,20 +470,22 @@ async function processTripReminders(trips, timeframe) {
         const userType = user?.userType || 'Unknown';
         console.log(`  👤 Processing trip registration for ${userType}: ${user?.email || userId}`);
         
-        const existingNotification = await Notification.findOne({
-          type: 'trip_reminder',
-          recipient: userId,
-          'metadata.timeframe': timeframe,
-          'metadata.tripId': trip._id.toString()
-        });
+        // Special handling for "trip test 2": only send reminders to professors and staff
+        const isTripTest2 = trip.name && trip.name.toLowerCase().includes('trip test 2');
+        if (isTripTest2 && userType !== 'Professor' && userType !== 'Staff') {
+          console.log(`  ⏭️  Skipping reminder for ${userType} - "trip test 2" is only for professors and staff`);
+          continue;
+        }
         
-        if (!existingNotification) {
+        try {
+          const timeframeText = timeframe === 'soon' ? 'soon' : timeframe;
           await Notification.create({
             recipient: userId,
             type: 'trip_reminder',
-            title: `Reminder: ${trip.name} starts in ${timeframe}`,
-            message: `The trip "${trip.name}" will start in ${timeframe} at ${trip.location}`,
-            priority: timeframe === '1 hour' ? 'high' : 'medium',
+            title: `Reminder: ${trip.name} starts ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`}`,
+            message: `The trip "${trip.name}" will start ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`} at ${trip.location}`,
+            relatedEvent: trip._id, // Set relatedEvent even for Trip model for consistency
+            priority: (timeframe === '1 hour' || timeframe === 'soon') ? 'high' : 'medium',
             metadata: {
               tripName: trip.name,
               tripDate: trip.startDate,
@@ -394,8 +495,13 @@ async function processTripReminders(trips, timeframe) {
             }
           });
           console.log(`  ✅ Created ${timeframe} trip reminder notification for ${userType}: ${user?.email || userId}`);
-        } else {
-          console.log(`  ⏭️  Skipped duplicate trip notification for ${userType}: ${user?.email || userId}`);
+        } catch (error) {
+          // Handle duplicate key error gracefully
+          if (error.code === 11000) {
+            console.log(`  ⏭️  Duplicate notification skipped for trip ${trip._id} and user ${userId}`);
+          } else {
+            throw error;
+          }
         }
       }
     } catch (error) {
@@ -417,27 +523,28 @@ async function processGymSessionReminders(gymSessions, timeframe) {
         const userId = registration.user;
         if (!userId) continue; // Skip if no user found
         
-        const existingNotification = await Notification.findOne({
-          type: 'gym_session_reminder',
-          recipient: userId,
-          'metadata.timeframe': timeframe,
-          'metadata.gymSessionId': gymSession._id.toString()
-        });
-        
-        if (!existingNotification) {
+        try {
+          const timeframeText = timeframe === 'soon' ? 'soon' : timeframe;
           await Notification.create({
             recipient: userId,
             type: 'gym_session_reminder',
-            title: `Reminder: Gym session starts in ${timeframe}`,
-            message: `Your gym session will start in ${timeframe}`,
+            title: `Reminder: Gym session starts ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`}`,
+            message: `Your gym session will start ${timeframeText === 'soon' ? 'soon' : `in ${timeframeText}`}`,
             relatedGymSession: gymSession._id,
-            priority: timeframe === '1 hour' ? 'high' : 'medium',
+            priority: (timeframe === '1 hour' || timeframe === 'soon') ? 'high' : 'medium',
             metadata: {
               gymSessionDate: gymSession.startDate,
               timeframe: timeframe,
               gymSessionId: gymSession._id.toString()
             }
           });
+        } catch (error) {
+          // Handle duplicate key error gracefully
+          if (error.code === 11000) {
+            console.log(`  ⏭️  Duplicate notification skipped for gym session ${gymSession._id} and user ${userId}`);
+          } else {
+            throw error;
+          }
         }
       }
     } catch (error) {

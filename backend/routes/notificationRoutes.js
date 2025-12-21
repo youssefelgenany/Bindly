@@ -12,5 +12,6 @@ router.put('/:notificationId/read', notificationController.markNotificationAsRea
 router.put('/mark-all-read', notificationController.markAllAsRead);
 router.delete('/:notificationId', notificationController.deleteNotification);
 router.post('/trigger-reminders', notificationController.triggerReminderJob);
+router.post('/send-dummy-trip-test2-reminder', notificationController.sendDummyTripTest2Reminder);
 
 module.exports = router;
