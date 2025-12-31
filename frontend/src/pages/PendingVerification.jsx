@@ -3,19 +3,42 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const PendingVerification = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already verified
+  // Handle redirects based on user state
   useEffect(() => {
-    if (user && user.isVerified && (user.status === 'active' || !user.status)) {
+    if (loading) return; // Wait for auth to finish loading
+    
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    
+    // Redirect if already verified
+    if (user.isVerified && (user.status === 'active' || !user.status)) {
       if (user.userType === 'Vendor') {
         navigate('/vendor');
       } else {
         navigate('/dashboard');
       }
     }
-  }, [user, navigate]);
+  }, [user, loading, navigate]);
+
+  // Show loading state while auth is initializing
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#fbfbfb'
+      }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
 
   return (
     <div style={{

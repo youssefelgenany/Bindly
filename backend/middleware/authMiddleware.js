@@ -44,6 +44,12 @@ const protect = async (req, res, next) => {
     };
     next();
   } catch (e) {
+    // Only log unexpected errors, not expired tokens (which are expected)
+    if (e.name === 'TokenExpiredError') {
+      // Expired tokens are expected - don't log as error
+      return res.status(401).json({ msg: 'Invalid/expired token' });
+    }
+    // Log other authentication errors
     console.error('auth error:', e);
     res.status(401).json({ msg: 'Invalid/expired token' });
   }
